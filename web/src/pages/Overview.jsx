@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useData, useStream } from '../api.js';
-import { Card, Empty, Icon, Page, Pill, Spark, Tile, Bar, fmt, Note } from '../ui.jsx';
+import { Card, Empty, Icon, Page, Pill, Spark, Trend, Tile, Bar, fmt, Note } from '../ui.jsx';
 import { go } from '../App.jsx';
 
 function Status({ title, tone, state, big, small, to }) {
@@ -69,8 +69,8 @@ export default function Overview() {
 
       <div className="row">
         <div className="grow">
-          <Card title="DNS queries" desc="Last minute, one bar per second">
-            <Spark values={st?.history || []} width={480} height={90} fluid />
+          <Card title="DNS queries" desc="The last minute, one point per second">
+            <Trend values={st?.history || []} unit="/s" series="Queries per second" height={110} empty="No queries in the last minute" />
             <div className="inline sec small">
               <span>{fmt.n(total)} queries in the last hour</span>
               <span>· average {fmt.d1(st?.avg_ms)} ms</span><span>· 95% under {fmt.d1(st?.p95_ms)} ms</span>

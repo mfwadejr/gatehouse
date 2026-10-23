@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { get, post, setInstallCode } from '../api.js';
-import { Button, Card, Field, Icon, Input, Note, Pill, Select, Bar, ToggleRow } from '../ui.jsx';
+import { Button, Card, Field, Icon, Input, Note, Pill, Segmented, Select, Bar, ToggleRow } from '../ui.jsx';
 
 const gb = (n) => `${Math.round(n / 1e9)} GB`;
 
@@ -164,15 +164,22 @@ function NetworkStep({ f, setF, onBack, onNext }) {
       {lanPort && others.length > 0 && (
         <>
           <h2 className="h3">Other ports</h2>
-          <p className="small muted">Left unused unless you choose. You can set each one up individually later.</p>
-          <div className="list">
-            {others.map((p) => (
-              <div className="item" key={p.name}>
-                <div><div className="name">{p.name}{p.usb ? ' (USB adapter)' : ''}</div><div className="meta">{p.link ? 'cable connected' : 'no cable'}</div></div>
-                <Select value={n.bridge.includes(p.name) ? 'bridge' : 'unused'} onChange={(v) => setNet((m) => ({ ...m, bridge: v === 'bridge' ? [...m.bridge.filter((b) => b !== p.name), p.name] : m.bridge.filter((b) => b !== p.name) }))}
-                  options={[{ value: 'unused', label: 'Not used' }, { value: 'bridge', label: 'Join the LAN (acts like a switch port)' }]} />
-              </div>
-            ))}
+          <p className="small muted">These ports are switched off unless you choose. Joining the LAN makes a port work like another socket on a switch, on the same network as your LAN port. You can set any of them up differently later.</p>
+          <div className="portlist">
+            {others.map((p) => {
+              const joined = n.bridge.includes(p.name);
+              return (
+                <div className="portrow" key={p.name}>
+                  <div className="pid">
+                    <span className="name mono">{p.name}</span>
+                    <span className="small muted">{p.usb ? 'USB adapter' : 'Built-in port'}{p.mac ? ` · ${p.mac}` : ''}</span>
+                  </div>
+                  <div className="pstat"><span className={`dot ${p.link ? '' : 'off'}`} />{p.link ? `Cable connected${p.speed ? `, ${p.speed} Mb/s` : ''}` : 'No cable'}</div>
+                  <Segmented value={joined ? 'bridge' : 'unused'} onChange={(v) => setNet((m) => ({ ...m, bridge: v === 'bridge' ? [...m.bridge.filter((b) => b !== p.name), p.name] : m.bridge.filter((b) => b !== p.name) }))}
+                    options={[{ value: 'unused', label: 'Not used' }, { value: 'bridge', label: 'Join the LAN' }]} />
+                </div>
+              );
+            })}
           </div>
         </>
       )}

@@ -159,21 +159,44 @@ export function Problems({ list }) {
   );
 }
 
-export function Spark({ values = [], width = 88, height = 30, area = true, tone = '', fluid = false }) {
+export function Spark({ values = [], width = 88, height = 30, area = true, tone = '', fluid = false, ceil }) {
   const path = useMemo(() => {
     if (values.length < 2) return null;
-    const max = Math.max(...values, 1), min = Math.min(...values, 0);
+    const max = ceil || Math.max(...values, 1), min = Math.min(...values, 0);
     const span = max - min || 1;
     const pts = values.map((v, i) => [(i / (values.length - 1)) * width, height - 2 - ((v - min) / span) * (height - 4)]);
     const line = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ');
     return { line, area: `${line} L${width} ${height} L0 ${height} Z` };
-  }, [values, width, height]);
+  }, [values, width, height, ceil]);
+  const idle = !values.some((v) => v > 0);
   return (
-    <svg className={`spark ${tone} ${fluid ? 'fluid' : ''}`} {...(fluid ? {} : { width, height })} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio={fluid ? 'none' : undefined} aria-hidden="true">
+    <svg className={`spark ${tone} ${fluid ? 'fluid' : ''} ${idle ? 'idle' : ''}`} {...(fluid ? {} : { width, height })} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio={fluid ? 'none' : undefined} aria-hidden="true">
       <line className="gridline" x1="0" x2={width} y1={height - 0.5} y2={height - 0.5} />
       {path && area && <path className="area" d={path.area} />}
       {path && <path className="line" d={path.line} />}
     </svg>
+  );
+}
+
+// A labelled chart: a scale on the left, time along the bottom, and a legend saying what the
+// line is, so an empty or flat chart still reads as "nothing happened" rather than "broken".
+export function Trend({ values = [], unit = '', series = '', seconds = 60, height = 90, empty = 'Nothing in this period' }) {
+  const peak = Math.max(0, ...values);
+  const top = peak === 0 ? 1 : peak < 10 ? Math.ceil(peak * 10) / 10 : Math.ceil(peak);
+  const label = (n) => `${n % 1 ? n.toFixed(1) : n}${unit}`;
+  return (
+    <figure className="trend-chart">
+      <div className="tc-body">
+        <div className="tc-y" aria-hidden="true"><span>{label(top)}</span><span>{label(top / 2)}</span><span>0</span></div>
+        <div className="tc-plot" style={{ height }}>
+          <div className="tc-grid" aria-hidden="true"><i /><i /><i /></div>
+          <Spark values={values} width={320} height={height} fluid ceil={top} />
+          {peak === 0 && <span className="tc-empty">{empty}</span>}
+        </div>
+      </div>
+      <div className="tc-x small muted" aria-hidden="true"><span>{seconds} s ago</span><span>{seconds / 2} s</span><span>now</span></div>
+      {series && <figcaption className="tc-legend small muted"><span className="swatch" />{series}</figcaption>}
+    </figure>
   );
 }
 

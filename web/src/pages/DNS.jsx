@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { del, get, patch, post, put, useData, useStream } from '../api.js';
-import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Select, Spark, Tabs, ToggleRow, useAction, fmt, Bar } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Select, Spark, Trend, Tabs, ToggleRow, useAction, fmt, Bar } from '../ui.jsx';
 
 function Overview() {
   const { data, setData } = useData('/api/dns/summary', { every: 10000 });
@@ -9,10 +9,16 @@ function Overview() {
   const [run] = useAction();
   const [add, setAdd] = useState(false);
   const st = data?.stats;
+  const hist = st?.history || [];
+  const peak = Math.max(0, ...hist);
   return (
     <>
       <section className="grid">
-        <div className="card tile"><span className="lbl">Queries per second</span><div className="line"><div><span className="val">{fmt.d1(st?.qps)}</span></div><Spark values={st?.history || []} /></div></div>
+        <div className="card tile trend">
+          <span className="lbl">Queries per second</span>
+          <div className="line"><span className="val">{fmt.d1(st?.qps)}</span><span className="small muted">{peak > 0 ? `peak ${fmt.d1(peak)} a second` : ''}</span></div>
+          <Trend values={hist} unit="/s" series="Queries per second" height={72} empty="No queries in the last minute" />
+        </div>
         <div className="card tile"><span className="lbl">Blocked</span><div><span className="val">{fmt.d1(st?.blocked_pct)}</span><span className="unit">%</span></div><span className="foot">{fmt.n(data?.blocked_entries)} names on your lists</span></div>
         <div className="card tile"><span className="lbl">Answered from memory</span><div><span className="val">{fmt.d1(st?.cached_pct)}</span><span className="unit">%</span></div><span className="foot">{fmt.n(st?.cache_size)} saved answers</span></div>
         <div className="card tile"><span className="lbl">Response time</span><div><span className="val">{fmt.d1(st?.avg_ms)}</span><span className="unit">ms</span></div><span className="foot">95% under {fmt.d1(st?.p95_ms)} ms</span></div>
