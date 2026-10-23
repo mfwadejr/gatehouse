@@ -79,6 +79,29 @@ func (c *compiler) clientIfaces() []string {
 	return out
 }
 
+// dnsEnforced splits the networks that must use the enforced DNS server. Networks without
+// internet access always use this router's resolver, since the chosen server may be out of reach.
+func (c *compiler) dnsEnforced() (local, remote []string, target net.IP) {
+	if !c.m.DNSRedirect {
+		return
+	}
+	target = net.ParseIP(c.m.DNSTarget)
+	if target != nil && target.To4() == nil {
+		target = nil // only IPv4 servers can be targeted; see Validate
+	}
+	for _, z := range c.m.Zones {
+		if z.Kind == KindWan || !z.DNSForce {
+			continue
+		}
+		if target != nil && z.Internet {
+			remote = append(remote, z.Ifaces...)
+		} else {
+			local = append(local, z.Ifaces...)
+		}
+	}
+	return
+}
+
 func portList(ports []int) string {
 	s := make([]string, len(ports))
 	for i, p := range ports {
@@ -196,7 +219,14 @@ func (c *compiler) forward() {
 	c.line(2, "ct state { established, related } accept")
 	wan := m.WanIfaces()
 	if m.BlockDoT && len(wan) > 0 {
-		c.line(2, "iifname %s oifname %s tcp dport 853 counter drop comment \"block dns-over-tls bypass\"", ifSet(c.clientIfaces()), ifSet(wan))
+		lo, re, _ := c.dnsEnforced()
+		if forced := append(append([]string(nil), lo...), re...); len(forced) > 0 {
+			c.line(2, "iifname %s oifname %s tcp dport 853 counter drop comment \"block dns-over-tls bypass\"", ifSet(forced), ifSet(wan))
+			c.line(2, "iifname %s oifname %s udp dport 853 counter drop comment \"block dns-over-quic bypass\"", ifSet(forced), ifSet(wan))
+		}
+	}
+	if _, re, t := c.dnsEnforced(); len(re) > 0 {
+		c.line(2, "iifname %s ip daddr %s meta l4proto { tcp, udp } th dport 53 ct status dnat accept comment \"enforced dns server\"", ifSet(re), t.To4())
 	}
 	if len(m.Forwards) > 0 {
 		c.line(2, "ct status dnat accept comment \"port forwards\"")
@@ -342,14 +372,24 @@ func setLit(v []string) string {
 func (c *compiler) nat() {
 	m := c.m
 	wan := m.WanIfaces()
-	redirect := m.DNSRedirect && len(c.clientIfaces()) > 0
+	dlocal, dremote, dtarget := c.dnsEnforced()
+	redirect := len(dlocal)+len(dremote) > 0
 	if !redirect && len(m.Forwards) == 0 && len(wan) == 0 {
 		return
 	}
 	c.line(1, "chain prerouting {")
 	c.line(2, "type nat hook prerouting priority dstnat; policy accept;")
 	if redirect {
-		c.line(2, "iifname %s meta l4proto { tcp, udp } th dport 53 redirect to :53 comment \"dns enforcement\"", ifSet(c.clientIfaces()))
+		if len(dlocal) > 0 {
+			c.line(2, "iifname %s meta l4proto { tcp, udp } th dport 53 redirect to :53 comment \"dns enforcement\"", ifSet(dlocal))
+		}
+		if len(dremote) > 0 {
+			// The chosen server itself is left alone so it can still ask the internet.
+			c.line(2, "iifname %s meta nfproto ipv4 ip saddr != %s ip daddr != %s meta l4proto { tcp, udp } th dport 53 counter dnat ip to %s:53 comment \"dns enforcement\"",
+				ifSet(dremote), dtarget.To4(), dtarget.To4(), dtarget.To4())
+			// A server that only speaks IPv4 cannot take IPv6 questions, so those go to this router.
+			c.line(2, "iifname %s meta nfproto ipv6 meta l4proto { tcp, udp } th dport 53 redirect to :53 comment \"dns enforcement (ipv6)\"", ifSet(dremote))
+		}
 	}
 	for _, f := range m.Forwards {
 		if !f.Enabled {
@@ -362,24 +402,37 @@ func (c *compiler) nat() {
 		if len(in) == 0 {
 			continue
 		}
-		port := f.IntPort
-		if port == "" {
-			port = f.ExtPort
-		}
 		ip := net.ParseIP(f.IntAddr)
+		// With no internal port the destination port is left alone, which also keeps a range
+		// of ports mapped one to one.
 		var target string
-		if ip.To4() != nil {
-			target = fmt.Sprintf("dnat ip to %s:%s", ip.To4(), strings.ReplaceAll(port, "-", "-"))
-		} else {
-			target = fmt.Sprintf("dnat ip6 to [%s]:%s", ip, port)
+		switch {
+		case ip.To4() != nil && f.IntPort == "":
+			target = fmt.Sprintf("dnat ip to %s", ip.To4())
+		case ip.To4() != nil:
+			target = fmt.Sprintf("dnat ip to %s:%s", ip.To4(), f.IntPort)
+		case f.IntPort == "":
+			target = fmt.Sprintf("dnat ip6 to %s", ip)
+		default:
+			target = fmt.Sprintf("dnat ip6 to [%s]:%s", ip, f.IntPort)
 		}
 		c.line(2, "iifname %s %s dport %s counter %s comment %s", ifSet(in), f.Proto, f.ExtPort, target, q("forward:"+f.Name))
+		// Hairpin: a device inside asking for the router's public address reaches the same
+		// server. Only public destinations that belong to the router qualify.
+		if hp := c.clientIfaces(); len(hp) > 0 && ip.To4() != nil {
+			c.line(2, "iifname %s fib daddr type local ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10, 127.0.0.0/8 } %s dport %s counter %s comment %s",
+				ifSet(hp), f.Proto, f.ExtPort, target, q("hairpin:"+f.Name))
+		}
 	}
 	c.line(1, "}")
 	if len(wan) > 0 {
 		c.line(1, "chain postrouting {")
 		c.line(2, "type nat hook postrouting priority srcnat; policy accept;")
 		c.line(2, "meta nfproto ipv4 oifname %s masquerade", ifSet(wan))
+		if hp := c.clientIfaces(); len(hp) > 0 && len(m.Forwards) > 0 {
+			// Replies to a hairpinned connection must come back through the router.
+			c.line(2, "ct status dnat meta nfproto ipv4 iifname %s oifname %s masquerade comment \"hairpin\"", ifSet(hp), ifSet(hp))
+		}
 		c.line(1, "}")
 	}
 }

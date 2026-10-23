@@ -28,6 +28,7 @@ type Zone struct {
 	IntraAllow  bool   // devices inside the zone may reach each other through the router
 	Gateway     bool   // this box is the gateway and NATs for it; false when another router is
 	SSH         bool   // allow SSH to the router from this zone
+	DNSForce    bool   // devices here cannot use any DNS server except the enforced one
 	Description string // shown in the console
 }
 
@@ -68,6 +69,9 @@ type Model struct {
 	ConsolePorts []int
 	// DNSRedirect sends port 53 from client networks to the router's own resolver.
 	DNSRedirect bool
+	// DNSTarget is where forced DNS goes: empty for this router's own resolver, otherwise the
+	// address of the server the administrator chose.
+	DNSTarget string
 	// BlockDoT drops DNS-over-TLS (port 853) toward the internet so clients cannot bypass filtering.
 	BlockDoT bool
 	// LogDrops writes dropped packets to the event log (rate limited).

@@ -39,7 +39,8 @@ func TestCompileShape(t *testing.T) {
 		`iifname { "eth3", "eth3.20" } oifname "eth1" ip daddr 192.168.1.9 tcp dport 554`,
 		"redirect to :53",
 		"tcp dport 853 counter drop",
-		`dnat ip to 192.168.1.20:443`,
+		"dnat ip to 192.168.1.20 comment",
+		"hairpin:",
 		"meta nfproto ipv4 oifname \"eth0\" masquerade",
 	} {
 		if !strings.Contains(out, want) {

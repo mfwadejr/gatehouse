@@ -149,14 +149,21 @@ func (a *App) registerFWRoutes() {
 	})
 	s.HandleAdmin("PUT /api/fw/settings", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		var in struct {
-			DNSRedirect bool `json:"dns_redirect"`
-			BlockDoT    bool `json:"block_dot"`
-			LogDrops    bool `json:"log_drops"`
-			StepUp      bool `json:"step_up"`
+			DNSRedirect bool   `json:"dns_redirect"`
+			DNSTarget   string `json:"dns_target"`
+			BlockDoT    bool   `json:"block_dot"`
+			LogDrops    bool   `json:"log_drops"`
+			StepUp      bool   `json:"step_up"`
 		}
 		if !api.Decode(w, r, &in) {
 			return
 		}
+		in.DNSTarget = strings.TrimSpace(in.DNSTarget)
+		if ip := net.ParseIP(in.DNSTarget); in.DNSTarget != "" && (ip == nil || ip.To4() == nil || ip.IsLoopback() || ip.IsUnspecified() || ip.IsMulticast()) {
+			fail(w, errors.New("Enter the DNS server as an IPv4 address such as 192.168.1.2, or leave it empty to use Gatehouse."))
+			return
+		}
+		a.Config.SetSetting("fw.dns_target", in.DNSTarget)
 		b := func(v bool) string { return strconv.Itoa(b2i(v)) }
 		for k, v := range map[string]string{"fw.dns_redirect": b(in.DNSRedirect), "fw.block_dot": b(in.BlockDoT), "fw.log_drops": b(in.LogDrops), "fw.stepup": b(in.StepUp)} {
 			a.Config.SetSetting(k, v)
@@ -256,9 +263,10 @@ func (a *App) fwOverview(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 	}
 	zones, _ := fw.Zones(a.Config)
 	out["zones"] = zones
-	out["settings"] = map[string]bool{
+	out["settings"] = map[string]any{
 		"dns_redirect": m.DNSRedirect, "block_dot": m.BlockDoT, "log_drops": m.LogDrops,
-		"step_up": a.Config.Setting("fw.stepup", "1") == "1",
+		"dns_target": m.DNSTarget,
+		"step_up":    a.Config.Setting("fw.stepup", "1") == "1",
 	}
 	api.JSON(w, 200, out)
 }

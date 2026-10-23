@@ -239,4 +239,35 @@ CREATE TABLE upnp_allow(
   mac TEXT PRIMARY KEY,
   note TEXT NOT NULL DEFAULT ''
 );
+`, `
+CREATE TABLE vpn_wg(
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  mode TEXT NOT NULL DEFAULT 'server',
+  listen_port INTEGER NOT NULL DEFAULT 51820,
+  address TEXT NOT NULL,
+  private_key TEXT NOT NULL,
+  public_key TEXT NOT NULL,
+  endpoint_host TEXT NOT NULL DEFAULT '',
+  dns TEXT NOT NULL DEFAULT '',
+  mtu INTEGER NOT NULL DEFAULT 0,
+  enabled INTEGER NOT NULL DEFAULT 1
+);
+CREATE TABLE vpn_wg_peers(
+  id INTEGER PRIMARY KEY,
+  wg_id INTEGER NOT NULL REFERENCES vpn_wg(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  public_key TEXT NOT NULL,
+  psk TEXT NOT NULL DEFAULT '',
+  address TEXT NOT NULL DEFAULT '',
+  allowed_ips TEXT NOT NULL DEFAULT '',
+  endpoint TEXT NOT NULL DEFAULT '',
+  keepalive INTEGER NOT NULL DEFAULT 25,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL DEFAULT 0,
+  UNIQUE(wg_id, name),
+  UNIQUE(wg_id, public_key)
+);
+`, `
+ALTER TABLE zones ADD COLUMN dns_force INTEGER NOT NULL DEFAULT 1;
 `}

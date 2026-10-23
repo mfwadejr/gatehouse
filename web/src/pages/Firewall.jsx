@@ -4,7 +4,7 @@ import ApplyBar from '../ApplyBar.jsx';
 import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Problems, Select, Tabs, ToggleRow, useAction, fmt } from '../ui.jsx';
 
 function ZoneForm({ initial, presets, ifaces, taken, onClose, onSaved }) {
-  const [z, setZ] = useState({ kind: 'trusted', name: '', ifaces: [], internet: true, management: true, intra_allow: true, gateway: true, upnp: false, ssh: false, description: '', ...initial });
+  const [z, setZ] = useState({ kind: 'trusted', name: '', ifaces: [], internet: true, management: true, intra_allow: true, gateway: true, upnp: false, ssh: false, dns_force: true, description: '', ...initial });
   const [run, busy] = useAction();
   const set = (k) => (v) => setZ((x) => ({ ...x, [k]: v }));
   const pick = (p) => setZ((x) => ({ ...x, kind: p.kind, internet: p.internet, intra_allow: p.intra_allow, management: p.management }));
@@ -38,6 +38,7 @@ function ZoneForm({ initial, presets, ifaces, taken, onClose, onSaved }) {
       <ToggleRow title="Devices here can talk to each other" checked={z.intra_allow} onChange={set('intra_allow')} />
       <ToggleRow title="Can manage Gatehouse" desc="Allows the console from this network." checked={z.management} onChange={set('management')} />
       <ToggleRow title="Gatehouse is the gateway" desc="Off if another router on this network does that job." checked={z.gateway} onChange={set('gateway')} />
+      <ToggleRow title="Make devices here use the enforced DNS server" desc="Catches gadgets with a DNS server built in, such as smart TVs and cameras. Turn off for a network that needs its own DNS." checked={z.dns_force} onChange={set('dns_force')} />
       <ToggleRow title="Allow remote login (SSH)" checked={z.ssh} onChange={set('ssh')} />
       <ToggleRow title="Let devices open ports automatically (UPnP)" desc="Convenient for games and cameras, but widens exposure. Off is safer." checked={z.upnp} onChange={set('upnp')} />
     </Modal>
@@ -206,6 +207,24 @@ function Forwards({ reload }) {
   );
 }
 
+function DnsTarget({ s, save }) {
+  const [mode, setMode] = useState(s.dns_target ? 'custom' : 'self');
+  const [addr, setAddr] = useState(s.dns_target || '');
+  const choose = (v) => { setMode(v); if (v === 'self') { setAddr(''); if (s.dns_target) save(''); } };
+  return (
+    <div className="stack">
+      <Field label="Send forced DNS to">
+        <Select value={mode} onChange={choose} options={[{ value: 'self', label: 'Gatehouse (recommended)' }, { value: 'custom', label: 'A different DNS server' }]} />
+      </Field>
+      {mode === 'custom' && (
+        <Field label="DNS server address" hint="For example your Pi-hole. That server's own lookups are not redirected. Networks without internet access still use Gatehouse.">
+          <Input value={addr} onChange={setAddr} onBlur={() => addr.trim() && addr.trim() !== s.dns_target && save(addr.trim())} placeholder="192.168.1.2" />
+        </Field>
+      )}
+    </div>
+  );
+}
+
 function Protection({ ov, reload }) {
   const s = ov?.settings;
   const [run] = useAction();
@@ -213,7 +232,8 @@ function Protection({ ov, reload }) {
   const save = (k) => (v) => run(() => put('/api/fw/settings', { ...s, [k]: v })).then(reload);
   return (
     <Card title="Protection" desc="Extra safeguards that apply to every network.">
-      <ToggleRow title="Make every device use Gatehouse for DNS" desc="Devices with their own DNS server settings are quietly redirected, so your filters cannot be bypassed." checked={s.dns_redirect} onChange={save('dns_redirect')} />
+      <ToggleRow title="Force every device to use one DNS server" desc="Devices with their own DNS server built in (smart TVs, cameras, IoT gadgets) are quietly redirected, so your filters cannot be bypassed. You can exclude a network when you edit it." checked={s.dns_redirect} onChange={save('dns_redirect')} />
+      {s.dns_redirect && <DnsTarget s={s} save={save('dns_target')} />}
       <ToggleRow title="Block encrypted DNS to other servers" desc="Stops devices bypassing your filters with DNS-over-TLS." checked={s.block_dot} onChange={save('block_dot')} />
       <ToggleRow title="Ask for a code before changing the firewall" desc="Requires your authenticator code to apply network changes." checked={s.step_up} onChange={save('step_up')} />
       <ToggleRow title="Log blocked traffic" desc="Useful when troubleshooting. Uses more disk space." checked={s.log_drops} onChange={save('log_drops')} />

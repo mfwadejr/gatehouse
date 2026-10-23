@@ -58,9 +58,10 @@ func Load(db Queryer) (*Model, error) {
 	m := &Model{Groups: map[string][]string{}, ConsolePorts: append([]int(nil), DefaultConsolePorts...)}
 	m.DNSRedirect = setting(db, "fw.dns_redirect", "1") == "1"
 	m.BlockDoT = setting(db, "fw.block_dot", "1") == "1"
+	m.DNSTarget = strings.TrimSpace(setting(db, "fw.dns_target", ""))
 	m.LogDrops = setting(db, "fw.log_drops", "0") == "1"
 
-	rows, err := db.Query(`SELECT id,name,kind,gateway_mode,intra_allow,management,upnp,internet,ssh,description FROM zones ORDER BY id`)
+	rows, err := db.Query(`SELECT id,name,kind,gateway_mode,intra_allow,management,upnp,internet,ssh,dns_force,description FROM zones ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -69,12 +70,13 @@ func Load(db Queryer) (*Model, error) {
 		var z Zone
 		var id int64
 		var gw string
-		var intra, mgmt, upnp, inet, ssh int
-		if err := rows.Scan(&id, &z.Name, &z.Kind, &gw, &intra, &mgmt, &upnp, &inet, &ssh, &z.Description); err != nil {
+		var intra, mgmt, upnp, inet, ssh, dnsf int
+		if err := rows.Scan(&id, &z.Name, &z.Kind, &gw, &intra, &mgmt, &upnp, &inet, &ssh, &dnsf, &z.Description); err != nil {
 			rows.Close()
 			return nil, err
 		}
 		z.Gateway, z.IntraAllow, z.Management, z.UPnP, z.Internet, z.SSH = gw == "gateway", intra == 1, mgmt == 1, upnp == 1, inet == 1, ssh == 1
+		z.DNSForce = dnsf == 1
 		byID[id] = len(m.Zones)
 		m.Zones = append(m.Zones, z)
 	}

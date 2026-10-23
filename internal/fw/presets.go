@@ -30,6 +30,7 @@ func ApplyPreset(z *Zone) {
 		}
 	}
 	z.Gateway = true
+	z.DNSForce = true
 }
 
 // DefaultModel is what the installer starts from: one trusted network, one internet connection.

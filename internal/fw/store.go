@@ -41,6 +41,7 @@ type ZoneRow struct {
 	IntraAllow  bool     `json:"intra_allow"`
 	Gateway     bool     `json:"gateway"`
 	SSH         bool     `json:"ssh"`
+	DNSForce    bool     `json:"dns_force"`
 	Description string   `json:"description"`
 }
 
@@ -53,7 +54,7 @@ func b2i(b bool) int {
 
 // Zones lists the stored (non-WAN) networks.
 func Zones(db Queryer) ([]ZoneRow, error) {
-	rows, err := db.Query(`SELECT id,name,kind,gateway_mode,intra_allow,management,upnp,internet,ssh,description FROM zones ORDER BY id`)
+	rows, err := db.Query(`SELECT id,name,kind,gateway_mode,intra_allow,management,upnp,internet,ssh,dns_force,description FROM zones ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -61,12 +62,13 @@ func Zones(db Queryer) ([]ZoneRow, error) {
 	for rows.Next() {
 		var z ZoneRow
 		var gw string
-		var intra, mgmt, upnp, inet, ssh int
-		if err := rows.Scan(&z.ID, &z.Name, &z.Kind, &gw, &intra, &mgmt, &upnp, &inet, &ssh, &z.Description); err != nil {
+		var intra, mgmt, upnp, inet, ssh, dnsf int
+		if err := rows.Scan(&z.ID, &z.Name, &z.Kind, &gw, &intra, &mgmt, &upnp, &inet, &ssh, &dnsf, &z.Description); err != nil {
 			rows.Close()
 			return nil, err
 		}
 		z.Gateway, z.IntraAllow, z.Management, z.UPnP, z.Internet, z.SSH = gw == "gateway", intra == 1, mgmt == 1, upnp == 1, inet == 1, ssh == 1
+		z.DNSForce = dnsf == 1
 		z.Ifaces = []string{}
 		out = append(out, z)
 	}
@@ -97,8 +99,8 @@ func SaveZone(tx *sql.Tx, z ZoneRow) (int64, error) {
 		gw = "gateway"
 	}
 	if z.ID == 0 {
-		res, err := tx.Exec(`INSERT INTO zones(name,kind,gateway_mode,intra_allow,management,upnp,internet,ssh,description) VALUES(?,?,?,?,?,?,?,?,?)`,
-			z.Name, z.Kind, gw, b2i(z.IntraAllow), b2i(z.Management), b2i(z.UPnP), b2i(z.Internet), b2i(z.SSH), z.Description)
+		res, err := tx.Exec(`INSERT INTO zones(name,kind,gateway_mode,intra_allow,management,upnp,internet,ssh,dns_force,description) VALUES(?,?,?,?,?,?,?,?,?,?)`,
+			z.Name, z.Kind, gw, b2i(z.IntraAllow), b2i(z.Management), b2i(z.UPnP), b2i(z.Internet), b2i(z.SSH), b2i(z.DNSForce), z.Description)
 		if err != nil {
 			if strings.Contains(err.Error(), "UNIQUE") {
 				return 0, errors.New("a network with that name already exists")
@@ -109,8 +111,8 @@ func SaveZone(tx *sql.Tx, z ZoneRow) (int64, error) {
 	} else {
 		var old string
 		tx.QueryRow(`SELECT name FROM zones WHERE id=?`, z.ID).Scan(&old)
-		if _, err := tx.Exec(`UPDATE zones SET name=?,kind=?,gateway_mode=?,intra_allow=?,management=?,upnp=?,internet=?,ssh=?,description=? WHERE id=?`,
-			z.Name, z.Kind, gw, b2i(z.IntraAllow), b2i(z.Management), b2i(z.UPnP), b2i(z.Internet), b2i(z.SSH), z.Description, z.ID); err != nil {
+		if _, err := tx.Exec(`UPDATE zones SET name=?,kind=?,gateway_mode=?,intra_allow=?,management=?,upnp=?,internet=?,ssh=?,dns_force=?,description=? WHERE id=?`,
+			z.Name, z.Kind, gw, b2i(z.IntraAllow), b2i(z.Management), b2i(z.UPnP), b2i(z.Internet), b2i(z.SSH), b2i(z.DNSForce), z.Description, z.ID); err != nil {
 			if strings.Contains(err.Error(), "UNIQUE") {
 				return 0, errors.New("a network with that name already exists")
 			}

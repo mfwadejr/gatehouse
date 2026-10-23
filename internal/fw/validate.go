@@ -182,6 +182,13 @@ func (m *Model) Validate() error {
 			add("rule %q: rate limit is out of range", r.Name)
 		}
 	}
+	if m.DNSTarget != "" {
+		if ip := net.ParseIP(m.DNSTarget); ip == nil || ip.To4() == nil {
+			add("the DNS server to enforce must be an IPv4 address, not %q", m.DNSTarget)
+		} else if ip.IsLoopback() || ip.IsUnspecified() || ip.IsMulticast() {
+			add("%s cannot be used as the DNS server", m.DNSTarget)
+		}
+	}
 	for _, f := range m.Forwards {
 		if !reName.MatchString(f.Name) {
 			add("forward name %q is not allowed", f.Name)
@@ -195,6 +202,13 @@ func (m *Model) Validate() error {
 		if f.IntPort != "" {
 			if _, _, err := parsePortRange(f.IntPort); err != nil {
 				add("forward %q: %v", f.Name, err)
+			} else if el, eh, e2 := parsePortRange(f.ExtPort); e2 == nil {
+				il, ih, _ := parsePortRange(f.IntPort)
+				if eh != el && (el != il || eh != ih) {
+					add("forward %q: a range of ports must keep the same numbers inside; leave the inside port empty", f.Name)
+				} else if eh == el && ih != il {
+					add("forward %q: one outside port needs one inside port", f.Name)
+				}
 			}
 		}
 		if ip := net.ParseIP(f.IntAddr); ip == nil {

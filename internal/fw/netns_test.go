@@ -62,12 +62,14 @@ while True:
 	l.procs = append(l.procs, cmd)
 }
 
-func (l *lab) udpEcho(ns, addr string, port int) {
+func (l *lab) udpEcho(ns, addr string, port int) { l.udpEchoAs(ns, addr, port, "router") }
+
+func (l *lab) udpEchoAs(ns, addr string, port int, reply string) {
 	l.t.Helper()
 	py := fmt.Sprintf(`import socket
 s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.bind(("%s",%d))
 while True:
-    d,a=s.recvfrom(512); s.sendto(b"router",a)`, addr, port)
+    d,a=s.recvfrom(512); s.sendto(b"%s",a)`, addr, port, reply)
 	cmd := exec.Command("ip", "netns", "exec", ns, "python3", "-c", py)
 	if err := cmd.Start(); err != nil {
 		l.t.Fatal(err)
@@ -213,6 +215,8 @@ func TestNetnsPolicy(t *testing.T) {
 		{"internet to router console", func() bool { return l.reach("ghinet", "203.0.113.2", 443) }, false},
 		{"internet to home server", func() bool { return l.reach("ghinet", "192.168.1.50", 8080) }, false},
 		{"internet to forwarded port", func() bool { return l.reach("ghinet", "203.0.113.2", 8443) }, true},
+		{"guest reaches forward via public address (hairpin)", func() bool { return l.reach("ghguest", "203.0.113.2", 8443) }, true},
+		{"home reaches own router public address, closed port", func() bool { return l.reach("ghguest", "203.0.113.2", 8444) }, false},
 		{"internet to unforwarded port", func() bool { return l.reach("ghinet", "203.0.113.2", 8444) }, false},
 		{"guest dns is redirected to the router", func() bool { return l.udpAsk("ghguest", "8.8.8.8", 53) == "router" }, true},
 	}
@@ -364,5 +368,54 @@ except Exception:
 	l.must("mwfw", "nft flush chain inet gatehouse wanmark")
 	if from("mwisp2", "192.0.2.92", "203.0.114.2", 8444) {
 		t.Error("control: the second link answered without marks, so the test proves nothing")
+	}
+}
+
+// Devices with hard-coded DNS are sent to the chosen server, and exemptions are honoured.
+func TestNetnsDNSEnforcement(t *testing.T) {
+	l := newLab(t)
+	l.udpEcho("ghfw", "0.0.0.0", 53)
+	l.udpEchoAs("ghinet", "198.51.100.7", 53, "internet")
+	l.udpEchoAs("ghhome", "0.0.0.0", 53, "pihole")
+	time.Sleep(700 * time.Millisecond)
+
+	// Default: everyone is sent to the router, cameras included.
+	m := labModel()
+	l.apply(m)
+	for _, c := range []struct{ ns, via, want string }{
+		{"ghguest", "8.8.8.8", "router"}, {"ghcam", "8.8.8.8", "router"}, {"ghhome", "8.8.8.8", "router"},
+	} {
+		if got := l.udpAsk(c.ns, c.via, 53); got != c.want {
+			t.Errorf("default: %s -> %s got %q want %q", c.ns, c.via, got, c.want)
+		}
+	}
+
+	// A chosen server (the Pi-hole on the home network). Guests and Home use it; cameras have no
+	// internet so they keep using the router; a network switched off is left alone.
+	m = labModel()
+	m.DNSTarget = "192.168.1.50"
+	for i := range m.Zones {
+		if m.Zones[i].Name == "Home" {
+			m.Zones[i].DNSForce = false
+		}
+	}
+	l.apply(m)
+	for _, c := range []struct{ ns, via, want string }{
+		{"ghguest", "8.8.8.8", "pihole"},
+		{"ghguest", "198.51.100.7", "pihole"},
+		{"ghcam", "8.8.8.8", "router"},
+		{"ghhome", "198.51.100.7", "internet"},
+	} {
+		if got := l.udpAsk(c.ns, c.via, 53); got != c.want {
+			t.Errorf("target: %s -> %s got %q want %q", c.ns, c.via, got, c.want)
+		}
+	}
+
+	// Switched off entirely: nobody is redirected.
+	m = labModel()
+	m.DNSRedirect = false
+	l.apply(m)
+	if got := l.udpAsk("ghguest", "198.51.100.7", 53); got != "internet" {
+		t.Errorf("redirect off: got %q", got)
 	}
 }
