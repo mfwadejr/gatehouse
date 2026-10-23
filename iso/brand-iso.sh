@@ -18,13 +18,15 @@ chmod -R u+w "$T"
 [ -f "$T/isolinux/isolinux.bin" ] || { echo "brand-iso: no BIOS boot loader found in the image"; exit 1; }
 [ -d "$T/boot/grub" ] || { echo "brand-iso: no UEFI boot loader found in the image"; exit 1; }
 
+HAD_THEME=no
+[ -d "$T/boot/grub/theme" ] && HAD_THEME=yes
 # Only the menu files change; the boot loader itself and the UEFI image are left exactly as built.
 rm -f "$T/boot/grub/efi.img" "$T/isolinux/isolinux.bin"
 sh "$HERE/brand-boot.sh" "$T" "$ART"
 
 rm -f "$ISO.new"
 set -- -indev "$ISO" -outdev "$ISO.new" -boot_image any replay -overwrite on
-set -- "$@" -rm_r /boot/grub/theme --
+[ "$HAD_THEME" = yes ] && set -- "$@" -rm_r /boot/grub/theme --
 set -- "$@" -map "$T/isolinux/isolinux.cfg" /isolinux/isolinux.cfg -map "$T/isolinux/splash.png" /isolinux/splash.png
 set -- "$@" -map "$T/boot/grub/grub.cfg" /boot/grub/grub.cfg -map "$T/boot/grub/theme" /boot/grub/theme
 [ -f "$T/boot/grub/unicode.pf2" ] && set -- "$@" -map "$T/boot/grub/unicode.pf2" /boot/grub/unicode.pf2

@@ -10,7 +10,8 @@ D=${1:?usage: brand-boot.sh DIR ARTDIR}
 ART=${2:?usage: brand-boot.sh DIR ARTDIR}
 EXTRA="rd.udev.log_level=0 consoleblank=0"
 # What an earlier run added; stripped so a second run does not stack it up.
-unextra() { sed -E 's/ (rd\.udev\.log_level=0|consoleblank=0|gatehouse\.text|nomodeset)//g'; }
+# Boot-menu variables (like findiso=${iso_path}) are dropped too: the new menu does not set them.
+unextra() { sed -E 's/ (rd\.udev\.log_level=0|consoleblank=0|gatehouse\.text|nomodeset)//g; s/ [^ ]*\$\{[^ ]*\}//g'; }
 
 [ -d "$D/isolinux" ] && cp "$ART/splash.png" "$D/isolinux/splash.png"
 if [ -d "$D/boot/grub" ]; then
@@ -100,7 +101,7 @@ if [ -d "$D"/boot/grub ]; then
 	L=$(grep -h -m1 -E '^[[:space:]]*linux[[:space:]]' "$D"/boot/grub/*.cfg | head -n1 | sed -E 's/^[[:space:]]*linux[[:space:]]+//' | unextra)
 	I=$(grep -h -m1 -E '^[[:space:]]*initrd[[:space:]]' "$D"/boot/grub/*.cfg | head -n1 | sed -E 's/^[[:space:]]*initrd[[:space:]]+//')
 	# Keep whatever tells GRUB which disk the image is on.
-	KEEP=$(grep -h -E '^[[:space:]]*(search|set root)' "$D"/boot/grub/grub.cfg 2>/dev/null | head -n3 || true)
+	KEEP=$(grep -h -E '^[[:space:]]*(search|set root)' "$D"/boot/grub/*.cfg 2>/dev/null | head -n3 || true)
 	for f in chroot/usr/share/grub/unicode.pf2 /usr/share/grub/unicode.pf2; do
 		[ -f "$f" ] && cp "$f" "$D"/boot/grub/unicode.pf2 && break
 	done
