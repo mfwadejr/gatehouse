@@ -31,6 +31,7 @@ type NetController interface {
 	WanStatus() (map[string]wanmon.State, error)
 	ApplyVPN(p netd.VPNPlan) error
 	VPNStatus() (netd.VPNStatus, error)
+	FWEvents(since uint64, max int) ([]netd.FWEvent, uint64, error)
 }
 
 // IfaceRow is a LAN-side port or VLAN as the console edits it.

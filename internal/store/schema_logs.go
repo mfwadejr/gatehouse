@@ -53,4 +53,11 @@ CREATE TABLE metrics(
   value REAL NOT NULL,
   PRIMARY KEY(key, ts)
 );
+`, `
+ALTER TABLE fw_events ADD COLUMN sport INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE fw_events ADD COLUMN src_name TEXT NOT NULL DEFAULT '';
+ALTER TABLE fw_events ADD COLUMN dst_name TEXT NOT NULL DEFAULT '';
+ALTER TABLE fw_events ADD COLUMN reason TEXT NOT NULL DEFAULT '';
+CREATE INDEX idx_fw_src ON fw_events(from_addr, ts);
+CREATE INDEX idx_fw_dst ON fw_events(to_addr, ts);
 `}

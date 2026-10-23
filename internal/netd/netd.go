@@ -56,6 +56,8 @@ type Service struct {
 	NewMon   func(links []wanmon.Link, mode wanmon.Mode) *wanmon.Monitor
 
 	VPN *VPN
+	// Log follows the kernel log for firewall decisions.
+	Log *FWLog
 
 	mu      sync.Mutex
 	cancel  context.CancelFunc
@@ -66,7 +68,7 @@ type Service struct {
 }
 
 func New(inst *netcfg.Installer, stateDir string) *Service {
-	return &Service{Inst: inst, StateDir: stateDir, VPN: NewVPN(stateDir), NewMon: func(l []wanmon.Link, m wanmon.Mode) *wanmon.Monitor {
+	return &Service{Inst: inst, StateDir: stateDir, VPN: NewVPN(stateDir), Log: NewFWLog(), NewMon: func(l []wanmon.Link, m wanmon.Mode) *wanmon.Monitor {
 		return wanmon.New(l, m, wanmon.NetChecker{}, &wanmon.IPRouter{Metric: 50})
 	}}
 }
@@ -83,6 +85,9 @@ func (s *Service) Start(ctx context.Context) error {
 	}
 	if s.VPN != nil {
 		s.VPN.Start()
+	}
+	if s.Log != nil {
+		go s.Log.Run(ctx)
 	}
 	// A change that was never confirmed is discarded on boot, as for the firewall.
 	if _, _, ok := s.Inst.Pending(); ok {
@@ -243,4 +248,12 @@ func (s *Service) VPNStatus() VPNStatus {
 		return VPNStatus{}
 	}
 	return s.VPN.Status()
+}
+
+// FWEvents returns firewall decisions recorded after seq.
+func (s *Service) FWEvents(since uint64, max int) ([]FWEvent, uint64) {
+	if s.Log == nil {
+		return nil, 0
+	}
+	return s.Log.Since(since, max)
 }

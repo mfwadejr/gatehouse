@@ -33,6 +33,35 @@ func ok(w http.ResponseWriter) { api.JSON(w, 200, map[string]string{"status": "o
 func (a *App) registerRoutes() {
 	s := a.API
 	a.registerVPNRoutes()
+	s.Handle("GET /api/logs", a.logSearch)
+	s.HandleAdmin("DELETE /api/logs", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		a.QLog.Clear()
+		a.Logs.Exec(`DELETE FROM fw_events`)
+		a.Logs.Exec(`DELETE FROM events`)
+		ok(w)
+	})
+	s.HandleAdmin("PUT /api/logs/settings", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		var in struct {
+			Allowed bool `json:"record_allowed"`
+			Blocked bool `json:"record_blocked"`
+		}
+		if !api.Decode(w, r, &in) {
+			return
+		}
+		// If nothing else is waiting to be applied, switch the change on straight away.
+		_, before, err := a.currentRuleset()
+		clean := err == nil && a.FW != nil && before == a.lastApplied()
+		a.Config.SetSetting("fw.log_allowed", strconv.Itoa(b2i(in.Allowed)))
+		a.Config.SetSetting("fw.log_drops", strconv.Itoa(b2i(in.Blocked)))
+		if clean {
+			if err := a.applyFirewall(c.User.Username); err != nil {
+				fail(w, err)
+				return
+			}
+		}
+		a.markDirty()
+		api.JSON(w, 200, map[string]any{"status": "ok", "applied": clean})
+	})
 	// DNS
 	s.Handle("GET /api/dns/summary", a.dnsSummary)
 	s.Handle("GET /api/dns/log", a.dnsLog)

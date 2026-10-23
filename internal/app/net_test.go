@@ -24,6 +24,7 @@ type fakeNet struct {
 	vpn      netd.VPNPlan
 	vpnCalls int
 	status   netd.VPNStatus
+	events   []netd.FWEvent
 }
 
 func (f *fakeNet) NetApply(p netd.Plan, w time.Duration) (string, time.Time, error) {
@@ -61,6 +62,18 @@ func (f *fakeNet) VPNStatus() (netd.VPNStatus, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.status, nil
+}
+
+func (f *fakeNet) FWEvents(since uint64, max int) ([]netd.FWEvent, uint64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []netd.FWEvent
+	for _, e := range f.events {
+		if e.Seq > since {
+			out = append(out, e)
+		}
+	}
+	return out, uint64(len(f.events)), nil
 }
 
 func TestNetworkFlow(t *testing.T) {

@@ -62,6 +62,7 @@ type App struct {
 	Net     NetController
 	apply   applyState
 	vpn     vpnState
+	fwn     fwNames
 	setup   setupGate
 
 	netApplyState struct {
@@ -124,7 +125,7 @@ func New(cfg Config) (*App, error) {
 	a.API = api.New(a.Auth, a.Bus)
 	a.API.Static = cfg.Static
 	a.API.Secure = cfg.TLSCert != ""
-	a.API.Topic("dns.stats", "dns.live", "dns.upstreams", "dns.lists", "dhcp.leases", "dhcp.utilisation", "fw.status", "net.status", "vpn.status")
+	a.API.Topic("dns.stats", "dns.live", "dns.upstreams", "dns.lists", "dhcp.leases", "dhcp.utilisation", "fw.status", "net.status", "vpn.status", "logs.live")
 	a.FW = cfg.FW
 	a.Net = cfg.Net
 	a.registerRoutes()
@@ -287,6 +288,7 @@ func (a *App) Run(ctx context.Context) error {
 	run(func() { a.housekeeping(ctx) })
 	run(func() { a.firstBoot(ctx) })
 	run(func() { a.vpnMonitor(ctx) })
+	run(func() { a.collectFW(ctx) })
 
 	l, err := net.Listen("tcp", a.Cfg.WebAddr)
 	if err != nil {
@@ -320,6 +322,7 @@ func (a *App) housekeeping(ctx context.Context) {
 		case <-daily.C:
 			days := int(a.settingFloat("dns.log_retention_days", 30))
 			a.QLog.Prune(days)
+			a.pruneFWLog(days)
 			a.Auth.PurgeExpired()
 		}
 	}

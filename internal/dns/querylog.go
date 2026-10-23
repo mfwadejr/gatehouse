@@ -124,7 +124,11 @@ type Filter struct {
 	Result string
 	Since  int64
 	Before int64 // for paging: rows with id lower than this
-	Limit  int
+	// BeforeTS limits to rows at or before a time, for paging a merged log.
+	BeforeTS int64
+	// NotResult leaves out one result, such as "blocked".
+	NotResult string
+	Limit     int
 }
 
 type Row struct {
@@ -155,6 +159,14 @@ func (q *QueryLog) Search(f Filter) ([]Row, error) {
 	if f.Before > 0 {
 		where = append(where, `id<?`)
 		args = append(args, f.Before)
+	}
+	if f.BeforeTS > 0 {
+		where = append(where, `ts<=?`)
+		args = append(args, f.BeforeTS)
+	}
+	if f.NotResult != "" {
+		where = append(where, `result<>?`)
+		args = append(args, f.NotResult)
 	}
 	sqlStr := `SELECT id,ts,client,client_name,qname,qtype,result,rcode,upstream,latency_us,rule FROM dns_queries`
 	if len(where) > 0 {

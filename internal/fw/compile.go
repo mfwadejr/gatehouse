@@ -156,9 +156,39 @@ func (c *compiler) build() string {
 	return c.out.String()
 }
 
+// The log lines that Gatehouse's own tools read are written as "gh|allow|<reason>" or
+// "gh|drop|<reason>", where the reason is the same text as the rule's comment.
+func logPrefix(verdict, tag string) string {
+	v := "allow"
+	if verdict != "accept" {
+		v = "drop"
+	}
+	if len(tag) > 100 {
+		tag = tag[:100]
+	}
+	return "gh|" + v + "|" + tag + " "
+}
+
+func (c *compiler) logs(verdict string) bool {
+	if verdict == "accept" {
+		return c.m.LogAllowed
+	}
+	return c.m.LogDrops
+}
+
+// decide writes a rule. When logging is on it first writes a copy that only records the first
+// packet of each new connection, rate limited so a flood cannot fill the log. The copy
+// never decides anything, so the log can never change what is allowed.
+func (c *compiler) decide(indent int, match, verdict, tag string) {
+	if c.logs(verdict) {
+		c.line(indent, "%s ct state new limit rate 100/second burst 200 packets log prefix %s", match, q(logPrefix(verdict, tag)))
+	}
+	c.line(indent, "%s counter %s comment %s", match, verdict, q(tag))
+}
+
 func (c *compiler) dropTail(indent int, tag string) {
 	if c.m.LogDrops {
-		c.line(indent, `limit rate 5/minute log prefix "gh-drop-%s: "`, tag)
+		c.line(indent, "limit rate 20/second burst 50 packets log prefix %s", q(logPrefix("drop", "default:"+tag)))
 	}
 	c.line(indent, "counter drop comment \"default\"")
 }
@@ -204,7 +234,7 @@ func (c *compiler) input() {
 	// Incoming VPN connections, from the internet side only.
 	if wan := m.WanIfaces(); len(wan) > 0 {
 		for _, v := range m.VPNPorts {
-			c.line(2, "iifname %s %s dport %d counter accept comment %s", ifSet(wan), v.Proto, v.Port, q("vpn:"+v.Name))
+			c.decide(2, fmt.Sprintf("iifname %s %s dport %d", ifSet(wan), v.Proto, v.Port), "accept", "vpn:"+v.Name)
 		}
 	}
 
@@ -236,7 +266,7 @@ func (c *compiler) forward() {
 		c.line(2, "iifname %s ip daddr %s meta l4proto { tcp, udp } th dport 53 ct status dnat accept comment \"enforced dns server\"", ifSet(re), t.To4())
 	}
 	if len(m.Forwards) > 0 {
-		c.line(2, "ct status dnat accept comment \"port forwards\"")
+		c.decide(2, "ct status dnat", "accept", "forward")
 	}
 	for _, r := range m.Rules {
 		if r.Enabled && r.To != "self" {
@@ -247,7 +277,7 @@ func (c *compiler) forward() {
 	// connection, even if the tunnel is down and the routes fall back to it.
 	for _, t := range m.Tunnels {
 		if t.KillSwitch && len(t.Sources) > 0 && len(wan) > 0 {
-			c.line(2, "ip saddr %s oifname %s counter drop comment %s", setLit(t.Sources), ifSet(wan), q("killswitch:"+t.Name))
+			c.decide(2, fmt.Sprintf("ip saddr %s oifname %s", setLit(t.Sources), ifSet(wan)), "drop", "killswitch:"+t.Name)
 		}
 	}
 	out := append(append([]string(nil), wan...), m.TunnelIfaces()...)
@@ -257,7 +287,7 @@ func (c *compiler) forward() {
 			continue
 		}
 		if z.Internet && z.Gateway && len(out) > 0 {
-			c.line(2, "iifname %s oifname %s counter accept comment %s", ifSet(z.Ifaces), ifSet(out), q("internet:"+z.Name))
+			c.decide(2, fmt.Sprintf("iifname %s oifname %s", ifSet(z.Ifaces), ifSet(out)), "accept", "internet:"+z.Name)
 		}
 		if z.Kind == KindTrusted && z.Gateway {
 			var others []string
@@ -267,11 +297,11 @@ func (c *compiler) forward() {
 				}
 			}
 			if len(others) > 0 {
-				c.line(2, "iifname %s oifname %s counter accept comment %s", ifSet(z.Ifaces), ifSet(others), q("trusted:"+z.Name))
+				c.decide(2, fmt.Sprintf("iifname %s oifname %s", ifSet(z.Ifaces), ifSet(others)), "accept", "trusted:"+z.Name)
 			}
 		}
 		if z.IntraAllow {
-			c.line(2, "iifname %s oifname %s counter accept comment %s", ifSet(z.Ifaces), ifSet(z.Ifaces), q("within:"+z.Name))
+			c.decide(2, fmt.Sprintf("iifname %s oifname %s", ifSet(z.Ifaces), ifSet(z.Ifaces)), "accept", "within:"+z.Name)
 		}
 	}
 	c.dropTail(2, "fwd")
@@ -368,11 +398,11 @@ func (c *compiler) explicit(indent int, r Rule, forward bool) {
 			if r.Limit > 0 {
 				fmt.Fprintf(&b, " limit rate %d/second", r.Limit)
 			}
-			if r.Log {
-				fmt.Fprintf(&b, " log prefix %s", q("gh-"+r.Action+": "))
+			tag := "rule:" + r.From + ":" + r.To + ":" + r.Name
+			if c.logs(r.Action) || r.Log {
+				c.line(indent, "%s ct state new limit rate 100/second burst 200 packets log prefix %s", b.String(), q(logPrefix(r.Action, tag)))
 			}
-			fmt.Fprintf(&b, " counter %s comment %s", r.Action, q("rule:"+r.From+":"+r.To+":"+r.Name))
-			c.line(indent, "%s", b.String())
+			c.line(indent, "%s counter %s comment %s", b.String(), r.Action, q(tag))
 		}
 	}
 }

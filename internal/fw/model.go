@@ -98,6 +98,8 @@ type Model struct {
 	BlockDoT bool
 	// LogDrops writes dropped packets to the event log (rate limited).
 	LogDrops bool
+	// LogAllowed records new connections that were allowed, with the reason, in the event log.
+	LogAllowed bool
 }
 
 // ZoneByName returns a zone.

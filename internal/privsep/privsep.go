@@ -29,6 +29,7 @@ type NetController interface {
 	Status() map[string]wanmon.State
 	ApplyVPN(p netd.VPNPlan) error
 	VPNStatus() netd.VPNStatus
+	FWEvents(since uint64, max int) ([]netd.FWEvent, uint64)
 }
 
 const maxRequest = 4 << 20
@@ -247,6 +248,16 @@ func (s *Server) dispatchNet(r request) (any, error) {
 		return nil, s.Net.ApplyVPN(p)
 	case "vpn.status":
 		return s.Net.VPNStatus(), nil
+	case "fwlog.read":
+		var p struct {
+			Since uint64 `json:"since"`
+			Max   int    `json:"max"`
+		}
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		ev, last := s.Net.FWEvents(p.Since, p.Max)
+		return FWBatch{Events: ev, Last: last}, nil
 	}
 	return nil, errors.New("unknown method")
 }
@@ -345,4 +356,16 @@ func (c *Client) VPNStatus() (netd.VPNStatus, error) {
 	var out netd.VPNStatus
 	err := c.call("vpn.status", nil, &out)
 	return out, err
+}
+
+// FWBatch is a run of firewall events and the sequence number to ask for next.
+type FWBatch struct {
+	Events []netd.FWEvent `json:"events"`
+	Last   uint64         `json:"last"`
+}
+
+func (c *Client) FWEvents(since uint64, max int) ([]netd.FWEvent, uint64, error) {
+	var out FWBatch
+	err := c.call("fwlog.read", map[string]any{"since": since, "max": max}, &out)
+	return out.Events, out.Last, err
 }

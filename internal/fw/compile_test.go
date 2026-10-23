@@ -154,9 +154,14 @@ func TestNftAcceptsRuleset(t *testing.T) {
 	if exec.Command("unshare", "-n", "true").Run() != nil {
 		t.Skip("cannot create a network namespace here")
 	}
-	out, err := Compile(sample())
+	m := sample()
+	m.LogAllowed, m.LogDrops = true, true
+	out, err := Compile(m)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !strings.Contains(out, `log prefix "gh|allow|internet:`) || !strings.Contains(out, `log prefix "gh|drop|default:fwd `) {
+		t.Fatalf("decisions are not logged with their reasons:\n%s", out)
 	}
 	f := filepath.Join(t.TempDir(), "r.nft")
 	os.WriteFile(f, []byte(out), 0o600)

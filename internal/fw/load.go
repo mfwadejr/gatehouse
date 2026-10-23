@@ -59,7 +59,8 @@ func Load(db Queryer) (*Model, error) {
 	m.DNSRedirect = setting(db, "fw.dns_redirect", "1") == "1"
 	m.BlockDoT = setting(db, "fw.block_dot", "1") == "1"
 	m.DNSTarget = strings.TrimSpace(setting(db, "fw.dns_target", ""))
-	m.LogDrops = setting(db, "fw.log_drops", "0") == "1"
+	m.LogDrops = setting(db, "fw.log_drops", "1") == "1"
+	m.LogAllowed = setting(db, "fw.log_allowed", "1") == "1"
 
 	rows, err := db.Query(`SELECT id,name,kind,gateway_mode,intra_allow,management,upnp,internet,ssh,dns_force,description FROM zones ORDER BY id`)
 	if err != nil {
