@@ -50,8 +50,18 @@ sed -i 's/^PRETTY_NAME=.*/PRETTY_NAME="Gatehouse"/' /etc/os-release
 printf '\nGatehouse\n\n' > /etc/issue
 printf 'Gatehouse\n' > /etc/issue.net
 : > /etc/motd
-# Rebuild the boot image so it contains the splash theme.
-update-initramfs -u -k all || true
+# Rebuild the boot image so it contains the splash theme. The splash package's boot-image
+# hook can fail on a minimal system; if it does, say why in the build log and carry on
+# without the early splash (the splash still starts with the rest of the system).
+if ! update-initramfs -u -k all >/tmp/initramfs.log 2>&1; then
+	echo "NOTE: building the boot image with the splash hook failed:"
+	cat /tmp/initramfs.log
+	rm -f /usr/share/initramfs-tools/hooks/plymouth /usr/share/initramfs-tools/scripts/init-premount/plymouth \
+		/usr/share/initramfs-tools/scripts/init-bottom/plymouth /usr/share/initramfs-tools/scripts/local-premount/plymouth
+	update-initramfs -u -k all
+else
+	cat /tmp/initramfs.log
+fi
 
 # One network tool only. A second one (ifupdown) also asked for an address on every port,
 # which gave each port two addresses.

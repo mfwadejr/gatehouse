@@ -13,6 +13,9 @@ locales
 console-setup
 kbd
 plymouth
+plymouth-label
+fontconfig
+fonts-dejavu-core
 keyboard-configuration
 ca-certificates
 systemd-timesyncd
