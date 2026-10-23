@@ -62,7 +62,7 @@ func TestNetnsWatchdogRestoresAccess(t *testing.T) {
 	}
 
 	// Apply a change that cuts the administrator off, and do not confirm it.
-	tok, deadline, err := a.Apply(lockoutScript, 2*time.Second, "test")
+	tok, deadline, err := a.Apply(lockoutScript, 8*time.Second, "test")
 	if err != nil {
 		t.Fatal(err)
 	}
