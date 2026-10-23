@@ -7,3 +7,9 @@ node_modules/
 web/dist/*
 !web/dist/.gitkeep
 web/src/tokens.css
+
+# Finder duplicates
+* 2
+* 2.*
+* 3
+* 3.*
