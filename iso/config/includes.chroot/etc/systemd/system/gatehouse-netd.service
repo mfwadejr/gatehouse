@@ -10,7 +10,7 @@ Wants=network-pre.target
 Type=simple
 RuntimeDirectory=gatehouse
 RuntimeDirectoryPreserve=yes
-ExecStart=/usr/local/bin/gatehouse netd -uid 990 -group gatehouse
+ExecStart=/usr/local/bin/gatehouse netd -user gatehouse -group gatehouse
 Restart=always
 RestartSec=2
 # The helper must be able to change the network, so it keeps root, but little else.

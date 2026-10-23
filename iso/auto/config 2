@@ -1,0 +1,21 @@
+#!/bin/sh
+# live-build configuration for the Gatehouse image (Debian 13 "trixie", x86-64, BIOS and UEFI).
+set -e
+lb config noauto \
+  --distribution trixie \
+  --architectures amd64 \
+  --archive-areas "main contrib non-free-firmware" \
+  --parent-archive-areas "main contrib non-free-firmware" \
+  --binary-images iso-hybrid \
+  --bootappend-live "boot=live components quiet loglevel=3" \
+  --debian-installer none \
+  --iso-application "Gatehouse" \
+  --iso-publisher "Gatehouse" \
+  --iso-volume "GATEHOUSE" \
+  --memtest none \
+  --apt-indices false \
+  --apt-recommends false \
+  --security true \
+  --updates true \
+  --linux-flavours amd64 \
+  "${@}"

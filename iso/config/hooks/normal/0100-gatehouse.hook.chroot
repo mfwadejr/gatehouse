@@ -5,9 +5,9 @@ set -e
 # systemd-networkd is a separate package on some releases; install it if it exists.
 apt-get install -y --no-install-recommends systemd-networkd 2>/dev/null || true
 
-# Service account for the console process. Fixed id so the helper can verify the caller.
-getent group gatehouse >/dev/null || groupadd --system --gid 990 gatehouse
-id gatehouse >/dev/null 2>&1 || useradd --system --uid 990 --gid 990 --home-dir /var/lib/gatehouse --no-create-home --shell /usr/sbin/nologin gatehouse
+# Service account for the console process. The helper looks it up by name to verify the caller.
+getent group gatehouse >/dev/null || groupadd --system gatehouse
+id gatehouse >/dev/null 2>&1 || useradd --system --gid gatehouse --home-dir /var/lib/gatehouse --no-create-home --shell /usr/sbin/nologin gatehouse
 install -d -o gatehouse -g gatehouse -m 750 /var/lib/gatehouse
 install -d -m 755 /run/gatehouse
 

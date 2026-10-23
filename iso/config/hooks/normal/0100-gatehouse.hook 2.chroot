@@ -1,0 +1,41 @@
+#!/bin/sh
+# Runs inside the image while it is built.
+set -e
+
+# systemd-networkd is a separate package on some releases; install it if it exists.
+apt-get install -y --no-install-recommends systemd-networkd 2>/dev/null || true
+
+# Service account for the console process. Fixed id so the helper can verify the caller.
+getent group gatehouse >/dev/null || groupadd --system --gid 990 gatehouse
+id gatehouse >/dev/null 2>&1 || useradd --system --uid 990 --gid 990 --home-dir /var/lib/gatehouse --no-create-home --shell /usr/sbin/nologin gatehouse
+install -d -o gatehouse -g gatehouse -m 750 /var/lib/gatehouse
+install -d -m 755 /run/gatehouse
+
+# Use systemd-networkd for the network; we serve DNS and DHCP ourselves.
+systemctl enable systemd-networkd.service || true
+systemctl disable systemd-resolved.service 2>/dev/null || true
+systemctl mask systemd-resolved.service 2>/dev/null || true
+rm -f /etc/resolv.conf
+printf 'nameserver 127.0.0.1\n' > /etc/resolv.conf
+
+# Services: the live image runs the installer, an installed system runs the appliance.
+systemctl enable gatehouse-installer.service
+systemctl enable gatehouse-netd.service
+systemctl enable gatehouse.service
+systemctl enable nftables.service 2>/dev/null || true
+systemctl disable nftables.service 2>/dev/null || true # Gatehouse loads its own table
+
+# SSH is off unless the administrator turns it on.
+systemctl disable ssh.service 2>/dev/null || true
+
+# Quiet, fast boot. Nothing in the image needs these.
+systemctl disable apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
+
+# Default locale and keyboard.
+sed -i 's/^# *en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen
+locale-gen
+printf 'LANG=en_US.UTF-8\n' > /etc/default/locale
+
+# Keep the image small.
+apt-get clean
+rm -rf /var/lib/apt/lists/* /usr/share/doc/* /usr/share/man/* /var/cache/debconf/*-old

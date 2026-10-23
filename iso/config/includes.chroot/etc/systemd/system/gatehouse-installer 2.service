@@ -1,0 +1,16 @@
+[Unit]
+Description=Gatehouse installer
+ConditionKernelCommandLine=boot=live
+After=network-online.target
+Wants=network-online.target
+Conflicts=getty@tty1.service
+After=getty@tty1.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/gatehouse installer
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

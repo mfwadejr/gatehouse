@@ -153,7 +153,19 @@ func runNetd(args []string) {
 	group := fs.String("group", "gatehouse", "group allowed to use the socket")
 	state := fs.String("state", "/var/lib/gatehouse", "state directory")
 	allow := fs.Int("uid", -1, "user id of the daemon (checked on every connection)")
+	uname := fs.String("user", "", "name of the daemon's account; used instead of -uid")
 	fs.Parse(args)
+	if *uname != "" {
+		u, err := user.Lookup(*uname)
+		if err != nil {
+			log.Fatalf("netd: user %q: %v", *uname, err)
+		}
+		n, err := strconv.Atoi(u.Uid)
+		if err != nil {
+			log.Fatalf("netd: user %q has an unusable id", *uname)
+		}
+		*allow = n
+	}
 
 	gid := lookupGID(*group)
 	ap := fw.NewApplier(*state + "/fw")
