@@ -205,3 +205,14 @@ func TestFailureStopsAndCleansUp(t *testing.T) {
 		t.Fatal("cannot retry after a failure")
 	}
 }
+
+func TestGrubDefaultsAreQuietAndBranded(t *testing.T) {
+	for _, want := range []string{`GRUB_DISTRIBUTOR="Gatehouse"`, "GRUB_TIMEOUT_STYLE=hidden", "splash", "GRUB_DISABLE_OS_PROBER=true"} {
+		if !strings.Contains(grubDefaults, want) {
+			t.Errorf("grub defaults lack %q", want)
+		}
+	}
+	if strings.Contains(strings.ToLower(grubDefaults), "debian") {
+		t.Error("grub defaults name another product")
+	}
+}

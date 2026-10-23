@@ -39,3 +39,26 @@ printf 'LANG=en_US.UTF-8\n' > /etc/default/locale
 # Keep the image small.
 apt-get clean
 rm -rf /var/lib/apt/lists/* /usr/share/doc/* /usr/share/man/* /var/cache/debconf/*-old
+
+# Start-up screen: the Gatehouse theme, in the boot image too.
+plymouth-set-default-theme gatehouse || true
+# Do not make the installer wait for a cable: the screen explains what to plug in.
+systemctl mask systemd-networkd-wait-online.service 2>/dev/null || true
+
+# Nothing the person sees should name another product.
+sed -i 's/^PRETTY_NAME=.*/PRETTY_NAME="Gatehouse"/' /etc/os-release
+printf '\nGatehouse\n\n' > /etc/issue
+printf 'Gatehouse\n' > /etc/issue.net
+: > /etc/motd
+# Rebuild the boot image so it contains the splash theme.
+update-initramfs -u -k all || true
+
+# One network tool only. A second one (ifupdown) also asked for an address on every port,
+# which gave each port two addresses.
+apt-get purge -y ifupdown 2>/dev/null || true
+systemctl mask networking.service 2>/dev/null || true
+mkdir -p /etc/network
+printf 'auto lo\niface lo inet loopback\n' > /etc/network/interfaces
+
+# An installed machine shows the Gatehouse status screen on its own display, never a login prompt.
+systemctl enable gatehouse-screen.service

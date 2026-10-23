@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Gatehouse
+Description=Gatehouse start-up screen
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/gatehouse
+ScriptFile=/usr/share/plymouth/themes/gatehouse/gatehouse.script

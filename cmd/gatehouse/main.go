@@ -61,6 +61,8 @@ func main() {
 		runNetd(os.Args[2:])
 	case "installer":
 		runInstaller(os.Args[2:])
+	case "screen":
+		installer.RunStatus("443")
 	case "user":
 		userCmd(os.Args[2:])
 	case "seed":

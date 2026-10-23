@@ -1,42 +1,113 @@
 #!/bin/sh
-# Runs after the boot loaders are laid down. Replace their menus with an immediate, silent
-# boot so the only thing a person sees is the Gatehouse screen.
+# Runs after the boot loaders are laid down. Replaces their stock menus with the Gatehouse
+# ones: same colours and logo as the installer, two choices, and no other product's name.
 set -e
 
-QUIET="quiet loglevel=0 systemd.show_status=0 rd.udev.log_level=0 vt.global_cursor_default=0 consoleblank=0 console=tty1"
+EXTRA="rd.udev.log_level=0 consoleblank=0"
 
-# BIOS (isolinux)
+# Put the Gatehouse artwork over whatever the stock boot loaders brought.
+ART=binary/gatehouse-boot
+if [ -d "$ART" ]; then
+	[ -d binary/isolinux ] && cp "$ART/splash.png" binary/isolinux/splash.png
+	if [ -d binary/boot/grub ]; then
+		rm -rf binary/boot/grub/theme
+		cp -r "$ART/theme" binary/boot/grub/theme
+	fi
+	rm -rf "$ART"
+fi
+
+# ---- BIOS (isolinux / syslinux) ----
 if [ -f binary/isolinux/live.cfg ]; then
 	K=$(awk '$1=="linux"||$1=="kernel"{print $2; exit}' binary/isolinux/live.cfg)
 	I=$(awk '$1=="initrd"{print $2; exit}' binary/isolinux/live.cfg)
 	A=$(awk '$1=="append"{$1=""; print; exit}' binary/isolinux/live.cfg)
+	# The graphical menu module; the image normally has it already.
+	for m in vesamenu.c32 libcom32.c32 libutil.c32 ldlinux.c32; do
+		if [ ! -f "binary/isolinux/$m" ]; then
+			for d in /usr/lib/syslinux/modules/bios /usr/share/syslinux; do
+				[ -f "$d/$m" ] && cp "$d/$m" binary/isolinux/ && break
+			done
+		fi
+	done
 	if [ -n "$K" ] && [ -n "$I" ]; then
+		SAFE=$(echo "$A" | sed 's/ splash//')
 		cat > binary/isolinux/isolinux.cfg <<CFG
-default gatehouse
+path
 prompt 0
 noescape 1
-timeout 1
+timeout 40
+ui vesamenu.c32
+default gatehouse
+menu title
+menu background splash.png
+menu margin 0
+menu hshift 17
+menu vshift 17
+menu width 46
+menu rows 3
+menu tabmsg
+menu timeoutrow 24
+menu autoboot Starting Gatehouse in # seconds
+menu color screen 0 #ffc3c2b7 #ff121211 none
+menu color border 0 #00000000 #00000000 none
+menu color title 0 #fff0efec #00000000 none
+menu color unsel 0 #ffc3c2b7 #00000000 none
+menu color sel 0 #ffffffff #ff3987e5 none
+menu color hotsel 0 #ffffffff #ff3987e5 none
+menu color hotkey 0 #ffc3c2b7 #00000000 none
+menu color timeout 0 #ff898781 #00000000 none
+menu color timeout_msg 0 #ff898781 #00000000 none
+menu color tabmsg 0 #00000000 #00000000 none
+menu color cmdmark 0 #00000000 #00000000 none
+menu color cmdline 0 #00000000 #00000000 none
+
 label gatehouse
+  menu label Install Gatehouse
   linux $K
   initrd $I
-  append $A $QUIET
+  append $A $EXTRA
+
+label basic
+  menu label Install Gatehouse (basic graphics)
+  linux $K
+  initrd $I
+  append $SAFE $EXTRA nomodeset
 CFG
 	fi
 fi
 
-# UEFI and BIOS-on-GRUB
+# ---- UEFI, and BIOS machines that start GRUB ----
 if [ -d binary/boot/grub ]; then
 	L=$(grep -h -m1 -E '^[[:space:]]*linux[[:space:]]' binary/boot/grub/*.cfg | head -n1 | sed -E 's/^[[:space:]]*linux[[:space:]]+//')
 	I=$(grep -h -m1 -E '^[[:space:]]*initrd[[:space:]]' binary/boot/grub/*.cfg | head -n1 | sed -E 's/^[[:space:]]*initrd[[:space:]]+//')
+	# Keep whatever tells GRUB which disk the image is on.
+	KEEP=$(grep -h -E '^[[:space:]]*(search|set root)' binary/boot/grub/grub.cfg 2>/dev/null | head -n3 || true)
+	for f in chroot/usr/share/grub/unicode.pf2 /usr/share/grub/unicode.pf2; do
+		[ -f "$f" ] && cp "$f" binary/boot/grub/unicode.pf2 && break
+	done
 	if [ -n "$L" ] && [ -n "$I" ]; then
+		SAFE=$(echo "$L" | sed 's/ splash//')
 		cat > binary/boot/grub/grub.cfg <<CFG
-set timeout=0
-set timeout_style=hidden
+$KEEP
 set default=0
-set color_normal=black/black
-set color_highlight=black/black
-menuentry "Gatehouse" {
-  linux $L $QUIET
+set timeout=4
+insmod all_video
+insmod gfxterm
+insmod png
+if [ -f /boot/grub/unicode.pf2 ]; then
+  loadfont /boot/grub/unicode.pf2
+fi
+set gfxmode=auto
+set gfxpayload=keep
+terminal_output gfxterm
+set theme=/boot/grub/theme/theme.txt
+
+menuentry "Install Gatehouse" {
+  linux $L $EXTRA
+  initrd $I
+}
+menuentry "Install Gatehouse (basic graphics)" {
+  linux $SAFE $EXTRA nomodeset
   initrd $I
 }
 CFG

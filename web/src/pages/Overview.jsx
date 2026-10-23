@@ -64,7 +64,7 @@ export default function Overview() {
       <div className="row">
         <div className="grow">
           <Card title="DNS queries" desc="Last minute, one bar per second">
-            <Spark values={st?.history || []} width={480} height={90} />
+            <Spark values={st?.history || []} width={480} height={90} fluid />
             <div className="inline sec small">
               <span>{fmt.n(total)} queries in the last hour</span>
               <span>· average {fmt.d1(st?.avg_ms)} ms</span><span>· 95% under {fmt.d1(st?.p95_ms)} ms</span>

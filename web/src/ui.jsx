@@ -159,7 +159,7 @@ export function Problems({ list }) {
   );
 }
 
-export function Spark({ values = [], width = 88, height = 30, area = true, tone = '' }) {
+export function Spark({ values = [], width = 88, height = 30, area = true, tone = '', fluid = false }) {
   const path = useMemo(() => {
     if (values.length < 2) return null;
     const max = Math.max(...values, 1), min = Math.min(...values, 0);
@@ -169,7 +169,8 @@ export function Spark({ values = [], width = 88, height = 30, area = true, tone 
     return { line, area: `${line} L${width} ${height} L0 ${height} Z` };
   }, [values, width, height]);
   return (
-    <svg className={`spark ${tone}`} width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden="true">
+    <svg className={`spark ${tone} ${fluid ? 'fluid' : ''}`} {...(fluid ? {} : { width, height })} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio={fluid ? 'none' : undefined} aria-hidden="true">
+      <line className="gridline" x1="0" x2={width} y1={height - 0.5} y2={height - 0.5} />
       {path && area && <path className="area" d={path.area} />}
       {path && <path className="line" d={path.line} />}
     </svg>

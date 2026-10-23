@@ -397,10 +397,18 @@ func (in *Installer) plan(r Request) []step {
 			} else if err := in.chroot("", "grub-install", "--target=i386-pc", d); err != nil {
 				return err
 			}
+			if err := in.brand(t); err != nil {
+				return err
+			}
 			if err := in.chroot("", "update-initramfs", "-u", "-k", "all"); err != nil {
 				return err
 			}
-			return in.chroot("", "update-grub")
+			if err := in.chroot("", "update-grub"); err != nil {
+				return err
+			}
+			// Menu entries would otherwise read "Gatehouse GNU/Linux".
+			in.chroot("", "sed", "-i", "s# GNU/Linux##g", "/boot/grub/grub.cfg")
+			return nil
 		}},
 		{"Creating your account", func() error {
 			if err := in.chroot("", "install", "-d", "-o", "gatehouse", "-g", "gatehouse", "-m", "750", "/var/lib/gatehouse"); err != nil {
@@ -447,4 +455,39 @@ func (in *Installer) Reboot() error {
 	}
 	go func() { time.Sleep(time.Second); in.R.Run("", "systemctl", "reboot") }()
 	return nil
+}
+
+// grubDefaults makes the installed machine start the way the installer did: no menu unless
+// a key is held, no kernel text, the Gatehouse splash, and nothing that names another product.
+const grubDefaults = `# Written by the Gatehouse installer.
+GRUB_DISTRIBUTOR="Gatehouse"
+GRUB_TIMEOUT=0
+GRUB_TIMEOUT_STYLE=hidden
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash loglevel=0 systemd.show_status=0 vt.global_cursor_default=0"
+GRUB_TERMINAL_OUTPUT=gfxterm
+GRUB_GFXMODE=auto
+GRUB_GFXPAYLOAD_LINUX=keep
+GRUB_THEME=/boot/grub/themes/gatehouse/theme.txt
+GRUB_DISABLE_OS_PROBER=true
+GRUB_DISABLE_RECOVERY=true
+GRUB_DISABLE_SUBMENU=y
+`
+
+// brand puts the Gatehouse boot menu and splash into the installed system.
+func (in *Installer) brand(t string) error {
+	if err := os.MkdirAll(filepath.Join(t, "etc/default/grub.d"), 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(t, "etc/default/grub.d/gatehouse.cfg"), []byte(grubDefaults), 0o644); err != nil {
+		return err
+	}
+	// The theme ships inside the image; copy it to where the boot loader reads it.
+	if err := in.sh("", "mkdir", "-p", filepath.Join(t, "boot/grub/themes")); err != nil {
+		return err
+	}
+	in.sh("", "rm", "-rf", filepath.Join(t, "boot/grub/themes/gatehouse"))
+	if err := in.sh("", "cp", "-a", filepath.Join(t, "usr/share/gatehouse/grub-theme"), filepath.Join(t, "boot/grub/themes/gatehouse")); err != nil {
+		return err
+	}
+	return in.chroot("", "plymouth-set-default-theme", "gatehouse")
 }

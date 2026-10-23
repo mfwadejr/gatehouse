@@ -2,6 +2,7 @@ package installer
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"sort"
@@ -99,7 +100,12 @@ func RenderScreen(ports []Port, urls []string, code string) string {
 	default:
 		line(bold + "Ready to install.")
 		b.WriteString("\n")
-		line(fg + "On a computer connected to this network, open:")
+		if len(urls) > 1 {
+			line(fg + "On a computer connected to this network, open the address")
+			line(fg + "for the port its cable is plugged into:")
+		} else {
+			line(fg + "On a computer connected to this network, open:")
+		}
 		b.WriteString("\n")
 		for _, u := range urls {
 			line(blue + "  " + u)
@@ -133,14 +139,50 @@ func RenderScreen(ports []Port, urls []string, code string) string {
 	return b.String()
 }
 
-// usableAddresses are the web addresses the installer can be reached on.
+// usableAddresses are the web addresses a person can really use: one per port that has a
+// cable in it, on a private network, so the address of an internet-facing port or a stray
+// link-local address never shows up as a second, confusing choice. With a single address
+// it is shown bare; with several, each says which port it belongs to.
 func usableAddresses(port string) []string {
-	var out []string
-	for _, u := range Addresses(port) {
-		if strings.HasPrefix(u, "https://169.254.") || strings.HasPrefix(u, "https://127.") {
+	wired := map[string]bool{}
+	for _, p := range WiredPorts() {
+		if p.Link {
+			wired[p.Name] = true
+		}
+	}
+	type entry struct{ port, url string }
+	var found []entry
+	seen := map[string]bool{}
+	hasPort := map[string]bool{} // one address per port is enough; a second would only confuse
+	ifs, _ := net.Interfaces()
+	for _, ifi := range ifs {
+		if !wired[ifi.Name] || ifi.Flags&net.FlagUp == 0 {
 			continue
 		}
-		out = append(out, u)
+		as, _ := ifi.Addrs()
+		for _, a := range as {
+			n, ok := a.(*net.IPNet)
+			if !ok || n.IP.To4() == nil || n.IP.IsLinkLocalUnicast() || !privateAddr(n.IP) {
+				continue
+			}
+			u := "https://" + n.IP.String()
+			if port != "" && port != "443" {
+				u += ":" + port
+			}
+			if !seen[u] && !hasPort[ifi.Name] {
+				seen[u], hasPort[ifi.Name] = true, true
+				found = append(found, entry{ifi.Name, u})
+			}
+		}
+	}
+	sort.Slice(found, func(i, j int) bool { return found[i].port < found[j].port })
+	var out []string
+	for _, e := range found {
+		if len(found) > 1 {
+			out = append(out, fmt.Sprintf("%-26s on port %s", e.url, e.port))
+		} else {
+			out = append(out, e.url)
+		}
 	}
 	return out
 }
@@ -165,5 +207,80 @@ func RunScreen(code, port string) {
 			last, first = s, false
 		}
 		time.Sleep(time.Second)
+	}
+}
+
+// RenderStatus is what an installed machine shows on its own display: the start-up splash
+// gives way to this, so there is never a login prompt or boot text on screen.
+func RenderStatus(host string, ports []Port, urls []string) string {
+	var b strings.Builder
+	line := func(s string) { b.WriteString("    " + s + reset + "\n") }
+	b.WriteString("\x1b[?25l\x1b[2J\x1b[H\n\n")
+	line(blue + "GATEHOUSE")
+	if host != "" {
+		line(dim + host)
+	}
+	b.WriteString("\n\n")
+	if len(urls) == 0 {
+		line(amber + "Waiting for a network connection.")
+		b.WriteString("\n")
+		line(fg + "Plug a network cable into a port below. This screen updates by itself.")
+	} else {
+		line(bold + "Ready.")
+		b.WriteString("\n")
+		if len(urls) > 1 {
+			line(fg + "From a computer on your network, open the address for its port:")
+		} else {
+			line(fg + "From a computer on your network, open:")
+		}
+		b.WriteString("\n")
+		for _, u := range urls {
+			line(blue + "  " + u)
+		}
+		b.WriteString("\n")
+		line(dim + "Your browser will warn about the certificate the first time. That is expected.")
+	}
+	if len(ports) > 0 {
+		b.WriteString("\n\n")
+		line(dim + "Network ports")
+		for _, p := range ports {
+			state, col := "no cable", dim
+			if p.Link {
+				state, col = "cable connected", green
+				if p.Speed != "" {
+					state += ", " + p.Speed + " Mb/s"
+				}
+			}
+			name := p.Name
+			if p.USB {
+				name += " (USB)"
+			}
+			line(fmt.Sprintf("%s%-18s%s%s", fg, name, col, state))
+		}
+	}
+	return b.String()
+}
+
+// RunStatus keeps an installed machine's display current. It never returns.
+func RunStatus(port string) {
+	var last string
+	first := true
+	for {
+		host, _ := os.Hostname()
+		s := RenderStatus(host, WiredPorts(), usableAddresses(port))
+		if s != last || first {
+			for _, tty := range []string{"/dev/tty1", "/dev/console"} {
+				if f, err := os.OpenFile(tty, os.O_WRONLY, 0); err == nil {
+					if first {
+						f.WriteString(palette)
+					}
+					f.WriteString(s)
+					f.Close()
+					break
+				}
+			}
+			last, first = s, false
+		}
+		time.Sleep(2 * time.Second)
 	}
 }

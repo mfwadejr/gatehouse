@@ -1,0 +1,20 @@
+[Unit]
+Description=Gatehouse status screen
+ConditionKernelCommandLine=!boot=live
+After=gatehouse.service systemd-networkd.service
+Conflicts=getty@tty1.service
+After=getty@tty1.service
+
+[Service]
+Type=simple
+ExecStartPre=-/usr/bin/plymouth quit
+ExecStartPre=-/bin/sh -c 'for f in Uni3-TerminusBold32x16 Uni3-Terminus32x16 Lat15-TerminusBold32x16; do setfont -C /dev/tty1 $f && exit 0; done; exit 0'
+ExecStart=/usr/local/bin/gatehouse screen
+Restart=always
+RestartSec=2
+StandardInput=null
+StandardOutput=null
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

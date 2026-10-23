@@ -1,0 +1,39 @@
+# Gatehouse boot menu
+desktop-image: "background.png"
+desktop-image-scale-method: "crop"
+desktop-image-h-align: "center"
+desktop-image-v-align: "center"
+desktop-color: "#121211"
+title-text: ""
+message-font: "Unifont Regular 16"
+message-color: "#c3c2b7"
+terminal-font: "Unifont Regular 16"
+
++ boot_menu {
+  left = 50%-200
+  top = 62%
+  width = 400
+  height = 140
+  item_font = "Unifont Regular 16"
+  item_color = "#c3c2b7"
+  selected_item_font = "Unifont Regular 16"
+  selected_item_color = "#ffffff"
+  item_height = 34
+  item_padding = 10
+  item_spacing = 6
+  icon_width = 0
+  icon_height = 0
+  item_icon_space = 0
+  selected_item_pixmap_style = "select_*.png"
+}
+
++ label {
+  id = "__timeout__"
+  left = 50%-200
+  top = 62%+160
+  width = 400
+  align = "center"
+  font = "Unifont Regular 16"
+  color = "#898781"
+  text = "Starting in %d seconds. Press any key to choose."
+}

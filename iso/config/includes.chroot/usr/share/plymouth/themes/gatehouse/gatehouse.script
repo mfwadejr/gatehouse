@@ -1,0 +1,35 @@
+# Gatehouse start-up screen: the shield, a message, and a light moving along a track.
+# It has no real progress to show while the system reads the USB stick, so the light just
+# keeps moving to prove the machine is alive.
+
+Window.SetBackgroundTopColor(0.071, 0.071, 0.067);
+Window.SetBackgroundBottomColor(0.071, 0.071, 0.067);
+
+sw = Window.GetWidth();
+sh = Window.GetHeight();
+
+logo_img = Image("logo.png");
+msg_img = Image("msg.png");
+track_img = Image("track.png");
+glow_img = Image("glow.png");
+
+logo = Sprite(logo_img);
+msg = Sprite(msg_img);
+track = Sprite(track_img);
+glow = Sprite(glow_img);
+
+top = sh * 0.5 - (logo_img.GetHeight() + 24 + msg_img.GetHeight() + 40 + track_img.GetHeight()) / 2;
+logo.SetPosition(sw / 2 - logo_img.GetWidth() / 2, top, 10);
+msg.SetPosition(sw / 2 - msg_img.GetWidth() / 2, top + logo_img.GetHeight() + 24, 10);
+track_x = sw / 2 - track_img.GetWidth() / 2;
+track_y = top + logo_img.GetHeight() + 24 + msg_img.GetHeight() + 40;
+track.SetPosition(track_x, track_y, 10);
+glow.SetPosition(track_x, track_y, 11);
+
+frame = 0;
+fun refresh_callback() {
+    frame++;
+    t = (Math.Sin(frame / 22.0) + 1) / 2;
+    glow.SetX(track_x + t * (track_img.GetWidth() - glow_img.GetWidth()));
+}
+Plymouth.SetRefreshFunction(refresh_callback);

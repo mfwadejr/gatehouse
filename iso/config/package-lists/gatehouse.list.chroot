@@ -12,6 +12,7 @@ initramfs-tools
 locales
 console-setup
 kbd
+plymouth
 keyboard-configuration
 ca-certificates
 systemd-timesyncd

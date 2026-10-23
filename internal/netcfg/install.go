@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -24,6 +26,7 @@ type Installer struct {
 	PPPDir      string // /etc/ppp/peers
 	PPPSecrets  string // /etc/ppp/chap-secrets (pap-secrets is written beside it)
 	SysctlFile  string // /etc/sysctl.d/90-gatehouse.conf
+	VPNDir      string // where tunnel keys live; empty disables key files
 	StateDir    string // /var/lib/gatehouse/net
 
 	// Hooks for the parts that talk to systemd; replaced in tests.
@@ -41,7 +44,7 @@ const filePrefix = "gatehouse-"
 func NewInstaller() *Installer {
 	return &Installer{
 		NetworkdDir: "/etc/systemd/network", PPPDir: "/etc/ppp/peers", PPPSecrets: "/etc/ppp/chap-secrets",
-		SysctlFile: "/etc/sysctl.d/90-gatehouse.conf", StateDir: "/var/lib/gatehouse/net",
+		SysctlFile: "/etc/sysctl.d/90-gatehouse.conf", VPNDir: VPNKeyDir, StateDir: "/var/lib/gatehouse/net",
 		Reload: func() error {
 			if out, err := exec.Command("networkctl", "reload").CombinedOutput(); err != nil {
 				return fmt.Errorf("networkctl reload: %s", strings.TrimSpace(string(out)))
@@ -111,6 +114,13 @@ func (in *Installer) current() (map[string]string, error) {
 	if err := add(in.PPPDir, "gh-*"); err != nil {
 		return nil, err
 	}
+	if in.VPNDir != "" {
+		for _, pat := range []string{"*.key", "*.psk"} {
+			if err := add(in.VPNDir, pat); err != nil {
+				return nil, err
+			}
+		}
+	}
 	for _, f := range []string{in.SysctlFile, in.PPPSecrets, in.papSecrets(), in.path("ppp-units")} {
 		if b, err := os.ReadFile(f); err == nil {
 			out[f] = string(b)
@@ -133,6 +143,11 @@ func (in *Installer) desired(o *Output) map[string]string {
 	}
 	for n, b := range o.PPPPeers {
 		want[filepath.Join(in.PPPDir, n)] = b
+	}
+	if in.VPNDir != "" {
+		for n, b := range o.Private {
+			want[filepath.Join(in.VPNDir, n)] = b
+		}
 	}
 	want[in.SysctlFile] = o.Sysctl
 	want[in.path("ppp-units")] = strings.Join(o.PPPUnits, "\n")
@@ -242,8 +257,7 @@ func (in *Installer) install(o *Output) error {
 		os.Remove(path)
 	}
 	for path, body := range want {
-		mode := os.FileMode(0o644)
-		if err := writeAtomic(path, []byte(body), mode); err != nil {
+		if err := in.writeFile(path, []byte(body)); err != nil {
 			return err
 		}
 	}
@@ -254,6 +268,26 @@ func (in *Installer) install(o *Output) error {
 		}
 	}
 	return in.activate(o.PPPUnits)
+}
+
+// writeFile writes one managed file. Keys are readable by root and the network service only.
+func (in *Installer) writeFile(path string, body []byte) error {
+	if in.VPNDir != "" && filepath.Dir(path) == filepath.Clean(in.VPNDir) {
+		if err := os.MkdirAll(in.VPNDir, 0o750); err != nil {
+			return err
+		}
+		if err := writeAtomic(path, body, 0o640); err != nil {
+			return err
+		}
+		if g, err := user.LookupGroup("systemd-network"); err == nil {
+			if gid, err := strconv.Atoi(g.Gid); err == nil {
+				os.Chown(path, 0, gid)
+				os.Chown(in.VPNDir, 0, gid)
+			}
+		}
+		return nil
+	}
+	return writeAtomic(path, body, 0o644)
 }
 
 func (in *Installer) activate(units []string) error {
@@ -331,15 +365,17 @@ func (in *Installer) restoreLocked() error {
 	}
 	var units []string
 	for path, body := range prev {
-		mode := os.FileMode(0o644)
-		if path == in.PPPSecrets || path == in.papSecrets() {
-			mode = 0o600
-		}
 		if path == in.path("ppp-units") {
 			units = strings.Fields(body)
 			continue
 		}
-		if err := writeAtomic(path, []byte(body), mode); err != nil {
+		if path == in.PPPSecrets || path == in.papSecrets() {
+			if err := writeAtomic(path, []byte(body), 0o600); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := in.writeFile(path, []byte(body)); err != nil {
 			return err
 		}
 	}

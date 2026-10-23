@@ -134,6 +134,7 @@ func (c *Config) generateWG(out *Output) {
 			d.l("ListenPort=%d", w.Port)
 		}
 		d.l("PrivateKeyFile=%s/%s", VPNKeyDir, keyFile)
+		d.l("RouteTable=main")
 		for i, p := range w.Peers {
 			if !p.Enabled {
 				continue

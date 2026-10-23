@@ -34,3 +34,19 @@ func TestScreenStates(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderStatus(t *testing.T) {
+	ready := RenderStatus("gatehouse", []Port{{Name: "enp1s0", Link: true, Speed: "1000"}}, []string{"https://192.168.1.1"})
+	for _, want := range []string{"GATEHOUSE", "Ready.", "https://192.168.1.1", "enp1s0", "cable connected"} {
+		if !strings.Contains(ready, want) {
+			t.Errorf("status screen lacks %q", want)
+		}
+	}
+	if strings.Contains(strings.ToLower(ready), "debian") || strings.Contains(strings.ToLower(ready), "login") {
+		t.Error("status screen names another product or asks for a login")
+	}
+	waiting := RenderStatus("gatehouse", nil, nil)
+	if !strings.Contains(waiting, "Waiting for a network connection") {
+		t.Error("no waiting message")
+	}
+}
