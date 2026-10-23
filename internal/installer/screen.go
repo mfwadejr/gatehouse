@@ -256,6 +256,16 @@ func RenderStatus(host string, ports []Port, urls []string, setup string, w, h i
 		s.midBox(box)
 	}
 	switch {
+	case setup == "starting":
+		s.mid(bold + "Starting" + reset)
+		s.blank()
+		s.mid(fg + "Gatehouse is starting. This takes up to a minute." + reset)
+		s.mid(dim + "This screen updates by itself." + reset)
+	case setup == "down" && len(urls) > 0:
+		s.mid(amber + "●" + reset + bold + " The console is not running" + reset)
+		s.blank()
+		s.mid(fg + "The network is up, but Gatehouse did not start." + reset)
+		s.mid(fg + "Press Alt+F2 on this keyboard, then choose 4, to see why." + reset)
 	case len(urls) == 0:
 		s.mid(amber + "Waiting for a network connection" + reset)
 		s.blank()
@@ -301,6 +311,26 @@ func RunStatus(port string) {
 		}
 		time.Sleep(2 * time.Second)
 	}
+}
+
+// consoleState replaces the setup state with "starting" or "down" when the web console is not
+// answering, so the screen never invites someone to open an address that is dead.
+func consoleState(port, setup string) string {
+	if port == "" {
+		port = "443"
+	}
+	if c, err := net.DialTimeout("tcp", "127.0.0.1:"+port, time.Second); err == nil {
+		c.Close()
+		return setup
+	}
+	if b, err := os.ReadFile("/proc/uptime"); err == nil {
+		var up float64
+		fmt.Sscanf(string(b), "%f", &up)
+		if up < 90 {
+			return "starting"
+		}
+	}
+	return "down"
 }
 
 // consoleSize is the size of the machine's own display in characters.

@@ -370,21 +370,56 @@ func recoverCmd(args []string) {
 	fs := flag.NewFlagSet("recover", flag.ExitOnError)
 	data := fs.String("data", "/var/lib/gatehouse", "data directory")
 	fs.Parse(args)
-	db, err := store.OpenConfig(filepath.Join(*data, "config.db"))
-	if err != nil {
-		log.Fatalf("recover: %v", err)
-	}
-	defer db.Close()
-	box, err := crypt.LoadOrCreate(filepath.Join(*data, "secret.key"))
-	if err != nil {
-		log.Fatalf("recover: %v", err)
-	}
-	svc := auth.New(db, box)
+	// This screen starts with the machine, before the console has made its own files. It must never
+	// create them: files made here are owned by root and the console could not open them. So the
+	// database is opened only when something needs it, and only if it already exists.
 	fixOwner := func() {
-		exec.Command("chown", "-R", "gatehouse:gatehouse", *data).Run()
+		// Hand back what the console uses. The helper's own folders stay with root.
+		ents, _ := os.ReadDir(*data)
+		for _, e := range ents {
+			switch e.Name() {
+			case "fw", "net", "netd":
+				continue
+			}
+			exec.Command("chown", "-R", "gatehouse:gatehouse", filepath.Join(*data, e.Name())).Run()
+		}
 	}
+	var db *store.DB
+	var svc *auth.Service
+	open := func() error {
+		if svc != nil {
+			return nil
+		}
+		cfgPath, keyPath := filepath.Join(*data, "config.db"), filepath.Join(*data, "secret.key")
+		if _, err := os.Stat(cfgPath); err != nil {
+			return errors.New("Gatehouse has not been set up yet")
+		}
+		if _, err := os.Stat(keyPath); err != nil {
+			return errors.New("Gatehouse has not been set up yet")
+		}
+		d, err := store.OpenConfig(cfgPath)
+		if err != nil {
+			return err
+		}
+		box, err := crypt.LoadOrCreate(keyPath)
+		if err != nil {
+			d.Close()
+			return err
+		}
+		db, svc = d, auth.New(d, box)
+		return nil
+	}
+	defer func() {
+		if db != nil {
+			db.Close()
+			fixOwner()
+		}
+	}()
 	env := installer.RecoveryEnv{
 		Users: func() []string {
+			if open() != nil {
+				return nil
+			}
 			rows, err := db.Query(`SELECT username FROM users ORDER BY id`)
 			if err != nil {
 				return nil
@@ -399,6 +434,9 @@ func recoverCmd(args []string) {
 			return out
 		},
 		SetPassword: func(name, pw string) error {
+			if err := open(); err != nil {
+				return err
+			}
 			u, err := svc.UserByName(name)
 			if err != nil {
 				return errors.New("no such account")
@@ -407,6 +445,9 @@ func recoverCmd(args []string) {
 			return svc.SetPassword(u.ID, pw)
 		},
 		ClearTwoStep: func(name string) error {
+			if err := open(); err != nil {
+				return err
+			}
 			u, err := svc.UserByName(name)
 			if err != nil {
 				return errors.New("no such account")
@@ -421,8 +462,26 @@ func recoverCmd(args []string) {
 			ap.Baseline = fw.FirstBootBaseline
 			return ap.Rollback()
 		},
+		Diagnose: diagnose,
 	}
 	if err := installer.RunRecoveryConsole(env); err != nil {
 		log.Fatalf("recover: %v", err)
 	}
+}
+
+// diagnose says what is running and shows the last lines the programs wrote.
+func diagnose() string {
+	var b strings.Builder
+	for _, u := range []string{"gatehouse-netd", "gatehouse", "gatehouse-screen", "systemd-networkd"} {
+		out, _ := exec.Command("systemctl", "is-active", u).Output()
+		st := strings.TrimSpace(string(out))
+		if st == "" {
+			st = "unknown"
+		}
+		fmt.Fprintf(&b, "%-18s %s\n", u, st)
+	}
+	b.WriteString("\nLast messages from Gatehouse:\n")
+	out, _ := exec.Command("journalctl", "-u", "gatehouse", "-u", "gatehouse-netd", "-n", "10", "--no-pager", "-o", "cat").CombinedOutput()
+	b.WriteString(strings.TrimSpace(string(out)))
+	return b.String()
 }

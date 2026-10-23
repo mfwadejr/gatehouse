@@ -111,12 +111,14 @@ func TestRecoveryScreen(t *testing.T) {
 		SetPassword:   func(n, p string) error { got = append(got, "pw:"+n+":"+p); return nil },
 		ClearTwoStep:  func(n string) error { got = append(got, "mfa:"+n); return nil },
 		ResetFirewall: func() error { got = append(got, "fw"); return nil },
+		Diagnose:      func() string { return "gatehouse          failed" },
 	}
 	script := strings.Join([]string{
 		"1", "short", "a long enough pass", "a long enough pass", "", // new password (too short first)
 		"2", "", // two-step off
 		"3", "y", "", // firewall
-		"4",
+		"4", "", // what is running
+		"5",
 	}, "\r") + "\r"
 	var out bytes.Buffer
 	if err := RunRecovery(NewTerm(strings.NewReader(script), &out), env); err != nil {
@@ -124,6 +126,9 @@ func TestRecoveryScreen(t *testing.T) {
 	}
 	if strings.Join(got, ",") != "pw:marvin:a long enough pass,mfa:marvin,fw" {
 		t.Fatalf("actions: %v\n%s", got, out.String())
+	}
+	if !strings.Contains(out.String(), "gatehouse          failed") {
+		t.Fatal("the diagnostics view shows nothing")
 	}
 	if !strings.Contains(out.String(), "Too short: 5 of the 12") || strings.Contains(out.String(), "a long enough pass") {
 		t.Fatal("password feedback wrong or the password was echoed")

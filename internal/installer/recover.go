@@ -14,6 +14,7 @@ type RecoveryEnv struct {
 	SetPassword   func(name, password string) error
 	ClearTwoStep  func(name string) error
 	ResetFirewall func() error
+	Diagnose      func() string // what is running and the last error lines
 }
 
 // RunRecovery is the screen for someone who is locked out and is standing at the machine. Physical
@@ -24,10 +25,11 @@ func RunRecovery(t *Term, env RecoveryEnv) error {
 		t.p("  1) Choose a new password for an administrator\n")
 		t.p("  2) Turn off two-step sign-in for an administrator\n")
 		t.p("  3) Reset the firewall to the safe starting rules\n")
-		t.p("  4) Leave recovery\n\n")
-		n, err := t.ask("Number", "4", func(s string) error {
-			if s < "1" || s > "4" || len(s) != 1 {
-				return errors.New("enter a number from 1 to 4")
+		t.p("  4) Check what is running and why the console may be down\n")
+		t.p("  5) Leave recovery\n\n")
+		n, err := t.ask("Number", "5", func(s string) error {
+			if s < "1" || s > "5" || len(s) != 1 {
+				return errors.New("enter a number from 1 to 5")
 			}
 			return nil
 		})
@@ -107,6 +109,14 @@ func RunRecovery(t *Term, env RecoveryEnv) error {
 				pause(t)
 			}
 		case "4":
+			t.heading("Recovery", "What is running")
+			if env.Diagnose != nil {
+				for _, l := range strings.Split(env.Diagnose(), "\n") {
+					t.p("  %s\n", trim(l, t.W-6))
+				}
+			}
+			pause(t)
+		case "5":
 			t.clear()
 			return nil
 		}

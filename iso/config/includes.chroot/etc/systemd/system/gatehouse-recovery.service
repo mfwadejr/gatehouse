@@ -1,7 +1,7 @@
 [Unit]
 Description=Gatehouse recovery screen (Alt+F2 at the machine)
 ConditionKernelCommandLine=!boot=live
-After=systemd-user-sessions.service
+After=systemd-user-sessions.service gatehouse.service
 Conflicts=getty@tty2.service autovt@tty2.service
 
 [Service]

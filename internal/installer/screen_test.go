@@ -72,3 +72,14 @@ func TestEnsureLinksUpRetriesSlowly(t *testing.T) {
 		t.Fatalf("ports were poked again immediately: %v", calls)
 	}
 }
+
+func TestStatusSaysWhenTheConsoleIsDown(t *testing.T) {
+	p := []Port{{Name: "enp1s0", Link: true}}
+	down := RenderStatus("gatehouse", p, []string{"https://192.168.1.20"}, "down", 80, 24)
+	if !strings.Contains(down, "The console is not running") || strings.Contains(down, "https://192.168.1.20") {
+		t.Fatalf("a dead console must not be offered as an address:\n%s", down)
+	}
+	if st := RenderStatus("gatehouse", p, []string{"https://192.168.1.20"}, "starting", 80, 24); !strings.Contains(st, "is starting") {
+		t.Fatalf("no start-up message:\n%s", st)
+	}
+}
