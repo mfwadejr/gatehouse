@@ -151,6 +151,9 @@ func TestNftAcceptsRuleset(t *testing.T) {
 	if _, err := exec.LookPath("nft"); err != nil {
 		t.Skip("nft not installed")
 	}
+	if exec.Command("unshare", "-n", "true").Run() != nil {
+		t.Skip("cannot create a network namespace here")
+	}
 	out, err := Compile(sample())
 	if err != nil {
 		t.Fatal(err)

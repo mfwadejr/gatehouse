@@ -2,6 +2,7 @@ package privsep
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -48,7 +49,7 @@ func TestRoundTrip(t *testing.T) {
 	}
 	defer l.Close()
 	f := &fake{}
-	go (&Server{FW: f}).Serve(l)
+	go (&Server{FW: f, AllowUID: []uint32{uint32(os.Getuid())}}).Serve(l)
 	c := &Client{Path: path}
 
 	if err := c.Check("bad"); err == nil || err.Error() != "nft: syntax" {

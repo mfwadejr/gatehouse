@@ -3,7 +3,7 @@
 #
 #   iso/build.sh /path/to/gatehouse [version]
 #
-# Run as root on Debian or Ubuntu with live-build installed (the GitHub workflow runs it in a
+# Run as root on Debian with live-build installed (the GitHub workflow runs it in a
 # Debian 13 container). The result is out/gatehouse-<version>-amd64.iso and its checksum.
 set -eu
 

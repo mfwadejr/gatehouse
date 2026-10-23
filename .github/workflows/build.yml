@@ -36,7 +36,12 @@ jobs:
         working-directory: web
         run: node ../tokens/check-tokens.mjs src/styles.css || true
       - name: Test
-        run: go vet ./... && go test ./... 
+        run: |
+          go vet ./...
+          go test ./...
+          # The firewall and routing tests build real networks, which needs root.
+          sudo apt-get install -y nftables iproute2 >/dev/null
+          sudo -E env "PATH=$PATH" go test -count=1 ./internal/fw ./internal/wanmon ./internal/privsep
       - name: Build the program
         run: CGO_ENABLED=1 go build -trimpath -ldflags "-s -w -X main.version=${{ steps.v.outputs.version }}" -o gatehouse ./cmd/gatehouse
       - uses: actions/upload-artifact@v4

@@ -27,7 +27,7 @@ The installer erases the disk you choose, and it will not let you choose the sti
 ```
 cd web && npm ci && npm run build      # the console
 go build ./cmd/gatehouse                # the program (CGO is needed for SQLite)
-iso/build.sh ./gatehouse 0.1.0          # the image (root, Debian or Ubuntu with live-build)
+iso/build.sh ./gatehouse 0.1.0          # the image (root, Debian with live-build)
 ```
 
 GitHub Actions does all of this on every push and attaches the image to a release (`nightly` for the latest commit, a numbered release for tags starting with `v`).
