@@ -23,8 +23,10 @@ lb clean --purge >/dev/null 2>&1 || true
 lb config
 lb build
 
-mkdir -p "$OUT"
 ISO=$(ls "$WORK"/*.iso | head -n1)
+# Put the Gatehouse boot menus on the finished image and fail the build if anything else shows.
+sh "$SRC/brand-iso.sh" "$ISO" "$SRC/config/includes.binary/gatehouse-boot"
+mkdir -p "$OUT"
 NAME="gatehouse-$VERSION-amd64.iso"
 mv "$ISO" "$OUT/$NAME"
 (cd "$OUT" && sha256sum "$NAME" > "$NAME.sha256")

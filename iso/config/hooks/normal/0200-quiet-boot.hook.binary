@@ -49,7 +49,7 @@ menu rows 4
 menu tabmsg
 menu timeoutrow 24
 menu autoboot Starting Gatehouse in # seconds
-menu color screen 0 #ffc3c2b7 #ff121211 none
+menu color screen 0 #ffc3c2b7 #00000000 none
 menu color border 0 #00000000 #00000000 none
 menu color title 0 #fff0efec #00000000 none
 menu color unsel 0 #ffc3c2b7 #00000000 none
