@@ -4,3 +4,6 @@ build/
 *.db-shm
 node_modules/
 *.iso
+web/dist/*
+!web/dist/.gitkeep
+web/src/tokens.css

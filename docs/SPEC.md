@@ -11,6 +11,23 @@ Status: first build. Everything below is in scope for the first bootable image u
 - Safe by default. A bad change must never lock the administrator out of the box.
 - A polished, themed console and installer. Every colour, size and spacing value comes from design tokens.
 
+## 1a. Ease of use is the product
+
+pfSense and OPNsense are powerful and hard. Gatehouse exists to be the opposite: a person who has never configured a firewall should be able to set up and run it. Every feature in this document is judged against these rules, and a feature that cannot meet them is not shipped in that form.
+
+1. **Defaults first.** A working network after the installer, with nothing else configured: DNS filtering on, DHCP on, a safe firewall, no open inbound ports. Most people never open a settings page.
+2. **Say what you want, not how.** Firewall policy is expressed as plain statements in the console ("Guests can reach the internet, but not other networks"), chosen from presets per network: Trusted, Private, Guest, Isolated (IoT), and Custom. Presets compile to the zone rules. Raw rules are an Advanced view, not the front door.
+3. **Plain language.** No jargon in the primary UI. "Network" instead of VLAN or zone, "Internet connection" instead of WAN, "Device" instead of lease. Technical terms appear in a detail line or tooltip for those who want them.
+4. **Guided setup for anything hard.** Internet connection types, VLANs, VPN and port forwarding use short step-by-step flows that ask a question at a time, detect what they can (link state, DHCP on the WAN, PPPoE need, CGNAT) and recommend the answer.
+5. **Impossible to lock yourself out, easy to undo.** Every risky change shows a plain-English summary of what will happen, applies with an automatic revert timer, and every change lands in a history you can roll back with one click.
+6. **Problems explain themselves.** Each warning says what is wrong, why it matters, and has one button that fixes it. "Why is this blocked?" and "Why can't this device reach that?" are built in and answer in a sentence.
+7. **Progressive disclosure.** Simple view by default, an Advanced toggle per page. Nothing is hidden for good; it is just not in the way.
+8. **Few pages, few choices.** A new setting must replace a decision the person would otherwise make, not add one. Where a good value exists, use it and do not ask.
+9. **One place for each thing.** A device is one list with its DHCP, DNS, filtering and firewall status together, not four tables in four menus.
+10. **Fast and calm.** Pages respond immediately, live data updates in place, and nothing needs a reboot or a restart.
+
+Measured by a first-boot test: from USB boot to a working, filtered network in under ten minutes with no documentation.
+
 ## 2. Target
 
 - x86-64 PC with one or more real network ports (Intel assumed, others supported by the Debian kernel).
@@ -35,6 +52,7 @@ External components the program orchestrates rather than re-implements:
 - `nftables` for firewalling and NAT (rules are generated and loaded with `nft -f`, validated first with `nft -c -f`).
 - `systemd-networkd` for addresses, VLANs, DHCPv4/DHCPv6 clients, IPv6 prefix delegation and router advertisements.
 - `ppp` (pppd with the rp-pppoe plugin) for PPPoE.
+- `openvpn` for OpenVPN tunnels; WireGuard is kernel-native and configured directly.
 
 ## 4. Storage
 
@@ -45,7 +63,7 @@ External components the program orchestrates rather than re-implements:
 
 ## 5. Console
 
-Pages: Overview (landing), DNS, DHCP, Firewall (overview and policies), Devices and access, Logs, Settings (access, interfaces and WAN, authentication, system).
+Pages: Overview (landing), DNS, DHCP, Firewall (overview and policies), VPN, Devices and access, Logs, Settings (access, interfaces and WAN, authentication, system).
 
 The Overview shows service status, internet throughput, per-link state, items needing attention, per-interface throughput, recent activity and link history. Detail lives on the area pages.
 
@@ -104,6 +122,30 @@ All styling derives from `tokens/tokens.json` (see section 11).
 - Mappings live in nftables sets with element timeouts. Every request is logged. UI lists active mappings with revoke.
 - Return traffic is bound to the link the mapping belongs to. Mappings are dropped on failover by default.
 
+## 9a. VPN
+
+Two engines, managed from one console page. Both appear to the firewall as zones, so ordinary policy applies to VPN traffic.
+
+### WireGuard
+- Kernel WireGuard, configured through `netd` (interfaces created with netlink, keys generated in Go with Curve25519; private keys sealed in `config.db`).
+- Server mode: one or more interfaces (`wg0`, ...), listen port, address pool, peers with name, public key, assigned address, allowed IPs, keepalive, optional preshared key. Peers can be created in the console, which generates the key pair and shows the client config once as text and a QR code.
+- Client / site-to-site mode: connect out to a provider or another site, with allowed IPs, endpoint, DNS and "route all traffic" or split routes. Can be a multi-WAN member for failover.
+- Per-peer state: last handshake, transfer counters, endpoint. Published as live events.
+- Each interface is bound to a firewall zone ("VPN" by default). Peers can be moved to a different zone by group.
+
+### OpenVPN
+- Orchestrates the `openvpn` daemon from generated configuration. Server mode (routed, UDP or TCP) and client mode (import a provider `.ovpn`).
+- Built-in certificate authority written in Go (ECDSA P-256): CA, server certificate, per-user client certificates, revocation list. CA key sealed in `config.db`.
+- Server: port, protocol, pool, pushed routes and DNS (Gatehouse DNS by default), cipher policy limited to AEAD suites, `tls-crypt` key, user certificates with optional username and password plus TOTP.
+- Profiles: generate and download a single `.ovpn` per user; revoke from the console.
+- Live status from the management interface on a unix socket (clients, bytes in and out, connected since).
+
+### Common
+- Remote access is off by default and never opens a port until the administrator enables it and the firewall policy for the VPN zone is saved.
+- The protected management rule never depends on a VPN being up.
+- VPN client addresses appear on the device list; DNS filtering groups apply to them.
+- Deferred inside VPN: SSO, per-user firewall policy, dynamic routing over tunnels.
+
 ## 10. Authentication and security
 
 - Local accounts. Password hashing PBKDF2-HMAC-SHA256 (600,000 iterations), constant-time comparison.
@@ -137,7 +179,7 @@ All styling derives from `tokens/tokens.json` (see section 11).
 
 ## 14. Deferred
 
-- High availability, VPN, DPI/IDS, mobile app.
+- High availability, DPI/IDS, mobile app.
 - A/B partition updates and an update channel.
 - Per-device throughput accounting.
 

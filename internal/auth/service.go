@@ -513,3 +513,20 @@ func (s *Service) PurgeExpired() {
 	}
 	s.mu.Unlock()
 }
+
+// MarkMFA records that a session has satisfied the second factor (after enrolment).
+func (s *Service) MarkMFA(sessionID string) {
+	s.db.Exec(`UPDATE sessions SET mfa=1 WHERE id=?`, sessionID)
+}
+
+// ChangePassword verifies the current password and sets a new one.
+func (s *Service) ChangePassword(userID int64, current, next string) error {
+	u, err := s.loadByID(userID)
+	if err != nil {
+		return ErrInvalid
+	}
+	if !VerifyPassword(current, u.hash) {
+		return ErrInvalid
+	}
+	return s.SetPassword(userID, next)
+}

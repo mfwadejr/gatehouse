@@ -1,0 +1,64 @@
+# Base system
+linux-image-amd64
+systemd
+systemd-sysv
+udev
+dbus
+kmod
+live-boot
+live-config
+live-config-systemd
+initramfs-tools
+locales
+console-setup
+keyboard-configuration
+ca-certificates
+systemd-timesyncd
+sudo
+
+# Networking
+iproute2
+iputils-ping
+nftables
+ppp
+ethtool
+tcpdump
+conntrack
+curl
+wireguard-tools
+openvpn
+dnsutils
+traceroute
+
+# Disk and boot loader tools (installer and the installed system)
+grub2-common
+grub-common
+grub-pc-bin
+grub-efi-amd64-bin
+efibootmgr
+parted
+gdisk
+dosfstools
+e2fsprogs
+squashfs-tools
+rsync
+util-linux
+pciutils
+usbutils
+
+# Hardware support. USB Ethernet adapters (Realtek, ASIX, Microchip) work with the kernel
+# drivers; the Realtek ones need their firmware package.
+firmware-linux-free
+firmware-realtek
+firmware-misc-nonfree
+firmware-bnx2
+firmware-bnx2x
+firmware-atheros
+firmware-amd-graphics
+firmware-intel-misc
+intel-microcode
+amd64-microcode
+
+# Convenience on the local console
+nano
+less

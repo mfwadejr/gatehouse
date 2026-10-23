@@ -1,0 +1,575 @@
+package app
+
+import (
+	"crypto/sha256"
+	"database/sql"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net"
+	"net/http"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
+
+	"gatehouse/internal/api"
+	"gatehouse/internal/fw"
+	"gatehouse/internal/netcfg"
+	"gatehouse/internal/netd"
+	"gatehouse/internal/wanmon"
+)
+
+// NetController is the privileged network side; privsep.Client implements it.
+type NetController interface {
+	NetApply(p netd.Plan, window time.Duration) (string, time.Time, error)
+	NetConfirm(token string) error
+	NetRollback() error
+	NetPending() (string, time.Time, bool)
+	WanStatus() (map[string]wanmon.State, error)
+}
+
+// IfaceRow is a LAN-side port or VLAN as the console edits it.
+type IfaceRow struct {
+	ID      int64  `json:"id"`
+	Name    string `json:"name"`
+	Kind    string `json:"kind"`
+	Parent  string `json:"parent"`
+	VLAN    int    `json:"vlan"`
+	ZoneID  int64  `json:"zone_id"`
+	IPv4    string `json:"ipv4"`
+	IPv6    string `json:"ipv6"`
+	PD      bool   `json:"pd"`
+	MTU     int    `json:"mtu"`
+	Enabled bool   `json:"enabled"`
+}
+
+// WanRow is an internet connection as the console edits it. The password is never sent back.
+type WanRow struct {
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	Iface       string `json:"iface"`
+	Type        string `json:"type"`
+	VLAN        int    `json:"vlan"`
+	Addr        string `json:"addr"`
+	Gateway     string `json:"gateway"`
+	DNS         string `json:"dns"`
+	PPPoEUser   string `json:"pppoe_user"`
+	PPPoEPass   string `json:"pppoe_pass,omitempty"` // write-only
+	HasPass     bool   `json:"has_pass"`
+	V6Mode      string `json:"v6_mode"`
+	V6Addr      string `json:"v6_addr"`
+	V6Gateway   string `json:"v6_gateway"`
+	Priority    int    `json:"priority"`
+	Weight      int    `json:"weight"`
+	CheckKind   string `json:"check_kind"`
+	CheckTarget string `json:"check_target"`
+	CheckEvery  int    `json:"check_interval"`
+	CheckFails  int    `json:"check_failures"`
+	MTU         int    `json:"mtu"`
+	UPnP        bool   `json:"upnp"`
+	Enabled     bool   `json:"enabled"`
+}
+
+type querier interface {
+	Query(query string, args ...any) (*sql.Rows, error)
+}
+
+func (a *App) listIfaces(q querier) ([]IfaceRow, error) {
+	rows, err := q.Query(`SELECT id,name,kind,parent,vlan_id,COALESCE(zone_id,0),ipv4_cidr,ipv6_cidr,ipv6_pd,mtu,enabled FROM interfaces ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []IfaceRow{}
+	for rows.Next() {
+		var r IfaceRow
+		var pd, en int
+		if err := rows.Scan(&r.ID, &r.Name, &r.Kind, &r.Parent, &r.VLAN, &r.ZoneID, &r.IPv4, &r.IPv6, &pd, &r.MTU, &en); err != nil {
+			return nil, err
+		}
+		r.PD, r.Enabled = pd == 1, en == 1
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+func (a *App) listWans(q querier) ([]WanRow, error) {
+	rows, err := q.Query(`SELECT id,name,iface,type,vlan_id,ipv4_addr,ipv4_gw,dns,pppoe_user,pppoe_pass,ipv6_mode,ipv6_addr,ipv6_gw,
+		priority,weight,check_kind,check_target,check_interval,check_failures,mtu,upnp,enabled FROM wan_links ORDER BY priority,id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []WanRow{}
+	for rows.Next() {
+		var r WanRow
+		var pass string
+		var up, en int
+		if err := rows.Scan(&r.ID, &r.Name, &r.Iface, &r.Type, &r.VLAN, &r.Addr, &r.Gateway, &r.DNS, &r.PPPoEUser, &pass, &r.V6Mode,
+			&r.V6Addr, &r.V6Gateway, &r.Priority, &r.Weight, &r.CheckKind, &r.CheckTarget, &r.CheckEvery, &r.CheckFails, &r.MTU, &up, &en); err != nil {
+			return nil, err
+		}
+		r.PPPoEPass = pass // sealed; callers decide whether to expose
+		r.HasPass = pass != ""
+		r.UPnP, r.Enabled = up == 1, en == 1
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// buildPlan turns the stored configuration into what the helper installs.
+// Connection i (enabled, ordered by priority then id) uses routing table 100+i and mark MarkBase+i,
+// matching the firewall's view of the internet-side interfaces.
+func (a *App) buildPlan(q querier) (*netd.Plan, error) {
+	ifs, err := a.listIfaces(q)
+	if err != nil {
+		return nil, err
+	}
+	wans, err := a.listWans(q)
+	if err != nil {
+		return nil, err
+	}
+	p := &netd.Plan{Mode: "failover"}
+	if rows, err := q.Query(`SELECT value FROM settings WHERE key='wan.mode'`); err == nil {
+		if rows.Next() {
+			rows.Scan(&p.Mode)
+		}
+		rows.Close()
+	}
+	for _, i := range ifs {
+		p.Config.Interfaces = append(p.Config.Interfaces, netcfg.Interface{Name: i.Name, Kind: i.Kind, Parent: i.Parent,
+			VLAN: i.VLAN, IPv4: i.IPv4, IPv6: i.IPv6, PD: i.PD, MTU: i.MTU, Enabled: i.Enabled})
+	}
+	n := 0
+	for _, w := range wans {
+		pass := ""
+		if w.PPPoEPass != "" {
+			if pass, err = a.Box.Open(w.PPPoEPass); err != nil {
+				return nil, fmt.Errorf("the saved password for %s cannot be read; enter it again", w.Name)
+			}
+		}
+		nw := netcfg.WAN{Name: w.Name, Iface: w.Iface, Type: w.Type, VLAN: w.VLAN, Addr: w.Addr, Gateway: w.Gateway, DNS: w.DNS,
+			PPPoEUser: w.PPPoEUser, PPPoEPass: pass, V6Mode: w.V6Mode, V6Addr: w.V6Addr, V6Gateway: w.V6Gateway,
+			Priority: w.Priority, MTU: w.MTU, Enabled: w.Enabled}
+		p.Config.WANs = append(p.Config.WANs, nw)
+		if !w.Enabled {
+			continue
+		}
+		p.Links = append(p.Links, netd.LinkSpec{Name: w.Name, Dev: netcfg.WanDevice(nw), Priority: w.Priority, Weight: max(w.Weight, 1),
+			Table: 100 + n, Mark: uint32(fw.MarkBase + n), Kind: w.CheckKind, Target: w.CheckTarget,
+			Interval: w.CheckEvery, Failures: w.CheckFails, Recover: w.CheckFails})
+		n++
+	}
+	return p, nil
+}
+
+// fingerprint identifies a plan, so the console can tell whether anything changed since the last apply.
+func fingerprint(p *netd.Plan) string {
+	q := *p
+	q.Seconds = 0
+	b, _ := json.Marshal(q)
+	h := sha256.Sum256(b)
+	return hex.EncodeToString(h[:])
+}
+
+func (a *App) validatePlan(p *netd.Plan) error {
+	if err := p.Config.Validate(); err != nil {
+		return err
+	}
+	if _, err := netcfg.Generate(&p.Config); err != nil {
+		return err
+	}
+	if p.Mode != "failover" && p.Mode != "balance" {
+		return errors.New("connection sharing must be failover or balance")
+	}
+	return nil
+}
+
+// mutateNet runs fn, then keeps the change only if the whole network configuration still validates.
+func (a *App) mutateNet(fn func(tx *sql.Tx) error) error {
+	tx, err := a.Config.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := fn(tx); err != nil {
+		return err
+	}
+	p, err := a.buildPlan(tx)
+	if err != nil {
+		return err
+	}
+	if err := a.validatePlan(p); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func b2iN(b bool) int { return b2i(b) }
+
+func (a *App) netStatus() map[string]any {
+	st := map[string]any{"helper": a.Net != nil}
+	p, err := a.buildPlan(a.Config)
+	if err != nil {
+		st["error"] = err.Error()
+		return st
+	}
+	st["dirty"] = (len(p.Config.Interfaces) > 0 || len(p.Config.WANs) > 0) && fingerprint(p) != a.Config.Setting("net.applied", "")
+	if a.Net != nil {
+		if tok, dl, ok := a.Net.NetPending(); ok {
+			st["pending"] = map[string]any{"token": tok, "deadline": dl.Unix()}
+		}
+	}
+	return st
+}
+
+func (a *App) publishNet() { a.Bus.Publish("net.status", a.netStatus()) }
+
+// ports lists network ports a person can plug a cable into: built-in, PCIe and USB adapters.
+// Virtual devices (bridges, VPNs, containers, loopback) and wireless are left out.
+func ports() []map[string]any {
+	ents, _ := os.ReadDir("/sys/class/net")
+	out := []map[string]any{}
+	for _, e := range ents {
+		n := e.Name()
+		base := "/sys/class/net/" + n
+		if n == "lo" {
+			continue
+		}
+		real, err := filepath.EvalSymlinks(base)
+		if err != nil || strings.Contains(real, "/devices/virtual/") {
+			continue
+		}
+		if _, err := os.Stat(base + "/wireless"); err == nil {
+			continue
+		}
+		if t, _ := os.ReadFile(base + "/type"); strings.TrimSpace(string(t)) != "1" {
+			continue // not Ethernet
+		}
+		ifi, err := net.InterfaceByName(n)
+		if err != nil {
+			continue
+		}
+		carrier, _ := os.ReadFile(base + "/carrier")
+		speed, _ := os.ReadFile(base + "/speed")
+		out = append(out, map[string]any{"name": n, "mac": ifi.HardwareAddr.String(),
+			"link": strings.TrimSpace(string(carrier)) == "1", "speed": strings.TrimSpace(string(speed)),
+			"usb": strings.Contains(real, "/usb")})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i]["name"].(string) < out[j]["name"].(string) })
+	return out
+}
+
+func (a *App) registerNetRoutes() {
+	s := a.API
+	s.Handle("GET /api/net/ports", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		api.JSON(w, 200, ports())
+	})
+	s.Handle("GET /api/net/status", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		out := map[string]any{"status": a.netStatus()}
+		if a.Net != nil {
+			if st, err := a.Net.WanStatus(); err == nil {
+				out["links"] = st
+			}
+		}
+		api.JSON(w, 200, out)
+	})
+	s.Handle("GET /api/net/interfaces", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		v, err := a.listIfaces(a.Config)
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		api.JSON(w, 200, v)
+	})
+	s.HandleAdmin("PUT /api/net/interfaces", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		var in IfaceRow
+		if !api.Decode(w, r, &in) {
+			return
+		}
+		var id int64
+		err := a.mutateNet(func(tx *sql.Tx) error {
+			var zone any
+			if in.ZoneID > 0 {
+				zone = in.ZoneID
+			}
+			if in.ID == 0 {
+				res, err := tx.Exec(`INSERT INTO interfaces(name,kind,parent,vlan_id,zone_id,ipv4_cidr,ipv6_cidr,ipv6_pd,mtu,enabled) VALUES(?,?,?,?,?,?,?,?,?,?)`,
+					in.Name, in.Kind, in.Parent, in.VLAN, zone, in.IPv4, in.IPv6, b2iN(in.PD), in.MTU, b2iN(in.Enabled))
+				if err != nil {
+					return friendlyDup(err, "a port or VLAN with that name already exists")
+				}
+				id, _ = res.LastInsertId()
+				return nil
+			}
+			id = in.ID
+			_, err := tx.Exec(`UPDATE interfaces SET name=?,kind=?,parent=?,vlan_id=?,zone_id=?,ipv4_cidr=?,ipv6_cidr=?,ipv6_pd=?,mtu=?,enabled=? WHERE id=?`,
+				in.Name, in.Kind, in.Parent, in.VLAN, zone, in.IPv4, in.IPv6, b2iN(in.PD), in.MTU, b2iN(in.Enabled), in.ID)
+			return friendlyDup(err, "a port or VLAN with that name already exists")
+		})
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		a.publishNet()
+		api.JSON(w, 200, map[string]int64{"id": id})
+	})
+	s.HandleAdmin("DELETE /api/net/interfaces/{id}", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		id, good := pathID(r)
+		if !good {
+			fail(w, errBadID)
+			return
+		}
+		if err := a.mutateNet(func(tx *sql.Tx) error { _, e := tx.Exec(`DELETE FROM interfaces WHERE id=?`, id); return e }); err != nil {
+			fail(w, err)
+			return
+		}
+		a.publishNet()
+		ok(w)
+	})
+	s.Handle("GET /api/net/wans", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		v, err := a.listWans(a.Config)
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		for i := range v {
+			v[i].PPPoEPass = ""
+		}
+		api.JSON(w, 200, map[string]any{"wans": v, "mode": a.Config.Setting("wan.mode", "failover")})
+	})
+	s.HandleAdmin("PUT /api/net/wans", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		var in WanRow
+		if !api.Decode(w, r, &in) {
+			return
+		}
+		defaults(&in)
+		var id int64
+		err := a.mutateNet(func(tx *sql.Tx) error {
+			sealed := ""
+			if in.PPPoEPass != "" {
+				sealed = a.Box.Seal(in.PPPoEPass)
+			} else if in.ID != 0 {
+				tx.QueryRow(`SELECT pppoe_pass FROM wan_links WHERE id=?`, in.ID).Scan(&sealed)
+			}
+			if in.Type != "pppoe" {
+				sealed = ""
+			}
+			args := []any{in.Name, in.Iface, in.Type, in.VLAN, in.Addr, in.Gateway, in.DNS, in.PPPoEUser, sealed, in.V6Mode, in.V6Addr, in.V6Gateway,
+				in.Priority, in.Weight, in.CheckKind, in.CheckTarget, in.CheckEvery, in.CheckFails, in.MTU, b2iN(in.UPnP), b2iN(in.Enabled)}
+			if in.ID == 0 {
+				res, err := tx.Exec(`INSERT INTO wan_links(name,iface,type,vlan_id,ipv4_addr,ipv4_gw,dns,pppoe_user,pppoe_pass,ipv6_mode,ipv6_addr,ipv6_gw,
+					priority,weight,check_kind,check_target,check_interval,check_failures,mtu,upnp,enabled) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, args...)
+				if err != nil {
+					return friendlyDup(err, "an internet connection with that name already exists")
+				}
+				id, _ = res.LastInsertId()
+				return nil
+			}
+			id = in.ID
+			_, err := tx.Exec(`UPDATE wan_links SET name=?,iface=?,type=?,vlan_id=?,ipv4_addr=?,ipv4_gw=?,dns=?,pppoe_user=?,pppoe_pass=?,ipv6_mode=?,ipv6_addr=?,ipv6_gw=?,
+				priority=?,weight=?,check_kind=?,check_target=?,check_interval=?,check_failures=?,mtu=?,upnp=?,enabled=? WHERE id=?`, append(args, in.ID)...)
+			return friendlyDup(err, "an internet connection with that name already exists")
+		})
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		a.publishNet()
+		a.publishFW()
+		api.JSON(w, 200, map[string]int64{"id": id})
+	})
+	s.HandleAdmin("DELETE /api/net/wans/{id}", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		id, good := pathID(r)
+		if !good {
+			fail(w, errBadID)
+			return
+		}
+		if err := a.mutateNet(func(tx *sql.Tx) error { _, e := tx.Exec(`DELETE FROM wan_links WHERE id=?`, id); return e }); err != nil {
+			fail(w, err)
+			return
+		}
+		a.publishNet()
+		a.publishFW()
+		ok(w)
+	})
+	s.HandleAdmin("PUT /api/net/mode", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		var in struct {
+			Mode string `json:"mode"`
+		}
+		if !api.Decode(w, r, &in) {
+			return
+		}
+		if in.Mode != "failover" && in.Mode != "balance" {
+			fail(w, errors.New("choose failover or balance"))
+			return
+		}
+		a.Config.SetSetting("wan.mode", in.Mode)
+		a.publishNet()
+		ok(w)
+	})
+	s.HandleAdmin("POST /api/net/preview", a.netPreview)
+	s.HandleAdmin("POST /api/net/apply", a.netApply)
+	s.HandleAdmin("POST /api/net/confirm", a.netConfirm)
+	s.HandleAdmin("POST /api/net/rollback", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		if a.Net == nil {
+			fail(w, errNoHelper)
+			return
+		}
+		if err := a.Net.NetRollback(); err != nil {
+			fail(w, err)
+			return
+		}
+		a.publishNet()
+		ok(w)
+	})
+}
+
+func friendlyDup(err error, msg string) error {
+	if err != nil && strings.Contains(err.Error(), "UNIQUE") {
+		return errors.New(msg)
+	}
+	return err
+}
+
+// defaults fills in sensible values so the console can send the minimum.
+func defaults(w *WanRow) {
+	if w.Type == "" {
+		w.Type = "dhcp"
+	}
+	if w.V6Mode == "" {
+		w.V6Mode = "none"
+	}
+	if w.Priority == 0 {
+		w.Priority = 1
+	}
+	if w.Weight == 0 {
+		w.Weight = 1
+	}
+	if w.CheckKind == "" {
+		w.CheckKind = "icmp"
+	}
+	if w.CheckTarget == "" {
+		w.CheckTarget = "1.1.1.1"
+	}
+	if w.CheckEvery == 0 {
+		w.CheckEvery = 5
+	}
+	if w.CheckFails == 0 {
+		w.CheckFails = 3
+	}
+}
+
+// netWarnings are plain-language cautions that do not block an apply.
+func (a *App) netWarnings(p *netd.Plan, clientIP string) []string {
+	var out []string
+	if len(p.Links) == 0 {
+		out = append(out, "No internet connection is set up, so devices will not reach the internet.")
+	}
+	ci := ifaceOf(clientIP)
+	for _, i := range p.Config.Interfaces {
+		if ci != "" && ci == i.Name && !i.Enabled {
+			out = append(out, "You are connected through "+i.Name+", which this turns off. You will be disconnected; the change is undone if you do not confirm.")
+		}
+	}
+	for _, w := range p.Config.WANs {
+		if w.Type == "static" && w.Enabled {
+			if ip, _, ok := strings.Cut(w.Addr, "/"); ok {
+				if shared, why := netcfg.CGNAT(ip); shared {
+					out = append(out, w.Name+": "+why)
+				}
+			}
+		}
+	}
+	return out
+}
+
+func (a *App) netPreview(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+	p, err := a.buildPlan(a.Config)
+	if err == nil {
+		err = a.validatePlan(p)
+	}
+	if err != nil {
+		api.JSON(w, 200, map[string]any{"ok": false, "problems": strings.Split(err.Error(), "; ")})
+		return
+	}
+	api.JSON(w, 200, map[string]any{"ok": true, "changed": fingerprint(p) != a.Config.Setting("net.applied", ""),
+		"warnings": a.netWarnings(p, c.IP)})
+}
+
+func (a *App) netApply(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+	if a.Net == nil {
+		fail(w, errNoHelper)
+		return
+	}
+	var in struct {
+		Code string `json:"code"`
+	}
+	if !api.Decode(w, r, &in) {
+		return
+	}
+	if _, _, pending := a.Net.NetPending(); pending {
+		api.Error(w, http.StatusConflict, netcfg.ErrPending.Error())
+		return
+	}
+	if a.Config.Setting("fw.stepup", "1") == "1" && c.User.TOTPEnabled {
+		if err := a.Auth.VerifyStepUp(c.User.ID, in.Code); err != nil {
+			api.Error(w, http.StatusForbidden, "enter a current code from your authenticator to apply network changes")
+			return
+		}
+	}
+	p, err := a.buildPlan(a.Config)
+	if err == nil {
+		err = a.validatePlan(p)
+	}
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	tok, deadline, err := a.Net.NetApply(*p, confirmWindow)
+	if err != nil {
+		if errors.Is(err, netcfg.ErrPending) {
+			api.Error(w, http.StatusConflict, err.Error())
+			return
+		}
+		fail(w, err)
+		return
+	}
+	a.netApplyState.mu.Lock()
+	a.netApplyState.connID, a.netApplyState.print = api.ConnID(r), fingerprint(p)
+	a.netApplyState.mu.Unlock()
+	a.publishNet()
+	w.Header().Set("Connection", "close")
+	api.JSON(w, 200, map[string]any{"token": tok, "deadline": deadline.Unix(), "seconds": int(confirmWindow / time.Second)})
+}
+
+func (a *App) netConfirm(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+	if a.Net == nil {
+		fail(w, errNoHelper)
+		return
+	}
+	var in struct {
+		Token string `json:"token"`
+	}
+	if !api.Decode(w, r, &in) {
+		return
+	}
+	a.netApplyState.mu.Lock()
+	same := a.netApplyState.connID != 0 && a.netApplyState.connID == api.ConnID(r)
+	print := a.netApplyState.print
+	a.netApplyState.mu.Unlock()
+	if same {
+		api.Error(w, http.StatusConflict, "confirm from a new connection; the old one can outlive a broken change")
+		return
+	}
+	if err := a.Net.NetConfirm(in.Token); err != nil {
+		fail(w, err)
+		return
+	}
+	a.Config.SetSetting("net.applied", print)
+	a.publishNet()
+	ok(w)
+}

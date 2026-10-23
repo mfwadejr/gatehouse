@@ -97,3 +97,10 @@ func hashRecovery(code string) string {
 	h := sha256.Sum256([]byte("gatehouse-recovery:" + code))
 	return hex.EncodeToString(h[:])
 }
+
+// TOTPCodeAt returns the current code for a secret. It exists for tests and the installer's
+// self-check; the server never reveals codes.
+func TOTPCodeAt(secret string, t time.Time) string {
+	c, _ := totpCode(secret, t.Unix()/30, 6)
+	return c
+}
