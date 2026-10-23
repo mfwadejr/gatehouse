@@ -32,6 +32,7 @@ func ok(w http.ResponseWriter) { api.JSON(w, 200, map[string]string{"status": "o
 
 func (a *App) registerRoutes() {
 	s := a.API
+	a.registerVPNRoutes()
 	// DNS
 	s.Handle("GET /api/dns/summary", a.dnsSummary)
 	s.Handle("GET /api/dns/log", a.dnsLog)

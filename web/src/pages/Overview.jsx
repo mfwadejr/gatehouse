@@ -22,6 +22,7 @@ export default function Overview() {
   const { data: util } = useData('/api/dhcp/utilisation', { topics: ['dhcp.utilisation'], every: 15000 });
   const { data: leases } = useData('/api/dhcp/leases', { topics: ['dhcp.leases'] });
   const { data: fw } = useData('/api/fw/overview', { topics: ['fw.status'] });
+  const { data: vpn } = useData('/api/vpn', { topics: ['vpn.status'], every: 15000 });
   const { data: top } = useData('/api/dns/top?hours=24', { every: 30000 });
 
   const st = dns?.stats;
@@ -38,6 +39,11 @@ export default function Overview() {
   if (fw?.status?.dirty) attention.push({ t: 'Firewall changes are waiting to be applied', s: 'Review and apply them.', to: 'firewall' });
   if (net?.status?.dirty) attention.push({ t: 'Internet settings are waiting to be applied', s: 'Review and apply them.', to: 'internet' });
   Object.entries(links).forEach(([n, v]) => { if (v.up === false) attention.push({ t: `${n} is down`, s: v.error || 'The connection check is failing.', to: 'internet' }); });
+  (vpn?.vpns || []).forEach((v) => {
+    if (!v.enabled) return;
+    if (v.state === 'down') attention.push({ t: `VPN ${v.label} is down`, s: v.message, to: 'vpn' });
+    else if (v.state === 'degraded') attention.push({ t: `VPN ${v.label} is not passing traffic`, s: v.message, to: 'vpn' });
+  });
   (util || []).forEach((s) => { if (s.size && s.active / s.size > 0.8) attention.push({ t: `${s.name} is ${Math.round((100 * s.active) / s.size)}% full`, s: 'Consider a larger address range.', to: 'dhcp' }); });
   (dns?.upstreams || []).forEach((u) => { if (u.state !== 'healthy') attention.push({ t: `DNS server ${u.name} is ${u.state}`, s: u.last_error || '', to: 'dns' }); });
 

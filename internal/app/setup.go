@@ -79,8 +79,16 @@ func (a *App) registerSetupRoutes() {
 			api.Error(w, http.StatusTooManyRequests, "too many wrong codes; wait a few minutes and try again")
 			return
 		}
-		code := strings.TrimSpace(in.Code)
-		if g.code == "" || subtle.ConstantTimeCompare([]byte(code), []byte(g.code)) != 1 {
+		digits := func(s string) string {
+			return strings.Map(func(r rune) rune {
+				if r >= '0' && r <= '9' {
+					return r
+				}
+				return -1
+			}, s)
+		}
+		code := digits(in.Code)
+		if g.code == "" || subtle.ConstantTimeCompare([]byte(code), []byte(digits(g.code))) != 1 {
 			g.fails++
 			if g.fails >= 5 {
 				g.fails, g.lockedTo = 0, time.Now().Add(10*time.Minute)

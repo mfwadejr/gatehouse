@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -46,6 +47,34 @@ func WiredPorts() []Port {
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
 }
+
+// linkTried remembers when a port was last asked to come up, so a port with nothing plugged
+// in is not poked every second.
+var linkTried = map[string]time.Time{}
+
+// EnsureLinksUp brings every wired port up. A port that is switched off cannot report a cable
+// (its carrier file cannot be read), which is how USB adapters that appeared after boot went
+// unnoticed until something else woke them. Ports are retried every few seconds because a USB
+// adapter can take a while to finish starting.
+func EnsureLinksUp() {
+	for _, p := range WiredPorts() {
+		state, _ := os.ReadFile("/sys/class/net/" + p.Name + "/operstate")
+		if st := strings.TrimSpace(string(state)); st != "down" && st != "" {
+			continue
+		}
+		if ifi, err := net.InterfaceByName(p.Name); err == nil && ifi.Flags&net.FlagUp != 0 && p.Link {
+			continue
+		}
+		if t, ok := linkTried[p.Name]; ok && time.Since(t) < 8*time.Second {
+			continue
+		}
+		linkTried[p.Name] = time.Now()
+		bringUp(p.Name)
+	}
+}
+
+// bringUp is replaced in tests.
+var bringUp = func(name string) { exec.Command("ip", "link", "set", "dev", name, "up").Run() }
 
 // Colours from the design tokens, loaded into the console palette.
 const palette = "\x1b]P0121211\x1b]P1e5484d\x1b]P24cb06a\x1b]P3e5b43a\x1b]P43987e5\x1b]P7c3c2b7\x1b]P8898781\x1b]PFf0efec"
@@ -192,6 +221,7 @@ func RunScreen(code, port string) {
 	var last string
 	first := true
 	for {
+		EnsureLinksUp()
 		s := RenderScreen(WiredPorts(), usableAddresses(port), code)
 		if s != last || first {
 			for _, tty := range []string{"/dev/tty1", "/dev/console"} {
@@ -267,6 +297,7 @@ func RunStatus(port string) {
 	first := true
 	for {
 		host, _ := os.Hostname()
+		EnsureLinksUp()
 		s := RenderStatus(host, WiredPorts(), usableAddresses(port))
 		if s != last || first {
 			for _, tty := range []string{"/dev/tty1", "/dev/console"} {

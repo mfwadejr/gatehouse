@@ -29,6 +29,8 @@ type NetController interface {
 	NetRollback() error
 	NetPending() (string, time.Time, bool)
 	WanStatus() (map[string]wanmon.State, error)
+	ApplyVPN(p netd.VPNPlan) error
+	VPNStatus() (netd.VPNStatus, error)
 }
 
 // IfaceRow is a LAN-side port or VLAN as the console edits it.
@@ -172,6 +174,9 @@ func (a *App) buildPlan(q querier) (*netd.Plan, error) {
 			Table: 100 + n, Mark: uint32(fw.MarkBase + n), Kind: w.CheckKind, Target: w.CheckTarget,
 			Interval: w.CheckEvery, Failures: w.CheckFails, Recover: w.CheckFails})
 		n++
+	}
+	if err := a.addVPNToPlan(q, p); err != nil {
+		return nil, err
 	}
 	return p, nil
 }
@@ -549,7 +554,7 @@ func (a *App) netApply(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		return
 	}
 	a.netApplyState.mu.Lock()
-	a.netApplyState.connID, a.netApplyState.print = api.ConnID(r), fingerprint(p)
+	a.netApplyState.connID, a.netApplyState.print, a.netApplyState.base = api.ConnID(r), fingerprint(p), baseFingerprint(p)
 	a.netApplyState.mu.Unlock()
 	a.publishNet()
 	w.Header().Set("Connection", "close")
@@ -569,7 +574,7 @@ func (a *App) netConfirm(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 	}
 	a.netApplyState.mu.Lock()
 	same := a.netApplyState.connID != 0 && a.netApplyState.connID == api.ConnID(r)
-	print := a.netApplyState.print
+	print, base := a.netApplyState.print, a.netApplyState.base
 	a.netApplyState.mu.Unlock()
 	if same {
 		api.Error(w, http.StatusConflict, "confirm from a new connection; the old one can outlive a broken change")
@@ -580,6 +585,7 @@ func (a *App) netConfirm(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		return
 	}
 	a.Config.SetSetting("net.applied", print)
+	a.Config.SetSetting("net.applied_base", base)
 	a.publishNet()
 	ok(w)
 }

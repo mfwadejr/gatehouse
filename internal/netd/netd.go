@@ -55,6 +55,8 @@ type Service struct {
 	StateDir string
 	NewMon   func(links []wanmon.Link, mode wanmon.Mode) *wanmon.Monitor
 
+	VPN *VPN
+
 	mu      sync.Mutex
 	cancel  context.CancelFunc
 	mon     *wanmon.Monitor
@@ -64,7 +66,7 @@ type Service struct {
 }
 
 func New(inst *netcfg.Installer, stateDir string) *Service {
-	return &Service{Inst: inst, StateDir: stateDir, NewMon: func(l []wanmon.Link, m wanmon.Mode) *wanmon.Monitor {
+	return &Service{Inst: inst, StateDir: stateDir, VPN: NewVPN(stateDir), NewMon: func(l []wanmon.Link, m wanmon.Mode) *wanmon.Monitor {
 		return wanmon.New(l, m, wanmon.NetChecker{}, &wanmon.IPRouter{Metric: 50})
 	}}
 }
@@ -78,6 +80,9 @@ func (s *Service) Start(ctx context.Context) error {
 	s.root = ctx
 	if err := os.MkdirAll(s.StateDir, 0o700); err != nil {
 		return err
+	}
+	if s.VPN != nil {
+		s.VPN.Start()
 	}
 	// A change that was never confirmed is discarded on boot, as for the firewall.
 	if _, _, ok := s.Inst.Pending(); ok {
@@ -222,4 +227,20 @@ func (s *Service) Status() map[string]wanmon.State {
 		return map[string]wanmon.State{}
 	}
 	return m.Snapshot()
+}
+
+// ApplyVPN installs the OpenVPN side and the tunnel health checks.
+func (s *Service) ApplyVPN(p VPNPlan) error {
+	if s.VPN == nil {
+		return errors.New("VPN support is not available")
+	}
+	return s.VPN.Apply(p)
+}
+
+// VPNStatus reports every tunnel's live state.
+func (s *Service) VPNStatus() VPNStatus {
+	if s.VPN == nil {
+		return VPNStatus{}
+	}
+	return s.VPN.Status()
 }

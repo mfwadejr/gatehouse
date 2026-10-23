@@ -189,6 +189,45 @@ func (m *Model) Validate() error {
 			add("%s cannot be used as the DNS server", m.DNSTarget)
 		}
 	}
+	tseen := map[string]bool{}
+	for _, t := range m.Tunnels {
+		if !reIface.MatchString(t.Iface) {
+			add("tunnel device name %q is not valid", t.Iface)
+		}
+		if tseen[t.Iface] {
+			add("tunnel %s is listed twice", t.Iface)
+		}
+		tseen[t.Iface] = true
+		for _, src := range t.Sources {
+			if p, err := netip.ParsePrefix(src); err != nil || !p.Addr().Is4() {
+				add("tunnel %s: %q is not an IPv4 address range", t.Name, src)
+			}
+		}
+	}
+	vseen := map[string]bool{}
+	for _, v := range m.VPNPorts {
+		if v.Proto != "udp" && v.Proto != "tcp" {
+			add("VPN %s must use udp or tcp", v.Name)
+		}
+		if v.Port < 1 || v.Port > 65535 {
+			add("VPN %s: port %d is not valid", v.Name, v.Port)
+		}
+		key := fmt.Sprintf("%s/%d", v.Proto, v.Port)
+		if vseen[key] {
+			add("two VPNs listen on %s", key)
+		}
+		vseen[key] = true
+		if v.Proto == "tcp" {
+			for _, cp := range m.ConsolePorts {
+				if cp == v.Port {
+					add("VPN %s cannot use port %d, the console already does", v.Name, v.Port)
+				}
+			}
+		}
+		if !reIface.MatchString(v.Name) {
+			add("VPN name %q is not valid", v.Name)
+		}
+	}
 	for _, f := range m.Forwards {
 		if !reName.MatchString(f.Name) {
 			add("forward name %q is not allowed", f.Name)

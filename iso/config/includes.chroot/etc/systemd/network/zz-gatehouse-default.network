@@ -2,7 +2,7 @@
 # can be reached from whichever network the device was plugged into. Connections you
 # configure in the console are written to gatehouse-*.network files, which take precedence.
 [Match]
-Name=en* eth*
+Name=en* eth* usb*
 Type=ether
 
 [Network]

@@ -3,6 +3,7 @@ package installer
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestScreenStates(t *testing.T) {
@@ -48,5 +49,20 @@ func TestRenderStatus(t *testing.T) {
 	waiting := RenderStatus("gatehouse", nil, nil)
 	if !strings.Contains(waiting, "Waiting for a network connection") {
 		t.Error("no waiting message")
+	}
+}
+
+func TestEnsureLinksUpRetriesSlowly(t *testing.T) {
+	var calls []string
+	old := bringUp
+	bringUp = func(n string) { calls = append(calls, n) }
+	defer func() { bringUp = old }()
+	linkTried = map[string]time.Time{}
+	// Whatever ports this machine has, a second call right away must not repeat the first.
+	EnsureLinksUp()
+	n := len(calls)
+	EnsureLinksUp()
+	if len(calls) != n {
+		t.Fatalf("ports were poked again immediately: %v", calls)
 	}
 }

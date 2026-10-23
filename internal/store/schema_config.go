@@ -275,4 +275,57 @@ ALTER TABLE interfaces ADD COLUMN dhcp INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE interfaces ADD COLUMN gateway TEXT NOT NULL DEFAULT '';
 ALTER TABLE interfaces ADD COLUMN dns TEXT NOT NULL DEFAULT '';
 ALTER TABLE interfaces ADD COLUMN members TEXT NOT NULL DEFAULT '';
+`, `
+ALTER TABLE vpn_wg ADD COLUMN label TEXT NOT NULL DEFAULT '';
+ALTER TABLE vpn_wg ADD COLUMN zone_id INTEGER;
+ALTER TABLE vpn_wg ADD COLUMN route_all INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE vpn_wg ADD COLUMN killswitch INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE vpn_wg ADD COLUMN check_target TEXT NOT NULL DEFAULT '';
+ALTER TABLE vpn_wg ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE vpn_ovpn(
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,            -- the device, tun0, tun1, ...
+  label TEXT NOT NULL DEFAULT '',
+  mode TEXT NOT NULL DEFAULT 'server',  -- server or client
+  enabled INTEGER NOT NULL DEFAULT 1,
+  proto TEXT NOT NULL DEFAULT 'udp',
+  port INTEGER NOT NULL DEFAULT 1194,
+  subnet TEXT NOT NULL DEFAULT '',
+  endpoint_host TEXT NOT NULL DEFAULT '',
+  route_all INTEGER NOT NULL DEFAULT 0,
+  dns TEXT NOT NULL DEFAULT '',
+  zone_id INTEGER,
+  killswitch INTEGER NOT NULL DEFAULT 1,
+  check_target TEXT NOT NULL DEFAULT '',
+  ca_cert TEXT NOT NULL DEFAULT '',
+  ca_key TEXT NOT NULL DEFAULT '',      -- sealed
+  srv_cert TEXT NOT NULL DEFAULT '',
+  srv_key TEXT NOT NULL DEFAULT '',     -- sealed
+  tls_crypt TEXT NOT NULL DEFAULT '',   -- sealed
+  crl TEXT NOT NULL DEFAULT '',
+  crl_number INTEGER NOT NULL DEFAULT 0,
+  profile TEXT NOT NULL DEFAULT '',     -- client mode: the imported file, sealed
+  auth_user TEXT NOT NULL DEFAULT '',
+  auth_pass TEXT NOT NULL DEFAULT '',   -- sealed
+  created_at INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE vpn_ovpn_users(
+  id INTEGER PRIMARY KEY,
+  ovpn_id INTEGER NOT NULL REFERENCES vpn_ovpn(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  serial TEXT NOT NULL,
+  cert TEXT NOT NULL,
+  created_at INTEGER NOT NULL DEFAULT 0,
+  revoked_at INTEGER NOT NULL DEFAULT 0,
+  UNIQUE(ovpn_id, name)
+);
+-- What each outbound tunnel carries: a whole network, one device, or an address range.
+CREATE TABLE vpn_routes(
+  id INTEGER PRIMARY KEY,
+  tunnel TEXT NOT NULL,                 -- wg1, tun1, ...
+  kind TEXT NOT NULL,                   -- network, device, cidr
+  value TEXT NOT NULL,                  -- zone name, MAC address, or prefix
+  label TEXT NOT NULL DEFAULT '',
+  UNIQUE(tunnel, kind, value)
+);
 `}

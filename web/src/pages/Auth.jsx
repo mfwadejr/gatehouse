@@ -17,6 +17,12 @@ function Frame({ title, children }) {
 
 function submitOnEnter(fn) { return (e) => { e.preventDefault(); fn(); }; }
 
+// Setup codes are eight digits shown as 0000-0000; the dash is added as you type.
+function fmtCode(v) {
+  const d = String(v).replace(/\D/g, '').slice(0, 8);
+  return d.length > 4 ? d.slice(0, 4) + '-' + d.slice(4) : d;
+}
+
 export function Setup({ onDone }) {
   const [f, setF] = useState({ code: '', username: 'admin', password: '', again: '' });
   const [err, setErr] = useState('');
@@ -34,7 +40,7 @@ export function Setup({ onDone }) {
     <Frame title="Set up this device">
       <p className="sec">Welcome. Create the administrator account. The setup code is shown on the screen of the machine Gatehouse is installed on.</p>
       <form className="stack" onSubmit={submitOnEnter(go)}>
-        <Field label="Setup code"><Input className="codebox" value={f.code} onChange={set('code')} placeholder="0000-0000" autoComplete="off" inputMode="numeric" /></Field>
+        <Field label="Setup code"><Input className="codebox" value={f.code} onChange={(v) => set('code')(fmtCode(v))} maxLength={9} placeholder="0000-0000" autoComplete="off" inputMode="numeric" /></Field>
         <Field label="Administrator name"><Input value={f.username} onChange={set('username')} autoComplete="username" /></Field>
         <Field label="Password" hint="At least 12 characters. A few random words works well."><Input type="password" value={f.password} onChange={set('password')} autoComplete="new-password" /></Field>
         <Field label="Password again"><Input type="password" value={f.again} onChange={set('again')} autoComplete="new-password" /></Field>

@@ -96,6 +96,77 @@ func Load(db Queryer) (*Model, error) {
 	}
 	irows.Close()
 
+	// VPN tunnels join the zone chosen for them, or the first VPN network.
+	vpnZone := func(id sql.NullInt64) (int, bool) {
+		if id.Valid {
+			if i, ok := byID[id.Int64]; ok {
+				return i, true
+			}
+		}
+		for i := range m.Zones {
+			if m.Zones[i].Kind == KindVpn {
+				return i, true
+			}
+		}
+		return 0, false
+	}
+	vrows, err := db.Query(`SELECT name,mode,listen_port,zone_id FROM vpn_wg WHERE enabled=1 ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	for vrows.Next() {
+		var name, mode string
+		var port int
+		var zid sql.NullInt64
+		vrows.Scan(&name, &mode, &port, &zid)
+		if i, ok := vpnZone(zid); ok {
+			m.Zones[i].Ifaces = append(m.Zones[i].Ifaces, name)
+		}
+		if mode == "server" && port > 0 {
+			m.VPNPorts = append(m.VPNPorts, VPNPort{Name: name, Proto: "udp", Port: port})
+		}
+	}
+	vrows.Close()
+	orows2, err := db.Query(`SELECT name,mode,proto,port,zone_id FROM vpn_ovpn WHERE enabled=1 ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	for orows2.Next() {
+		var name, mode, proto string
+		var port int
+		var zid sql.NullInt64
+		orows2.Scan(&name, &mode, &proto, &port, &zid)
+		if mode != "server" {
+			continue
+		}
+		if i, ok := vpnZone(zid); ok {
+			m.Zones[i].Ifaces = append(m.Zones[i].Ifaces, name)
+		}
+		m.VPNPorts = append(m.VPNPorts, VPNPort{Name: name, Proto: proto, Port: port})
+	}
+	orows2.Close()
+
+	// Outbound tunnels, and who uses them.
+	srcs, err := TunnelSources(db)
+	if err != nil {
+		return nil, err
+	}
+	trows, err := db.Query(`SELECT name,label,killswitch FROM vpn_wg WHERE mode='client' AND enabled=1
+		UNION ALL SELECT name,label,killswitch FROM vpn_ovpn WHERE mode='client' AND enabled=1 ORDER BY 1`)
+	if err != nil {
+		return nil, err
+	}
+	for trows.Next() {
+		var name, label string
+		var ks int
+		trows.Scan(&name, &label, &ks)
+		if label == "" {
+			label = name
+		}
+		m.Tunnels = append(m.Tunnels, Tunnel{Name: label, Iface: name, Sources: srcs[name], KillSwitch: ks == 1})
+	}
+	trows.Close()
+
 	// WAN links form the internet-side zone.
 	wan := Zone{Name: "Internet", Kind: KindWan, Gateway: true}
 	wrows, err := db.Query(`SELECT name,iface,type,vlan_id FROM wan_links WHERE enabled=1 ORDER BY priority,id`)

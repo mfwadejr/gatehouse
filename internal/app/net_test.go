@@ -20,6 +20,10 @@ type fakeNet struct {
 	mu      sync.Mutex
 	plan    netd.Plan
 	pending bool
+
+	vpn      netd.VPNPlan
+	vpnCalls int
+	status   netd.VPNStatus
 }
 
 func (f *fakeNet) NetApply(p netd.Plan, w time.Duration) (string, time.Time, error) {
@@ -47,6 +51,17 @@ func (f *fakeNet) NetPending() (string, time.Time, bool) {
 	return "ntok", time.Now().Add(time.Minute), f.pending
 }
 func (f *fakeNet) WanStatus() (map[string]wanmon.State, error) { return map[string]wanmon.State{}, nil }
+func (f *fakeNet) ApplyVPN(p netd.VPNPlan) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.vpn, f.vpnCalls = p, f.vpnCalls+1
+	return nil
+}
+func (f *fakeNet) VPNStatus() (netd.VPNStatus, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.status, nil
+}
 
 func TestNetworkFlow(t *testing.T) {
 	web, dnsAddr := freeAddr(t), freeAddr(t)

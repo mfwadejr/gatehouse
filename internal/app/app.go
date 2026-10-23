@@ -61,12 +61,14 @@ type App struct {
 	FW      fw.Controller // nil when no privileged helper is available
 	Net     NetController
 	apply   applyState
+	vpn     vpnState
 	setup   setupGate
 
 	netApplyState struct {
 		mu     sync.Mutex
 		connID uint64
 		print  string
+		base   string
 	}
 
 	liveMu  sync.Mutex
@@ -122,7 +124,7 @@ func New(cfg Config) (*App, error) {
 	a.API = api.New(a.Auth, a.Bus)
 	a.API.Static = cfg.Static
 	a.API.Secure = cfg.TLSCert != ""
-	a.API.Topic("dns.stats", "dns.live", "dns.upstreams", "dns.lists", "dhcp.leases", "dhcp.utilisation", "fw.status", "net.status")
+	a.API.Topic("dns.stats", "dns.live", "dns.upstreams", "dns.lists", "dhcp.leases", "dhcp.utilisation", "fw.status", "net.status", "vpn.status")
 	a.FW = cfg.FW
 	a.Net = cfg.Net
 	a.registerRoutes()
@@ -284,6 +286,7 @@ func (a *App) Run(ctx context.Context) error {
 	run(func() { a.DHCPSrv.Run(ctx) })
 	run(func() { a.housekeeping(ctx) })
 	run(func() { a.firstBoot(ctx) })
+	run(func() { a.vpnMonitor(ctx) })
 
 	l, err := net.Listen("tcp", a.Cfg.WebAddr)
 	if err != nil {

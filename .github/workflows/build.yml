@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@v4
       - id: v
         run: |
-          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then v="${GITHUB_REF_NAME#v}"; else v="0.0.0-$(git rev-parse --short HEAD)"; fi
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then v="${GITHUB_REF_NAME#v}"; else v="0.1.${GITHUB_RUN_NUMBER}"; fi
           echo "version=$v" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@v4
         with: { node-version: '22', cache: npm, cache-dependency-path: web/package-lock.json }
@@ -80,6 +80,6 @@ jobs:
             gh release create "${GITHUB_REF_NAME}" out/* --title "Gatehouse ${GITHUB_REF_NAME}" --generate-notes
           else
             gh release delete nightly --yes --cleanup-tag 2>/dev/null || true
-            gh release create nightly out/* --prerelease --target "${GITHUB_SHA}" --title "Gatehouse nightly build" \
-              --notes "Automatic build of the latest commit (${GITHUB_SHA::7}). For testing."
+            gh release create nightly out/* --prerelease --target "${GITHUB_SHA}" --title "Gatehouse ${{ needs.binary.outputs.version }} (test build)" \
+              --notes "Automatic build ${{ needs.binary.outputs.version }} of commit ${GITHUB_SHA::7}. For testing."
           fi

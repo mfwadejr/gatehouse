@@ -193,3 +193,54 @@ func TestBridgeAndBehindRouter(t *testing.T) {
 		t.Fatal("automatic and fixed together should be refused")
 	}
 }
+
+func TestTunnelRoutingFiles(t *testing.T) {
+	c := &Config{WireGuard: []WG{{
+		Name: "wg1", Mode: "client", Address: "10.2.0.2/32", Enabled: true, Table: 301,
+		PrivateKey: "yAnz5TF+lXXJte14tji3zlMNq+hd2rYUIgJBgB3fBmk=",
+		Sources:    []string{"192.168.1.0/24", "192.168.5.20/32"},
+		Peers: []WGPeer{{Name: "provider", PublicKey: "HIgo9xNzJMWLKASShiTqIybxZ0U3wGLiUeJ1PKf8ykw=", Enabled: true,
+			AllowedIPs: []string{"0.0.0.0/0", "10.50.0.0/16"}, Endpoint: "vpn.example.net:51820", Keepalive: 25}},
+	}}, Tunnels: []Tunnel{{Name: "tun1", Table: 302, Sources: []string{"192.168.9.0/24"}, Enabled: true}}}
+	out, err := Generate(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := out.Networkd["gatehouse-wg1.network"]
+	for _, want := range []string{
+		"[Route]\nDestination=0.0.0.0/0\nTable=301",
+		"[Route]\nDestination=10.50.0.0/16\n",
+		"From=192.168.1.0/24\nTable=main\nSuppressPrefixLength=0\nPriority=300",
+		"From=192.168.1.0/24\nTable=301\nPriority=301",
+		"From=192.168.5.20/32\nTable=301\nPriority=303",
+	} {
+		if !strings.Contains(n, want) {
+			t.Errorf("wg1.network lacks %q\n%s", want, n)
+		}
+	}
+	// The tunnel's own default route must never land in the main table.
+	if strings.Contains(n, "Destination=0.0.0.0/0\n\n") || strings.Contains(n, "Destination=0.0.0.0/0\n[") {
+		t.Errorf("default route without a table:\n%s", n)
+	}
+	u := out.Networkd["gatehouse-tun1.network"]
+	if !strings.Contains(u, "Name=tun1") || !strings.Contains(u, "Table=302") || strings.Contains(u, "Address=") {
+		t.Errorf("tun1.network:\n%s", u)
+	}
+	// No sources: the tunnel keeps its own table (for its health check) but no device is sent there.
+	c.WireGuard[0].Sources = nil
+	out, _ = Generate(c)
+	un := out.Networkd["gatehouse-wg1.network"]
+	if strings.Contains(un, "From=") || strings.Contains(un, "SuppressPrefixLength") {
+		t.Errorf("unused tunnel still takes devices:\n%s", un)
+	}
+	if !strings.Contains(un, "OutgoingInterface=wg1\nTable=301") || !strings.Contains(un, "Destination=0.0.0.0/0\nTable=301") {
+		t.Errorf("unused tunnel cannot be checked:\n%s", un)
+	}
+	if strings.Contains(un, "[Route]\nDestination=0.0.0.0/0\n\n") {
+		t.Errorf("default route in the main table:\n%s", un)
+	}
+	c.WireGuard[0].Sources = []string{"not-an-address"}
+	if _, err := Generate(c); err == nil {
+		t.Error("bad source accepted")
+	}
+}

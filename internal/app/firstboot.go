@@ -58,6 +58,7 @@ func (a *App) applyStored() error {
 		return err
 	}
 	a.Config.SetSetting("net.applied", fingerprint(p))
+	a.Config.SetSetting("net.applied_base", baseFingerprint(p))
 
 	m, script, err := a.currentRuleset()
 	if err != nil {

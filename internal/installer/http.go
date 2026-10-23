@@ -221,6 +221,7 @@ func NetworkInfo() map[string]any {
 			}
 		}
 	}
+	EnsureLinksUp()
 	var ports []PortInfo
 	for _, p := range WiredPorts() {
 		ports = append(ports, PortInfo{Name: p.Name, MAC: macs[p.Name], Link: p.Link, USB: p.USB, Speed: p.Speed, Addrs: byName[p.Name]})

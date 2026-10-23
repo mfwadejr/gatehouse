@@ -143,7 +143,7 @@ func (c *compiler) build() string {
 	c.line(1, "chain output {")
 	c.line(2, "type filter hook output priority filter; policy accept;")
 	c.line(1, "}")
-	if wan := c.m.WanIfaces(); len(wan) > 0 {
+	if wan := append(c.m.WanIfaces(), c.m.TunnelIfaces()...); len(wan) > 0 {
 		c.line(1, "chain clamp {")
 		c.line(2, "type filter hook forward priority mangle; policy accept;")
 		c.line(2, "oifname %s tcp flags & (syn|rst) == syn tcp option maxseg size set rt mtu", ifSet(wan))
@@ -201,6 +201,13 @@ func (c *compiler) input() {
 		c.line(2, "iifname %s udp sport 547 udp dport 546 accept comment \"wan dhcpv6 client\"", ifSet(wan))
 	}
 
+	// Incoming VPN connections, from the internet side only.
+	if wan := m.WanIfaces(); len(wan) > 0 {
+		for _, v := range m.VPNPorts {
+			c.line(2, "iifname %s %s dport %d counter accept comment %s", ifSet(wan), v.Proto, v.Port, q("vpn:"+v.Name))
+		}
+	}
+
 	// Explicit exceptions that target the router itself.
 	for _, r := range m.Rules {
 		if r.Enabled && r.To == "self" {
@@ -236,13 +243,21 @@ func (c *compiler) forward() {
 			c.explicit(2, r, true)
 		}
 	}
+	// Kill switch: traffic that belongs in a tunnel never leaves through an internet
+	// connection, even if the tunnel is down and the routes fall back to it.
+	for _, t := range m.Tunnels {
+		if t.KillSwitch && len(t.Sources) > 0 && len(wan) > 0 {
+			c.line(2, "ip saddr %s oifname %s counter drop comment %s", setLit(t.Sources), ifSet(wan), q("killswitch:"+t.Name))
+		}
+	}
+	out := append(append([]string(nil), wan...), m.TunnelIfaces()...)
 	all := c.clientIfaces()
 	for _, z := range m.Zones {
 		if z.Kind == KindWan || len(z.Ifaces) == 0 {
 			continue
 		}
-		if z.Internet && z.Gateway && len(wan) > 0 {
-			c.line(2, "iifname %s oifname %s counter accept comment %s", ifSet(z.Ifaces), ifSet(wan), q("internet:"+z.Name))
+		if z.Internet && z.Gateway && len(out) > 0 {
+			c.line(2, "iifname %s oifname %s counter accept comment %s", ifSet(z.Ifaces), ifSet(out), q("internet:"+z.Name))
 		}
 		if z.Kind == KindTrusted && z.Gateway {
 			var others []string
@@ -374,7 +389,7 @@ func (c *compiler) nat() {
 	wan := m.WanIfaces()
 	dlocal, dremote, dtarget := c.dnsEnforced()
 	redirect := len(dlocal)+len(dremote) > 0
-	if !redirect && len(m.Forwards) == 0 && len(wan) == 0 {
+	if !redirect && len(m.Forwards) == 0 && len(wan) == 0 && len(m.Tunnels) == 0 {
 		return
 	}
 	c.line(1, "chain prerouting {")
@@ -425,10 +440,15 @@ func (c *compiler) nat() {
 		}
 	}
 	c.line(1, "}")
-	if len(wan) > 0 {
+	if len(wan) > 0 || len(m.Tunnels) > 0 {
 		c.line(1, "chain postrouting {")
 		c.line(2, "type nat hook postrouting priority srcnat; policy accept;")
-		c.line(2, "meta nfproto ipv4 oifname %s masquerade", ifSet(wan))
+		if len(wan) > 0 {
+			c.line(2, "meta nfproto ipv4 oifname %s masquerade", ifSet(wan))
+		}
+		if ti := m.TunnelIfaces(); len(ti) > 0 {
+			c.line(2, "meta nfproto ipv4 oifname %s masquerade comment \"tunnels\"", ifSet(ti))
+		}
 		if hp := c.clientIfaces(); len(hp) > 0 && len(m.Forwards) > 0 {
 			// Replies to a hairpinned connection must come back through the router.
 			c.line(2, "ct status dnat meta nfproto ipv4 iifname %s oifname %s masquerade comment \"hairpin\"", ifSet(hp), ifSet(hp))

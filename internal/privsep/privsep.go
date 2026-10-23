@@ -27,6 +27,8 @@ type NetController interface {
 	Rollback() error
 	Pending() (string, time.Time, bool)
 	Status() map[string]wanmon.State
+	ApplyVPN(p netd.VPNPlan) error
+	VPNStatus() netd.VPNStatus
 }
 
 const maxRequest = 4 << 20
@@ -199,7 +201,7 @@ func (s *Server) dispatch(r request) (any, error) {
 		t, d, ok := s.FW.Pending()
 		return pendingResult{ok, t, d.Unix()}, nil
 	}
-	if len(r.Method) > 4 && (r.Method[:4] == "net." || r.Method[:4] == "wan.") {
+	if len(r.Method) > 4 && (r.Method[:4] == "net." || r.Method[:4] == "wan." || r.Method[:4] == "vpn.") {
 		return s.dispatchNet(r)
 	}
 	return nil, errors.New("unknown method")
@@ -237,6 +239,14 @@ func (s *Server) dispatchNet(r request) (any, error) {
 		return pendingResult{ok, t, d.Unix()}, nil
 	case "wan.status":
 		return s.Net.Status(), nil
+	case "vpn.apply":
+		var p netd.VPNPlan
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return nil, s.Net.ApplyVPN(p)
+	case "vpn.status":
+		return s.Net.VPNStatus(), nil
 	}
 	return nil, errors.New("unknown method")
 }
@@ -326,5 +336,13 @@ func (c *Client) NetPending() (string, time.Time, bool) {
 func (c *Client) WanStatus() (map[string]wanmon.State, error) {
 	var out map[string]wanmon.State
 	err := c.call("wan.status", nil, &out)
+	return out, err
+}
+
+func (c *Client) ApplyVPN(p netd.VPNPlan) error { return c.call("vpn.apply", p, nil) }
+
+func (c *Client) VPNStatus() (netd.VPNStatus, error) {
+	var out netd.VPNStatus
+	err := c.call("vpn.status", nil, &out)
 	return out, err
 }

@@ -1,0 +1,3 @@
+# A USB network adapter is switched on the moment it appears, so its cable can be detected
+# and it gets an address without anyone opening a menu first.
+ACTION=="add", SUBSYSTEM=="net", SUBSYSTEMS=="usb", ATTR{type}=="1", RUN+="/usr/bin/env ip link set dev %k up"

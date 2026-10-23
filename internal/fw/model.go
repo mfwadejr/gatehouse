@@ -58,6 +58,24 @@ type Forward struct {
 	Enabled bool
 }
 
+// VPNPort is a port the router listens on for incoming VPN connections. It is only opened
+// toward the internet side, and only while that VPN is turned on.
+type VPNPort struct {
+	Name  string // shown in the rule's comment, like wg0
+	Proto string // udp or tcp
+	Port  int
+}
+
+// Tunnel is an outbound VPN connection that selected networks or devices use instead of an
+// internet connection. The routing itself is set up by the network helper; the firewall only
+// has to allow and translate the traffic, and to hold back anything that must not leak.
+type Tunnel struct {
+	Name       string   // the label shown in rule comments
+	Iface      string   // wg1, tun1, ...
+	Sources    []string // IPv4 prefixes whose traffic is sent through it
+	KillSwitch bool     // if the tunnel drops, those sources get no internet at all
+}
+
 // Model is everything the compiler needs.
 type Model struct {
 	Zones    []Zone
@@ -67,6 +85,10 @@ type Model struct {
 	Groups map[string][]string
 	// ConsolePorts are the TCP ports of the web console, always open to management zones.
 	ConsolePorts []int
+	// Tunnels are the outbound VPN connections.
+	Tunnels []Tunnel
+	// VPNPorts are the listening ports of enabled VPN servers.
+	VPNPorts []VPNPort
 	// DNSRedirect sends port 53 from client networks to the router's own resolver.
 	DNSRedirect bool
 	// DNSTarget is where forced DNS goes: empty for this router's own resolver, otherwise the
@@ -86,6 +108,15 @@ func (m *Model) ZoneByName(name string) (*Zone, bool) {
 		}
 	}
 	return nil, false
+}
+
+// TunnelIfaces lists the devices of the outbound tunnels.
+func (m *Model) TunnelIfaces() []string {
+	var out []string
+	for _, t := range m.Tunnels {
+		out = append(out, t.Iface)
+	}
+	return out
 }
 
 // WanIfaces lists every interface in a WAN zone.

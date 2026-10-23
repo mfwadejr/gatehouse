@@ -463,7 +463,7 @@ const grubDefaults = `# Written by the Gatehouse installer.
 GRUB_DISTRIBUTOR="Gatehouse"
 GRUB_TIMEOUT=0
 GRUB_TIMEOUT_STYLE=hidden
-GRUB_CMDLINE_LINUX_DEFAULT="quiet splash loglevel=0 systemd.show_status=0 vt.global_cursor_default=0"
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash usbcore.autosuspend=-1 loglevel=0 systemd.show_status=0 vt.global_cursor_default=0"
 GRUB_TERMINAL_OUTPUT=gfxterm
 GRUB_GFXMODE=auto
 GRUB_GFXPAYLOAD_LINUX=keep
