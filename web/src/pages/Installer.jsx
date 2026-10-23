@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { get, post, setInstallCode } from '../api.js';
-import { Button, Card, Field, Icon, Input, Note, Select, Bar, ToggleRow } from '../ui.jsx';
+import { Button, Card, Field, Icon, Input, Note, Pill, Select, Bar, ToggleRow } from '../ui.jsx';
 
 const gb = (n) => `${Math.round(n / 1e9)} GB`;
 
@@ -9,11 +9,175 @@ function Shell({ title, children, step }) {
     <main className="auth">
       <section className="card" style={{ width: 'min(100%, 40rem)' }}>
         <div className="brand" style={{ padding: 0 }}><Icon name="logo" size={24} /><span>Gatehouse installer</span></div>
-        {step && <div className="small muted">Step {step} of 4</div>}
+        {step && <div className="small muted">Step {step} of 5</div>}
         <h1>{title}</h1>
         {children}
       </section>
     </main>
+  );
+}
+
+const baseAddr = (cidr) => (cidr || '').split('/')[0];
+
+// What to do after the restart, given how the network was set up.
+function afterInstall(f) {
+  const n = f.network;
+  const open = (a) => <>Open <strong>https://{a}</strong> and sign in as <strong>{f.username}</strong>.</>;
+  if (n.lan.mode === 'router') {
+    return <>Gatehouse will start handing out addresses on your network. Unplug and replug the cable on your computer so it gets a new one, then {open(baseAddr(n.lan.address)).props.children}</>;
+  }
+  if (n.lan.addressing === 'static') return open(baseAddr(n.lan.static));
+  return <>Gatehouse will get its address from your router. The address appears on this machine&apos;s screen after it starts. Open it and sign in as <strong>{f.username}</strong>.</>;
+}
+
+function PortPick({ ports, value, onChange, taken, recent }) {
+  return (
+    <div className="stack">
+      {ports.map((p) => {
+        const off = taken.includes(p.name);
+        return (
+          <button type="button" key={p.name} disabled={off} className={`preset ${value === p.name ? 'on' : ''}`} aria-pressed={value === p.name} onClick={() => onChange(p.name)}>
+            <span className="t">{p.name}{p.usb ? ' (USB adapter)' : ''} {p.link ? <Pill tone="good">cable connected{p.speed ? `, ${p.speed} Mb/s` : ''}</Pill> : <Pill>no cable</Pill>}{recent[p.name] ? <Pill tone="info">just plugged in</Pill> : null}</span>
+            <span className="d mono">{p.mac}{off ? ' · used for something else' : ''}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function NetworkStep({ f, setF, onBack, onNext }) {
+  const [info, setInfo] = useState(null);
+  const [recent, setRecent] = useState({});
+  const prev = useRef({});
+  const n = f.network;
+  const setNet = (fn) => setF((x) => ({ ...x, network: fn(x.network) }));
+  const setLan = (k) => (v) => setNet((m) => ({ ...m, lan: { ...m.lan, [k]: v } }));
+  const setWan = (k) => (v) => setNet((m) => ({ ...m, wan: { ...m.wan, [k]: v } }));
+
+  useEffect(() => {
+    let live = true;
+    const tick = async () => {
+      try {
+        const d = await get('/api/install/network');
+        if (!live) return;
+        const fresh = {};
+        d.ports.forEach((p) => { if (p.link && prev.current[p.name] === false) fresh[p.name] = true; prev.current[p.name] = p.link; });
+        if (Object.keys(fresh).length) { setRecent((r) => ({ ...r, ...fresh })); setTimeout(() => setRecent((r) => { const c = { ...r }; Object.keys(fresh).forEach((k) => delete c[k]); return c; }), 6000); }
+        setInfo(d);
+        setNet((m) => (m.lan.mode === 'router' && !m.lan.address ? { ...m, lan: { ...m.lan, address: d.suggested_lan } } : m));
+      } catch { /* the page may briefly lose the network */ }
+    };
+    tick();
+    const t = setInterval(tick, 2000);
+    return () => { live = false; clearInterval(t); };
+  }, []);
+
+  const ports = info?.ports || [];
+  const lanPort = n.lan.port;
+  const wanPort = n.wan?.port || '';
+  const used = [lanPort, wanPort, ...n.bridge].filter(Boolean);
+  const others = ports.filter((p) => p.name !== lanPort && p.name !== wanPort);
+
+  const pickMode = (mode) => setNet((m) => ({ ...m, lan: { ...m.lan, mode, address: mode === 'router' ? (m.lan.address || info?.suggested_lan || '') : m.lan.address }, wan: mode === 'behind' ? null : m.wan }));
+  const lan = n.lan;
+  const wan = n.wan;
+  const okLan = lan.mode === 'router' ? /^\d+\.\d+\.\d+\.\d+\/\d+$/.test(lan.address)
+    : lan.mode === 'behind' ? (lan.addressing === 'dhcp' || (/\//.test(lan.static) && lan.gateway)) : false;
+  const okWan = !wan || (wan.port && (wan.type === 'dhcp' || (wan.type === 'pppoe' && wan.pppoe_user && wan.pppoe_pass) || (wan.type === 'static' && wan.addr && wan.gateway)));
+  const ready = lanPort && okLan && okWan;
+
+  return (
+    <Shell title="Connect your network" step={3}>
+      <p className="sec">Plug your <strong>LAN cable</strong> into a port. It lights up below. The internet cable is optional, and you can add it now or later.</p>
+      {!ports.length && <Note tone="warn">No wired network port found yet. If you use a USB network adapter, plug it in.</Note>}
+
+      <h2 className="h3">1. Which port is your LAN?</h2>
+      <PortPick ports={ports} value={lanPort} onChange={(p) => setNet((m) => ({ ...m, lan: { ...m.lan, port: p }, wan: m.wan?.port === p ? { ...m.wan, port: '' } : m.wan, bridge: m.bridge.filter((b) => b !== p) }))} taken={[wanPort].filter(Boolean)} recent={recent} />
+
+      {lanPort && (
+        <>
+          <h2 className="h3">2. How will Gatehouse be used?</h2>
+          <div className="stack">
+            <button type="button" className={`preset ${lan.mode === 'router' ? 'on' : ''}`} aria-pressed={lan.mode === 'router'} onClick={() => pickMode('router')}>
+              <span className="t">Gatehouse is my router</span>
+              <span className="d">It hands out addresses to your devices (DHCP), runs DNS, and connects you to the internet.</span>
+            </button>
+            <button type="button" className={`preset ${lan.mode === 'behind' ? 'on' : ''}`} aria-pressed={lan.mode === 'behind'} onClick={() => pickMode('behind')}>
+              <span className="t">Gatehouse sits behind my existing router</span>
+              <span className="d">Another router stays in charge of addresses and the internet. Gatehouse adds DNS filtering and a firewall for devices on this network.</span>
+            </button>
+          </div>
+          {lan.mode === 'router' && (
+            <Field label="Address of this device on your network" hint="Gatehouse picked a range that does not clash with the network you are on now. Devices get addresses from the same range.">
+              <Input className="mono" value={lan.address} onChange={setLan('address')} placeholder="192.168.1.1/24" />
+            </Field>
+          )}
+          {lan.mode === 'behind' && (
+            <>
+              <Field label="Address of this device">
+                <Select value={lan.addressing} onChange={setLan('addressing')} options={[{ value: 'dhcp', label: 'Automatic, from my router (DHCP)' }, { value: 'static', label: 'A fixed address I choose' }]} />
+              </Field>
+              {lan.addressing === 'static' && (
+                <div className="formgrid">
+                  <Field label="Address" hint="For example 192.168.0.50/24"><Input className="mono" value={lan.static} onChange={setLan('static')} /></Field>
+                  <Field label="Your router's address"><Input className="mono" value={lan.gateway} onChange={setLan('gateway')} placeholder="192.168.0.1" /></Field>
+                  <Field label="DNS server (optional)"><Input className="mono" value={lan.dns} onChange={setLan('dns')} /></Field>
+                </div>
+              )}
+            </>
+          )}
+        </>
+      )}
+
+      {lan.mode === 'router' && (
+        <>
+          <h2 className="h3">3. Internet connection <span className="muted small">(optional)</span></h2>
+          <p className="small muted">Connect the cable from your modem or provider to another port. Skip this to add it later under Internet.</p>
+          {!wan ? (
+            <Button onClick={() => setNet((m) => ({ ...m, wan: { port: '', type: 'dhcp', addr: '', gateway: '', dns: '', pppoe_user: '', pppoe_pass: '' } }))}>Set up internet now</Button>
+          ) : (
+            <>
+              <PortPick ports={ports} value={wan.port} onChange={(p) => setNet((m) => ({ ...m, wan: { ...m.wan, port: p }, bridge: m.bridge.filter((b) => b !== p) }))} taken={[lanPort]} recent={recent} />
+              <Field label="How does your provider connect you?">
+                <Select value={wan.type} onChange={setWan('type')} options={[{ value: 'dhcp', label: 'Automatically (most cable and fibre)' }, { value: 'pppoe', label: 'User name and password (PPPoE)' }, { value: 'static', label: 'A fixed address' }]} />
+              </Field>
+              {wan.type === 'pppoe' && (
+                <div className="formgrid">
+                  <Field label="User name"><Input value={wan.pppoe_user} onChange={setWan('pppoe_user')} autoComplete="off" /></Field>
+                  <Field label="Password"><Input type="password" value={wan.pppoe_pass} onChange={setWan('pppoe_pass')} autoComplete="off" /></Field>
+                </div>
+              )}
+              {wan.type === 'static' && (
+                <div className="formgrid">
+                  <Field label="Address" hint="For example 203.0.113.10/24"><Input className="mono" value={wan.addr} onChange={setWan('addr')} /></Field>
+                  <Field label="Gateway"><Input className="mono" value={wan.gateway} onChange={setWan('gateway')} /></Field>
+                  <Field label="DNS servers (optional)"><Input className="mono" value={wan.dns} onChange={setWan('dns')} /></Field>
+                </div>
+              )}
+              <div className="actions"><Button small onClick={() => setNet((m) => ({ ...m, wan: null }))}>Not now</Button></div>
+            </>
+          )}
+        </>
+      )}
+
+      {lanPort && others.length > 0 && (
+        <>
+          <h2 className="h3">Other ports</h2>
+          <p className="small muted">Left unused unless you choose. You can set each one up individually later.</p>
+          <div className="list">
+            {others.map((p) => (
+              <div className="item" key={p.name}>
+                <div><div className="name">{p.name}{p.usb ? ' (USB adapter)' : ''}</div><div className="meta">{p.link ? 'cable connected' : 'no cable'}</div></div>
+                <Select value={n.bridge.includes(p.name) ? 'bridge' : 'unused'} onChange={(v) => setNet((m) => ({ ...m, bridge: v === 'bridge' ? [...m.bridge.filter((b) => b !== p.name), p.name] : m.bridge.filter((b) => b !== p.name) }))}
+                  options={[{ value: 'unused', label: 'Not used' }, { value: 'bridge', label: 'Join the LAN (acts like a switch port)' }]} />
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+      <div className="actions"><Button onClick={onBack}>Back</Button><Button kind="primary" disabled={!ready} onClick={onNext}>Next</Button></div>
+    </Shell>
   );
 }
 
@@ -24,7 +188,7 @@ export default function Installer({ info }) {
   const [busy, setBusy] = useState(false);
   const [disks, setDisks] = useState([]);
   const [zones, setZones] = useState(['UTC']);
-  const [f, setF] = useState({ disk: '', confirm: '', hostname: 'gatehouse', username: 'admin', password: '', again: '', timezone: 'UTC', require_mfa: false });
+  const [f, setF] = useState({ disk: '', confirm: '', hostname: 'gatehouse', username: 'admin', password: '', again: '', timezone: 'UTC', require_mfa: false, network: { lan: { port: '', mode: '', address: '', addressing: 'dhcp', static: '', gateway: '', dns: '' }, wan: null, bridge: [] } });
   const [status, setStatus] = useState(null);
   const poll = useRef(null);
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
@@ -46,13 +210,13 @@ export default function Installer({ info }) {
     try {
       const { again, ...body } = f;
       await post('/api/install/start', body);
-      setStep(4);
+      setStep(5);
     } catch (e) { setErr(e.message); }
     finally { setBusy(false); }
   };
 
   useEffect(() => {
-    if (step !== 4) return undefined;
+    if (step !== 5) return undefined;
     const tick = async () => { try { const s = await get('/api/install/status'); setStatus(s); if (s.state === 'done' || s.state === 'error') clearInterval(poll.current); } catch { /* the page may briefly lose the network */ } };
     tick(); poll.current = setInterval(tick, 1500);
     return () => clearInterval(poll.current);
@@ -104,29 +268,32 @@ export default function Installer({ info }) {
     );
   }
   if (step === 3) {
+    return <NetworkStep f={f} setF={setF} onBack={() => setStep(2)} onNext={() => setStep(4)} />;
+  }
+  if (step === 4) {
     return (
-      <Shell title="Ready to install" step={3}>
+      <Shell title="Ready to install" step={4}>
         <Note tone="bad" title="This erases the disk">{disk?.model || f.disk} ({gb(disk?.size || 0)}) at <span className="mono">{f.disk}</span> will be wiped, including anything stored on it.</Note>
         <Field label={`Type ${f.disk} to confirm`}><Input value={f.confirm} onChange={set('confirm')} autoComplete="off" className="mono" /></Field>
         {err && <Note tone="bad">{err}</Note>}
-        <div className="actions"><Button onClick={() => setStep(2)}>Back</Button><Button kind="primary" disabled={busy || f.confirm !== f.disk} onClick={start}>Erase and install</Button></div>
+        <div className="actions"><Button onClick={() => setStep(3)}>Back</Button><Button kind="primary" disabled={busy || f.confirm !== f.disk} onClick={start}>Erase and install</Button></div>
       </Shell>
     );
   }
   const done = status?.steps?.filter((s) => s.state === 'done').length || 0;
   const total = status?.steps?.length || 1;
   return (
-    <Shell title={status?.state === 'done' ? 'Installed' : status?.state === 'error' ? 'Something went wrong' : 'Installing…'} step={4}>
+    <Shell title={status?.state === 'done' ? 'Installed' : status?.state === 'error' ? 'Something went wrong' : 'Installing…'} step={5}>
       {status && <Bar pct={status.state === 'done' ? 100 : (100 * done) / total} />}
       <div className="list">
         {(status?.steps || []).map((s) => (
           <div className="item" key={s.name}><span>{s.name}</span><span className={s.state === 'error' ? '' : 'muted'}>{s.state === 'done' ? '✓' : s.state === 'running' ? 'working…' : s.state === 'error' ? 'failed' : ''}</span></div>
         ))}
       </div>
-      {status?.state === 'error' && <><Note tone="bad">{status.error}</Note><pre className="card mono" style={{ margin: 0, whiteSpace: 'pre-wrap', maxHeight: '16rem', overflow: 'auto' }}>{status.log}</pre><div className="actions"><Button onClick={() => setStep(3)}>Try again</Button></div></>}
+      {status?.state === 'error' && <><Note tone="bad">{status.error}</Note><pre className="card mono" style={{ margin: 0, whiteSpace: 'pre-wrap', maxHeight: '16rem', overflow: 'auto' }}>{status.log}</pre><div className="actions"><Button onClick={() => setStep(4)}>Try again</Button></div></>}
       {status?.state === 'done' && (
         <>
-          <Note tone="good" title="Gatehouse is installed.">Remove the USB stick, then restart. After it starts, open <strong>https://{f.hostname}.lan</strong> or the address shown on its screen and sign in as <strong>{f.username}</strong>.</Note>
+          <Note tone="good" title="Gatehouse is installed.">Remove the USB stick, then restart. {afterInstall(f)}</Note>
           <div className="actions"><Button kind="primary" onClick={async () => { try { await post('/api/install/reboot'); } catch { /* going down */ } }}>Restart now</Button></div>
         </>
       )}

@@ -16,11 +16,18 @@ import (
 
 // Interface is a LAN-side port or VLAN.
 type Interface struct {
-	Name    string `json:"name"`
-	Kind    string `json:"kind"` // phys or vlan
-	Parent  string `json:"parent"`
-	VLAN    int    `json:"vlan"`
-	IPv4    string `json:"ipv4"` // CIDR, for example 192.168.1.1/24
+	Name   string `json:"name"`
+	Kind   string `json:"kind"` // phys, vlan or bridge
+	Parent string `json:"parent"`
+	// Members are the ports of a bridge: several ports behaving as one switch.
+	Members []string `json:"members"`
+	VLAN    int      `json:"vlan"`
+	IPv4    string   `json:"ipv4"` // CIDR, for example 192.168.1.1/24
+	// DHCP takes the address from another router instead (Gatehouse sits behind it). With a
+	// fixed IPv4 address and no DHCP, Gateway and DNS say where that router is.
+	DHCP    bool   `json:"dhcp"`
+	Gateway string `json:"gateway"`
+	DNS     string `json:"dns"`
 	IPv6    string `json:"ipv6"`
 	PD      bool   `json:"pd"` // receive a delegated IPv6 prefix from the internet link
 	MTU     int    `json:"mtu"`
@@ -130,6 +137,18 @@ func (c *Config) Validate() error {
 		names[i.Name] = true
 		switch i.Kind {
 		case "phys":
+		case "bridge":
+			if len(i.Members) == 0 {
+				add("%s: a bridge needs at least one port", i.Name)
+			}
+			for _, m := range i.Members {
+				if !reName.MatchString(m) {
+					add("%s: port name %q is not valid", i.Name, m)
+				}
+				if m == i.Name {
+					add("%s: a bridge cannot contain itself", i.Name)
+				}
+			}
 		case "vlan":
 			if i.VLAN < 1 || i.VLAN > 4094 {
 				add("%s: VLAN number must be between 1 and 4094", i.Name)
@@ -150,8 +169,38 @@ func (c *Config) Validate() error {
 				add("%s: %v", i.Name, err)
 			}
 		}
+		if i.DHCP && i.IPv4 != "" {
+			add("%s: choose either an automatic address or a fixed one", i.Name)
+		}
+		if i.Gateway != "" {
+			gw, err := netip.ParseAddr(i.Gateway)
+			pf, perr := netip.ParsePrefix(i.IPv4)
+			switch {
+			case err != nil || !gw.Is4():
+				add("%s: %q is not an IPv4 address for the router", i.Name, i.Gateway)
+			case perr != nil || !pf.Contains(gw):
+				add("%s: the router address must be inside this network", i.Name)
+			}
+		}
+		for _, d := range strings.FieldsFunc(i.DNS, func(r rune) bool { return r == ',' || r == ' ' }) {
+			if a, err := netip.ParseAddr(d); err != nil {
+				add("%s: %q is not an address", i.Name, d)
+			} else if a.IsUnspecified() {
+				add("%s: %q cannot be a DNS server", i.Name, d)
+			}
+		}
 		if i.MTU != 0 && (i.MTU < 576 || i.MTU > 9216) {
 			add("%s: MTU must be between 576 and 9216", i.Name)
+		}
+	}
+	for _, i := range c.Interfaces {
+		if i.Kind != "bridge" {
+			continue
+		}
+		for _, m := range i.Members {
+			if names[m] {
+				add("%s is in the bridge %s and also set up on its own", m, i.Name)
+			}
 		}
 	}
 	wnames := map[string]bool{}
@@ -255,6 +304,13 @@ func Generate(c *Config) (*Output, error) {
 		}
 		if w.Enabled && w.Type == "pppoe" && w.VLAN > 0 {
 			addVLAN(w.Iface, fmt.Sprintf("%s.%d", w.Iface, w.VLAN), w.VLAN)
+		}
+	}
+	for _, i := range c.Interfaces {
+		if i.Enabled && i.Kind == "bridge" {
+			f := &file{}
+			f.l("[NetDev]\nName=%s\nKind=bridge\n\n[Bridge]\nSTP=no", i.Name)
+			netdevs[i.Name] = f
 		}
 	}
 	for name, f := range netdevs {
@@ -391,6 +447,21 @@ func Generate(c *Config) (*Output, error) {
 		}
 	}
 
+	// Ports that belong to a bridge only carry traffic into it.
+	for _, i := range c.Interfaces {
+		if !i.Enabled || i.Kind != "bridge" {
+			continue
+		}
+		for _, m := range i.Members {
+			if written[m] {
+				continue
+			}
+			f := netFile(m)
+			f.l("[Network]\nBridge=%s\nConfigureWithoutCarrier=yes\nLinkLocalAddressing=no\nIPv6AcceptRA=no", i.Name)
+			finish(m, f)
+		}
+	}
+
 	// LAN side.
 	for _, i := range c.Interfaces {
 		if !i.Enabled || written[i.Name] {
@@ -400,6 +471,12 @@ func Generate(c *Config) (*Output, error) {
 		f.l("[Network]")
 		if i.IPv4 != "" {
 			f.l("Address=%s", i.IPv4)
+		}
+		if i.DHCP {
+			f.l("DHCP=ipv4")
+		}
+		for _, d := range strings.FieldsFunc(i.DNS, func(r rune) bool { return r == ',' || r == ' ' }) {
+			f.l("DNS=%s", d)
 		}
 		if i.IPv6 != "" {
 			f.l("Address=%s", i.IPv6)
@@ -415,6 +492,12 @@ func Generate(c *Config) (*Output, error) {
 			for _, v := range vlansOn[i.Name] {
 				f.l("VLAN=%s", v)
 			}
+		}
+		if i.Gateway != "" {
+			f.l("\n[Route]\nGateway=%s", i.Gateway)
+		}
+		if i.DHCP {
+			f.l("\n[DHCPv4]\nUseDNS=no\nUseNTP=no\nUseHostname=no\nUseDomains=no")
 		}
 		if i.PD && uplink != "" {
 			f.l("\n[DHCPPrefixDelegation]\nUplinkInterface=%s\nAnnounce=yes\nToken=::1", uplink)

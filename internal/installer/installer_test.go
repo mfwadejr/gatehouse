@@ -3,11 +3,14 @@ package installer
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"gatehouse/internal/seed"
 )
 
 type fake struct {
@@ -45,13 +48,17 @@ func (f *fake) Run(stdin, name string, args ...string) (string, error) {
 
 func newTest(t *testing.T) (*Installer, *fake) {
 	f := &fake{}
+	old := PortExists
+	PortExists = func(n string) bool { return n == "enp1s0" || n == "enp2s0" || n == "enp3s0" }
+	t.Cleanup(func() { PortExists = old })
 	in := &Installer{R: f, Target: t.TempDir(), Squash: "/live/fs.squashfs", EFI: func() bool { return true }}
 	os.MkdirAll(filepath.Join(in.Target, "etc"), 0o755)
 	return in, f
 }
 
 func good() Request {
-	return Request{Disk: "/dev/nvme0n1", Confirm: "/dev/nvme0n1", Hostname: "gatehouse", Username: "marvin", Password: "a long enough password", Timezone: "UTC"}
+	return Request{Disk: "/dev/nvme0n1", Confirm: "/dev/nvme0n1", Hostname: "gatehouse", Username: "marvin", Password: "a long enough password", Timezone: "UTC",
+		Network: seed.Network{LAN: seed.LAN{Port: "enp2s0", Mode: "router", Address: "192.168.1.1/24"}}}
 }
 
 func TestDisksMarkTheLiveMedium(t *testing.T) {
@@ -77,6 +84,11 @@ func TestValidate(t *testing.T) {
 		"short password":  func(r *Request) { r.Password = "short" },
 		"newline":         func(r *Request) { r.Password = "long enough password\nx" },
 		"bad zone":        func(r *Request) { r.Timezone = "../../etc/passwd" },
+		"no lan port":     func(r *Request) { r.Network.LAN.Port = "" },
+		"no lan mode":     func(r *Request) { r.Network.LAN.Mode = "" },
+		"missing port":    func(r *Request) { r.Network.LAN.Port = "enp9s9" },
+		"wan same port":   func(r *Request) { r.Network.WAN = &seed.WAN{Port: "enp2s0", Type: "dhcp"} },
+		"wan missing":     func(r *Request) { r.Network.WAN = &seed.WAN{Port: "enp8s0", Type: "dhcp"} },
 	}
 	for n, mut := range bad {
 		r := good()
@@ -88,6 +100,21 @@ func TestValidate(t *testing.T) {
 	g := good()
 	if err := Validate(&g, disks); err != nil {
 		t.Fatal(err)
+	}
+	// The internet connection is optional.
+	g.Network.WAN = &seed.WAN{Port: "enp1s0", Type: "dhcp"}
+	g.Network.Bridge = []string{"enp3s0"}
+	if err := Validate(&g, disks); err != nil {
+		t.Fatalf("lan with optional wan and bridge: %v", err)
+	}
+}
+
+func TestPrivateOnly(t *testing.T) {
+	for ip, want := range map[string]bool{"192.168.1.5": true, "10.1.2.3": true, "172.20.0.9": true, "169.254.4.4": true, "127.0.0.1": true,
+		"100.64.5.5": true, "8.8.8.8": false, "203.0.113.9": false, "172.32.0.1": false} {
+		if got := privateAddr(net.ParseIP(ip)); got != want {
+			t.Errorf("%s: got %v want %v", ip, got, want)
+		}
 	}
 }
 
@@ -119,7 +146,7 @@ func TestInstallSequence(t *testing.T) {
 		t.Fatalf("%+v\n%s", s, s.Log)
 	}
 	all := strings.Join(f.cmds, "\n")
-	order := []string{"wipefs -a /dev/nvme0n1", "sgdisk --zap-all", "sgdisk -n1:0:+1M", "mkfs.vfat", "mkfs.ext4 -F -L gatehouse-root /dev/nvme0n1p3", "unsquashfs -f -d", "grub-install --target=x86_64-efi", "update-grub", "gatehouse user add"}
+	order := []string{"wipefs -a /dev/nvme0n1", "sgdisk --zap-all", "sgdisk -n1:0:+1M", "mkfs.vfat", "mkfs.ext4 -F -L gatehouse-root /dev/nvme0n1p3", "unsquashfs -f -d", "grub-install --target=x86_64-efi", "update-grub", "gatehouse user add", "gatehouse seed"}
 	pos := -1
 	for _, o := range order {
 		i := strings.Index(all, o)
@@ -127,6 +154,16 @@ func TestInstallSequence(t *testing.T) {
 			t.Fatalf("%q missing or out of order in:\n%s", o, all)
 		}
 		pos = i
+	}
+	// The network choice reaches the seed command as JSON on standard input.
+	seeded := false
+	for line, v := range f.stdin {
+		if strings.Contains(line, "gatehouse seed") && strings.Contains(v, `"port":"enp2s0"`) && strings.Contains(v, `"mode":"router"`) {
+			seeded = true
+		}
+	}
+	if !seeded {
+		t.Fatalf("the network choice was not passed to seed: %v", f.stdin)
 	}
 	// The password goes to stdin, never into a command line.
 	if strings.Contains(all, "a long enough password") {

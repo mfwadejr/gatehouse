@@ -5,11 +5,14 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	"gatehouse/internal/seed"
 )
 
 // Server exposes the installer over HTTP. Every call except /info needs the code that is
@@ -80,6 +83,12 @@ func (s *Server) Handler() http.Handler {
 			return
 		}
 		writeJSON(w, 200, d)
+	})
+	m.HandleFunc("GET /api/install/network", func(w http.ResponseWriter, r *http.Request) {
+		if !s.authorised(w, r) {
+			return
+		}
+		writeJSON(w, 200, NetworkInfo())
 	})
 	m.HandleFunc("GET /api/install/timezones", func(w http.ResponseWriter, r *http.Request) {
 		if !s.authorised(w, r) {
@@ -178,4 +187,75 @@ func Addresses(port string) []string {
 		}
 	}
 	return out
+}
+
+// PortInfo is a wired port as the installer's network step shows it.
+type PortInfo struct {
+	Name  string   `json:"name"`
+	MAC   string   `json:"mac"`
+	Link  bool     `json:"link"`
+	USB   bool     `json:"usb"`
+	Speed string   `json:"speed"`
+	Addrs []string `json:"addrs"` // addresses it already has on the network the installer started on
+}
+
+// NetworkInfo describes the ports and suggests a local network that does not clash with the
+// one the installer is running on.
+func NetworkInfo() map[string]any {
+	var used []netip.Prefix
+	byName := map[string][]string{}
+	ifs, _ := net.Interfaces()
+	macs := map[string]string{}
+	for _, ifi := range ifs {
+		macs[ifi.Name] = ifi.HardwareAddr.String()
+		if ifi.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		as, _ := ifi.Addrs()
+		for _, a := range as {
+			if n, ok := a.(*net.IPNet); ok && n.IP.To4() != nil {
+				if p, err := netip.ParsePrefix(n.String()); err == nil && !p.Addr().IsLinkLocalUnicast() {
+					used = append(used, p)
+					byName[ifi.Name] = append(byName[ifi.Name], n.IP.String())
+				}
+			}
+		}
+	}
+	var ports []PortInfo
+	for _, p := range WiredPorts() {
+		ports = append(ports, PortInfo{Name: p.Name, MAC: macs[p.Name], Link: p.Link, USB: p.USB, Speed: p.Speed, Addrs: byName[p.Name]})
+	}
+	if ports == nil {
+		ports = []PortInfo{}
+	}
+	return map[string]any{"ports": ports, "suggested_lan": seed.Suggest(used)}
+}
+
+// PrivateOnly wraps a listener so that only devices on private, link-local or loopback
+// addresses can connect. If the internet cable is plugged in first, nobody on the internet
+// can reach the installer.
+func PrivateOnly(l net.Listener) net.Listener { return &privateListener{l} }
+
+type privateListener struct{ net.Listener }
+
+func (p *privateListener) Accept() (net.Conn, error) {
+	for {
+		c, err := p.Listener.Accept()
+		if err != nil {
+			return nil, err
+		}
+		if ra, ok := c.RemoteAddr().(*net.TCPAddr); ok && privateAddr(ra.IP) {
+			return c, nil
+		}
+		c.Close()
+	}
+}
+
+func privateAddr(ip net.IP) bool {
+	a, ok := netip.AddrFromSlice(ip)
+	if !ok {
+		return false
+	}
+	a = a.Unmap()
+	return a.IsPrivate() || a.IsLoopback() || a.IsLinkLocalUnicast() || netip.MustParsePrefix("100.64.0.0/10").Contains(a)
 }

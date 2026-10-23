@@ -40,10 +40,15 @@ type IfaceRow struct {
 	VLAN    int    `json:"vlan"`
 	ZoneID  int64  `json:"zone_id"`
 	IPv4    string `json:"ipv4"`
+	DHCP    bool   `json:"dhcp"`
+	Gateway string `json:"gateway"`
+	DNS     string `json:"dns"`
 	IPv6    string `json:"ipv6"`
 	PD      bool   `json:"pd"`
 	MTU     int    `json:"mtu"`
 	Enabled bool   `json:"enabled"`
+	// Members are the ports of a bridge.
+	Members []string `json:"members"`
 }
 
 // WanRow is an internet connection as the console edits it. The password is never sent back.
@@ -78,7 +83,7 @@ type querier interface {
 }
 
 func (a *App) listIfaces(q querier) ([]IfaceRow, error) {
-	rows, err := q.Query(`SELECT id,name,kind,parent,vlan_id,COALESCE(zone_id,0),ipv4_cidr,ipv6_cidr,ipv6_pd,mtu,enabled FROM interfaces ORDER BY id`)
+	rows, err := q.Query(`SELECT id,name,kind,parent,vlan_id,COALESCE(zone_id,0),ipv4_cidr,ipv6_cidr,ipv6_pd,mtu,enabled,dhcp,gateway,dns,members FROM interfaces ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -86,11 +91,16 @@ func (a *App) listIfaces(q querier) ([]IfaceRow, error) {
 	out := []IfaceRow{}
 	for rows.Next() {
 		var r IfaceRow
-		var pd, en int
-		if err := rows.Scan(&r.ID, &r.Name, &r.Kind, &r.Parent, &r.VLAN, &r.ZoneID, &r.IPv4, &r.IPv6, &pd, &r.MTU, &en); err != nil {
+		var pd, en, dh int
+		var mem string
+		if err := rows.Scan(&r.ID, &r.Name, &r.Kind, &r.Parent, &r.VLAN, &r.ZoneID, &r.IPv4, &r.IPv6, &pd, &r.MTU, &en, &dh, &r.Gateway, &r.DNS, &mem); err != nil {
 			return nil, err
 		}
-		r.PD, r.Enabled = pd == 1, en == 1
+		r.Members = []string{}
+		if mem != "" {
+			r.Members = strings.Split(mem, ",")
+		}
+		r.PD, r.Enabled, r.DHCP = pd == 1, en == 1, dh == 1
 		out = append(out, r)
 	}
 	return out, rows.Err()
@@ -141,7 +151,7 @@ func (a *App) buildPlan(q querier) (*netd.Plan, error) {
 	}
 	for _, i := range ifs {
 		p.Config.Interfaces = append(p.Config.Interfaces, netcfg.Interface{Name: i.Name, Kind: i.Kind, Parent: i.Parent,
-			VLAN: i.VLAN, IPv4: i.IPv4, IPv6: i.IPv6, PD: i.PD, MTU: i.MTU, Enabled: i.Enabled})
+			VLAN: i.VLAN, IPv4: i.IPv4, DHCP: i.DHCP, Gateway: i.Gateway, DNS: i.DNS, Members: i.Members, IPv6: i.IPv6, PD: i.PD, MTU: i.MTU, Enabled: i.Enabled})
 	}
 	n := 0
 	for _, w := range wans {
@@ -297,8 +307,8 @@ func (a *App) registerNetRoutes() {
 				zone = in.ZoneID
 			}
 			if in.ID == 0 {
-				res, err := tx.Exec(`INSERT INTO interfaces(name,kind,parent,vlan_id,zone_id,ipv4_cidr,ipv6_cidr,ipv6_pd,mtu,enabled) VALUES(?,?,?,?,?,?,?,?,?,?)`,
-					in.Name, in.Kind, in.Parent, in.VLAN, zone, in.IPv4, in.IPv6, b2iN(in.PD), in.MTU, b2iN(in.Enabled))
+				res, err := tx.Exec(`INSERT INTO interfaces(name,kind,parent,vlan_id,zone_id,ipv4_cidr,ipv6_cidr,ipv6_pd,mtu,enabled,dhcp,gateway,dns,members) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+					in.Name, in.Kind, in.Parent, in.VLAN, zone, in.IPv4, in.IPv6, b2iN(in.PD), in.MTU, b2iN(in.Enabled), b2iN(in.DHCP), in.Gateway, in.DNS, strings.Join(in.Members, ","))
 				if err != nil {
 					return friendlyDup(err, "a port or VLAN with that name already exists")
 				}
@@ -306,8 +316,8 @@ func (a *App) registerNetRoutes() {
 				return nil
 			}
 			id = in.ID
-			_, err := tx.Exec(`UPDATE interfaces SET name=?,kind=?,parent=?,vlan_id=?,zone_id=?,ipv4_cidr=?,ipv6_cidr=?,ipv6_pd=?,mtu=?,enabled=? WHERE id=?`,
-				in.Name, in.Kind, in.Parent, in.VLAN, zone, in.IPv4, in.IPv6, b2iN(in.PD), in.MTU, b2iN(in.Enabled), in.ID)
+			_, err := tx.Exec(`UPDATE interfaces SET name=?,kind=?,parent=?,vlan_id=?,zone_id=?,ipv4_cidr=?,ipv6_cidr=?,ipv6_pd=?,mtu=?,enabled=?,dhcp=?,gateway=?,dns=?,members=? WHERE id=?`,
+				in.Name, in.Kind, in.Parent, in.VLAN, zone, in.IPv4, in.IPv6, b2iN(in.PD), in.MTU, b2iN(in.Enabled), b2iN(in.DHCP), in.Gateway, in.DNS, strings.Join(in.Members, ","), in.ID)
 			return friendlyDup(err, "a port or VLAN with that name already exists")
 		})
 		if err != nil {

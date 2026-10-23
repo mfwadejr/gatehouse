@@ -283,6 +283,7 @@ func (a *App) Run(ctx context.Context) error {
 	run(func() { a.Lists.Run(ctx) })
 	run(func() { a.DHCPSrv.Run(ctx) })
 	run(func() { a.housekeeping(ctx) })
+	run(func() { a.firstBoot(ctx) })
 
 	l, err := net.Listen("tcp", a.Cfg.WebAddr)
 	if err != nil {

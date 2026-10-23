@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/binary"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -28,6 +29,7 @@ import (
 	"gatehouse/internal/netcfg"
 	"gatehouse/internal/netd"
 	"gatehouse/internal/privsep"
+	"gatehouse/internal/seed"
 	"gatehouse/internal/store"
 	"gatehouse/internal/tlsutil"
 )
@@ -39,6 +41,7 @@ Commands:
   netd       run the privileged network helper (firewall, interfaces, WAN monitor)
   installer  run the installer (on the live USB image only)
   user       add an administrator or reset a password (run on the device itself)
+  seed       store the network chosen in the installer (used by the installer)
   rollback   undo a firewall or network change that was not confirmed (started automatically)
   version    print the version
 
@@ -60,6 +63,8 @@ func main() {
 		runInstaller(os.Args[2:])
 	case "user":
 		userCmd(os.Args[2:])
+	case "seed":
+		seedCmd(os.Args[2:])
 	case "rollback":
 		rollback(os.Args[2:])
 	case "version":
@@ -296,13 +301,51 @@ func runInstaller(args []string) {
 	srv := &installer.Server{In: installer.New(), Code: code, Web: staticHandler()}
 	_, port, _ := net.SplitHostPort(*addr)
 	go installer.RunScreen(code, port)
-	go http.ListenAndServe(":80", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		h := r.Host
-		if i := strings.LastIndex(h, ":"); i >= 0 {
-			h = h[:i]
-		}
-		http.Redirect(w, r, "https://"+h+r.URL.RequestURI(), http.StatusMovedPermanently)
-	}))
-	hs := &http.Server{Addr: *addr, Handler: srv.Handler(), ReadHeaderTimeout: 10 * time.Second}
-	log.Fatal(hs.ListenAndServeTLS(cert, key))
+	// Only private addresses may reach the installer, so plugging the internet cable in first
+	// does not expose it.
+	if l80, err := net.Listen("tcp", ":80"); err == nil {
+		go http.Serve(installer.PrivateOnly(l80), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			h := r.Host
+			if i := strings.LastIndex(h, ":"); i >= 0 {
+				h = h[:i]
+			}
+			http.Redirect(w, r, "https://"+h+r.URL.RequestURI(), http.StatusMovedPermanently)
+		}))
+	}
+	ln, err := net.Listen("tcp", *addr)
+	if err != nil {
+		log.Fatalf("installer: %v", err)
+	}
+	hs := &http.Server{Handler: srv.Handler(), ReadHeaderTimeout: 10 * time.Second}
+	log.Fatal(hs.ServeTLS(installer.PrivateOnly(ln), cert, key))
+}
+
+// seedCmd stores the network chosen in the installer. The choice arrives as JSON on standard
+// input because it may include an internet provider password.
+func seedCmd(args []string) {
+	fs := flag.NewFlagSet("seed", flag.ExitOnError)
+	data := fs.String("data", "/var/lib/gatehouse", "data directory")
+	fs.Parse(args)
+	var n seed.Network
+	dec := json.NewDecoder(os.Stdin)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&n); err != nil {
+		log.Fatalf("seed: read the network choice as JSON on standard input: %v", err)
+	}
+	if err := os.MkdirAll(*data, 0o750); err != nil {
+		log.Fatalf("seed: %v", err)
+	}
+	db, err := store.OpenConfig(filepath.Join(*data, "config.db"))
+	if err != nil {
+		log.Fatalf("seed: %v", err)
+	}
+	defer db.Close()
+	box, err := crypt.LoadOrCreate(filepath.Join(*data, "secret.key"))
+	if err != nil {
+		log.Fatalf("seed: %v", err)
+	}
+	if err := seed.Apply(db, box, &n); err != nil {
+		log.Fatalf("seed: %v", err)
+	}
+	fmt.Println("done")
 }

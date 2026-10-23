@@ -143,3 +143,53 @@ func TestCGNAT(t *testing.T) {
 		t.Error("public address flagged")
 	}
 }
+
+func TestBridgeAndBehindRouter(t *testing.T) {
+	c := &Config{Interfaces: []Interface{
+		{Name: "br-lan", Kind: "bridge", Members: []string{"enp2s0", "enp3s0"}, IPv4: "192.168.1.1/24", Enabled: true},
+	}, WANs: []WAN{{Name: "Internet", Iface: "enp1s0", Type: "dhcp", Priority: 1, Enabled: true}}}
+	out, err := Generate(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.Networkd["gatehouse-br-lan.netdev"], "Kind=bridge") {
+		t.Fatalf("no bridge device: %v", out.Networkd)
+	}
+	for _, m := range []string{"enp2s0", "enp3s0"} {
+		if !strings.Contains(out.Networkd["gatehouse-"+m+".network"], "Bridge=br-lan") {
+			t.Fatalf("%s is not in the bridge", m)
+		}
+	}
+	if !strings.Contains(out.Networkd["gatehouse-br-lan.network"], "Address=192.168.1.1/24") {
+		t.Fatal("bridge has no address")
+	}
+	// A port cannot be both a member and set up on its own.
+	c.Interfaces = append(c.Interfaces, Interface{Name: "enp2s0", Kind: "phys", IPv4: "10.0.0.1/24", Enabled: true})
+	if err := c.Validate(); err == nil {
+		t.Fatal("member also configured separately should be refused")
+	}
+
+	// Behind another router: automatic address, or a fixed one with a gateway and DNS.
+	auto := &Config{Interfaces: []Interface{{Name: "enp1s0", Kind: "phys", DHCP: true, Enabled: true}}}
+	o, err := Generate(auto)
+	if err != nil || !strings.Contains(o.Networkd["gatehouse-enp1s0.network"], "DHCP=ipv4") {
+		t.Fatalf("dhcp client: %v %v", o, err)
+	}
+	fixed := &Config{Interfaces: []Interface{{Name: "enp1s0", Kind: "phys", IPv4: "192.168.0.50/24", Gateway: "192.168.0.1", DNS: "192.168.0.1", Enabled: true}}}
+	o, err = Generate(fixed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := o.Networkd["gatehouse-enp1s0.network"]
+	if !strings.Contains(n, "[Route]\nGateway=192.168.0.1") || !strings.Contains(n, "DNS=192.168.0.1") {
+		t.Fatalf("fixed address behind a router:\n%s", n)
+	}
+	fixed.Interfaces[0].Gateway = "10.9.9.9"
+	if fixed.Validate() == nil {
+		t.Fatal("a gateway outside the network should be refused")
+	}
+	both := &Config{Interfaces: []Interface{{Name: "enp1s0", Kind: "phys", IPv4: "192.168.0.50/24", DHCP: true, Enabled: true}}}
+	if both.Validate() == nil {
+		t.Fatal("automatic and fixed together should be refused")
+	}
+}

@@ -15,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"gatehouse/internal/seed"
 )
 
 // Runner executes commands. Tests replace it.
@@ -56,6 +58,8 @@ type Request struct {
 	Timezone string `json:"timezone"`
 	// RequireMFA makes two-step sign-in mandatory for every account. Off by default.
 	RequireMFA bool `json:"require_mfa"`
+	// Network is how the ports are used: the LAN first, the internet connection optional.
+	Network seed.Network `json:"network"`
 }
 
 // Step is one stage of the installation.
@@ -138,10 +142,33 @@ func Validate(r *Request, disks []Disk) error {
 	case !reTZ.MatchString(r.Timezone):
 		return errors.New("choose a time zone")
 	}
+	if err := r.Network.Validate(); err != nil {
+		return err
+	}
+	all := []string{r.Network.LAN.Port}
+	if r.Network.WAN != nil {
+		all = append(all, r.Network.WAN.Port)
+	}
+	all = append(all, r.Network.Bridge...)
+	for _, p := range all {
+		if !PortExists(p) {
+			return fmt.Errorf("this machine has no network port called %s", p)
+		}
+	}
 	if _, err := os.Stat("/usr/share/zoneinfo/" + r.Timezone); err != nil && !strings.HasPrefix(r.Timezone, "Etc/") && r.Timezone != "UTC" {
 		return errors.New("unknown time zone")
 	}
 	return nil
+}
+
+// PortExists says whether a network port is present. Tests replace it.
+var PortExists = func(name string) bool {
+	for _, p := range WiredPorts() {
+		if p.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 // partition returns the path of partition n on a disk (nvme0n1p2, sda2).
@@ -384,6 +411,16 @@ func (in *Installer) plan(r Request) []step {
 				args = append(args, "-require-mfa")
 			}
 			if err := in.chroot(r.Password+"\n", args...); err != nil {
+				return err
+			}
+			return in.chroot("", "chown", "-R", "gatehouse:gatehouse", "/var/lib/gatehouse")
+		}},
+		{"Setting up your network", func() error {
+			b, err := json.Marshal(r.Network)
+			if err != nil {
+				return err
+			}
+			if err := in.chroot(string(b)+"\n", "/usr/local/bin/gatehouse", "seed", "-data", "/var/lib/gatehouse"); err != nil {
 				return err
 			}
 			return in.chroot("", "chown", "-R", "gatehouse:gatehouse", "/var/lib/gatehouse")

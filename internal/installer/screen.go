@@ -83,10 +83,13 @@ func RenderScreen(ports []Port, urls []string, code string) string {
 		line(fg + "Gatehouse needs at least one wired network port. If you use a USB")
 		line(fg + "network adapter, plug it in now. It is detected automatically.")
 	case connected == 0:
-		line(bold + "Connect a network cable to continue.")
+		line(bold + "Connect your LAN cable to continue.")
 		b.WriteString("\n")
-		line(fg + "Plug in the cable from your internet (modem or provider),")
-		line(fg + "the cable to your own network (a computer or switch), or both.")
+		line(fg + "Plug the cable to your own network (a computer or switch) into any")
+		line(fg + "port below. You finish setup from a computer on that network.")
+		b.WriteString("\n")
+		line(dim + "The internet cable (from your modem or provider) is optional.")
+		line(dim + "Connect it now, or add it later from the console.")
 		b.WriteString("\n")
 		line(dim + "This screen updates by itself when a cable is detected.")
 	case len(urls) == 0:
@@ -104,6 +107,7 @@ func RenderScreen(ports []Port, urls []string, code string) string {
 		b.WriteString("\n")
 		line(fg + "Installer code   " + bold + code)
 		b.WriteString("\n")
+		line(dim + "The internet cable is optional. You can connect it now or later.")
 		line(dim + "Your browser will warn about the certificate. That is expected.")
 		line(dim + "Nothing on this machine's disks changes until you confirm.")
 	}
