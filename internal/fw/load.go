@@ -189,6 +189,18 @@ func Load(db Queryer) (*Model, error) {
 		}
 	}
 	m.Zones = append(kept, wan)
+	var upnpWans int
+	if r, err := db.Query(`SELECT count(*) FROM wan_links WHERE enabled=1 AND upnp=1`); err == nil {
+		if r.Next() {
+			r.Scan(&upnpWans)
+		}
+		r.Close()
+	}
+	for _, z := range m.Zones {
+		if z.UPnP && z.Kind != KindWan && upnpWans > 0 {
+			m.UPnP = true
+		}
+	}
 
 	rrows, err := db.Query(`SELECT name,from_zone,to_zone,src,dst,service,action,limit_rate,log,enabled FROM fw_rules ORDER BY position,id`)
 	if err != nil {

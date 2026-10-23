@@ -353,4 +353,19 @@ CREATE TABLE wan_group_routes(
   label TEXT NOT NULL DEFAULT '',
   UNIQUE(group_id, kind, value)
 );
+`, `
+-- Wireless cards: each one either joins a network (client) or broadcasts one (ap).
+CREATE TABLE wifi_radios(
+  iface TEXT PRIMARY KEY,
+  mode TEXT NOT NULL DEFAULT 'client',
+  ssid TEXT NOT NULL DEFAULT '',
+  psk TEXT NOT NULL DEFAULT '',          -- sealed
+  country TEXT NOT NULL DEFAULT '',
+  band TEXT NOT NULL DEFAULT '5',
+  channel INTEGER NOT NULL DEFAULT 0,
+  hidden INTEGER NOT NULL DEFAULT 0,
+  wpa3 INTEGER NOT NULL DEFAULT 0,
+  fast INTEGER NOT NULL DEFAULT 0,
+  enabled INTEGER NOT NULL DEFAULT 1
+);
 `}

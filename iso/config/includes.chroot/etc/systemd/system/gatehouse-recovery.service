@@ -1,0 +1,22 @@
+[Unit]
+Description=Gatehouse recovery screen (Alt+F2 at the machine)
+ConditionKernelCommandLine=!boot=live
+After=systemd-user-sessions.service
+Conflicts=getty@tty2.service autovt@tty2.service
+
+[Service]
+Type=simple
+ExecStartPre=-/bin/sh -c 'for f in Uni3-TerminusBold32x16 Uni3-Terminus32x16 Lat15-TerminusBold32x16; do setfont -C /dev/tty2 $f && exit 0; done; exit 0'
+ExecStart=/usr/local/bin/gatehouse recover
+StandardInput=tty
+StandardOutput=tty
+StandardError=journal
+TTYPath=/dev/tty2
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=multi-user.target

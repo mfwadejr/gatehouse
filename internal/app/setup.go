@@ -1,53 +1,108 @@
 package app
 
 import (
-	"crypto/rand"
-	"crypto/subtle"
-	"fmt"
-	"math/big"
+	"context"
+	"errors"
+	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"gatehouse/internal/api"
+	"gatehouse/internal/installer"
+	"gatehouse/internal/seed"
 )
 
-// First-run setup. Until an account exists the console asks for a one-time code that is
-// shown only on this machine's own screen (and kept in a root-readable file), so someone
-// else on the network cannot claim a freshly installed box.
-type setupGate struct {
-	mu       sync.Mutex
-	code     string
-	fails    int
-	lockedTo time.Time
+// First-run setup. A freshly installed device has no account. The first person to open it from
+// their own network creates the administrator account, then a short wizard sets up how Gatehouse
+// is used on the network. There is no default login anywhere. Until the account exists the
+// page only answers devices on private addresses, never the internet side, and once it exists
+// the page is closed for good. The machine's own screen says "setup not finished" until
+// both steps are done.
+
+const wizardSetting = "setup.wizard" // "done" once the wizard was finished or skipped
+
+func (a *App) setupStatePath() string { return filepath.Join(a.Cfg.DataDir, "setup-state") }
+
+// setupState is "account" (nobody has signed up yet), "wizard" (account made, wizard open) or "ready".
+func (a *App) setupState() string {
+	switch {
+	case !a.Auth.HasUsers():
+		return "account"
+	case a.wizardPending():
+		return "wizard"
+	}
+	return "ready"
 }
 
-func (a *App) setupCodePath() string { return filepath.Join(a.Cfg.DataDir, "setup-code") }
+// wizardPending is true until the network wizard is finished or skipped. A device that was
+// already configured some other way never shows it.
+func (a *App) wizardPending() bool {
+	if a.Config.Setting(wizardSetting, "") == "done" {
+		return false
+	}
+	var zones, wans int
+	a.Config.QueryRow(`SELECT count(*) FROM zones`).Scan(&zones)
+	a.Config.QueryRow(`SELECT count(*) FROM wan_links`).Scan(&wans)
+	return zones == 0 && wans == 0
+}
 
-func newCode() string {
-	n, err := rand.Int(rand.Reader, big.NewInt(100000000))
+// writeSetupState tells the machine's own screen how far setup has got.
+func (a *App) writeSetupState() {
+	os.WriteFile(a.setupStatePath(), []byte(a.setupState()+"\n"), 0o644)
+}
+
+func (a *App) prepareSetup() { a.writeSetupState() }
+
+func privateIP(ip net.IP) bool {
+	x, ok := netip.AddrFromSlice(ip)
+	if !ok {
+		return false
+	}
+	x = x.Unmap()
+	return x.IsPrivate() || x.IsLoopback() || x.IsLinkLocalUnicast() || netip.MustParsePrefix("100.64.0.0/10").Contains(x)
+}
+
+func remotePrivate(r *http.Request) bool {
+	h, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		panic(err)
+		return false
 	}
-	s := fmt.Sprintf("%08d", n.Int64())
-	return s[:4] + "-" + s[4:]
+	return privateIP(net.ParseIP(h))
 }
 
-// prepareSetup creates the code while no account exists and removes it afterwards.
-func (a *App) prepareSetup() {
-	if a.Auth.HasUsers() {
-		os.Remove(a.setupCodePath())
-		return
+// localPort finds the network port this very connection arrived on.
+func localPort(r *http.Request) (name, addr string) {
+	la, ok := r.Context().Value(http.LocalAddrContextKey).(net.Addr)
+	if !ok {
+		return "", ""
 	}
-	a.setup.mu.Lock()
-	a.setup.code = newCode()
-	code := a.setup.code
-	a.setup.mu.Unlock()
-	os.WriteFile(a.setupCodePath(), []byte(code+"\n"), 0o600)
-	fmt.Fprintf(os.Stderr, "\n  First-time setup code: %s\n  Open the console in a browser and enter it to create the administrator account.\n\n", code)
+	h, _, err := net.SplitHostPort(la.String())
+	if err != nil {
+		return "", ""
+	}
+	ip := net.ParseIP(h)
+	ifs, _ := net.Interfaces()
+	for _, ifi := range ifs {
+		as, _ := ifi.Addrs()
+		for _, x := range as {
+			if n, ok := x.(*net.IPNet); ok && n.IP.Equal(ip) {
+				return ifi.Name, ip.String()
+			}
+		}
+	}
+	return "", ip.String()
+}
+
+func currentZone() string {
+	b, err := os.ReadFile("/etc/timezone")
+	if err != nil {
+		return "UTC"
+	}
+	return strings.TrimSpace(string(b))
 }
 
 func (a *App) registerSetupRoutes() {
@@ -60,48 +115,131 @@ func (a *App) registerSetupRoutes() {
 			api.Error(w, http.StatusForbidden, "request rejected")
 			return
 		}
+		if !remotePrivate(r) {
+			api.Error(w, http.StatusForbidden, "first-time setup is only available from your own network")
+			return
+		}
 		var in struct {
-			Code     string `json:"code"`
 			Username string `json:"username"`
 			Password string `json:"password"`
 		}
 		if !api.Decode(w, r, &in) {
 			return
 		}
+		// One at a time: whoever gets here first creates the account, everyone else is told it exists.
+		a.setupMu.Lock()
+		defer a.setupMu.Unlock()
 		if a.Auth.HasUsers() {
 			api.Error(w, http.StatusConflict, "this device is already set up")
 			return
 		}
-		g := &a.setup
-		g.mu.Lock()
-		defer g.mu.Unlock()
-		if time.Now().Before(g.lockedTo) {
-			api.Error(w, http.StatusTooManyRequests, "too many wrong codes; wait a few minutes and try again")
-			return
-		}
-		digits := func(s string) string {
-			return strings.Map(func(r rune) rune {
-				if r >= '0' && r <= '9' {
-					return r
-				}
-				return -1
-			}, s)
-		}
-		code := digits(in.Code)
-		if g.code == "" || subtle.ConstantTimeCompare([]byte(code), []byte(digits(g.code))) != 1 {
-			g.fails++
-			if g.fails >= 5 {
-				g.fails, g.lockedTo = 0, time.Now().Add(10*time.Minute)
-			}
-			api.Error(w, http.StatusForbidden, "that setup code is not right; it is shown on the screen of this device")
+		if len(in.Password) < 12 {
+			api.Error(w, http.StatusBadRequest, "the password must be at least 12 characters")
 			return
 		}
 		if _, err := a.Auth.CreateUser(in.Username, in.Password, "admin"); err != nil {
 			api.Error(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		g.code = ""
-		os.Remove(a.setupCodePath())
+		a.writeSetupState()
 		api.JSON(w, 200, map[string]string{"status": "ok"})
+	})
+
+	// The wizard that follows: how Gatehouse is used on the network.
+	s.HandleAdmin("GET /api/setup/wizard", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		here, hereAddr := localPort(r)
+		var used []netip.Prefix
+		ifs, _ := net.Interfaces()
+		for _, ifi := range ifs {
+			if ifi.Flags&net.FlagLoopback != 0 {
+				continue
+			}
+			as, _ := ifi.Addrs()
+			for _, x := range as {
+				if n, ok := x.(*net.IPNet); ok && n.IP.To4() != nil {
+					if p, err := netip.ParsePrefix(n.String()); err == nil && !p.Addr().IsLinkLocalUnicast() {
+						used = append(used, p)
+					}
+				}
+			}
+		}
+		host, _ := os.Hostname()
+		api.JSON(w, 200, map[string]any{
+			"pending": a.wizardPending(), "ports": ports(), "here": here, "here_addr": hereAddr,
+			"suggested_lan": seed.Suggest(used), "hostname": host, "timezone": currentZone(),
+			"timezones": installer.Timezones(),
+		})
+	})
+	s.HandleAdmin("POST /api/setup/wizard", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		var in struct {
+			Skip     bool         `json:"skip"`
+			Network  seed.Network `json:"network"`
+			Hostname string       `json:"hostname"`
+			Timezone string       `json:"timezone"`
+			MFA      bool         `json:"require_mfa"`
+		}
+		if !api.Decode(w, r, &in) {
+			return
+		}
+		a.setupMu.Lock()
+		defer a.setupMu.Unlock()
+		if !a.wizardPending() {
+			api.Error(w, http.StatusConflict, "setup is already finished")
+			return
+		}
+		if in.Skip {
+			a.Config.SetSetting(wizardSetting, "done")
+			a.writeSetupState()
+			api.JSON(w, 200, map[string]any{"status": "skipped"})
+			return
+		}
+		if err := in.Network.Validate(); err != nil {
+			fail(w, err)
+			return
+		}
+		have := map[string]bool{}
+		for _, p := range ports() {
+			have[p["name"].(string)] = true
+		}
+		all := []string{in.Network.LAN.Port}
+		if in.Network.WAN != nil {
+			all = append(all, in.Network.WAN.Port)
+		}
+		all = append(all, in.Network.Bridge...)
+		for _, p := range all {
+			if !have[p] {
+				fail(w, errors.New("this machine has no network port called "+p))
+				return
+			}
+		}
+		if a.Net != nil {
+			if err := a.Net.SetSystem(strings.TrimSpace(in.Hostname), strings.TrimSpace(in.Timezone)); err != nil {
+				fail(w, err)
+				return
+			}
+		}
+		if err := seed.Apply(a.Config, a.Box, &in.Network); err != nil {
+			fail(w, err)
+			return
+		}
+		if in.MFA {
+			a.Auth.SetMFARequired(true)
+		}
+		a.Config.SetSetting(wizardSetting, "done")
+		a.writeSetupState()
+		// The change moves this very connection when Gatehouse becomes the router, so it is
+		// applied a moment after the answer has gone out.
+		go func() {
+			time.Sleep(2 * time.Second)
+			a.firstBoot(context.Background())
+		}()
+		out := map[string]any{"status": "applying", "mode": in.Network.LAN.Mode}
+		switch {
+		case in.Network.LAN.Mode == "router":
+			out["address"] = strings.Split(in.Network.LAN.Address, "/")[0]
+		case in.Network.LAN.Addressing == "static":
+			out["address"] = strings.Split(in.Network.LAN.Static, "/")[0]
+		}
+		api.JSON(w, 200, out)
 	})
 }

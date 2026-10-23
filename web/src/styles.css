@@ -227,3 +227,6 @@ textarea.in { height: auto; padding: var(--space-2-5) var(--component-input-padd
 .wg-member .grow { flex: 1; }
 .wg-rank { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; border-radius: var(--radius-full); background: var(--color-bg-surface); font-size: var(--font-size-sm); font-weight: 600; }
 .wg-pct { width: 5rem; }
+
+.wg-member.on { border-color: var(--color-accent-default, var(--color-border-strong)); }
+button.wg-member { width: 100%; text-align: left; cursor: pointer; color: inherit; font: inherit; }

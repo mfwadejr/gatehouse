@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useId, useMemo, useState, 
 export const ICONS = {
   overview: 'M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z',
   internet: 'M2 9a15 15 0 0120 0M5 12.5a10 10 0 0114 0M8.5 16a5 5 0 017 0M12 19.5h.01',
+  wifi: 'M5 19v-3M10 19v-7M15 19V8M20 19V4',
   dns: 'M12 21a9 9 0 100-18 9 9 0 000 18zM3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18',
   dhcp: 'M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01',
   firewall: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z',
@@ -118,7 +119,7 @@ export function Segmented({ value, onChange, options }) {
   return (
     <div className="seg" role="group">
       {options.map((o) => (
-        <button key={o.value} type="button" className={value === o.value ? 'on' : ''} onClick={() => onChange(o.value)}>{o.label}</button>
+        <button key={o.value} type="button" disabled={o.disabled} className={value === o.value ? 'on' : ''} onClick={() => onChange(o.value)}>{o.label}</button>
       ))}
     </div>
   );

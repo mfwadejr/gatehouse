@@ -83,6 +83,8 @@ type Service struct {
 	NewMon   func(links []wanmon.Link, mode wanmon.Mode) *wanmon.Monitor // groups are set on the result
 
 	VPN *VPN
+	// Root is the directory the system settings are written under; empty means the real system.
+	Root string
 	// Log follows the kernel log for firewall decisions.
 	Log *FWLog
 

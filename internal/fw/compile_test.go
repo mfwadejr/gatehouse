@@ -170,3 +170,20 @@ func TestNftAcceptsRuleset(t *testing.T) {
 		t.Fatalf("nft rejected the ruleset: %v\n%s\n%s", err, b, out)
 	}
 }
+
+func TestUPnPLetsMappedConnectionsThrough(t *testing.T) {
+	m := sample()
+	m.Forwards = nil
+	out, err := Compile(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "ct status dnat") && strings.Contains(strings.SplitN(out, "chain forward", 2)[1], "ct status dnat accept") {
+		t.Fatal("nothing should be let through by default")
+	}
+	m.UPnP = true
+	out, _ = Compile(m)
+	if !strings.Contains(strings.SplitN(out, "chain forward", 2)[1], "ct status dnat") {
+		t.Fatalf("UPnP mappings are not accepted:\n%s", out)
+	}
+}

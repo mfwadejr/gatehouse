@@ -17,8 +17,6 @@ import (
 	"time"
 
 	"golang.org/x/sys/unix"
-
-	"gatehouse/internal/seed"
 )
 
 // Runner executes commands. Tests replace it.
@@ -50,18 +48,11 @@ type Disk struct {
 	Parts     int    `json:"partitions"`
 }
 
-// Request is what the person chose.
+// Request is what the person chose: only the disk. Everything else (the administrator account,
+// the networks, the device name and the time zone) is set in the browser on first start.
 type Request struct {
-	Disk     string `json:"disk"`
-	Confirm  string `json:"confirm"` // must repeat the disk path
-	Hostname string `json:"hostname"`
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Timezone string `json:"timezone"`
-	// RequireMFA makes two-step sign-in mandatory for every account. Off by default.
-	RequireMFA bool `json:"require_mfa"`
-	// Network is how the ports are used: the LAN first, the internet connection optional.
-	Network seed.Network `json:"network"`
+	Disk    string `json:"disk"`
+	Confirm string `json:"confirm"` // must repeat the disk path
 }
 
 // Step is one stage of the installation.
@@ -113,6 +104,11 @@ func (in *Installer) Status() Status {
 	return s
 }
 
+const (
+	defaultHost = "gatehouse"
+	defaultZone = "UTC"
+)
+
 var (
 	reHost = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 	reUser = regexp.MustCompile(`^[a-z][a-z0-9._-]{0,31}$`)
@@ -134,44 +130,8 @@ func Validate(r *Request, disks []Disk) error {
 		return errors.New("that disk holds the installer itself; choose another")
 	case r.Confirm != r.Disk:
 		return errors.New("type the disk name to confirm that everything on it will be erased")
-	case !reHost.MatchString(r.Hostname):
-		return errors.New("the device name can use lowercase letters, digits and dashes")
-	case !reUser.MatchString(r.Username):
-		return errors.New("the administrator name must start with a letter and use lowercase letters, digits, dots, dashes or underscores")
-	case len(r.Password) < 12:
-		return errors.New("the password must be at least 12 characters")
-	case strings.ContainsAny(r.Password, "\r\n"):
-		return errors.New("the password cannot contain a line break")
-	case !reTZ.MatchString(r.Timezone):
-		return errors.New("choose a time zone")
-	}
-	if err := r.Network.Validate(); err != nil {
-		return err
-	}
-	all := []string{r.Network.LAN.Port}
-	if r.Network.WAN != nil {
-		all = append(all, r.Network.WAN.Port)
-	}
-	all = append(all, r.Network.Bridge...)
-	for _, p := range all {
-		if !PortExists(p) {
-			return fmt.Errorf("this machine has no network port called %s", p)
-		}
-	}
-	if _, err := os.Stat("/usr/share/zoneinfo/" + r.Timezone); err != nil && !strings.HasPrefix(r.Timezone, "Etc/") && r.Timezone != "UTC" {
-		return errors.New("unknown time zone")
 	}
 	return nil
-}
-
-// PortExists says whether a network port is present. Tests replace it.
-var PortExists = func(name string) bool {
-	for _, p := range WiredPorts() {
-		if p.Name == name {
-			return true
-		}
-	}
-	return false
 }
 
 // partition returns the path of partition n on a disk (nvme0n1p2, sda2).
@@ -368,18 +328,18 @@ func (in *Installer) plan(r Request) []step {
 			if err := os.WriteFile(filepath.Join(t, "etc/fstab"), []byte(fstab), 0o644); err != nil {
 				return err
 			}
-			if err := os.WriteFile(filepath.Join(t, "etc/hostname"), []byte(r.Hostname+"\n"), 0o644); err != nil {
+			if err := os.WriteFile(filepath.Join(t, "etc/hostname"), []byte(defaultHost+"\n"), 0o644); err != nil {
 				return err
 			}
-			hosts := fmt.Sprintf("127.0.0.1 localhost\n127.0.1.1 %s %s.lan\n::1 localhost ip6-localhost ip6-loopback\n", r.Hostname, r.Hostname)
+			hosts := fmt.Sprintf("127.0.0.1 localhost\n127.0.1.1 %s %s.lan\n::1 localhost ip6-localhost ip6-loopback\n", defaultHost, defaultHost)
 			if err := os.WriteFile(filepath.Join(t, "etc/hosts"), []byte(hosts), 0o644); err != nil {
 				return err
 			}
 			os.Remove(filepath.Join(t, "etc/localtime"))
-			if err := os.Symlink("/usr/share/zoneinfo/"+r.Timezone, filepath.Join(t, "etc/localtime")); err != nil {
+			if err := os.Symlink("/usr/share/zoneinfo/"+defaultZone, filepath.Join(t, "etc/localtime")); err != nil {
 				return err
 			}
-			os.WriteFile(filepath.Join(t, "etc/timezone"), []byte(r.Timezone+"\n"), 0o644)
+			os.WriteFile(filepath.Join(t, "etc/timezone"), []byte(defaultZone+"\n"), 0o644)
 			for _, b := range bind {
 				os.MkdirAll(filepath.Join(t, b), 0o755)
 				if err := in.sh("", "mount", "--bind", b, filepath.Join(t, b)); err != nil {
@@ -413,25 +373,8 @@ func (in *Installer) plan(r Request) []step {
 			in.chroot("", "sed", "-i", "s# GNU/Linux##g", "/boot/grub/grub.cfg")
 			return nil
 		}},
-		{"Creating your account", func() error {
+		{"Preparing first start", func() error {
 			if err := in.chroot("", "install", "-d", "-o", "gatehouse", "-g", "gatehouse", "-m", "750", "/var/lib/gatehouse"); err != nil {
-				return err
-			}
-			args := []string{"/usr/local/bin/gatehouse", "user", "add", "-data", "/var/lib/gatehouse", "-name", r.Username}
-			if r.RequireMFA {
-				args = append(args, "-require-mfa")
-			}
-			if err := in.chroot(r.Password+"\n", args...); err != nil {
-				return err
-			}
-			return in.chroot("", "chown", "-R", "gatehouse:gatehouse", "/var/lib/gatehouse")
-		}},
-		{"Setting up your network", func() error {
-			b, err := json.Marshal(r.Network)
-			if err != nil {
-				return err
-			}
-			if err := in.chroot(string(b)+"\n", "/usr/local/bin/gatehouse", "seed", "-data", "/var/lib/gatehouse"); err != nil {
 				return err
 			}
 			return in.chroot("", "chown", "-R", "gatehouse:gatehouse", "/var/lib/gatehouse")

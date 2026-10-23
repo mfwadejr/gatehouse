@@ -1,0 +1,15 @@
+[Unit]
+Description=Gatehouse Wi-Fi client on %i
+ConditionKernelCommandLine=!boot=live
+After=network-pre.target sys-subsystem-net-devices-%i.device
+Wants=network-pre.target
+
+[Service]
+Type=simple
+ExecStartPre=-/usr/sbin/rfkill unblock wifi
+ExecStart=/usr/sbin/wpa_supplicant -i %i -D nl80211 -c /etc/gatehouse/wifi/%i.supplicant.conf
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -27,6 +27,11 @@ iputils-ping
 nftables
 ppp
 ethtool
+hostapd
+wpasupplicant
+iw
+rfkill
+wireless-regdb
 tcpdump
 conntrack
 curl
@@ -59,6 +64,9 @@ firmware-misc-nonfree
 firmware-bnx2
 firmware-bnx2x
 firmware-atheros
+firmware-iwlwifi
+firmware-brcm80211
+firmware-mediatek
 firmware-amd-graphics
 firmware-intel-misc
 intel-microcode

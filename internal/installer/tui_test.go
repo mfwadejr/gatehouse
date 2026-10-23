@@ -3,7 +3,6 @@ package installer
 import (
 	"bytes"
 	"errors"
-	"net/netip"
 	"strings"
 	"testing"
 	"time"
@@ -14,8 +13,6 @@ func testEnv(in *Installer) *TextEnv {
 		Ports: func() []Port {
 			return []Port{{Name: "enp1s0"}, {Name: "enp2s0", Link: true, Speed: "1000"}, {Name: "enp3s0", USB: true}}
 		},
-		Used:    func() []netip.Prefix { return []netip.Prefix{netip.MustParsePrefix("192.168.1.77/24")} },
-		Zones:   func() []string { return []string{"UTC", "Europe/London", "Europe/Paris", "America/Chicago"} },
 		Refresh: func() {}, Poll: 5 * time.Millisecond, Settle: time.Millisecond, Serial: "ttyS0, 115200 baud, 8N1"}
 }
 
@@ -28,21 +25,8 @@ func run(t *testing.T, script string, env *TextEnv) (string, error) {
 func TestTextInstallHappyPath(t *testing.T) {
 	in, f := newTest(t)
 	script := strings.Join([]string{
-		"",                   // welcome
-		"",                   // disk: the only usable one
-		"",                   // LAN port: the one with a cable
-		"2",                  // internet port: enp1s0
-		"",                   // automatic
-		"",                   // LAN address: suggested
-		"n",                  // spare port stays unused
-		"",                   // device name
-		"lond",               // time zone search
-		"1",                  // Europe/London
-		"marvin",             // admin
-		"short",              // too short
-		"a long enough pass", // good
-		"a long enough pass",
-		"",             // no mandatory MFA
+		"",             // welcome
+		"",             // disk: the only usable one
 		"/dev/nvme0n1", // confirm
 		"",             // reboot
 	}, "\r") + "\r"
@@ -50,20 +34,10 @@ func TestTextInstallHappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
-	for _, want := range []string{"115200", "Europe/London", "Too short: 5 of the 12", "Installed.", "192.168.50.1/24", "will be erased"} {
-		if want == "192.168.50.1/24" {
-			continue
-		}
+	for _, want := range []string{"115200", "Installation complete", "will be erased", "create your administrator account"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output lacks %q", want)
 		}
-	}
-	// The suggestion avoids the network the machine is already on.
-	if strings.Contains(out, "[192.168.1.1/24]") {
-		t.Error("suggested a clashing network")
-	}
-	if strings.Contains(out, "a long enough pass") {
-		t.Error("password was echoed")
 	}
 	joined := strings.Join(f.cmds, "\n")
 	for _, c := range []string{"sgdisk --zap-all /dev/nvme0n1", "unsquashfs"} {
@@ -71,60 +45,17 @@ func TestTextInstallHappyPath(t *testing.T) {
 			t.Errorf("missing command %q", c)
 		}
 	}
-	var seeded string
-	for k, v := range f.stdin {
-		if strings.Contains(k, "gatehouse seed") {
-			seeded = v
+	// Only the disk is asked for: no account or network questions at the machine.
+	for _, no := range []string{"Administrator", "Password", "time zone", "LAN port"} {
+		if strings.Contains(out, no) {
+			t.Errorf("the installer should not ask about %q", no)
 		}
-		if strings.Contains(k, "user add") && !strings.Contains(v, "a long enough pass") {
-			t.Errorf("password not passed to the account step")
-		}
-	}
-	for _, want := range []string{`"port":"enp2s0"`, `"mode":"router"`, `"port":"enp1s0"`, `"type":"dhcp"`, `192.168.50.1/24`} {
-		if !strings.Contains(seeded, want) {
-			t.Errorf("seed lacks %s: %s", want, seeded)
-		}
-	}
-}
-
-func TestTextInstallBehindRouterWithFixedAddress(t *testing.T) {
-	in, f := newTest(t)
-	script := strings.Join([]string{
-		"", "", // welcome, disk
-		"",  // LAN port
-		"",  // no internet port
-		"2", // behind another router
-		"2", // fixed address
-		"192.168.0.50/24",
-		"",          // gateway default 192.168.0.1
-		"",          // DNS default
-		"n", "", "", // spare ports, name, zone
-		"", "a long enough pass", "a long enough pass", "y", // admin default, password, MFA
-		"/dev/nvme0n1", "",
-	}, "\n") + "\n"
-	out, err := run(t, script, testEnv(in))
-	if err != nil {
-		t.Fatalf("%v\n%s", err, out)
-	}
-	var seeded string
-	for k, v := range f.stdin {
-		if strings.Contains(k, "gatehouse seed") {
-			seeded = v
-		}
-	}
-	for _, want := range []string{`"mode":"behind"`, `"addressing":"static"`, `"gateway":"192.168.0.1"`, `192.168.0.50/24`} {
-		if !strings.Contains(seeded, want) {
-			t.Errorf("seed lacks %s: %s", want, seeded)
-		}
-	}
-	if !strings.Contains(strings.Join(f.cmds, "\n"), "-require-mfa") {
-		t.Error("MFA choice lost")
 	}
 }
 
 func TestTextWrongConfirmationStartsOverAndErasesNothing(t *testing.T) {
 	in, f := newTest(t)
-	script := strings.Join([]string{"", "", "", "1", "", "", "", "", "marvin", "a long enough pass", "a long enough pass", "", "nope"}, "\n") + "\n"
+	script := strings.Join([]string{"", "", "nope"}, "\n") + "\n"
 	_, err := run(t, script, testEnv(in))
 	if !errors.Is(err, errClosed) {
 		t.Fatalf("expected the script to run out after starting over, got %v", err)
@@ -170,5 +101,31 @@ func TestSerialFromCmdline(t *testing.T) {
 		if d != want[0] || b != want[1] {
 			t.Errorf("%q: %s %d", in, d, b)
 		}
+	}
+}
+
+func TestRecoveryScreen(t *testing.T) {
+	var got []string
+	env := RecoveryEnv{
+		Users:         func() []string { return []string{"marvin"} },
+		SetPassword:   func(n, p string) error { got = append(got, "pw:"+n+":"+p); return nil },
+		ClearTwoStep:  func(n string) error { got = append(got, "mfa:"+n); return nil },
+		ResetFirewall: func() error { got = append(got, "fw"); return nil },
+	}
+	script := strings.Join([]string{
+		"1", "short", "a long enough pass", "a long enough pass", "", // new password (too short first)
+		"2", "", // two-step off
+		"3", "y", "", // firewall
+		"4",
+	}, "\r") + "\r"
+	var out bytes.Buffer
+	if err := RunRecovery(NewTerm(strings.NewReader(script), &out), env); err != nil {
+		t.Fatalf("%v\n%s", err, out.String())
+	}
+	if strings.Join(got, ",") != "pw:marvin:a long enough pass,mfa:marvin,fw" {
+		t.Fatalf("actions: %v\n%s", got, out.String())
+	}
+	if !strings.Contains(out.String(), "Too short: 5 of the 12") || strings.Contains(out.String(), "a long enough pass") {
+		t.Fatal("password feedback wrong or the password was echoed")
 	}
 }

@@ -207,6 +207,58 @@ function Forwards({ reload }) {
   );
 }
 
+function UPnP() {
+  const { data, reload } = useData('/api/upnp', { topics: ['upnp.maps'], every: 10000 });
+  const [run, busy] = useAction();
+  const [mac, setMac] = useState('');
+  if (!data) return null;
+  const save = (patch) => run(() => put('/api/upnp/settings', { restrict: data.restrict, max_lease_hours: data.max_lease_hours, allowed: data.allowed, ...patch })).then(reload);
+  return (
+    <>
+      <Card title="Devices opening ports by themselves (UPnP)" desc="A game console or media app can ask for a port and Gatehouse opens it for that device only, for a limited time.">
+        <Note tone={data.active ? 'good' : ''} title={data.active ? 'On' : 'Off'}>{data.active ? `Listening on ${data.networks.join(', ')}. Internet address ${data.ext_ip}.` : data.why}</Note>
+        {data.active && data.private_ext && <Note tone="warn" title="Your internet connection is behind another router">Ports opened here will not be reachable from the internet until the router in front also forwards them.</Note>}
+        <div className="list">
+          {data.mappings.map((m) => (
+            <div className="item" key={m.id}>
+              <div><div className="name">{m.proto.toUpperCase()} port {m.ext_port} → {m.int_addr}:{m.int_port}</div><div className="meta">{m.desc || 'No description'} · closes {fmt.dt(Math.floor(new Date(m.expires).getTime() / 1000))}</div></div>
+              <div className="actions"><Button small kind="danger" icon="trash" disabled={busy} onClick={() => run(() => del(`/api/upnp/mappings/${m.id}`)).then(reload)}>Close</Button></div>
+            </div>
+          ))}
+          {!data.mappings.length && <Empty>No ports are open right now.</Empty>}
+        </div>
+        {data.mappings.length > 0 && <Button small kind="danger" disabled={busy} onClick={() => run(() => del('/api/upnp/mappings')).then(reload)}>Close all</Button>}
+      </Card>
+      <Card title="Who may use it" desc="Ports below 1024 and the ones Gatehouse itself uses can never be opened this way.">
+        <Field label="Longest a port stays open" hint="Devices renew what they still need."><Select value={String(data.max_lease_hours)} onChange={(v) => save({ max_lease_hours: Number(v) })} options={[{ value: '1', label: '1 hour' }, { value: '6', label: '6 hours' }, { value: '24', label: '1 day' }, { value: '168', label: '7 days' }]} /></Field>
+        <ToggleRow title="Only the devices I list" desc="Everything else is refused. Off means any device on an allowed network may ask." checked={data.restrict} onChange={(v) => save({ restrict: v })} />
+        {data.restrict && (
+          <>
+            <div className="list">
+              {data.allowed.map((a) => (
+                <div className="item" key={a.mac}><div><div className="name">{a.mac}</div><div className="meta">{a.note}</div></div>
+                  <div className="actions"><Button small kind="danger" icon="trash" onClick={() => save({ allowed: data.allowed.filter((x) => x.mac !== a.mac) })}>Remove</Button></div></div>
+              ))}
+              {!data.allowed.length && <Empty>No devices listed, so nothing can open a port.</Empty>}
+            </div>
+            <div className="formgrid">
+              <Field label="Device address (MAC)"><Input value={mac} onChange={setMac} placeholder="aa:bb:cc:dd:ee:ff" /></Field>
+              <Field label=" "><Button disabled={busy || !mac} onClick={async () => { await save({ allowed: [...data.allowed, { mac, note: '' }] }); setMac(''); }}>Add</Button></Field>
+            </div>
+          </>
+        )}
+      </Card>
+      <Card title="Recent requests" desc="What devices asked for, and what was refused.">
+        <div className="scroll"><table className="table">
+          <thead><tr><th>When</th><th>What</th></tr></thead>
+          <tbody>{[...data.log].reverse().slice(0, 50).map((l, i) => <tr key={i}><td>{fmt.ago(l.at)}</td><td>{l.kind === 'deny' ? <Pill tone="warn">Refused</Pill> : null} {l.msg}</td></tr>)}</tbody></table>
+          {!data.log.length && <Empty>Nothing yet.</Empty>}
+        </div>
+      </Card>
+    </>
+  );
+}
+
 function DnsTarget({ s, save }) {
   const [mode, setMode] = useState(s.dns_target ? 'custom' : 'self');
   const [addr, setAddr] = useState(s.dns_target || '');
@@ -264,10 +316,11 @@ export default function Firewall({ me }) {
   const presets = pr?.presets || [];
   return (
     <Page title="Firewall" sub="Decide what each network may reach. Changes only take effect when you apply them.">
-      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'networks', label: 'Networks' }, { value: 'exceptions', label: 'Exceptions' }, { value: 'ports', label: 'Open ports' }, { value: 'protection', label: 'Protection' }, { value: 'history', label: 'History' }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'networks', label: 'Networks' }, { value: 'exceptions', label: 'Exceptions' }, { value: 'ports', label: 'Open ports' }, { value: 'upnp', label: 'UPnP' }, { value: 'protection', label: 'Protection' }, { value: 'history', label: 'History' }]} />
       {tab === 'networks' && <><Networks ov={ov} presets={presets} reload={reload} /><Matrix ov={ov} /></>}
       {tab === 'exceptions' && <Exceptions ov={ov} reload={reload} />}
       {tab === 'ports' && <Forwards reload={reload} />}
+      {tab === 'upnp' && <UPnP />}
       {tab === 'protection' && <Protection ov={ov} reload={reload} />}
       {tab === 'history' && <History />}
       <ApplyBar kind="fw" label="the firewall" status={ov?.status} me={me} onChanged={reload} />

@@ -30,6 +30,9 @@ type NetController interface {
 	ApplyVPN(p netd.VPNPlan) error
 	VPNStatus() netd.VPNStatus
 	FWEvents(since uint64, max int) ([]netd.FWEvent, uint64)
+	SetSystem(hostname, zone string) error
+	WifiScan(iface string) ([]netd.WifiNetwork, error)
+	UPnPApply(ms []netd.UPnPMapping) error
 }
 
 const maxRequest = 4 << 20
@@ -248,6 +251,31 @@ func (s *Server) dispatchNet(r request) (any, error) {
 		return nil, s.Net.ApplyVPN(p)
 	case "vpn.status":
 		return s.Net.VPNStatus(), nil
+	case "net.wifiscan":
+		var p struct {
+			Iface string `json:"iface"`
+		}
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return s.Net.WifiScan(p.Iface)
+	case "net.upnp":
+		var p struct {
+			Maps []netd.UPnPMapping `json:"maps"`
+		}
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return nil, s.Net.UPnPApply(p.Maps)
+	case "net.system":
+		var p struct {
+			Hostname string `json:"hostname"`
+			Zone     string `json:"zone"`
+		}
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return nil, s.Net.SetSystem(p.Hostname, p.Zone)
 	case "fwlog.read":
 		var p struct {
 			Since uint64 `json:"since"`
@@ -356,6 +384,23 @@ func (c *Client) VPNStatus() (netd.VPNStatus, error) {
 	var out netd.VPNStatus
 	err := c.call("vpn.status", nil, &out)
 	return out, err
+}
+
+// SetSystem changes the device name and time zone.
+func (c *Client) SetSystem(hostname, zone string) error {
+	return c.call("net.system", map[string]string{"hostname": hostname, "zone": zone}, nil)
+}
+
+// WifiScan lists the networks a wireless card can see.
+func (c *Client) WifiScan(iface string) ([]netd.WifiNetwork, error) {
+	var out []netd.WifiNetwork
+	err := c.call("net.wifiscan", map[string]string{"iface": iface}, &out)
+	return out, err
+}
+
+// UPnPApply replaces the set of ports opened on request by devices on the inside.
+func (c *Client) UPnPApply(ms []netd.UPnPMapping) error {
+	return c.call("net.upnp", map[string]any{"maps": ms}, nil)
 }
 
 // FWBatch is a run of firewall events and the sequence number to ask for next.

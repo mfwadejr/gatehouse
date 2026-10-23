@@ -65,6 +65,7 @@ function WanForm({ initial, ports, found, onClose, onSaved, wans }) {
           <Field label="DNS servers" hint="Optional, comma separated"><Input value={w.dns} onChange={set('dns')} /></Field>
         </div>
       )}
+      <ToggleRow title="Let devices open ports on this connection (UPnP)" desc="For games and media apps. Also needs to be switched on for a network under Firewall." checked={!!w.upnp} onChange={set('upnp')} />
       <button className="link small" onClick={() => setAdv(!adv)}>{adv ? 'Hide' : 'Show'} advanced options</button>
       {adv && (
         <div className="formgrid">

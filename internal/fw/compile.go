@@ -265,7 +265,7 @@ func (c *compiler) forward() {
 	if _, re, t := c.dnsEnforced(); len(re) > 0 {
 		c.line(2, "iifname %s ip daddr %s meta l4proto { tcp, udp } th dport 53 ct status dnat accept comment \"enforced dns server\"", ifSet(re), t.To4())
 	}
-	if len(m.Forwards) > 0 {
+	if len(m.Forwards) > 0 || m.UPnP {
 		c.decide(2, "ct status dnat", "accept", "forward")
 	}
 	for _, r := range m.Rules {

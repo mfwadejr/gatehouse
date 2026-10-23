@@ -1,0 +1,15 @@
+[Unit]
+Description=Gatehouse Wi-Fi access point on %i
+ConditionKernelCommandLine=!boot=live
+After=network-pre.target sys-subsystem-net-devices-%i.device
+Wants=network-pre.target
+
+[Service]
+Type=simple
+ExecStartPre=-/usr/sbin/rfkill unblock wifi
+ExecStart=/usr/sbin/hostapd /etc/gatehouse/wifi/%i.hostapd.conf
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

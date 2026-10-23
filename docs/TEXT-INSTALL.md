@@ -1,12 +1,15 @@
 # Installing from a text screen or a serial console
 
-The boot menu has three choices:
+The boot menu has four choices:
 
-1. **Install Gatehouse**: the normal graphical installer, finished from a web browser on another computer.
+1. **Install Gatehouse**: installs on this machine, using its own screen and keyboard.
 2. **Install Gatehouse (basic graphics)**: the same, for screens that show nothing with the first one.
-3. **Install Gatehouse (text mode / serial console: 115200 baud, 8N1)**: asks the same questions on the machine itself. No second computer, no network and no setup code are needed.
+3. **Install from another computer**: the machine shows an address and a code, and you choose the disk in a web browser.
+4. **Install with serial console (115200 8N1)**: for machines with no screen, over a serial cable.
 
-Use the third choice for a machine with a plain text screen, one with no screen at all, or one you reach through a serial cable or a management card.
+Every choice asks only for the disk. The administrator account, networks, name and time zone are set in a browser after the machine restarts, so there is nothing to write down.
+
+Use the fourth choice for a machine with no screen, or one you reach through a serial cable or a management card.
 
 ## Serial settings
 
@@ -36,12 +39,9 @@ The boot menu is also sent to the serial port, but it only waits four seconds. O
 ## The questions
 
 1. Which disk to install on. The USB stick you started from is never offered.
-2. Your network: the port for your own network, an optional internet port (automatic, username and password, or fixed address), and how Gatehouse is used on your network. Every question has a suggested answer in brackets, so pressing Enter is enough for the usual setup. For fixed addresses, the gateway is guessed from the address you type.
-3. Device name and time zone (type part of a name to search).
-4. Administrator name and password, and whether to require two-step sign-in.
-5. A review. You confirm by typing the disk name; anything else starts over.
-6. Progress, then a prompt to remove the USB stick and restart.
+2. A confirmation: type the disk name; anything else starts over.
+3. Progress, then a prompt to remove the USB stick and restart.
 
-Ctrl-C at any question starts over. Nothing on the disk changes until the review is confirmed.
+Ctrl-C at any question starts over. Nothing on the disk changes until you confirm.
 
-After the restart the installed system does not use a serial console. The local screen shows the address to open in a browser, as usual.
+After the restart the machine's screen shows an address. Open it in a browser on the same network to create your administrator account and finish setup. The installed system does not use a serial console.

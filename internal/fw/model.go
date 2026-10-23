@@ -98,6 +98,9 @@ type Model struct {
 	BlockDoT bool
 	// LogDrops writes dropped packets to the event log (rate limited).
 	LogDrops bool
+	// UPnP lets port mappings made by the automatic port mapping service (a separate table) through the
+	// firewall. It is on only when some network allows UPnP and some internet connection offers it.
+	UPnP bool
 	// LogAllowed records new connections that were allowed, with the reason, in the event log.
 	LogAllowed bool
 }

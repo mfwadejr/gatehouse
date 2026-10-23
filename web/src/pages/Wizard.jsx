@@ -1,0 +1,230 @@
+import React, { useEffect, useRef, useState } from 'react';
+import { get, post } from '../api.js';
+import { Button, Field, Icon, Input, Note, Pill, Segmented, Select, ToggleRow, enterToPrimary } from '../ui.jsx';
+
+const baseAddr = (cidr) => (cidr || '').split('/')[0];
+
+function Frame({ title, step, children }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const on = (e) => enterToPrimary(e, ref.current);
+    document.addEventListener('keydown', on);
+    return () => document.removeEventListener('keydown', on);
+  }, []);
+  return (
+    <main className="auth">
+      <section className="card" ref={ref} style={{ width: 'min(100%, 40rem)' }}>
+        <div className="brand" style={{ padding: 0 }}><Icon name="logo" size={24} /><span>Gatehouse</span></div>
+        {step && <div className="small muted">Step {step} of 3</div>}
+        <h1>{title}</h1>
+        {children}
+      </section>
+    </main>
+  );
+}
+
+function PortPick({ ports, value, onChange, taken = [], here }) {
+  return (
+    <div className="stack">
+      {ports.map((p) => {
+        const off = taken.includes(p.name);
+        return (
+          <button type="button" key={p.name} disabled={off} className={`preset ${value === p.name ? 'on' : ''}`} aria-pressed={value === p.name} onClick={() => onChange(p.name)}>
+            <span className="t">
+              {p.name}{p.usb ? ' (USB adapter)' : ''}{p.wifi ? ' (Wi-Fi)' : ''}{' '}
+              {p.link ? <Pill tone="good">cable connected{p.speed && p.speed > 0 ? `, ${p.speed} Mb/s` : ''}</Pill> : <Pill>no cable</Pill>}
+              {here === p.name ? <Pill tone="info">you are connected here</Pill> : null}
+            </span>
+            <span className="d mono">{p.mac}{off ? ' · used for something else' : ''}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+const empty = (lan) => ({ lan: { port: lan, mode: 'router', address: '', addressing: 'dhcp', static: '', gateway: '', dns: '' }, wan: null, bridge: [] });
+
+// The first-run wizard: how this device is used on the network. Everything here can be changed later.
+export default function Wizard({ data, me, onDone }) {
+  const wired = (data.ports || []).filter((p) => !p.wifi);
+  const [step, setStep] = useState(1);
+  const [net, setNet] = useState(() => {
+    const n = empty(data.here || (wired.find((p) => p.link) || wired[0])?.name || '');
+    n.lan.address = data.suggested_lan || '192.168.1.1/24';
+    return n;
+  });
+  const [host, setHost] = useState(data.hostname || 'gatehouse');
+  const [zone, setZone] = useState(data.timezone || 'UTC');
+  const [mfa, setMfa] = useState(false);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+  const setLan = (k) => (v) => setNet((m) => ({ ...m, lan: { ...m.lan, [k]: v } }));
+  const setWan = (k) => (v) => setNet((m) => ({ ...m, wan: { ...m.wan, [k]: v } }));
+  const lan = net.lan;
+  const wan = net.wan;
+  const router = lan.mode === 'router';
+
+  // Arrived over the LAN cable itself while becoming the router: the connection will move. Say so plainly.
+  const hereIsLan = data.here && data.here === lan.port;
+
+  const okLan = router ? /^\d+\.\d+\.\d+\.\d+\/\d+$/.test(lan.address) : lan.addressing === 'dhcp' || (/\//.test(lan.static) && lan.gateway);
+  const okWan = !wan || (wan.port && (wan.type === 'dhcp' || (wan.type === 'pppoe' && wan.pppoe_user && wan.pppoe_pass) || (wan.type === 'static' && wan.addr && wan.gateway)));
+  const ready = lan.port && okLan && okWan;
+  const others = wired.filter((p) => p.name !== lan.port && p.name !== wan?.port);
+
+  const finish = async (skip) => {
+    setErr(''); setBusy(true);
+    try {
+      const r = await post('/api/setup/wizard', skip ? { skip: true } : { network: net, hostname: host.trim(), timezone: zone, require_mfa: mfa });
+      if (skip) onDone(); else setResult(r);
+    } catch (e) { setErr(e.message); }
+    finally { setBusy(false); }
+  };
+
+  if (result) {
+    const addr = result.address;
+    const url = addr ? `https://${addr}/` : '';
+    return <Applied url={url} mode={result.mode} user={me.user.username} onDone={onDone} />;
+  }
+
+  if (step === 1) {
+    return (
+      <Frame title="How will Gatehouse be used?" step={1}>
+        <p className="sec">You can change any of this later. Nothing is switched on until you finish.</p>
+        <div className="stack">
+          <button type="button" className={`preset ${router ? 'on' : ''}`} aria-pressed={router} onClick={() => setLan('mode')('router')}>
+            <span className="t">Gatehouse is my router</span>
+            <span className="d">It hands out addresses to your devices (DHCP), runs DNS, and connects you to the internet.</span>
+          </button>
+          <button type="button" className={`preset ${!router ? 'on' : ''}`} aria-pressed={!router} onClick={() => setNet((m) => ({ ...m, lan: { ...m.lan, mode: 'behind' }, wan: null }))}>
+            <span className="t">Gatehouse sits behind my existing router</span>
+            <span className="d">Another router stays in charge of addresses and the internet. Gatehouse adds DNS filtering and a firewall for devices on this network.</span>
+          </button>
+        </div>
+        <div className="actions"><Button onClick={() => finish(true)} disabled={busy}>Skip for now</Button><Button kind="primary" onClick={() => setStep(2)}>Next</Button></div>
+        {err && <Note tone="bad">{err}</Note>}
+      </Frame>
+    );
+  }
+
+  if (step === 2) {
+    return (
+      <Frame title="Your network" step={2}>
+        <h2 className="h3">Which port is your LAN?</h2>
+        <p className="small muted">The port your computers and switch connect to.{data.here ? ` You are using ${data.here} right now.` : ''}</p>
+        <PortPick ports={wired} value={lan.port} here={data.here} taken={[wan?.port].filter(Boolean)}
+          onChange={(p) => setNet((m) => ({ ...m, lan: { ...m.lan, port: p }, wan: m.wan?.port === p ? { ...m.wan, port: '' } : m.wan, bridge: m.bridge.filter((b) => b !== p) }))} />
+        {router ? (
+          <>
+            <Field label="Address of this device on your network" hint="Gatehouse picked a range that does not clash with the network you are on now.">
+              <Input className="mono" value={lan.address} onChange={setLan('address')} placeholder="192.168.1.1/24" />
+            </Field>
+            <h2 className="h3">Internet connection <span className="muted small">(optional)</span></h2>
+            <p className="small muted">Plug the cable from your modem or provider into another port. Skip this to add it later under Internet.</p>
+            {!wan ? (
+              <Button onClick={() => setNet((m) => ({ ...m, wan: { port: '', type: 'dhcp', addr: '', gateway: '', dns: '', pppoe_user: '', pppoe_pass: '' } }))}>Set up internet now</Button>
+            ) : (
+              <>
+                <PortPick ports={wired} value={wan.port} taken={[lan.port]} onChange={(p) => setNet((m) => ({ ...m, wan: { ...m.wan, port: p }, bridge: m.bridge.filter((b) => b !== p) }))} />
+                <Field label="How does your provider connect you?">
+                  <Select value={wan.type} onChange={setWan('type')} options={[{ value: 'dhcp', label: 'Automatically (most cable and fibre)' }, { value: 'pppoe', label: 'User name and password (PPPoE)' }, { value: 'static', label: 'A fixed address' }]} />
+                </Field>
+                {wan.type === 'pppoe' && (
+                  <div className="formgrid">
+                    <Field label="User name"><Input value={wan.pppoe_user} onChange={setWan('pppoe_user')} autoComplete="off" /></Field>
+                    <Field label="Password"><Input type="password" value={wan.pppoe_pass} onChange={setWan('pppoe_pass')} autoComplete="off" /></Field>
+                  </div>
+                )}
+                {wan.type === 'static' && (
+                  <div className="formgrid">
+                    <Field label="Address" hint="For example 203.0.113.10/24"><Input className="mono" value={wan.addr} onChange={setWan('addr')} /></Field>
+                    <Field label="Gateway"><Input className="mono" value={wan.gateway} onChange={setWan('gateway')} /></Field>
+                    <Field label="DNS servers (optional)"><Input className="mono" value={wan.dns} onChange={setWan('dns')} /></Field>
+                  </div>
+                )}
+                <div className="actions"><Button small onClick={() => setNet((m) => ({ ...m, wan: null }))}>Not now</Button></div>
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            <Field label="Address of this device">
+              <Select value={lan.addressing} onChange={setLan('addressing')} options={[{ value: 'dhcp', label: 'Automatic, from my router (DHCP)' }, { value: 'static', label: 'A fixed address I choose' }]} />
+            </Field>
+            {lan.addressing === 'static' && (
+              <div className="formgrid">
+                <Field label="Address" hint="For example 192.168.0.50/24"><Input className="mono" value={lan.static} onChange={setLan('static')} /></Field>
+                <Field label="Your router's address"><Input className="mono" value={lan.gateway} onChange={setLan('gateway')} placeholder="192.168.0.1" /></Field>
+                <Field label="DNS server (optional)"><Input className="mono" value={lan.dns} onChange={setLan('dns')} /></Field>
+              </div>
+            )}
+          </>
+        )}
+        {others.length > 0 && (
+          <>
+            <h2 className="h3">Other ports</h2>
+            <p className="small muted">Switched off unless you choose. Joining the LAN makes a port work like another socket on a switch.</p>
+            <div className="portlist">
+              {others.map((p) => {
+                const joined = net.bridge.includes(p.name);
+                return (
+                  <div className="portrow" key={p.name}>
+                    <div className="pid"><span className="name mono">{p.name}</span><span className="small muted">{p.usb ? 'USB adapter' : 'Built-in port'}</span></div>
+                    <div className="pstat"><span className={`dot ${p.link ? '' : 'off'}`} />{p.link ? 'Cable connected' : 'No cable'}</div>
+                    <Segmented value={joined ? 'bridge' : 'unused'} onChange={(v) => setNet((m) => ({ ...m, bridge: v === 'bridge' ? [...m.bridge.filter((b) => b !== p.name), p.name] : m.bridge.filter((b) => b !== p.name) }))}
+                      options={[{ value: 'unused', label: 'Not used' }, { value: 'bridge', label: 'Join the LAN' }]} />
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+        {data.ports?.some((p) => p.wifi) && <p className="small muted">A Wi-Fi card was found. You can set it up under Wi-Fi once you are in.</p>}
+        <div className="actions"><Button onClick={() => setStep(1)}>Back</Button><Button kind="primary" disabled={!ready} onClick={() => setStep(3)}>Next</Button></div>
+      </Frame>
+    );
+  }
+
+  return (
+    <Frame title="About this device" step={3}>
+      <Field label="Name of this device" hint="Shown on your network, for example gatehouse"><Input value={host} onChange={setHost} /></Field>
+      <Field label="Time zone"><Select value={zone} onChange={setZone} options={data.timezones || ['UTC']} /></Field>
+      <ToggleRow title="Require two-step sign-in" desc="Optional. Asks for a code from an authenticator app each time you sign in. You can change this later in Settings." checked={mfa} onChange={setMfa} />
+      {router && hereIsLan && <Note tone="warn" title="Your connection will move">Gatehouse becomes your router on this port. After you finish, unplug and replug the cable on this computer so it gets a new address. The next page shows where to go.</Note>}
+      {err && <Note tone="bad">{err}</Note>}
+      <div className="actions"><Button onClick={() => setStep(2)}>Back</Button><Button kind="primary" disabled={busy || !host} onClick={() => finish(false)}>Finish setup</Button></div>
+    </Frame>
+  );
+}
+
+// After the wizard: the change moves this connection, so wait for the console to answer at its new address.
+function Applied({ url, mode, user, onDone }) {
+  const [up, setUp] = useState(false);
+  useEffect(() => {
+    if (!url) return undefined;
+    let live = true;
+    const probe = async () => {
+      try { await fetch(`${url}api/health`, { mode: 'no-cors', cache: 'no-store' }); if (live) { setUp(true); window.location.href = url; } } catch { /* not up yet */ }
+    };
+    const t = setInterval(probe, 3000);
+    return () => { live = false; clearInterval(t); };
+  }, [url]);
+  return (
+    <Frame title="Setting up your network…">
+      <p className="sec">{mode === 'router' ? 'Gatehouse is becoming your router and will start handing out addresses.' : 'Gatehouse is applying your settings.'}</p>
+      {url ? (
+        <>
+          <Note tone="good" title="Unplug and replug the cable on this computer">That makes it pick up a new address. This page opens Gatehouse by itself as soon as it is ready{up ? '' : '.'} Sign in as <strong>{user}</strong>.</Note>
+          <div className="actions"><a className="btn primary" href={url}>Open {url.replace('https://', '').replace('/', '')} now</a></div>
+        </>
+      ) : (
+        <>
+          <Note tone="good" title="Done">Gatehouse gets its address from your router. The address is shown on this machine&apos;s screen. Open it and sign in as <strong>{user}</strong>.</Note>
+          <div className="actions"><Button kind="primary" onClick={onDone}>Continue</Button></div>
+        </>
+      )}
+    </Frame>
+  );
+}

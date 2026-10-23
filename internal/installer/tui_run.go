@@ -3,8 +3,6 @@ package installer
 import (
 	"fmt"
 	"io"
-	"net"
-	"net/netip"
 	"os"
 	"os/exec"
 	"regexp"
@@ -12,25 +10,6 @@ import (
 	"strings"
 	"sync"
 )
-
-func usedPrefixes() []netip.Prefix {
-	var used []netip.Prefix
-	ifs, _ := net.Interfaces()
-	for _, ifi := range ifs {
-		if ifi.Flags&net.FlagLoopback != 0 {
-			continue
-		}
-		as, _ := ifi.Addrs()
-		for _, a := range as {
-			if n, ok := a.(*net.IPNet); ok && n.IP.To4() != nil {
-				if p, err := netip.ParsePrefix(n.String()); err == nil && !p.Addr().IsLinkLocalUnicast() {
-					used = append(used, p)
-				}
-			}
-		}
-	}
-	return used
-}
 
 var reConsole = regexp.MustCompile(`(?:^|\s)console=(ttyS\d+)(?:,(\d+))?`)
 
@@ -97,9 +76,15 @@ func RunTextInstaller() error {
 		}()
 	}
 	serial := ""
+	disp := openGraphics()
 	if f, err := os.OpenFile("/dev/tty1", os.O_RDWR, 0); err == nil {
 		rawTTY("/dev/tty1", 0)
-		outs = append(outs, f)
+		if disp != nil {
+			outs = append(outs, disp) // drawn as graphics; the keyboard still comes from the console
+		} else {
+			io.WriteString(f, palette) // the Gatehouse colours, as on the other screens
+			outs = append(outs, f)
+		}
 		pump(f)
 	}
 	if hasUART(sdev) {
@@ -114,6 +99,12 @@ func RunTextInstaller() error {
 		return fmt.Errorf("no console to use")
 	}
 	t := NewTerm(pr, io.MultiWriter(outs...))
+	if len(outs) > 0 {
+		t.W, t.H = screenSize(disp)
+		if serial != "" {
+			t.W, t.H = min(t.W, 80), min(t.H, 24) // the serial terminal's size is unknown
+		}
+	}
 	env := NewTextEnv(New(), serial)
 	err := RunText(t, env)
 	if err == errClosed {

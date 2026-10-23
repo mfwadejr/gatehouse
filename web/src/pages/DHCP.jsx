@@ -47,7 +47,15 @@ function Scopes() {
   const { data: util } = useData('/api/dhcp/utilisation', { topics: ['dhcp.utilisation'], every: 10000 });
   const { data: ifs } = useData('/api/net/interfaces');
   const [edit, setEdit] = useState(null);
+  const [checking, setChecking] = useState(0);
+  const [result, setResult] = useState({});
   const [run] = useAction();
+  const check = async (s) => {
+    setChecking(s.id);
+    const r = await run(() => post(`/api/dhcp/scopes/${s.id}/probe`));
+    setChecking(0);
+    if (r) setResult((x) => ({ ...x, [s.id]: r }));
+  };
   return (
     <Card title="Networks" desc="Each network gets its own pool of addresses." actions={<Button small icon="plus" onClick={() => setEdit({})}>Add network</Button>}>
       <div className="list">
@@ -59,9 +67,16 @@ function Scopes() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="name">{s.name} {!s.enabled && <Pill>Off</Pill>}{s.mode !== 'serve' && <Pill>{s.mode === 'relay' ? 'Relayed' : 'Another device'}</Pill>}</div>
                 <div className="meta">{s.iface} · {s.subnet}{s.mode !== 'off' ? ` · ${s.range_start} – ${s.range_end}` : ''}</div>
+                {result[s.id] && (
+                  <Note tone={result[s.id].verdict === 'ok' ? 'good' : 'warn'} title={result[s.id].verdict === 'conflict' ? 'Another device is handing out addresses here' : result[s.id].verdict === 'none' ? 'Nothing is handing out addresses here' : 'No other servers found'}>
+                    {result[s.id].verdict === 'conflict' && `Devices may get an address from ${result[s.id].found.map((f) => f.server).join(', ')} instead of Gatehouse. Turn that server's address handing off, or switch this network to "Another device".`}
+                    {result[s.id].verdict === 'none' && 'This network is set to use another device for addresses, but none answered. New devices will not get an address.'}
+                    {result[s.id].verdict === 'ok' && 'Only Gatehouse answered on this network.'}
+                  </Note>
+                )}
                 {u && s.mode !== 'off' && <div className="stack" style={{ gap: 'var(--space-1)', marginTop: 'var(--space-2)', maxWidth: '24rem' }}><Bar pct={pct} thin /><span className="small muted">{u.active} of {u.size} addresses in use</span></div>}
               </div>
-              <div className="actions"><Button small icon="edit" onClick={() => setEdit(s)}>Edit</Button><Button small kind="danger" icon="trash" onClick={() => window.confirm(`Delete ${s.name}?`) && run(() => del(`/api/dhcp/scopes/${s.id}`)).then(reload)}>Delete</Button></div>
+              <div className="actions"><Button small icon="refresh" disabled={checking === s.id || s.mode === 'relay'} onClick={() => check(s)}>{checking === s.id ? 'Listening…' : 'Check for other servers'}</Button><Button small icon="edit" onClick={() => setEdit(s)}>Edit</Button><Button small kind="danger" icon="trash" onClick={() => window.confirm(`Delete ${s.name}?`) && run(() => del(`/api/dhcp/scopes/${s.id}`)).then(reload)}>Delete</Button></div>
             </div>
           );
         })}

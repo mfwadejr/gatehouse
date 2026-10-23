@@ -2,6 +2,8 @@ package installer
 
 import (
 	"fmt"
+	"gatehouse/internal/gfx"
+	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -9,6 +11,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 // Port is a wired network port as the installer's own screen reports it.
@@ -76,30 +80,11 @@ func EnsureLinksUp() {
 // bringUp is replaced in tests.
 var bringUp = func(name string) { exec.Command("ip", "link", "set", "dev", name, "up").Run() }
 
-// Colours from the design tokens, loaded into the console palette.
-const palette = "\x1b]P0121211\x1b]P1e5484d\x1b]P24cb06a\x1b]P3e5b43a\x1b]P43987e5\x1b]P7c3c2b7\x1b]P8898781\x1b]PFf0efec"
-
-const (
-	reset = "\x1b[0m"
-	dim   = "\x1b[0;90m" // grey
-	fg    = "\x1b[0;37m"
-	bold  = "\x1b[1;97m"
-	blue  = "\x1b[1;34m"
-	green = "\x1b[0;32m"
-	amber = "\x1b[0;33m"
-	red   = "\x1b[0;31m"
-)
-
-// RenderScreen builds what the machine's own display shows while it waits to be installed.
-// It is a pure function of the machine's state so it can be tested.
-func RenderScreen(ports []Port, urls []string, code string) string {
-	var b strings.Builder
-	line := func(s string) { b.WriteString("    " + s + reset + "\n") }
-	b.WriteString("\x1b[?25l\x1b[2J\x1b[H\n\n")
-	line(blue + "GATEHOUSE")
-	line(dim + "Installer")
-	b.WriteString("\n\n")
-
+// RenderScreen is what the machine's own display shows while it waits for the browser-based
+// installer. It is a pure function of the machine's state so it can be tested.
+func RenderScreen(ports []Port, urls []string, code string, w, h int) string {
+	s := NewScreen(w, h)
+	s.header("Installer")
 	connected := 0
 	for _, p := range ports {
 		if p.Link {
@@ -108,64 +93,43 @@ func RenderScreen(ports []Port, urls []string, code string) string {
 	}
 	switch {
 	case len(ports) == 0:
-		line(amber + "No network port found yet.")
-		b.WriteString("\n")
-		line(fg + "Gatehouse needs at least one wired network port. If you use a USB")
-		line(fg + "network adapter, plug it in now. It is detected automatically.")
+		s.mid(amber + "No network port found yet" + reset)
+		s.blank()
+		s.mid(fg + "Gatehouse needs at least one wired network port." + reset)
+		s.mid(fg + "If you use a USB network adapter, plug it in now." + reset)
+		s.mid(dim + "It is detected automatically." + reset)
 	case connected == 0:
-		line(bold + "Connect your LAN cable to continue.")
-		b.WriteString("\n")
-		line(fg + "Plug the cable to your own network (a computer or switch) into any")
-		line(fg + "port below. You finish setup from a computer on that network.")
-		b.WriteString("\n")
-		line(dim + "The internet cable (from your modem or provider) is optional.")
-		line(dim + "Connect it now, or add it later from the console.")
-		b.WriteString("\n")
-		line(dim + "This screen updates by itself when a cable is detected.")
+		s.mid(bold + "Connect your network cable to continue" + reset)
+		s.blank()
+		s.mid(fg + "Plug the cable from your own network (a computer or a switch)" + reset)
+		s.mid(fg + "into any port. You finish setup from a computer on that network." + reset)
+		s.blank()
+		s.mid(dim + "The internet cable is optional. You can add it now or later." + reset)
 	case len(urls) == 0:
-		line(bold + "Cable detected. Getting a network address...")
-		b.WriteString("\n")
-		line(dim + "This normally takes a few seconds.")
+		s.mid(bold + "Cable detected" + reset)
+		s.blank()
+		s.mid(fg + "Getting a network address…" + reset)
+		s.mid(dim + "This normally takes a few seconds." + reset)
 	default:
-		line(bold + "Ready to install.")
-		b.WriteString("\n")
+		s.mid(bold + "Ready to install" + reset)
+		s.blank()
 		if len(urls) > 1 {
-			line(fg + "On a computer connected to this network, open the address")
-			line(fg + "for the port its cable is plugged into:")
+			s.mid(fg + "On a computer on this network, open the address for its port" + reset)
 		} else {
-			line(fg + "On a computer connected to this network, open:")
+			s.mid(fg + "On a computer on this network, open" + reset)
 		}
-		b.WriteString("\n")
+		var box []string
 		for _, u := range urls {
-			line(blue + "  " + u)
+			box = append(box, bold+u+reset)
 		}
-		b.WriteString("\n")
-		line(fg + "Installer code   " + bold + code)
-		b.WriteString("\n")
-		line(dim + "The internet cable is optional. You can connect it now or later.")
-		line(dim + "Your browser will warn about the certificate. That is expected.")
-		line(dim + "Nothing on this machine's disks changes until you confirm.")
+		box = append(box, "", dim+"Installer code  "+reset+bold+code+reset)
+		s.midBox(box)
+		s.blank()
+		s.mid(dim + "Your browser will warn about the certificate. That is expected." + reset)
+		s.mid(dim + "Nothing on this machine's disks changes until you confirm." + reset)
 	}
-
-	if len(ports) > 0 {
-		b.WriteString("\n\n")
-		line(dim + "Network ports")
-		for _, p := range ports {
-			state, col := "no cable", dim
-			if p.Link {
-				state, col = "cable connected", green
-				if p.Speed != "" {
-					state += ", " + p.Speed + " Mb/s"
-				}
-			}
-			name := p.Name
-			if p.USB {
-				name += " (USB)"
-			}
-			line(fmt.Sprintf("%s%-18s%s%s", fg, name, col, state))
-		}
-	}
-	return b.String()
+	s.footer(portsLine(ports))
+	return s.String()
 }
 
 // usableAddresses are the web addresses a person can really use: one per port that has a
@@ -220,98 +184,144 @@ func usableAddresses(port string) []string {
 func RunScreen(code, port string) {
 	var last string
 	first := true
+	d := openGraphics()
 	for {
 		EnsureLinksUp()
-		s := RenderScreen(WiredPorts(), usableAddresses(port), code)
+		cw, ch := screenSize(d)
+		s := RenderScreen(WiredPorts(), usableAddresses(port), code, cw, ch)
 		if s != last || first {
-			for _, tty := range []string{"/dev/tty1", "/dev/console"} {
-				if f, err := os.OpenFile(tty, os.O_WRONLY, 0); err == nil {
-					if first {
-						f.WriteString(palette)
-					}
-					f.WriteString(s)
-					f.Close()
-					break
-				}
-			}
+			paint(d, s, first)
 			last, first = s, false
 		}
 		time.Sleep(time.Second)
 	}
 }
 
+// openGraphics takes over the display for graphics when it can. It returns nil on machines with no usable
+// frame buffer, which then keep the plain console.
+func openGraphics() *gfx.Display {
+	d, err := gfx.OpenDisplay()
+	if err != nil {
+		log.Printf("screen: graphics unavailable (%v); using the text console", err)
+		return nil
+	}
+	return d
+}
+
+// screenSize is the display's size in characters, graphical or not.
+func screenSize(d *gfx.Display) (w, h int) {
+	if d != nil {
+		return d.Size()
+	}
+	return consoleSize()
+}
+
+// paint puts a finished screen on the display, or on the text console when there is no graphics.
+func paint(d *gfx.Display, s string, first bool) {
+	if d != nil {
+		d.Write([]byte(s))
+		return
+	}
+	for _, tty := range []string{"/dev/tty1", "/dev/console"} {
+		if f, err := os.OpenFile(tty, os.O_WRONLY, 0); err == nil {
+			if first {
+				f.WriteString(palette)
+			}
+			f.WriteString(s)
+			f.Close()
+			break
+		}
+	}
+}
+
 // RenderStatus is what an installed machine shows on its own display: the start-up splash
-// gives way to this, so there is never a login prompt or boot text on screen.
-func RenderStatus(host string, ports []Port, urls []string) string {
-	var b strings.Builder
-	line := func(s string) { b.WriteString("    " + s + reset + "\n") }
-	b.WriteString("\x1b[?25l\x1b[2J\x1b[H\n\n")
-	line(blue + "GATEHOUSE")
-	if host != "" {
-		line(dim + host)
+// gives way to this, so there is never a login prompt or boot text on screen. setup is
+// "account", "wizard" or "ready" (see the daemon's setup-state file).
+func RenderStatus(host string, ports []Port, urls []string, setup string, w, h int) string {
+	s := NewScreen(w, h)
+	sub := host
+	if setup == "account" || setup == "wizard" {
+		sub = "Setup not finished"
 	}
-	b.WriteString("\n\n")
-	if len(urls) == 0 {
-		line(amber + "Waiting for a network connection.")
-		b.WriteString("\n")
-		line(fg + "Plug a network cable into a port below. This screen updates by itself.")
-	} else {
-		line(bold + "Ready.")
-		b.WriteString("\n")
+	s.header(sub)
+	open := func(lead string) {
 		if len(urls) > 1 {
-			line(fg + "From a computer on your network, open the address for its port:")
-		} else {
-			line(fg + "From a computer on your network, open:")
+			lead = strings.Replace(lead, "open", "open the address for its port", 1)
 		}
-		b.WriteString("\n")
+		s.mid(fg + lead + reset)
+		var box []string
 		for _, u := range urls {
-			line(blue + "  " + u)
+			box = append(box, bold+u+reset)
 		}
-		b.WriteString("\n")
-		line(dim + "Your browser will warn about the certificate the first time. That is expected.")
+		s.midBox(box)
 	}
-	if len(ports) > 0 {
-		b.WriteString("\n\n")
-		line(dim + "Network ports")
-		for _, p := range ports {
-			state, col := "no cable", dim
-			if p.Link {
-				state, col = "cable connected", green
-				if p.Speed != "" {
-					state += ", " + p.Speed + " Mb/s"
-				}
-			}
-			name := p.Name
-			if p.USB {
-				name += " (USB)"
-			}
-			line(fmt.Sprintf("%s%-18s%s%s", fg, name, col, state))
-		}
+	switch {
+	case len(urls) == 0:
+		s.mid(amber + "Waiting for a network connection" + reset)
+		s.blank()
+		s.mid(fg + "Plug a network cable into a port below." + reset)
+		s.mid(dim + "This screen updates by itself." + reset)
+	case setup == "account":
+		s.mid(bold + "Welcome" + reset)
+		s.blank()
+		open("On a computer on your network, open")
+		s.mid(fg + "and create your administrator account." + reset)
+		s.blank()
+		s.mid(dim + "Your browser will warn about the certificate. That is expected." + reset)
+	case setup == "wizard":
+		s.mid(bold + "Your account is ready" + reset)
+		s.blank()
+		open("To finish setting up, open")
+		s.mid(fg + "and sign in." + reset)
+	default:
+		s.mid(green + "●" + reset + bold + " Gatehouse is running" + reset)
+		s.blank()
+		open("Manage it from a computer on your network: open")
+		s.blank()
+		s.mid(dim + "Your browser will warn about the certificate the first time. That is expected." + reset)
+		s.mid(dim + "Locked out? Press Alt+F2 on this machine's keyboard." + reset)
 	}
-	return b.String()
+	s.footer(portsLine(ports))
+	return s.String()
 }
 
 // RunStatus keeps an installed machine's display current. It never returns.
 func RunStatus(port string) {
 	var last string
 	first := true
+	d := openGraphics()
 	for {
 		host, _ := os.Hostname()
 		EnsureLinksUp()
-		s := RenderStatus(host, WiredPorts(), usableAddresses(port))
+		cw, ch := screenSize(d)
+		s := RenderStatus(host, WiredPorts(), usableAddresses(port), readSetupState(), cw, ch)
 		if s != last || first {
-			for _, tty := range []string{"/dev/tty1", "/dev/console"} {
-				if f, err := os.OpenFile(tty, os.O_WRONLY, 0); err == nil {
-					if first {
-						f.WriteString(palette)
-					}
-					f.WriteString(s)
-					f.Close()
-					break
-				}
-			}
+			paint(d, s, first)
 			last, first = s, false
 		}
 		time.Sleep(2 * time.Second)
 	}
+}
+
+// consoleSize is the size of the machine's own display in characters.
+func consoleSize() (w, h int) {
+	f, err := os.Open("/dev/tty1")
+	if err != nil {
+		return 80, 24
+	}
+	defer f.Close()
+	ws, err := unix.IoctlGetWinsize(int(f.Fd()), unix.TIOCGWINSZ)
+	if err != nil || ws.Col == 0 {
+		return 80, 24
+	}
+	return int(ws.Col), int(ws.Row)
+}
+
+// readSetupState reads how far first-time setup has got, as written by the daemon.
+func readSetupState() string {
+	b, err := os.ReadFile("/var/lib/gatehouse/setup-state")
+	if err != nil {
+		return "ready"
+	}
+	return strings.TrimSpace(string(b))
 }

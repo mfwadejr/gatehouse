@@ -64,7 +64,8 @@ type App struct {
 	vpn     vpnState
 	fwn     fwNames
 	traffic wanTraffic
-	setup   setupGate
+	upnp    upnpState
+	setupMu sync.Mutex
 
 	netApplyState struct {
 		mu     sync.Mutex
@@ -126,11 +127,12 @@ func New(cfg Config) (*App, error) {
 	a.API = api.New(a.Auth, a.Bus)
 	a.API.Static = cfg.Static
 	a.API.Secure = cfg.TLSCert != ""
-	a.API.Topic("dns.stats", "dns.live", "dns.upstreams", "dns.lists", "dhcp.leases", "dhcp.utilisation", "fw.status", "net.status", "vpn.status", "logs.live")
+	a.API.Topic("dns.stats", "dns.live", "dns.upstreams", "dns.lists", "dhcp.leases", "dhcp.utilisation", "fw.status", "net.status", "vpn.status", "logs.live", "upnp.maps")
 	a.FW = cfg.FW
 	a.Net = cfg.Net
 	a.registerRoutes()
 	a.registerSetupRoutes()
+	a.registerUPnPRoutes()
 	a.prepareSetup()
 
 	if err := a.reloadAll(); err != nil {
@@ -291,6 +293,7 @@ func (a *App) Run(ctx context.Context) error {
 	run(func() { a.vpnMonitor(ctx) })
 	run(func() { a.collectFW(ctx) })
 	run(func() { a.collectTraffic(ctx) })
+	run(func() { a.runUPnP(ctx) })
 
 	l, err := net.Listen("tcp", a.Cfg.WebAddr)
 	if err != nil {

@@ -17,33 +17,35 @@ function Frame({ title, children }) {
 
 function submitOnEnter(fn) { return (e) => { e.preventDefault(); fn(); }; }
 
-// Setup codes are eight digits shown as 0000-0000; the dash is added as you type.
-function fmtCode(v) {
-  const d = String(v).replace(/\D/g, '').slice(0, 8);
-  return d.length > 4 ? d.slice(0, 4) + '-' + d.slice(4) : d;
+function pwHint(p) {
+  if (!p) return 'At least 12 characters. Several unrelated words in a row works well.';
+  if (p.length < 12) return `${p.length} of 12 characters. ${12 - p.length} more needed.`;
+  return 'Long enough.';
 }
 
+// The first visit to a new device: whoever opens it from the local network creates the administrator
+// account. There is no code and no default login. Once it exists this page never appears again.
 export function Setup({ onDone }) {
-  const [f, setF] = useState({ code: '', username: 'admin', password: '', again: '' });
+  const [f, setF] = useState({ username: 'admin', password: '', again: '' });
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
   const go = async () => {
     setErr('');
+    if (f.password.length < 12) { setErr(`The password is too short: ${f.password.length} of the 12 characters needed. Several unrelated words in a row is easy to remember and long enough.`); return; }
     if (f.password !== f.again) { setErr('The two passwords do not match.'); return; }
     setBusy(true);
-    try { await post('/api/setup', { code: f.code, username: f.username, password: f.password }); onDone(f.username, f.password); }
+    try { await post('/api/setup', { username: f.username, password: f.password }); onDone(f.username, f.password); }
     catch (e) { setErr(e.message); }
     finally { setBusy(false); }
   };
   return (
-    <Frame title="Set up this device">
-      <p className="sec">Welcome. Create the administrator account. The setup code is shown on the screen of the machine Gatehouse is installed on.</p>
+    <Frame title="Welcome">
+      <p className="sec">Create your administrator account. You will use it to sign in to this device.</p>
       <form className="stack" onSubmit={submitOnEnter(go)}>
-        <Field label="Setup code"><Input className="codebox" value={f.code} onChange={(v) => set('code')(fmtCode(v))} maxLength={9} placeholder="0000-0000" autoComplete="off" inputMode="numeric" /></Field>
-        <Field label="Administrator name"><Input value={f.username} onChange={set('username')} autoComplete="username" /></Field>
-        <Field label="Password" hint="At least 12 characters. A few random words works well."><Input type="password" value={f.password} onChange={set('password')} autoComplete="new-password" /></Field>
-        <Field label="Password again"><Input type="password" value={f.again} onChange={set('again')} autoComplete="new-password" /></Field>
+        <Field label="Administrator name"><Input value={f.username} onChange={set('username')} autoComplete="username" autoFocus /></Field>
+        <Field label="Password" hint={pwHint(f.password)}><Input type="password" value={f.password} onChange={set('password')} autoComplete="new-password" /></Field>
+        <Field label="Password again" hint={f.again && f.again !== f.password ? 'These do not match yet.' : undefined}><Input type="password" value={f.again} onChange={set('again')} autoComplete="new-password" /></Field>
         {err && <Note tone="bad">{err}</Note>}
         <Button kind="primary" disabled={busy} onClick={go}>Create account</Button>
       </form>

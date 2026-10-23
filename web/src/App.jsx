@@ -4,6 +4,7 @@ import { Icon, Loading } from './ui.jsx';
 import { Enrol, Login, Setup } from './pages/Auth.jsx';
 import Overview from './pages/Overview.jsx';
 import Internet from './pages/Internet.jsx';
+import Wifi from './pages/Wifi.jsx';
 import DNS from './pages/DNS.jsx';
 import DHCP from './pages/DHCP.jsx';
 import VPN from './pages/VPN.jsx';
@@ -12,10 +13,12 @@ import Devices from './pages/Devices.jsx';
 import Logs from './pages/Logs.jsx';
 import Settings from './pages/Settings.jsx';
 import Installer from './pages/Installer.jsx';
+import Wizard from './pages/Wizard.jsx';
 
 export const PAGES = [
   { id: 'overview', label: 'Overview', icon: 'overview', el: Overview },
   { id: 'internet', label: 'Internet', icon: 'internet', el: Internet },
+  { id: 'wifi', label: 'Wi-Fi', icon: 'wifi', el: Wifi },
   { id: 'dns', label: 'DNS', icon: 'dns', el: DNS },
   { id: 'dhcp', label: 'DHCP', icon: 'dhcp', el: DHCP },
   { id: 'firewall', label: 'Firewall', icon: 'firewall', el: Firewall },
@@ -92,7 +95,14 @@ export default function App() {
     try {
       const me = await get('/api/auth/me');
       setCsrf(me.csrf);
-      setState(me.needs_enrol ? { kind: 'enrol' } : { kind: 'app', me });
+      if (me.needs_enrol) { setState({ kind: 'enrol' }); return; }
+      if (me.user?.role === 'admin') {
+        try {
+          const wz = await get('/api/setup/wizard');
+          if (wz.pending) { setState({ kind: 'wizard', me, data: wz }); return; }
+        } catch { /* no wizard to show */ }
+      }
+      setState({ kind: 'app', me });
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) setState({ kind: 'login' });
       else setState({ kind: 'login' });
@@ -106,6 +116,7 @@ export default function App() {
   if (state.kind === 'installer') return <Installer info={state.info} />;
   if (state.kind === 'setup') return <Setup onDone={(u, p) => { setPrefill({ u, p }); setState({ kind: 'login' }); }} />;
   if (state.kind === 'login') return <Login prefill={prefill} onSession={() => { setPrefill(null); boot(); }} />;
+  if (state.kind === 'wizard') return <Wizard me={state.me} data={state.data} onDone={boot} />;
   if (state.kind === 'enrol') return <Enrol onDone={boot} />;
   return <Shell me={state.me} onSignOut={signOut} reloadMe={boot} />;
 }

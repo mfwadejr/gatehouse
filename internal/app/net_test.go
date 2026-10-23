@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -23,8 +24,11 @@ type fakeNet struct {
 
 	vpn      netd.VPNPlan
 	vpnCalls int
+	upnp     []netd.UPnPMapping
 	status   netd.VPNStatus
 	events   []netd.FWEvent
+	hostname string
+	zone     string
 }
 
 func (f *fakeNet) NetApply(p netd.Plan, w time.Duration) (string, time.Time, error) {
@@ -62,6 +66,24 @@ func (f *fakeNet) VPNStatus() (netd.VPNStatus, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.status, nil
+}
+
+func (f *fakeNet) WifiScan(string) ([]netd.WifiNetwork, error) {
+	return []netd.WifiNetwork{{SSID: "Home", Signal: -50, Security: "wpa2"}}, nil
+}
+
+func (f *fakeNet) UPnPApply(ms []netd.UPnPMapping) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.upnp = ms
+	return nil
+}
+
+func (f *fakeNet) SetSystem(h, z string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.hostname, f.zone = h, z
+	return nil
 }
 
 func (f *fakeNet) FWEvents(since uint64, max int) ([]netd.FWEvent, uint64, error) {
@@ -190,17 +212,10 @@ func TestFirstRunSetup(t *testing.T) {
 	if _, m, _ := c.call("GET", "/api/setup", nil); m["needed"] != true {
 		t.Fatal("setup not offered on a fresh box")
 	}
-	code, _ := os.ReadFile(dir + "/setup-code")
-	if len(code) == 0 {
-		t.Fatal("no setup code written")
+	if st, _ := os.ReadFile(dir + "/setup-state"); strings.TrimSpace(string(st)) != "account" {
+		t.Fatalf("the machine's screen is not told setup is unfinished: %q", st)
 	}
-	good := string(bytes.TrimSpace(code))
-	body := map[string]string{"code": "0000-0000", "username": "admin", "password": "correct horse battery"}
-	if rc, _, _ := c.call("POST", "/api/setup", body); rc != 403 {
-		t.Fatalf("wrong code accepted: %d", rc)
-	}
-	body["code"] = good
-	body["password"] = "short"
+	body := map[string]string{"username": "admin", "password": "short"}
 	if rc, _, _ := c.call("POST", "/api/setup", body); rc != 400 {
 		t.Fatalf("weak password accepted: %d", rc)
 	}
@@ -211,8 +226,8 @@ func TestFirstRunSetup(t *testing.T) {
 	if rc, _, _ := c.call("POST", "/api/setup", body); rc != 409 {
 		t.Fatalf("second setup: %d", rc)
 	}
-	if _, err := os.Stat(dir + "/setup-code"); err == nil {
-		t.Fatal("setup code left behind")
+	if st, _ := os.ReadFile(dir + "/setup-state"); strings.TrimSpace(string(st)) != "wizard" {
+		t.Fatalf("after the account, the screen should say the wizard is open: %q", st)
 	}
 	if rc, _, _ := c.call("POST", "/api/auth/login", map[string]string{"username": "admin", "password": "correct horse battery"}); rc != 200 {
 		t.Fatal("cannot log in as the new admin")

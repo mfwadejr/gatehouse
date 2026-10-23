@@ -5,13 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/netip"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
-
-	"gatehouse/internal/seed"
 )
 
 // The text-mode installer asks the same questions as the web installer, one at a time, on the
@@ -26,14 +22,21 @@ var (
 // Term is a line-oriented terminal. It speaks plain ANSI and never positions the cursor,
 // so it works on a monitor, a serial terminal, or a terminal emulator alike.
 type Term struct {
-	r   *bufio.Reader
-	w   io.Writer
-	cur [3]any // the heading on screen: step, of, title
+	r    *bufio.Reader
+	w    io.Writer
+	cur  [3]any // the heading on screen: step, of, title
+	W, H int    // screen size in characters
+	M    string // left margin that centres the prompts under a themed heading
 }
 
-func NewTerm(r io.Reader, w io.Writer) *Term { return &Term{r: bufio.NewReader(r), w: w} }
+func NewTerm(r io.Reader, w io.Writer) *Term { return &Term{r: bufio.NewReader(r), w: w, W: 80, H: 24} }
 
-func (t *Term) p(f string, a ...any) { fmt.Fprintf(t.w, strings.ReplaceAll(f, "\n", "\r\n"), a...) }
+// show draws a finished screen and leaves the cursor visible for the next prompt.
+func (t *Term) show(s *Screen) { io.WriteString(t.w, s.String()+"\x1b[?25h") }
+
+func (t *Term) p(f string, a ...any) {
+	fmt.Fprintf(t.w, strings.ReplaceAll(f, "\n", "\r\n"+t.M), a...)
+}
 
 func (t *Term) clear() { io.WriteString(t.w, "\x1b[0m\x1b[2J\x1b[H") }
 
@@ -181,8 +184,6 @@ func (t *Term) password(prompt string) (string, error) {
 type TextEnv struct {
 	In      *Installer
 	Ports   func() []Port
-	Used    func() []netip.Prefix // networks this machine is already attached to
-	Zones   func() []string
 	Refresh func() // bring ports up so cables are noticed
 	Poll    time.Duration
 	Settle  time.Duration // how long to wait for a port to come up before listing
@@ -190,7 +191,7 @@ type TextEnv struct {
 }
 
 func NewTextEnv(in *Installer, serial string) *TextEnv {
-	return &TextEnv{In: in, Ports: WiredPorts, Used: usedPrefixes, Zones: timezones, Refresh: EnsureLinksUp, Poll: 500 * time.Millisecond, Settle: time.Second, Serial: serial}
+	return &TextEnv{In: in, Ports: WiredPorts, Refresh: EnsureLinksUp, Poll: 500 * time.Millisecond, Settle: time.Second, Serial: serial}
 }
 
 // again redraws the current heading on a clean screen, so a long step does not scroll its
@@ -201,13 +202,21 @@ func (t *Term) again(env *TextEnv) {
 
 func (t *Term) banner(env *TextEnv, step, of int, title string) {
 	t.cur = [3]any{step, of, title}
-	t.clear()
-	t.p("\n  %sGATEHOUSE%s  %sInstaller · step %d of %d%s\n", blue, reset, dim, step, of, reset)
-	t.p("  %s%s%s\n", bold, title, reset)
-	t.p("  %s%s%s\n", dim, strings.Repeat("-", 60), reset)
+	t.heading(fmtf("Installer · step %d of %d", step, of), title)
 }
 
-const steps = 6
+// heading clears the screen and draws the themed heading; prompts that follow are centred under it.
+func (t *Term) heading(sub, title string) {
+	sc := NewScreen(t.W, t.H)
+	sc.header(sub)
+	sc.mid(bold + title + reset)
+	sc.blank()
+	t.M = strings.Repeat(" ", max(2, (t.W-58)/2))
+	t.show(sc)
+	io.WriteString(t.w, t.M)
+}
+
+const steps = 2
 
 // RunText walks through the questions and installs. It returns when the machine is about to
 // reboot, when the input closes, or after a failed install the person gives up on.
@@ -225,18 +234,20 @@ func RunText(t *Term, env *TextEnv) error {
 
 func textOnce(t *Term, env *TextEnv) error {
 	// Welcome
-	t.clear()
-	t.p("\n  %sGATEHOUSE%s  %sInstaller (text mode)%s\n", blue, reset, dim, reset)
-	t.p("  %s%s%s\n\n", dim, strings.Repeat("-", 60), reset)
-	t.p("  This installs Gatehouse on this machine and erases the disk you pick.\n")
-	t.p("  Nothing is changed until you confirm at the end.\n\n")
-	t.p("  Keys:   Enter accepts the suggestion in [brackets]\n")
-	t.p("          Backspace edits      Ctrl-C starts over\n\n")
+	w := NewScreen(t.W, t.H)
+	w.header("Installer")
+	w.mid(bold + "Install Gatehouse on this machine" + reset)
+	w.blank()
+	w.mid(fg + "This erases the disk you choose. Nothing changes until you confirm." + reset)
+	w.blank()
+	w.mid(dim + "Enter accepts the suggestion in [brackets]   ·   Ctrl-C starts over" + reset)
 	if env.Serial != "" {
-		t.p("  %sSerial console%s  %s\n", dim, reset, env.Serial)
-		t.p("  %sThis screen and the serial console both work at the same time.%s\n\n", dim, reset)
+		w.blank()
+		w.mid(dim + "Serial console: " + env.Serial + reset)
 	}
-	t.p("  Press Enter to begin. ")
+	w.blank()
+	w.mid(bold + "Press Enter to begin" + reset)
+	t.show(w)
 	if _, err := t.readLine(true); err != nil {
 		return err
 	}
@@ -281,79 +292,12 @@ func textOnce(t *Term, env *TextEnv) error {
 		break
 	}
 
-	// 2. Network
-	t.banner(env, 2, steps, "Your network")
-	net, err := askNetwork(t, env)
-	if err != nil {
-		return err
-	}
-
-	// 3. Name and time zone
-	t.banner(env, 3, steps, "This device")
-	host, err := t.ask("Device name", "gatehouse", func(s string) error {
-		if !reHost.MatchString(s) {
-			return errors.New("use lowercase letters, digits and dashes")
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-	zone, err := askZone(t, env)
-	if err != nil {
-		return err
-	}
-
-	// 4. Administrator
-	t.banner(env, 4, steps, "Administrator account")
-	t.p("  You sign in to the console with this account.\n\n")
-	user, err := t.ask("Administrator name", "admin", func(s string) error {
-		if !reUser.MatchString(s) {
-			return errors.New("start with a letter; use lowercase letters, digits, dots, dashes or underscores")
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-	var pass string
+	// 2. Confirm
+	req := Request{Disk: disk.Path}
 	for {
-		p1, err := t.password("Password (at least 12 characters)")
-		if err != nil {
-			return err
-		}
-		if len(p1) < 12 {
-			t.p("  %sToo short: %d of the 12 characters needed. Add %d more. Several unrelated\n  words in a row is easy to remember and long enough.%s\n", red, len([]rune(p1)), 12-len([]rune(p1)), reset)
-			continue
-		}
-		p2, err := t.password("Type it again")
-		if err != nil {
-			return err
-		}
-		if p1 != p2 {
-			t.p("  %sThe two passwords differ. Try again.%s\n", red, reset)
-			continue
-		}
-		pass = p1
-		break
-	}
-	mfa, err := t.yesno("Require two-step sign-in for every account", false)
-	if err != nil {
-		return err
-	}
-
-	// 5. Review
-	req := Request{Disk: disk.Path, Hostname: host, Username: user, Password: pass, Timezone: zone, RequireMFA: mfa, Network: *net}
-	for {
-		t.banner(env, 5, steps, "Review")
-		t.p("  Disk            %s%s %s%s  %s(will be erased)%s\n", bold, disk.Path, humanSize(disk.Size), reset, red, reset)
-		for _, l := range describeNetwork(net) {
-			t.p("  %s\n", l)
-		}
-		t.p("  Device name     %s\n", host)
-		t.p("  Time zone       %s\n", zone)
-		t.p("  Administrator   %s%s\n", user, map[bool]string{true: " (two-step sign-in required)", false: ""}[mfa])
-		t.p("\n  To go ahead, type the disk name (%s%s%s) exactly. Anything else cancels.\n\n", bold, disk.Path, reset)
+		t.banner(env, 2, steps, "Confirm")
+		t.p("  Disk   %s%s %s%s  %s(everything on it will be erased)%s\n", bold, disk.Path, humanSize(disk.Size), reset, red, reset)
+		t.p("\n  To go ahead, type %s%s%s below.\n  %sAnything else cancels.%s\n\n", bold, disk.Path, reset, dim, reset)
 		c, err := t.ask("Disk name", "", nil)
 		if err != nil {
 			return err
@@ -373,86 +317,73 @@ func textOnce(t *Term, env *TextEnv) error {
 		break
 	}
 
-	// 6. Install
+	// 3. Install
 	for {
 		st := env.In.Status()
-		t.banner(env, 6, steps, "Installing")
-		t.p("  This takes a few minutes. Do not switch the machine off.\n\n")
-		for _, s := range st.Steps {
-			mark, col := "[ ]", dim
-			switch s.State {
-			case "running":
-				mark, col = "[>]", bold
-			case "done":
-				mark, col = "[x]", green
-			case "error":
-				mark, col = "[!]", red
+		n, total := 0, len(st.Steps)
+		cur := ""
+		for _, x := range st.Steps {
+			if x.State == "done" {
+				n++
 			}
-			t.p("  %s%s %s%s\n", col, mark, s.Name, reset)
+			if x.State == "running" {
+				cur = x.Name
+			}
 		}
+		sc := NewScreen(t.W, t.H)
 		switch st.State {
 		case "done":
-			t.p("\n  %sInstalled.%s\n\n", green, reset)
-			t.p("  Press Enter to restart. Take the USB stick out as soon as the screen\n")
-			t.p("  goes blank, or the machine will start the installer again.\n\n")
-			t.p("  After it starts (about a minute), the machine's screen shows the\n")
-			t.p("  address to open in a browser.\n\n")
+			sc.header("Installed")
+			sc.mid(green + "●" + reset + bold + " Installation complete" + reset)
+			sc.blank()
+			sc.mid(fg + "Press Enter to restart." + reset)
+			sc.mid(fg + "Take the USB stick out as soon as the screen goes blank." + reset)
+			sc.blank()
+			sc.mid(dim + "After it starts, this screen shows an address. Open it in a browser" + reset)
+			sc.mid(dim + "to create your administrator account and finish setup." + reset)
+			t.show(sc)
 			if _, err := t.readLine(true); err != nil {
 				return err
 			}
 			return env.In.Reboot()
 		case "error":
-			t.p("\n  %s%s%s\n", red, st.Error, reset)
-			if lines := lastLines(st.Log, 8); lines != "" {
-				t.p("\n%s\n", indent(lines))
+			sc.header("Installation failed")
+			sc.mid(red + "●" + reset + bold + " " + trim(st.Error, t.W-8) + reset)
+			sc.blank()
+			for _, l := range strings.Split(lastLines(st.Log, 5), "\n") {
+				sc.mid(dim + trim(l, t.W-8) + reset)
 			}
-			t.p("\n  Nothing more was changed. Press Enter to start over. ")
+			sc.blank()
+			sc.mid(fg + "Nothing more was changed. Press Enter to start over." + reset)
+			t.show(sc)
 			if _, err := t.readLine(true); err != nil {
 				return err
 			}
 			return errRestart
 		}
+		sc.header("Installing")
+		sc.mid(bar(n, total, 40))
+		sc.blank()
+		if cur == "" {
+			cur = "Starting"
+		}
+		sc.mid(bold + cur + reset + dim + fmtf("   step %d of %d", min(n+1, total), total) + reset)
+		sc.blank()
+		sc.mid(dim + "This takes a few minutes. Do not switch the machine off." + reset)
+		t.show(sc)
 		time.Sleep(env.Poll)
 	}
 }
 
-func askZone(t *Term, env *TextEnv) (string, error) {
-	zones := env.Zones()
-	have := map[string]bool{}
-	for _, z := range zones {
-		have[z] = true
+func trim(s string, n int) string {
+	if n < 10 {
+		n = 10
 	}
-	for {
-		t.p("\n  Time zone: type a name like Europe/London or America/Chicago, or part of\n  one to search. UTC is fine if you are not sure.\n\n")
-		s, err := t.ask("Time zone", "UTC", nil)
-		if err != nil {
-			return "", err
-		}
-		if have[s] {
-			return s, nil
-		}
-		var hits []string
-		for _, z := range zones {
-			if strings.Contains(strings.ToLower(z), strings.ToLower(s)) {
-				hits = append(hits, z)
-			}
-		}
-		sort.Strings(hits)
-		switch {
-		case len(hits) == 0:
-			t.p("  %sNothing matches %q.%s\n", red, s, reset)
-		case len(hits) > 12:
-			t.p("  %d matches. Type more of the name to narrow it down.\n", len(hits))
-		default:
-			n, err := t.choose("Matches", append(hits, "None of these, search again"), 1)
-			if err != nil {
-				return "", err
-			}
-			if n < len(hits) {
-				return hits[n], nil
-			}
-		}
+	r := []rune(s)
+	if len(r) > n {
+		return string(r[:n-1]) + "…"
 	}
+	return s
 }
 
 func humanSize(b int64) string {
@@ -470,267 +401,4 @@ func lastLines(s string, n int) string {
 		ls = ls[len(ls)-n:]
 	}
 	return strings.Join(ls, "\n")
-}
-
-func indent(s string) string {
-	ls := strings.Split(s, "\n")
-	for i := range ls {
-		if len(ls[i]) > 70 {
-			ls[i] = ls[i][:70]
-		}
-		ls[i] = "    " + dim + ls[i] + reset
-	}
-	return strings.Join(ls, "\r\n")
-}
-
-func portLabel(p Port) string {
-	s := p.Name
-	if p.USB {
-		s += " (USB)"
-	}
-	state := "no cable"
-	if p.Link {
-		state = "cable connected"
-		if p.Speed != "" {
-			state += ", " + p.Speed + " Mb/s"
-		}
-	}
-	return fmt.Sprintf("%-16s %s", s, state)
-}
-
-// askNetwork gathers the same choices as the web installer's network step, with defaults for
-// everything that has a sensible one.
-func askNetwork(t *Term, env *TextEnv) (*seed.Network, error) {
-	env.Refresh()
-	time.Sleep(env.Settle)
-	ports := env.Ports()
-	for len(ports) == 0 {
-		t.p("\n  %sNo network port found.%s\n  Gatehouse needs at least one wired port. If you use a USB network adapter,\n  plug it in, then press Enter to look again. ", amber, reset)
-		if _, err := t.readLine(true); err != nil {
-			return nil, err
-		}
-		env.Refresh()
-		time.Sleep(env.Settle)
-		ports = env.Ports()
-	}
-	// Local network port
-	t.p("\n  Plug a cable from your own network (a computer or switch) into a port now,\n  and it shows as connected below. Press Enter on a blank line to refresh.\n")
-	var lan Port
-	for {
-		var opts []string
-		def := 1
-		for i, p := range ports {
-			opts = append(opts, portLabel(p))
-			if p.Link && def == 1 {
-				def = i + 1
-			}
-		}
-		opts = append(opts, "Refresh the list")
-		n, err := t.choose("Which port is for your own network?", opts, def)
-		if err != nil {
-			return nil, err
-		}
-		if n == len(ports) {
-			env.Refresh()
-			time.Sleep(env.Settle)
-			ports = env.Ports()
-			continue
-		}
-		lan = ports[n]
-		break
-	}
-	net := &seed.Network{LAN: seed.LAN{Port: lan.Name}}
-
-	// Internet port (optional)
-	var others []Port
-	for _, p := range ports {
-		if p.Name != lan.Name {
-			others = append(others, p)
-		}
-	}
-	var wan *Port
-	if len(others) > 0 {
-		t.again(env)
-		opts := []string{"None. Another router provides the internet, or I will add it later"}
-		for _, p := range others {
-			opts = append(opts, portLabel(p))
-		}
-		n, err := t.choose("Which port goes to the internet (your modem or provider)?", opts, 1)
-		if err != nil {
-			return nil, err
-		}
-		if n > 0 {
-			wan = &others[n-1]
-		}
-	}
-	if wan != nil {
-		w := &seed.WAN{Port: wan.Name}
-		n, err := t.choose("How does your provider connect you?", []string{
-			"Automatic (most home and office connections)",
-			"Username and password (PPPoE)",
-			"Fixed address",
-		}, 1)
-		if err != nil {
-			return nil, err
-		}
-		switch n {
-		case 0:
-			w.Type = "dhcp"
-		case 1:
-			w.Type = "pppoe"
-			t.p("\n")
-			if w.PPPoEUser, err = t.ask("Provider user name", "", nonEmpty("enter the user name from your provider")); err != nil {
-				return nil, err
-			}
-			if w.PPPoEPass, err = t.password("Provider password"); err != nil {
-				return nil, err
-			}
-		case 2:
-			w.Type = "static"
-			t.p("\n")
-			if w.Addr, err = t.ask("Address with size (like 203.0.113.10/29)", "", prefixCheck); err != nil {
-				return nil, err
-			}
-			pf, _ := netip.ParsePrefix(w.Addr)
-			if w.Gateway, err = t.ask("Gateway", guessGateway(pf), addrCheck); err != nil {
-				return nil, err
-			}
-			if w.DNS, err = t.ask("DNS servers (optional, comma separated)", "1.1.1.1, 9.9.9.9", nil); err != nil {
-				return nil, err
-			}
-		}
-		net.WAN = w
-	}
-
-	// How Gatehouse is used on the LAN
-	t.again(env)
-	if net.WAN != nil {
-		net.LAN.Mode = "router"
-	} else {
-		n, err := t.choose("How will Gatehouse be used?", []string{
-			"As the main router: it hands out addresses to your devices",
-			"Behind another router: it gets its address from that router",
-		}, 1)
-		if err != nil {
-			return nil, err
-		}
-		net.LAN.Mode = []string{"router", "behind"}[n]
-	}
-	if net.LAN.Mode == "router" {
-		def := seed.Suggest(env.Used())
-		t.p("\n  Gatehouse's own address on your network. The suggestion avoids any\n  network this machine is already connected to.\n\n")
-		a, err := t.ask("Address with size", def, func(s string) error {
-			x := seed.Network{LAN: seed.LAN{Port: "x", Mode: "router", Address: s}}
-			return x.Validate()
-		})
-		if err != nil {
-			return nil, err
-		}
-		net.LAN.Address = a
-	} else {
-		n, err := t.choose("What address should this device have?", []string{
-			"Automatic, from your router",
-			"A fixed address",
-		}, 1)
-		if err != nil {
-			return nil, err
-		}
-		if n == 0 {
-			net.LAN.Addressing = "dhcp"
-		} else {
-			net.LAN.Addressing = "static"
-			t.p("\n")
-			if net.LAN.Static, err = t.ask("Address with size (like 192.168.0.50/24)", "", prefixCheck); err != nil {
-				return nil, err
-			}
-			pf, _ := netip.ParsePrefix(net.LAN.Static)
-			if net.LAN.Gateway, err = t.ask("Your router's address", guessGateway(pf), addrCheck); err != nil {
-				return nil, err
-			}
-			if net.LAN.DNS, err = t.ask("DNS server (optional)", net.LAN.Gateway, nil); err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	// Remaining ports join the LAN as a switch.
-	var spare []string
-	for _, p := range ports {
-		if p.Name != lan.Name && (wan == nil || p.Name != wan.Name) {
-			spare = append(spare, p.Name)
-		}
-	}
-	if len(spare) > 0 {
-		t.p("\n  Unused ports: %s\n", strings.Join(spare, ", "))
-		yes, err := t.yesno("Use them as extra sockets on your own network (like a switch)", false)
-		if err != nil {
-			return nil, err
-		}
-		if yes {
-			net.Bridge = spare
-		}
-	}
-	if err := net.Validate(); err != nil {
-		t.p("\n  %s%v%s\n", red, err, reset)
-		return nil, errRestart
-	}
-	return net, nil
-}
-
-func describeNetwork(n *seed.Network) []string {
-	out := []string{fmt.Sprintf("Local network   port %s", n.LAN.Port)}
-	if n.LAN.Mode == "router" {
-		out[0] += ", Gatehouse is the router at " + n.LAN.Address
-	} else if n.LAN.Addressing == "dhcp" {
-		out[0] += ", behind another router, automatic address"
-	} else {
-		out[0] += ", behind " + n.LAN.Gateway + ", address " + n.LAN.Static
-	}
-	if n.WAN != nil {
-		how := map[string]string{"dhcp": "automatic", "pppoe": "user name " + n.WAN.PPPoEUser, "static": n.WAN.Addr}[n.WAN.Type]
-		out = append(out, fmt.Sprintf("Internet        port %s, %s", n.WAN.Port, how))
-	} else {
-		out = append(out, "Internet        not set up now (add it later in the console)")
-	}
-	if len(n.Bridge) > 0 {
-		out = append(out, "Extra sockets   "+strings.Join(n.Bridge, ", "))
-	}
-	return out
-}
-
-func nonEmpty(msg string) func(string) error {
-	return func(s string) error {
-		if strings.TrimSpace(s) == "" {
-			return errors.New(msg)
-		}
-		return nil
-	}
-}
-
-func prefixCheck(s string) error {
-	p, err := netip.ParsePrefix(s)
-	if err != nil || !p.Addr().Is4() {
-		return errors.New("type the address and size, like 192.168.0.50/24")
-	}
-	return nil
-}
-
-func addrCheck(s string) error {
-	a, err := netip.ParseAddr(s)
-	if err != nil || !a.Is4() {
-		return errors.New("type an address like 192.168.0.1")
-	}
-	return nil
-}
-
-// guessGateway offers the first address of the network, which is where most routers live.
-func guessGateway(p netip.Prefix) string {
-	if !p.IsValid() {
-		return ""
-	}
-	g := p.Masked().Addr().Next()
-	if g == p.Addr() {
-		g = g.Next()
-	}
-	return g.String()
 }

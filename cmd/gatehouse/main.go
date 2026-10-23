@@ -7,12 +7,14 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"os/user"
 	"path/filepath"
@@ -42,6 +44,7 @@ Commands:
   installer  run the installer (on the live USB image only)
   textinstaller  run the text-mode installer (boot menu: text / serial console)
   user       add an administrator or reset a password (run on the device itself)
+  recover    local recovery screen: new password, turn off two-step sign-in, reset the firewall
   seed       store the network chosen in the installer (used by the installer)
   rollback   undo a firewall or network change that was not confirmed (started automatically)
   version    print the version
@@ -69,6 +72,8 @@ func main() {
 		}
 	case "screen":
 		installer.RunStatus("443")
+	case "recover":
+		recoverCmd(os.Args[2:])
 	case "user":
 		userCmd(os.Args[2:])
 	case "seed":
@@ -357,4 +362,67 @@ func seedCmd(args []string) {
 		log.Fatalf("seed: %v", err)
 	}
 	fmt.Println("done")
+}
+
+// recoverCmd is the screen for someone locked out who is standing at the machine. It runs as root on a
+// local console (Alt+F2), never over the network.
+func recoverCmd(args []string) {
+	fs := flag.NewFlagSet("recover", flag.ExitOnError)
+	data := fs.String("data", "/var/lib/gatehouse", "data directory")
+	fs.Parse(args)
+	db, err := store.OpenConfig(filepath.Join(*data, "config.db"))
+	if err != nil {
+		log.Fatalf("recover: %v", err)
+	}
+	defer db.Close()
+	box, err := crypt.LoadOrCreate(filepath.Join(*data, "secret.key"))
+	if err != nil {
+		log.Fatalf("recover: %v", err)
+	}
+	svc := auth.New(db, box)
+	fixOwner := func() {
+		exec.Command("chown", "-R", "gatehouse:gatehouse", *data).Run()
+	}
+	env := installer.RecoveryEnv{
+		Users: func() []string {
+			rows, err := db.Query(`SELECT username FROM users ORDER BY id`)
+			if err != nil {
+				return nil
+			}
+			defer rows.Close()
+			var out []string
+			for rows.Next() {
+				var n string
+				rows.Scan(&n)
+				out = append(out, n)
+			}
+			return out
+		},
+		SetPassword: func(name, pw string) error {
+			u, err := svc.UserByName(name)
+			if err != nil {
+				return errors.New("no such account")
+			}
+			defer fixOwner()
+			return svc.SetPassword(u.ID, pw)
+		},
+		ClearTwoStep: func(name string) error {
+			u, err := svc.UserByName(name)
+			if err != nil {
+				return errors.New("no such account")
+			}
+			defer fixOwner()
+			return svc.ClearTOTP(u.ID)
+		},
+		ResetFirewall: func() error {
+			dir := filepath.Join(*data, "fw")
+			os.Remove(filepath.Join(dir, "lastgood.nft"))
+			ap := fw.NewApplier(dir)
+			ap.Baseline = fw.FirstBootBaseline
+			return ap.Rollback()
+		},
+	}
+	if err := installer.RunRecoveryConsole(env); err != nil {
+		log.Fatalf("recover: %v", err)
+	}
 }

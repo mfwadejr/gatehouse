@@ -13,6 +13,11 @@ install -d -m 755 /run/gatehouse
 
 # Use systemd-networkd for the network; we serve DNS and DHCP ourselves.
 systemctl enable systemd-networkd.service || true
+# Wi-Fi is started per card by Gatehouse (gatehouse-wifi-*@), never by the packages themselves.
+for u in hostapd.service wpa_supplicant.service wpa_supplicant@.service wpa_supplicant-nl80211@.service wpa_supplicant-wired@.service wpa_supplicant-nl80211.service; do
+	systemctl disable "$u" 2>/dev/null || true
+	systemctl mask "$u" 2>/dev/null || true
+done
 systemctl disable systemd-resolved.service 2>/dev/null || true
 systemctl mask systemd-resolved.service 2>/dev/null || true
 rm -f /etc/resolv.conf
@@ -73,3 +78,5 @@ printf 'auto lo\niface lo inet loopback\n' > /etc/network/interfaces
 
 # An installed machine shows the Gatehouse status screen on its own display, never a login prompt.
 systemctl enable gatehouse-screen.service
+systemctl enable gatehouse-recovery.service
+systemctl mask getty@tty2.service autovt@tty2.service 2>/dev/null || true

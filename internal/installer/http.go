@@ -148,6 +148,9 @@ func secure(next http.Handler) http.Handler {
 	})
 }
 
+// Timezones lists the zone names the system knows, for pickers.
+func Timezones() []string { return timezones() }
+
 func timezones() []string {
 	b, err := os.ReadFile("/usr/share/zoneinfo/zone1970.tab")
 	out := []string{"UTC"}

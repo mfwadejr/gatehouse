@@ -299,5 +299,7 @@ func (a *App) registerRoutes() {
 	a.registerFWRoutes()
 	a.registerNetRoutes()
 	a.registerGroupRoutes()
+	a.registerWifiRoutes()
+	a.registerRogueRoutes()
 	a.registerTrafficRoutes()
 }
