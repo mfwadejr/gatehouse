@@ -84,6 +84,7 @@ func TestFullLoginFlow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	s.SetMFARequired(true)
 	// Without TOTP: session is created but must enrol.
 	r, err := s.Login("marvin", "a-long-passphrase-1", "10.0.0.5", "ua")
 	if err != nil || r.Session == nil || !r.Session.NeedsEnrol || r.Session.MFA {
@@ -190,5 +191,43 @@ func TestMFATicketAttempts(t *testing.T) {
 	}
 	if _, err := s.VerifyMFA(r.MFATicket, "000000", "1.1.1.1", "ua"); err != ErrInvalid {
 		t.Fatalf("ticket should be dead: %v", err)
+	}
+}
+
+// Two-step sign-in is optional unless required, and can be turned off with password and code.
+func TestOptionalMFA(t *testing.T) {
+	s, now := newSvc(t)
+	u, _ := s.CreateUser("marvin", "a-long-passphrase-1", "admin")
+	r, err := s.Login("marvin", "a-long-passphrase-1", "10.0.0.5", "ua")
+	if err != nil || r.Session == nil || r.Session.NeedsEnrol || !r.Session.MFA {
+		t.Fatalf("optional login should be a full session: %+v %v", r, err)
+	}
+	if sess, _, err := s.Authenticate(r.Session.Token); err != nil || sess.NeedsEnrol || !sess.MFA {
+		t.Fatalf("authenticate: %+v %v", sess, err)
+	}
+	secret, _ := enrol(t, s, *now, u.ID)
+	*now = now.Add(31 * time.Second)
+	if err := s.DisableTOTP(u.ID, "wrong-password-123", "000000"); err == nil {
+		t.Fatal("disabled with the wrong password")
+	}
+	if err := s.DisableTOTP(u.ID, "a-long-passphrase-1", "000000"); err == nil {
+		t.Fatal("disabled with the wrong code")
+	}
+	code, _ := totpCode(secret, now.Unix()/30, 6)
+	if err := s.DisableTOTP(u.ID, "a-long-passphrase-1", code); err != nil {
+		t.Fatalf("disable: %v", err)
+	}
+	r, err = s.Login("marvin", "a-long-passphrase-1", "10.0.0.5", "ua")
+	if err != nil || r.Session == nil || r.MFATicket != "" {
+		t.Fatalf("after disabling, password alone should sign in: %+v %v", r, err)
+	}
+	// When required, it cannot be disabled and sign-in forces enrolment.
+	s.SetMFARequired(true)
+	if err := s.DisableTOTP(u.ID, "a-long-passphrase-1", ""); err == nil {
+		t.Fatal("disabled while required")
+	}
+	r, _ = s.Login("marvin", "a-long-passphrase-1", "10.0.0.5", "ua")
+	if r.Session == nil || !r.Session.NeedsEnrol {
+		t.Fatal("required policy did not force enrolment")
 	}
 }

@@ -11,6 +11,7 @@ live-config-systemd
 initramfs-tools
 locales
 console-setup
+kbd
 keyboard-configuration
 ca-certificates
 systemd-timesyncd

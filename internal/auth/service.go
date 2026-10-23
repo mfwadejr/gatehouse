@@ -213,11 +213,13 @@ func (s *Service) Login(username, password, ip, ua string) (LoginResult, error) 
 		return LoginResult{}, ErrInvalid
 	}
 	if !u.TOTPEnabled {
-		sess, err := s.newSession(u.ID, ip, ua, false)
+		// Two-step sign-in is optional unless the administrator requires it.
+		required := s.MFARequired()
+		sess, err := s.newSession(u.ID, ip, ua, !required)
 		if err != nil {
 			return LoginResult{}, err
 		}
-		sess.NeedsEnrol = true
+		sess.NeedsEnrol = required
 		return LoginResult{Session: sess}, nil
 	}
 	t := randToken(24)
@@ -284,6 +286,40 @@ func (s *Service) checkSecondFactor(u *userRow, code string) (bool, error) {
 	}
 	n, _ := res.RowsAffected()
 	return n == 1, nil
+}
+
+// MFARequired reports whether every account must use two-step sign-in.
+func (s *Service) MFARequired() bool { return s.db.Setting("auth.mfa_required", "0") == "1" }
+
+// SetMFARequired turns the requirement on or off for all accounts.
+func (s *Service) SetMFARequired(on bool) error {
+	v := "0"
+	if on {
+		v = "1"
+	}
+	return s.db.SetSetting("auth.mfa_required", v)
+}
+
+// DisableTOTP turns a user's two-step sign-in off. It needs the password and a current code.
+func (s *Service) DisableTOTP(userID int64, password, code string) error {
+	if s.MFARequired() {
+		return errors.New("an administrator requires two-step sign-in for every account")
+	}
+	u, err := s.loadByID(userID)
+	if err != nil {
+		return ErrInvalid
+	}
+	if !VerifyPassword(password, u.hash) {
+		s.accountFail(u)
+		return ErrInvalid
+	}
+	if u.TOTPEnabled {
+		ok, err := s.checkSecondFactor(u, code)
+		if err != nil || !ok {
+			return ErrInvalid
+		}
+	}
+	return s.ClearTOTP(userID)
 }
 
 // VerifyStepUp re-checks a TOTP code for a sensitive action such as applying firewall changes.
@@ -439,7 +475,11 @@ func (s *Service) Authenticate(token string) (*Session, *User, error) {
 	}
 	sess.ID = id
 	sess.MFA = mfa == 1
-	sess.NeedsEnrol = !u.TOTPEnabled
+	if !u.TOTPEnabled {
+		required := s.MFARequired()
+		sess.NeedsEnrol = required
+		sess.MFA = !required // no second factor is set up, so none is asked for
+	}
 	sess.ExpiresAt = newExp
 	return &sess, &u.User, nil
 }

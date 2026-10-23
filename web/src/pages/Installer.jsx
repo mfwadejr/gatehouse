@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { get, post, setInstallCode } from '../api.js';
-import { Button, Card, Field, Icon, Input, Note, Select, Bar } from '../ui.jsx';
+import { Button, Card, Field, Icon, Input, Note, Select, Bar, ToggleRow } from '../ui.jsx';
 
 const gb = (n) => `${Math.round(n / 1e9)} GB`;
 
@@ -24,7 +24,7 @@ export default function Installer({ info }) {
   const [busy, setBusy] = useState(false);
   const [disks, setDisks] = useState([]);
   const [zones, setZones] = useState(['UTC']);
-  const [f, setF] = useState({ disk: '', confirm: '', hostname: 'gatehouse', username: 'admin', password: '', again: '', timezone: 'UTC' });
+  const [f, setF] = useState({ disk: '', confirm: '', hostname: 'gatehouse', username: 'admin', password: '', again: '', timezone: 'UTC', require_mfa: false });
   const [status, setStatus] = useState(null);
   const poll = useRef(null);
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
@@ -98,6 +98,7 @@ export default function Installer({ info }) {
         <Field label="Administrator name"><Input value={f.username} onChange={set('username')} autoComplete="username" /></Field>
         <Field label="Password" hint="At least 12 characters. A few random words works well."><Input type="password" value={f.password} onChange={set('password')} autoComplete="new-password" /></Field>
         <Field label="Password again" hint={f.again && f.again !== f.password ? 'These do not match.' : undefined}><Input type="password" value={f.again} onChange={set('again')} autoComplete="new-password" /></Field>
+        <ToggleRow title="Require two-step sign-in" desc="Optional. Asks for a code from an authenticator app each time you sign in, and sets it up the first time. You can turn this on or off later in Settings." checked={f.require_mfa} onChange={set('require_mfa')} />
         <div className="actions"><Button onClick={() => setStep(1)}>Back</Button><Button kind="primary" disabled={!pwOK || !f.hostname || !f.username} onClick={() => setStep(3)}>Next</Button></div>
       </Shell>
     );

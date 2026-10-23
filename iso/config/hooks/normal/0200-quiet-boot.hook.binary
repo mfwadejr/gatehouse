@@ -1,0 +1,44 @@
+#!/bin/sh
+# Runs after the boot loaders are laid down. Replace their menus with an immediate, silent
+# boot so the only thing a person sees is the Gatehouse screen.
+set -e
+
+QUIET="quiet loglevel=0 systemd.show_status=0 rd.udev.log_level=0 vt.global_cursor_default=0 consoleblank=0 console=tty1"
+
+# BIOS (isolinux)
+if [ -f binary/isolinux/live.cfg ]; then
+	K=$(awk '$1=="linux"||$1=="kernel"{print $2; exit}' binary/isolinux/live.cfg)
+	I=$(awk '$1=="initrd"{print $2; exit}' binary/isolinux/live.cfg)
+	A=$(awk '$1=="append"{$1=""; print; exit}' binary/isolinux/live.cfg)
+	if [ -n "$K" ] && [ -n "$I" ]; then
+		cat > binary/isolinux/isolinux.cfg <<CFG
+default gatehouse
+prompt 0
+noescape 1
+timeout 1
+label gatehouse
+  linux $K
+  initrd $I
+  append $A $QUIET
+CFG
+	fi
+fi
+
+# UEFI and BIOS-on-GRUB
+if [ -d binary/boot/grub ]; then
+	L=$(grep -h -m1 -E '^[[:space:]]*linux[[:space:]]' binary/boot/grub/*.cfg | head -n1 | sed -E 's/^[[:space:]]*linux[[:space:]]+//')
+	I=$(grep -h -m1 -E '^[[:space:]]*initrd[[:space:]]' binary/boot/grub/*.cfg | head -n1 | sed -E 's/^[[:space:]]*initrd[[:space:]]+//')
+	if [ -n "$L" ] && [ -n "$I" ]; then
+		cat > binary/boot/grub/grub.cfg <<CFG
+set timeout=0
+set timeout_style=hidden
+set default=0
+set color_normal=black/black
+set color_highlight=black/black
+menuentry "Gatehouse" {
+  linux $L $QUIET
+  initrd $I
+}
+CFG
+	fi
+fi

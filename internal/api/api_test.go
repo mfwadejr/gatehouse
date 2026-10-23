@@ -76,6 +76,7 @@ func (e *env) do(method, path string, body any, csrf string) (*http.Response, ma
 
 func TestFullLoginFlow(t *testing.T) {
 	e := newEnv(t)
+	e.srv.Auth.SetMFARequired(true)
 	// Unauthenticated access is refused.
 	if r, _ := e.do("GET", "/api/auth/me", nil, ""); r.StatusCode != 401 {
 		t.Fatalf("me without session: %d", r.StatusCode)

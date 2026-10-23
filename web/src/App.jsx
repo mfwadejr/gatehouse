@@ -36,7 +36,7 @@ function useRoute() {
 
 export const go = (id) => { window.location.hash = `#/${id}`; };
 
-function Shell({ me, onSignOut }) {
+function Shell({ me, onSignOut, reloadMe }) {
   const route = useRoute();
   const page = PAGES.find((p) => p.id === route) || PAGES[0];
   const Page = page.el;
@@ -62,13 +62,13 @@ function Shell({ me, onSignOut }) {
           <div className="avatar">{initials}</div>
           <div className="who">
             <span>{me.user.username}</span>
-            <span className="small muted">{me.user.role === 'admin' ? 'Admin' : 'Viewer'}{me.user.totp_enabled || me.mfa ? ' · 2-step on' : ''}</span>
+            <span className="small muted">{me.user.role === 'admin' ? 'Admin' : 'Viewer'}{me.user.totp_enabled ? ' · 2-step on' : ''}</span>
             <button className="link small" style={{ textAlign: 'left' }} onClick={onSignOut}>Sign out</button>
           </div>
         </div>
       </aside>
       <main className="main" id="main">
-        <Page me={me} />
+        <Page me={me} reloadMe={reloadMe} />
       </main>
     </div>
   );
@@ -105,5 +105,5 @@ export default function App() {
   if (state.kind === 'setup') return <Setup onDone={(u, p) => { setPrefill({ u, p }); setState({ kind: 'login' }); }} />;
   if (state.kind === 'login') return <Login prefill={prefill} onSession={() => { setPrefill(null); boot(); }} />;
   if (state.kind === 'enrol') return <Enrol onDone={boot} />;
-  return <Shell me={state.me} onSignOut={signOut} />;
+  return <Shell me={state.me} onSignOut={signOut} reloadMe={boot} />;
 }

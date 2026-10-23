@@ -215,6 +215,8 @@ func (s *Server) routes() {
 	m.HandleFunc("GET /api/auth/me", s.guard(s.me, false, false))
 	m.HandleFunc("POST /api/auth/enrol/begin", s.guard(s.enrolBegin, false, false))
 	m.HandleFunc("POST /api/auth/enrol/confirm", s.guard(s.enrolConfirm, false, false))
+	m.HandleFunc("POST /api/auth/mfa/disable", s.guard(s.mfaDisable, true, false))
+	m.HandleFunc("PUT /api/auth/policy", s.guard(s.mfaPolicy, true, true))
 	m.HandleFunc("POST /api/auth/password", s.guard(s.password, true, false))
 	m.HandleFunc("GET /api/auth/sessions", s.guard(s.sessions, true, false))
 	m.HandleFunc("DELETE /api/auth/sessions/{id}", s.guard(s.revoke, true, false))
@@ -262,7 +264,11 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	}
 	if res.Session != nil {
 		s.setCookie(w, res.Session)
-		JSON(w, 200, map[string]any{"status": "enrol", "csrf": res.Session.CSRF})
+		status := "ok"
+		if res.Session.NeedsEnrol {
+			status = "enrol"
+		}
+		JSON(w, 200, map[string]any{"status": status, "csrf": res.Session.CSRF})
 		return
 	}
 	JSON(w, 200, map[string]any{"status": "mfa", "ticket": res.MFATicket})
@@ -299,7 +305,7 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request, c *Ctx) {
 
 func (s *Server) me(w http.ResponseWriter, r *http.Request, c *Ctx) {
 	JSON(w, 200, map[string]any{"user": c.User, "csrf": c.Session.CSRF, "needs_enrol": c.Session.NeedsEnrol,
-		"mfa": c.Session.MFA, "recovery_left": s.Auth.RecoveryCodesLeft(c.User.ID)})
+		"mfa": c.Session.MFA, "recovery_left": s.Auth.RecoveryCodesLeft(c.User.ID), "mfa_required": s.Auth.MFARequired()})
 }
 
 func (s *Server) enrolBegin(w http.ResponseWriter, r *http.Request, c *Ctx) {
@@ -333,6 +339,43 @@ func (s *Server) enrolConfirm(w http.ResponseWriter, r *http.Request, c *Ctx) {
 	// The session that proved the code is now a full session.
 	s.Auth.MarkMFA(c.Session.ID)
 	JSON(w, 200, map[string]any{"recovery_codes": codes})
+}
+
+func (s *Server) mfaDisable(w http.ResponseWriter, r *http.Request, c *Ctx) {
+	var in struct {
+		Password string `json:"password"`
+		Code     string `json:"code"`
+	}
+	if !Decode(w, r, &in) {
+		return
+	}
+	if err := s.Auth.DisableTOTP(c.User.ID, in.Password, strings.TrimSpace(in.Code)); err != nil {
+		if errors.Is(err, auth.ErrInvalid) {
+			Error(w, http.StatusBadRequest, "the password or code did not match")
+		} else {
+			Error(w, http.StatusBadRequest, err.Error())
+		}
+		return
+	}
+	JSON(w, 200, map[string]string{"status": "ok"})
+}
+
+func (s *Server) mfaPolicy(w http.ResponseWriter, r *http.Request, c *Ctx) {
+	var in struct {
+		Require bool `json:"require_mfa"`
+	}
+	if !Decode(w, r, &in) {
+		return
+	}
+	if in.Require && !c.User.TOTPEnabled {
+		Error(w, http.StatusBadRequest, "turn on two-step sign-in for your own account first, so you are not locked out")
+		return
+	}
+	if err := s.Auth.SetMFARequired(in.Require); err != nil {
+		Error(w, 500, "could not save")
+		return
+	}
+	JSON(w, 200, map[string]string{"status": "ok"})
 }
 
 type passReq struct {

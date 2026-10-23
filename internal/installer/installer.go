@@ -54,6 +54,8 @@ type Request struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 	Timezone string `json:"timezone"`
+	// RequireMFA makes two-step sign-in mandatory for every account. Off by default.
+	RequireMFA bool `json:"require_mfa"`
 }
 
 // Step is one stage of the installation.
@@ -377,7 +379,11 @@ func (in *Installer) plan(r Request) []step {
 			if err := in.chroot("", "install", "-d", "-o", "gatehouse", "-g", "gatehouse", "-m", "750", "/var/lib/gatehouse"); err != nil {
 				return err
 			}
-			if err := in.chroot(r.Password+"\n", "/usr/local/bin/gatehouse", "user", "add", "-data", "/var/lib/gatehouse", "-name", r.Username); err != nil {
+			args := []string{"/usr/local/bin/gatehouse", "user", "add", "-data", "/var/lib/gatehouse", "-name", r.Username}
+			if r.RequireMFA {
+				args = append(args, "-require-mfa")
+			}
+			if err := in.chroot(r.Password+"\n", args...); err != nil {
 				return err
 			}
 			return in.chroot("", "chown", "-R", "gatehouse:gatehouse", "/var/lib/gatehouse")

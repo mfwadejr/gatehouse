@@ -226,6 +226,7 @@ func userCmd(args []string) {
 	fs := flag.NewFlagSet("user", flag.ExitOnError)
 	data := fs.String("data", "/var/lib/gatehouse", "data directory")
 	name := fs.String("name", "", "account name")
+	requireMFA := fs.Bool("require-mfa", false, "require two-step sign-in for every account")
 	fs.Parse(args[1:])
 	if *name == "" {
 		log.Fatal("user: -name is required")
@@ -248,6 +249,11 @@ func userCmd(args []string) {
 		log.Fatalf("user: %v", err)
 	}
 	svc := auth.New(db, box)
+	if *requireMFA {
+		if err := svc.SetMFARequired(true); err != nil {
+			log.Fatalf("user: %v", err)
+		}
+	}
 	switch args[0] {
 	case "add":
 		if _, err := svc.CreateUser(*name, pw, "admin"); err != nil {
@@ -289,12 +295,7 @@ func runInstaller(args []string) {
 	}
 	srv := &installer.Server{In: installer.New(), Code: code, Web: staticHandler()}
 	_, port, _ := net.SplitHostPort(*addr)
-	go func() { // keep the on-screen message current as addresses appear
-		for {
-			showBanner(code, installer.Addresses(port))
-			time.Sleep(10 * time.Second)
-		}
-	}()
+	go installer.RunScreen(code, port)
 	go http.ListenAndServe(":80", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := r.Host
 		if i := strings.LastIndex(h, ":"); i >= 0 {
@@ -304,27 +305,4 @@ func runInstaller(args []string) {
 	}))
 	hs := &http.Server{Addr: *addr, Handler: srv.Handler(), ReadHeaderTimeout: 10 * time.Second}
 	log.Fatal(hs.ListenAndServeTLS(cert, key))
-}
-
-func showBanner(code string, urls []string) {
-	var sb strings.Builder
-	sb.WriteString("\033[2J\033[H\n  GATEHOUSE INSTALLER\n  -------------------\n\n")
-	if len(urls) == 0 {
-		sb.WriteString("  Waiting for a network connection...\n  Plug a network cable into this machine.\n\n")
-	} else {
-		sb.WriteString("  On another computer on the same network, open:\n\n")
-		for _, u := range urls {
-			sb.WriteString("      " + u + "\n")
-		}
-		sb.WriteString("\n  (your browser will warn about the certificate; that is expected)\n\n")
-	}
-	sb.WriteString("  Installer code:   " + code + "\n\n  Nothing is changed on this machine's disks until you confirm in the browser.\n")
-	for _, tty := range []string{"/dev/tty1", "/dev/console"} {
-		if f, err := os.OpenFile(tty, os.O_WRONLY, 0); err == nil {
-			f.WriteString(sb.String())
-			f.Close()
-			return
-		}
-	}
-	fmt.Print(sb.String())
 }
