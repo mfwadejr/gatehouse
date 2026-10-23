@@ -51,8 +51,10 @@ type State struct {
 	Error   string        `json:"error,omitempty"`
 	Since   time.Time     `json:"since"`
 	Active  bool          `json:"active"` // carrying traffic now
-	fails   int
-	succ    int
+	// Via names the connections a group is using right now (groups only; their key starts with "group:").
+	Via   []string `json:"via,omitempty"`
+	fails int
+	succ  int
 }
 
 // Nexthop is one entry of the default route.
@@ -121,6 +123,7 @@ func Plan(links []Link, st map[string]*State, mode Mode) []Nexthop {
 type Monitor struct {
 	Links   []Link
 	Mode    Mode
+	Groups  []Group
 	Checker Checker
 	Router  Router
 	// OnChange is called when a link goes up or down or the active set changes.
@@ -129,6 +132,7 @@ type Monitor struct {
 	mu     sync.Mutex
 	states map[string]*State
 	active []Nexthop
+	gact   map[string][]Nexthop
 	now    func() time.Time
 }
 
@@ -157,6 +161,25 @@ func (m *Monitor) snapshotLocked() map[string]State {
 		s := *m.states[l.Name]
 		s.Active = on[l.Dev] && s.Up
 		out[l.Name] = s
+	}
+	devName := map[string]string{}
+	for _, l := range m.Links {
+		devName[l.Dev] = l.Name
+	}
+	for _, g := range m.Groups {
+		plan, seen := m.gact[g.Name]
+		st := State{Up: len(plan) > 0, Since: m.now(), Active: len(plan) > 0}
+		for _, nh := range plan {
+			st.Via = append(st.Via, devName[nh.Dev])
+		}
+		if seen && len(plan) == 0 {
+			if g.Block {
+				st.Error = "No connection in this group works. Its devices are cut off until one comes back."
+			} else {
+				st.Error = "No connection in this group works. Its devices are using the default connections."
+			}
+		}
+		out["group:"+g.Name] = st
 	}
 	return out
 }
@@ -197,20 +220,45 @@ func (m *Monitor) Observe(l Link, rtt time.Duration, err error) {
 func (m *Monitor) replan(force bool) {
 	m.mu.Lock()
 	plan := Plan(m.Links, m.states, m.Mode)
-	same := fmt.Sprint(plan) == fmt.Sprint(m.active)
-	if !same {
+	mainChanged := fmt.Sprint(plan) != fmt.Sprint(m.active)
+	if mainChanged {
 		m.active = plan
+	}
+	if m.gact == nil {
+		m.gact = map[string][]Nexthop{}
+	}
+	type gchange struct {
+		g  Group
+		nh []Nexthop
+	}
+	var gch []gchange
+	for _, g := range m.Groups {
+		gp := GroupPlan(g, m.Links, m.states)
+		old, seen := m.gact[g.Name]
+		if !seen || fmt.Sprint(gp) != fmt.Sprint(old) {
+			m.gact[g.Name] = gp
+			gch = append(gch, gchange{g, gp})
+		}
 	}
 	snap := m.snapshotLocked()
 	m.mu.Unlock()
-	if !same && len(plan) > 0 {
+	if mainChanged && len(plan) > 0 {
 		if err := m.Router.SetDefault(plan); err != nil {
 			m.mu.Lock()
 			m.active = nil // try again on the next observation
 			m.mu.Unlock()
 		}
 	}
-	if (force || !same) && m.OnChange != nil {
+	if gr, ok := m.Router.(GroupRouter); ok {
+		for _, c := range gch {
+			if err := gr.SetTable(c.g.Table, c.nh, c.g.Block); err != nil {
+				m.mu.Lock()
+				delete(m.gact, c.g.Name) // try again on the next observation
+				m.mu.Unlock()
+			}
+		}
+	}
+	if (force || mainChanged || len(gch) > 0) && m.OnChange != nil {
 		m.OnChange(snap)
 	}
 }
@@ -229,6 +277,16 @@ func (m *Monitor) Refresh() error {
 		}
 		if err := m.Router.EnsureLink(l, gw); err != nil {
 			errs = append(errs, err)
+		}
+	}
+	if gr, ok := m.Router.(GroupRouter); ok {
+		if err := gr.Prune(m.Groups); err != nil {
+			errs = append(errs, err)
+		}
+		for _, g := range m.Groups {
+			if err := gr.SyncRules(g); err != nil {
+				errs = append(errs, err)
+			}
 		}
 	}
 	m.replan(true)

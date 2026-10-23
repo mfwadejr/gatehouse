@@ -40,6 +40,7 @@ Commands:
   daemon     run the DNS, DHCP and console services
   netd       run the privileged network helper (firewall, interfaces, WAN monitor)
   installer  run the installer (on the live USB image only)
+  textinstaller  run the text-mode installer (boot menu: text / serial console)
   user       add an administrator or reset a password (run on the device itself)
   seed       store the network chosen in the installer (used by the installer)
   rollback   undo a firewall or network change that was not confirmed (started automatically)
@@ -61,6 +62,11 @@ func main() {
 		runNetd(os.Args[2:])
 	case "installer":
 		runInstaller(os.Args[2:])
+	case "textinstaller":
+		installer.PinMemory()
+		if err := installer.RunTextInstaller(); err != nil {
+			log.Fatalf("textinstaller: %v", err)
+		}
 	case "screen":
 		installer.RunStatus("443")
 	case "user":
@@ -282,6 +288,7 @@ func userCmd(args []string) {
 // runInstaller serves the installer console from the live image. The one-time code is shown
 // only on this machine's screen.
 func runInstaller(args []string) {
+	installer.PinMemory()
 	fs := flag.NewFlagSet("installer", flag.ExitOnError)
 	addr := fs.String("addr", ":443", "HTTPS listen address")
 	fs.Parse(args)

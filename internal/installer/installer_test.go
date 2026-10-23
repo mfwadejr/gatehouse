@@ -51,7 +51,7 @@ func newTest(t *testing.T) (*Installer, *fake) {
 	old := PortExists
 	PortExists = func(n string) bool { return n == "enp1s0" || n == "enp2s0" || n == "enp3s0" }
 	t.Cleanup(func() { PortExists = old })
-	in := &Installer{R: f, Target: t.TempDir(), Squash: "/live/fs.squashfs", EFI: func() bool { return true }}
+	in := &Installer{R: f, Target: t.TempDir(), Squash: "/live/fs.squashfs", EFI: func() bool { return true }, RebootFn: func() {}}
 	os.MkdirAll(filepath.Join(in.Target, "etc"), 0o755)
 	return in, f
 }

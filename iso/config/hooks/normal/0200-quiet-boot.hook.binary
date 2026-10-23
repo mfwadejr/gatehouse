@@ -33,6 +33,7 @@ if [ -f binary/isolinux/live.cfg ]; then
 		SAFE=$(echo "$A" | sed 's/ splash//')
 		cat > binary/isolinux/isolinux.cfg <<CFG
 path
+serial 0 115200
 prompt 0
 noescape 1
 timeout 40
@@ -72,6 +73,17 @@ label basic
   linux $K
   initrd $I
   append $SAFE $EXTRA nomodeset
+
+label text
+  menu label Install Gatehouse (text mode / serial console)
+  text help
+  Text-only installer for screens that will not show the graphical one,
+  and for machines with no screen. Also on serial port 1 (COM1) at
+  115200 baud, 8 data bits, no parity, 1 stop bit, no flow control.
+  endtext
+  linux $K
+  initrd $I
+  append $SAFE $EXTRA nomodeset gatehouse.text console=tty0 console=ttyS0,115200n8
 CFG
 	fi
 fi
@@ -100,6 +112,10 @@ fi
 set gfxmode=auto
 set gfxpayload=keep
 terminal_output gfxterm
+if serial --unit=0 --speed=115200 --word=8 --parity=no --stop=1; then
+  terminal_input console serial
+  terminal_output gfxterm serial
+fi
 set theme=/boot/grub/theme/theme.txt
 
 menuentry "Install Gatehouse" {
@@ -108,6 +124,10 @@ menuentry "Install Gatehouse" {
 }
 menuentry "Install Gatehouse (basic graphics)" {
   linux $SAFE $EXTRA nomodeset
+  initrd $I
+}
+menuentry "Install Gatehouse (text mode / serial console: 115200 baud, 8N1)" {
+  linux $SAFE $EXTRA nomodeset gatehouse.text console=tty0 console=ttyS0,115200n8
   initrd $I
 }
 CFG

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { del, put, useData } from '../api.js';
 import ApplyBar from '../ApplyBar.jsx';
+import WanGroups, { Traffic } from './WanGroups.jsx';
 import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, ToggleRow, useAction, fmt } from '../ui.jsx';
 
 const TYPES = [
@@ -183,7 +184,7 @@ export default function Internet({ me }) {
 
       {wans.length > 0 || !isNew ? (
         <Card title="Internet connections" actions={<Button icon="plus" onClick={() => setEdit({})}>Add connection</Button>}
-          desc={wans.length > 1 ? 'The connection at the top is used first. If it stops working, Gatehouse switches to the next one automatically.' : undefined}>
+          desc={wans.length > 1 ? 'Choose how these share the work, or send certain devices through specific ones, in Connection groups below.' : undefined}>
           {wans.length === 0 ? <Empty>No connection yet.</Empty> : (
             <div className="list">
               {wans.map((w) => {
@@ -204,15 +205,11 @@ export default function Internet({ me }) {
               })}
             </div>
           )}
-          {wans.filter((w) => w.enabled).length > 1 && (
-            <div className="stack">
-              <strong>When there is more than one connection</strong>
-              <Segmented value={wd.mode} onChange={(m) => run(() => put('/api/net/mode', { mode: m })).then(all)}
-                options={[{ value: 'failover', label: 'Use one, switch if it fails' }, { value: 'balance', label: 'Share the load' }]} />
-            </div>
-          )}
         </Card>
       ) : null}
+
+      <WanGroups wans={wans} links={links} onChanged={all} />
+      <Traffic wans={wans} links={links} />
 
       {(ifs?.length > 0 || !isNew) && (
         <Card title="Your networks and ports" actions={<Button icon="plus" onClick={() => setEditIf({})}>Add port or VLAN</Button>}

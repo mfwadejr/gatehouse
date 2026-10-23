@@ -217,3 +217,13 @@ textarea.in { height: auto; padding: var(--space-2-5) var(--component-input-padd
 .tc-x { display: flex; justify-content: space-between; margin-left: 3.25rem; }
 .tc-legend { display: flex; align-items: center; gap: var(--space-2); margin-left: 3.25rem; }
 .tc-legend .swatch { width: 0.75rem; height: 0.25rem; border-radius: var(--radius-full); background: var(--color-chart-series-1); }
+
+/* connection groups and traffic */
+.wg-traffic { display: flex; flex-direction: column; gap: var(--space-2); padding-bottom: var(--space-3); border-bottom: var(--border-width-thin) solid var(--color-border-default); }
+.wg-traffic:last-child { border-bottom: 0; padding-bottom: 0; }
+.wg-head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
+.wg-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: var(--space-4); }
+.wg-member { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); border: var(--border-width-thin) solid var(--color-border-default); border-radius: var(--radius-lg); background: var(--color-bg-inset); }
+.wg-member .grow { flex: 1; }
+.wg-rank { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; border-radius: var(--radius-full); background: var(--color-bg-surface); font-size: var(--font-size-sm); font-weight: 600; }
+.wg-pct { width: 5rem; }

@@ -36,4 +36,4 @@ Layout: `cmd/gatehouse` (the program), `internal/` (DNS, DHCP, firewall, network
 
 ## Status
 
-Early. DNS, DHCP, firewall, internet connections, the console and the installer are written and tested in isolation; the image build is new. VPN (WireGuard and OpenVPN) and UPnP are specified in `docs/SPEC.md` and not built yet.
+Early. DNS, DHCP, firewall, internet connections, the console and the installer are written and tested in isolation; the image build is new. VPN (WireGuard and OpenVPN), connection groups and a text-mode installer (`docs/TEXT-INSTALL.md`) are built; UPnP is specified in `docs/SPEC.md` and not built yet.

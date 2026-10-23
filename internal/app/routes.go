@@ -298,4 +298,6 @@ func (a *App) registerRoutes() {
 	a.registerDHCPRoutes()
 	a.registerFWRoutes()
 	a.registerNetRoutes()
+	a.registerGroupRoutes()
+	a.registerTrafficRoutes()
 }

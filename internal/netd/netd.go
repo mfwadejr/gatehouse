@@ -20,7 +20,33 @@ type Plan struct {
 	Config  netcfg.Config `json:"config"`
 	Mode    string        `json:"mode"` // failover or balance
 	Links   []LinkSpec    `json:"links"`
+	Groups  []GroupSpec   `json:"groups,omitempty"`
 	Seconds int           `json:"seconds"`
+}
+
+// GroupSpec is a named set of connections that chosen sources use instead of the default.
+type GroupSpec struct {
+	Name    string        `json:"name"`
+	Table   int           `json:"table"`
+	Prio    int           `json:"prio"`
+	Mode    string        `json:"mode"`
+	Block   bool          `json:"block"`
+	Members []GroupMember `json:"members"`
+	Sources []string      `json:"sources"`
+}
+
+// GroupMember is one connection in a group; the order of the list is the failover order.
+type GroupMember struct {
+	Link   string `json:"link"`
+	Weight int    `json:"weight"`
+}
+
+func (g GroupSpec) group() wanmon.Group {
+	out := wanmon.Group{Name: g.Name, Table: g.Table, Prio: g.Prio, Mode: wanmon.Mode(g.Mode), Block: g.Block, Sources: g.Sources}
+	for _, m := range g.Members {
+		out.Members = append(out.Members, wanmon.Member{Link: m.Link, Weight: m.Weight})
+	}
+	return out
 }
 
 // LinkSpec is the serialisable form of wanmon.Link.
@@ -45,15 +71,16 @@ func (s LinkSpec) link() wanmon.Link {
 }
 
 type monitorFile struct {
-	Mode  string     `json:"mode"`
-	Links []LinkSpec `json:"links"`
+	Mode   string      `json:"mode"`
+	Links  []LinkSpec  `json:"links"`
+	Groups []GroupSpec `json:"groups,omitempty"`
 }
 
 // Service ties the installer and the monitor together.
 type Service struct {
 	Inst     *netcfg.Installer
 	StateDir string
-	NewMon   func(links []wanmon.Link, mode wanmon.Mode) *wanmon.Monitor
+	NewMon   func(links []wanmon.Link, mode wanmon.Mode) *wanmon.Monitor // groups are set on the result
 
 	VPN *VPN
 	// Log follows the kernel log for firewall decisions.
@@ -111,7 +138,7 @@ func (s *Service) runLocked(mf *monitorFile) {
 		s.running.Wait()
 		s.cancel, s.mon = nil, nil
 	}
-	if mf == nil || len(mf.Links) < 2 || s.root == nil {
+	if mf == nil || len(mf.Links) == 0 || (len(mf.Links) < 2 && len(mf.Groups) == 0) || s.root == nil {
 		return // one connection needs no monitor; systemd-networkd owns its route
 	}
 	links := make([]wanmon.Link, len(mf.Links))
@@ -123,6 +150,9 @@ func (s *Service) runLocked(mf *monitorFile) {
 		mode = wanmon.Balance
 	}
 	m := s.NewMon(links, mode)
+	for _, g := range mf.Groups {
+		m.Groups = append(m.Groups, g.group())
+	}
 	ctx, cancel := context.WithCancel(s.root)
 	s.cancel, s.mon = cancel, m
 	s.running.Add(1)
@@ -160,12 +190,27 @@ func validateLinks(ls []LinkSpec) error {
 	return nil
 }
 
+func validateGroups(p Plan) error {
+	var gs []wanmon.Group
+	var ls []wanmon.Link
+	for _, l := range p.Links {
+		ls = append(ls, l.link())
+	}
+	for _, g := range p.Groups {
+		gs = append(gs, g.group())
+	}
+	return wanmon.ValidateGroups(gs, ls)
+}
+
 // Apply validates the plan, installs it and starts the confirmation window.
 func (s *Service) Apply(p Plan, window time.Duration) (string, time.Time, error) {
 	if p.Mode != "failover" && p.Mode != "balance" {
 		return "", time.Time{}, errors.New("mode must be failover or balance")
 	}
 	if err := validateLinks(p.Links); err != nil {
+		return "", time.Time{}, err
+	}
+	if err := validateGroups(p); err != nil {
 		return "", time.Time{}, err
 	}
 	if err := p.Config.Validate(); err != nil {
@@ -181,7 +226,7 @@ func (s *Service) Apply(p Plan, window time.Duration) (string, time.Time, error)
 	if err != nil {
 		return "", time.Time{}, err
 	}
-	s.staged = &monitorFile{Mode: p.Mode, Links: p.Links}
+	s.staged = &monitorFile{Mode: p.Mode, Links: p.Links, Groups: p.Groups}
 	// Run the monitor against the new links right away so failures show up during the window.
 	s.runLocked(s.staged)
 	return tok, dl, nil

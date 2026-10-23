@@ -1,13 +1,20 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { get, post, setInstallCode } from '../api.js';
-import { Button, Card, Field, Icon, Input, Note, Pill, Segmented, Select, Bar, ToggleRow } from '../ui.jsx';
+import { Button, Card, Field, Icon, Input, Note, Pill, Segmented, Select, Bar, ToggleRow, enterToPrimary } from '../ui.jsx';
 
 const gb = (n) => `${Math.round(n / 1e9)} GB`;
 
 function Shell({ title, children, step }) {
+  const ref = useRef(null);
+  // Enter does what the green button does, even when the pointer is resting on it and nothing is focused.
+  useEffect(() => {
+    const on = (e) => enterToPrimary(e, ref.current);
+    document.addEventListener('keydown', on);
+    return () => document.removeEventListener('keydown', on);
+  }, []);
   return (
     <main className="auth">
-      <section className="card" style={{ width: 'min(100%, 40rem)' }}>
+      <section className="card" ref={ref} style={{ width: 'min(100%, 40rem)' }}>
         <div className="brand" style={{ padding: 0 }}><Icon name="logo" size={24} /><span>Gatehouse installer</span></div>
         {step && <div className="small muted">Step {step} of 5</div>}
         <h1>{title}</h1>
@@ -15,6 +22,12 @@ function Shell({ title, children, step }) {
       </section>
     </main>
   );
+}
+
+function pwHint(p) {
+  if (!p) return 'At least 12 characters. Several unrelated words in a row works well.';
+  if (p.length < 12) return `${p.length} of 12 characters. ${12 - p.length} more needed.`;
+  return 'Long enough.';
 }
 
 const baseAddr = (cidr) => (cidr || '').split('/')[0];
@@ -197,6 +210,7 @@ export default function Installer({ info }) {
   const [zones, setZones] = useState(['UTC']);
   const [f, setF] = useState({ disk: '', confirm: '', hostname: 'gatehouse', username: 'admin', password: '', again: '', timezone: 'UTC', require_mfa: false, network: { lan: { port: '', mode: '', address: '', addressing: 'dhcp', static: '', gateway: '', dns: '' }, wan: null, bridge: [] } });
   const [status, setStatus] = useState(null);
+  const [restarting, setRestarting] = useState(0);
   const poll = useRef(null);
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
 
@@ -229,6 +243,7 @@ export default function Installer({ info }) {
     return () => clearInterval(poll.current);
   }, [step]);
 
+  if (restarting) return <Restarting f={f} since={restarting} />;
   const disk = disks.find((d) => d.path === f.disk);
   const pwOK = f.password.length >= 12 && f.password === f.again;
 
@@ -267,9 +282,16 @@ export default function Installer({ info }) {
         <Field label="Name of this device" hint="Shown on your network, for example gatehouse"><Input value={f.hostname} onChange={set('hostname')} /></Field>
         <Field label="Time zone"><Select value={f.timezone} onChange={set('timezone')} options={zones} /></Field>
         <Field label="Administrator name"><Input value={f.username} onChange={set('username')} autoComplete="username" /></Field>
-        <Field label="Password" hint="At least 12 characters. A few random words works well."><Input type="password" value={f.password} onChange={set('password')} autoComplete="new-password" /></Field>
-        <Field label="Password again" hint={f.again && f.again !== f.password ? 'These do not match.' : undefined}><Input type="password" value={f.again} onChange={set('again')} autoComplete="new-password" /></Field>
+        <Field label="Password" hint={pwHint(f.password)}><Input type="password" value={f.password} onChange={set('password')} autoComplete="new-password" /></Field>
+        <Field label="Password again" hint={f.again && f.again !== f.password ? 'These do not match yet.' : undefined}><Input type="password" value={f.again} onChange={set('again')} autoComplete="new-password" /></Field>
         <ToggleRow title="Require two-step sign-in" desc="Optional. Asks for a code from an authenticator app each time you sign in, and sets it up the first time. You can turn this on or off later in Settings." checked={f.require_mfa} onChange={set('require_mfa')} />
+        {!pwOK && f.password.length > 0 && (
+          <Note tone="warn" title={f.password.length < 12 ? `The password is too short: ${f.password.length} of the 12 characters needed` : 'The two passwords are different'}>
+            {f.password.length < 12
+              ? `Add ${12 - f.password.length} more character${12 - f.password.length > 1 ? 's' : ''}. Several unrelated words in a row is easy to remember and long enough.`
+              : 'Type the same password in both boxes.'}
+          </Note>
+        )}
         <div className="actions"><Button onClick={() => setStep(1)}>Back</Button><Button kind="primary" disabled={!pwOK || !f.hostname || !f.username} onClick={() => setStep(3)}>Next</Button></div>
       </Shell>
     );
@@ -300,9 +322,55 @@ export default function Installer({ info }) {
       {status?.state === 'error' && <><Note tone="bad">{status.error}</Note><pre className="card mono" style={{ margin: 0, whiteSpace: 'pre-wrap', maxHeight: '16rem', overflow: 'auto' }}>{status.log}</pre><div className="actions"><Button onClick={() => setStep(4)}>Try again</Button></div></>}
       {status?.state === 'done' && (
         <>
-          <Note tone="good" title="Gatehouse is installed.">Remove the USB stick, then restart. {afterInstall(f)}</Note>
-          <div className="actions"><Button kind="primary" onClick={async () => { try { await post('/api/install/reboot'); } catch { /* going down */ } }}>Restart now</Button></div>
+          <Note tone="good" title="Gatehouse is installed.">Click Restart, then take the USB stick out when the screen goes blank. {afterInstall(f)}</Note>
+          <div className="actions"><Button kind="primary" onClick={async () => { try { await post('/api/install/reboot'); } catch { /* going down */ } setRestarting(Date.now()); }}>Restart now</Button></div>
         </>
+      )}
+    </Shell>
+  );
+}
+
+const BOOT_SECONDS = 75; // about how long a restart takes before the console answers
+
+// The address Gatehouse will have after the restart, when it is known in advance.
+function targetAddress(f) {
+  const n = f.network;
+  if (n.lan.mode === 'router') return baseAddr(n.lan.address);
+  if (n.lan.addressing === 'static') return baseAddr(n.lan.static);
+  return '';
+}
+
+// Shown after Restart: counts the minute the machine needs, tells the person to pull the stick,
+// and sends the browser to the new console as soon as it answers.
+function Restarting({ f, since }) {
+  const [now, setNow] = useState(Date.now());
+  const target = targetAddress(f);
+  const url = target ? `https://${target}/` : '';
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 500); return () => clearInterval(t); }, []);
+  useEffect(() => {
+    if (!url) return undefined;
+    let live = true;
+    const probe = async () => {
+      try { await fetch(`${url}api/health`, { mode: 'no-cors', cache: 'no-store' }); if (live) window.location.href = url; } catch { /* not up yet, or the certificate is not accepted yet */ }
+    };
+    const t = setInterval(probe, 3000);
+    return () => { live = false; clearInterval(t); };
+  }, [url]);
+  const s = Math.max(0, (now - since) / 1000);
+  const left = Math.max(0, Math.ceil(BOOT_SECONDS - s));
+  const phase = s < 10 ? 'Restarting this machine…' : left > 0 ? 'Starting Gatehouse…' : 'Still starting. This can take a little longer the first time.';
+  return (
+    <Shell title="Restarting">
+      <Bar pct={Math.min(95, (100 * s) / BOOT_SECONDS)} />
+      <p className="sec"><strong>{phase}</strong>{left > 0 ? ` About ${left} second${left === 1 ? '' : 's'} to go.` : ''}</p>
+      {s < 40 && <Note tone="warn" title="Take the USB stick out now">If it stays in, the machine may start the installer again instead of Gatehouse.</Note>}
+      {url ? (
+        <>
+          <p className="sec">This page opens Gatehouse by itself as soon as it is ready. If your network gives out addresses through Gatehouse, unplug and replug the cable on this computer so it gets a new one. Your browser will warn about the certificate the first time. That is expected: choose to continue.</p>
+          <div className="actions"><a className="btn primary" href={url}>Open {url.replace('https://', '').replace('/', '')} now</a></div>
+        </>
+      ) : (
+        <p className="sec">Gatehouse gets its address from your router. When it has started, the address appears on this machine&apos;s screen. Open it and sign in as <strong>{f.username}</strong>.</p>
       )}
     </Shell>
   );

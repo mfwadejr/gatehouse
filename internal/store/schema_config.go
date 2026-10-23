@@ -328,4 +328,29 @@ CREATE TABLE vpn_routes(
   label TEXT NOT NULL DEFAULT '',
   UNIQUE(tunnel, kind, value)
 );
+`, `
+-- Named sets of internet connections. The Default set is implicit: every connection, in the
+-- order and shares kept on wan_links. These are the extra sets that chosen sources use instead.
+CREATE TABLE wan_groups(
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  mode TEXT NOT NULL DEFAULT 'failover',     -- failover or balance
+  fallback TEXT NOT NULL DEFAULT 'default',  -- when nothing in the set works: default or block
+  position INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE wan_group_members(
+  group_id INTEGER NOT NULL REFERENCES wan_groups(id) ON DELETE CASCADE,
+  wan_id INTEGER NOT NULL REFERENCES wan_links(id) ON DELETE CASCADE,
+  position INTEGER NOT NULL DEFAULT 0,
+  weight INTEGER NOT NULL DEFAULT 50,
+  PRIMARY KEY(group_id, wan_id)
+);
+CREATE TABLE wan_group_routes(
+  id INTEGER PRIMARY KEY,
+  group_id INTEGER NOT NULL REFERENCES wan_groups(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,   -- network, device, cidr
+  value TEXT NOT NULL,
+  label TEXT NOT NULL DEFAULT '',
+  UNIQUE(group_id, kind, value)
+);
 `}

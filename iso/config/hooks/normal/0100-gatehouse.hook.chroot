@@ -20,6 +20,7 @@ printf 'nameserver 127.0.0.1\n' > /etc/resolv.conf
 
 # Services: the live image runs the installer, an installed system runs the appliance.
 systemctl enable gatehouse-installer.service
+systemctl enable gatehouse-text-installer.service
 systemctl enable gatehouse-netd.service
 systemctl enable gatehouse.service
 systemctl enable nftables.service 2>/dev/null || true

@@ -147,3 +147,78 @@ func TestNetnsFailoverWithRealRoutesAndICMP(t *testing.T) {
 	sh(t, "gwisp1", "ip addr add 192.0.2.7/32 dev lo")
 	waitFor("return to fibre", "dev eth0", 6*time.Second)
 }
+
+func TestNetnsGroupSendsSourcesThroughChosenLink(t *testing.T) {
+	needRoot(t)
+	nss := []string{"grrouter", "grisp1", "grisp2", "grlan"}
+	clean := func() {
+		for _, n := range nss {
+			exec.Command("ip", "netns", "del", n).Run()
+		}
+	}
+	clean()
+	t.Cleanup(clean)
+	for _, n := range nss {
+		sh(t, "", "ip netns add "+n)
+		sh(t, n, "ip link set lo up")
+	}
+	legs := []struct{ peer, rif, rip, pip string }{
+		{"grisp1", "eth0", "203.0.113.2/24", "203.0.113.1/24"},
+		{"grisp2", "eth1", "198.51.100.2/24", "198.51.100.1/24"},
+		{"grlan", "eth2", "192.168.1.1/24", "192.168.1.50/24"},
+	}
+	for i, g := range legs {
+		a, b := fmt.Sprintf("gg-r%d", i), fmt.Sprintf("gg-p%d", i)
+		sh(t, "", fmt.Sprintf("ip link add %s type veth peer name %s && ip link set %s netns grrouter name %s && ip link set %s netns %s name eth0", a, b, a, g.rif, b, g.peer))
+		sh(t, "grrouter", fmt.Sprintf("ip addr add %s dev %s && ip link set %s up", g.rip, g.rif, g.rif))
+		sh(t, g.peer, fmt.Sprintf("ip addr add %s dev eth0 && ip link set eth0 up", g.pip))
+	}
+	for _, isp := range []string{"grisp1", "grisp2"} {
+		sh(t, isp, "ip addr add 192.0.2.7/32 dev lo")
+	}
+	sh(t, "grrouter", "echo 1 > /proc/sys/net/ipv4/ip_forward")
+	sh(t, "grrouter", "ip route add default via 203.0.113.1 dev eth0 table 100 && ip route add default via 198.51.100.1 dev eth1 table 101")
+	// A stale rule from an earlier group must be cleaned up.
+	sh(t, "grrouter", "ip rule add from 10.9.9.0/24 lookup 325 priority 1305")
+
+	ls := []Link{
+		{Name: "Fibre", Dev: "eth0", Priority: 1, Weight: 1, Table: 100, Mark: 0x100, Kind: "icmp", Target: "192.0.2.7", Interval: 200 * time.Millisecond, Failures: 3, Recover: 2},
+		{Name: "LTE", Dev: "eth1", Priority: 2, Weight: 1, Table: 101, Mark: 0x101, Kind: "icmp", Target: "192.0.2.7", Interval: 200 * time.Millisecond, Failures: 3, Recover: 2},
+	}
+	g := Group{Name: "Cameras", Table: 320, Prio: 1300, Mode: Failover, Sources: []string{"192.168.1.50/32"}, Members: []Member{{"LTE", 1}}}
+	m := New(ls, Failover, nsChecker{"grrouter"}, &IPRouter{Netns: "grrouter"})
+	m.Groups = []Group{g}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go m.Run(ctx)
+
+	get := func(from string) string {
+		return sh(t, "grrouter", "ip route get 8.8.8.8 from "+from+" iif eth2 | head -1")
+	}
+	wait := func(from, want string) {
+		t.Helper()
+		end := time.Now().Add(16 * time.Second)
+		var got string
+		for time.Now().Before(end) {
+			got = get(from)
+			if strings.Contains(got, want) {
+				return
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+		t.Fatalf("from %s wanted %q, got %q", from, want, got)
+	}
+	wait("192.168.1.50", "dev eth1") // the camera is pinned to LTE
+	wait("192.168.1.77", "dev eth0") // everyone else uses the default (Fibre)
+	if r := sh(t, "grrouter", "ip rule show"); strings.Contains(r, "10.9.9.0/24") {
+		t.Fatalf("stale rule survived:\n%s", r)
+	}
+	// LTE dies: with fallback to default, the camera follows the default connection.
+	sh(t, "grisp2", "ip addr del 192.0.2.7/32 dev lo")
+	wait("192.168.1.50", "dev eth0")
+	if st := m.Snapshot()["group:Cameras"]; st.Up {
+		t.Fatalf("group should be down: %+v", st)
+	}
+	sh(t, "grisp2", "ip addr add 192.0.2.7/32 dev lo")
+	wait("192.168.1.50", "dev eth1")
+}

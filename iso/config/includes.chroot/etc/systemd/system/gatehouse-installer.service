@@ -1,6 +1,7 @@
 [Unit]
 Description=Gatehouse installer
 ConditionKernelCommandLine=boot=live
+ConditionKernelCommandLine=!gatehouse.text
 After=systemd-networkd.service
 Conflicts=getty@tty1.service
 After=getty@tty1.service

@@ -238,6 +238,19 @@ export function ToastHost({ children }) {
   );
 }
 
+// ---------- Enter key ----------
+// Pressing Enter in a field, or anywhere on a dialog or step that has nothing focused, does what
+// the green button does. A focused button, link or multi-line box keeps its own Enter.
+export function enterToPrimary(e, root) {
+  if (e.key !== 'Enter' || e.defaultPrevented || e.isComposing || e.shiftKey || !root) return;
+  const t = e.target;
+  const tag = t?.tagName;
+  if (tag === 'BUTTON' || tag === 'A' || tag === 'TEXTAREA' || t?.closest?.('form')) return;
+  if (tag === 'INPUT' && ['checkbox', 'radio'].includes(t.type)) return;
+  const b = root.querySelector('.btn.primary:not([disabled])');
+  if (b) { e.preventDefault(); b.click(); }
+}
+
 // ---------- modal ----------
 export function Modal({ title, onClose, children, footer }) {
   const ref = useRef(null);
@@ -251,7 +264,7 @@ export function Modal({ title, onClose, children, footer }) {
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-label={title}>
       <div className="scrim" onClick={onClose} />
-      <div className="modal" ref={ref}>
+      <div className="modal" ref={ref} onKeyDown={(e) => enterToPrimary(e, ref.current)}>
         <h2>{title}</h2>
         {children}
         {footer && <div className="actions" style={{ justifyContent: 'flex-end' }}>{footer}</div>}

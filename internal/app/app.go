@@ -63,6 +63,7 @@ type App struct {
 	apply   applyState
 	vpn     vpnState
 	fwn     fwNames
+	traffic wanTraffic
 	setup   setupGate
 
 	netApplyState struct {
@@ -289,6 +290,7 @@ func (a *App) Run(ctx context.Context) error {
 	run(func() { a.firstBoot(ctx) })
 	run(func() { a.vpnMonitor(ctx) })
 	run(func() { a.collectFW(ctx) })
+	run(func() { a.collectTraffic(ctx) })
 
 	l, err := net.Listen("tcp", a.Cfg.WebAddr)
 	if err != nil {

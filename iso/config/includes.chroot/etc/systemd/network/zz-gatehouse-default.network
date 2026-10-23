@@ -10,5 +10,8 @@ DHCP=yes
 LinkLocalAddressing=ipv4
 
 [DHCPv4]
+# Identify by MAC address, so the installed system gets the same address from your router
+# as this installer did, instead of looking like a new device.
+ClientIdentifier=mac
 UseDNS=yes
 RouteMetric=1000

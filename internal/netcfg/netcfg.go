@@ -430,7 +430,7 @@ func Generate(c *Config) (*Output, error) {
 			f.l("\n[Route]\nGateway=%s\nMetric=%d", w.V6Gateway, metric)
 		}
 		if w.Type == "dhcp" {
-			f.l("\n[DHCPv4]\nUseDNS=no\nUseNTP=no\nUseHostname=no\nUseDomains=no\nRouteMetric=%d", metric)
+			f.l("\n[DHCPv4]\nClientIdentifier=mac\nUseDNS=no\nUseNTP=no\nUseHostname=no\nUseDomains=no\nRouteMetric=%d", metric)
 			f.l("\n[DHCPv6]\nUseDNS=no\nUseNTP=no\nUseHostname=no\nWithoutRA=solicit")
 		}
 		f.l("\n[IPv6AcceptRA]\nUseDNS=no\nRouteMetric=%d", metric)
@@ -499,7 +499,7 @@ func Generate(c *Config) (*Output, error) {
 			f.l("\n[Route]\nGateway=%s", i.Gateway)
 		}
 		if i.DHCP {
-			f.l("\n[DHCPv4]\nUseDNS=no\nUseNTP=no\nUseHostname=no\nUseDomains=no")
+			f.l("\n[DHCPv4]\nClientIdentifier=mac\nUseDNS=no\nUseNTP=no\nUseHostname=no\nUseDomains=no")
 		}
 		if i.PD && uplink != "" {
 			f.l("\n[DHCPPrefixDelegation]\nUplinkInterface=%s\nAnnounce=yes\nToken=::1", uplink)

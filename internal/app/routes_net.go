@@ -179,6 +179,9 @@ func (a *App) buildPlan(q querier) (*netd.Plan, error) {
 	if err := a.addVPNToPlan(q, p); err != nil {
 		return nil, err
 	}
+	if err := a.addGroupsToPlan(q, p); err != nil {
+		return nil, err
+	}
 	return p, nil
 }
 

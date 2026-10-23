@@ -16,6 +16,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sys/unix"
+
 	"gatehouse/internal/seed"
 )
 
@@ -78,15 +80,16 @@ type Status struct {
 
 // Installer holds the state of one installation.
 type Installer struct {
-	R       Runner
-	Target  string // mount point of the new system
-	Squash  string // path of the root filesystem image on the live medium
-	EFI     func() bool
-	Binary  string // path to the gatehouse binary, for creating the account inside the target
-	mu      sync.Mutex
-	st      Status
-	logBuf  strings.Builder
-	started bool
+	R        Runner
+	Target   string // mount point of the new system
+	Squash   string // path of the root filesystem image on the live medium
+	EFI      func() bool
+	RebootFn func() // replaces the real restart in tests
+	Binary   string // path to the gatehouse binary, for creating the account inside the target
+	mu       sync.Mutex
+	st       Status
+	logBuf   strings.Builder
+	started  bool
 }
 
 func New() *Installer {
@@ -453,9 +456,32 @@ func (in *Installer) Reboot() error {
 	if in.Status().State != "done" {
 		return errors.New("the installation has not finished")
 	}
-	go func() { time.Sleep(time.Second); in.R.Run("", "systemctl", "reboot") }()
+	go func() {
+		time.Sleep(time.Second)
+		in.sh("", "sync")
+		in.reboot()
+	}()
 	return nil
 }
+
+// reboot restarts the machine straight from the kernel. The live system runs from the USB
+// stick, and people pull the stick out as they restart; starting another program (systemctl,
+// the shutdown scripts) would then fail to load and the machine would hang on a frozen screen.
+// By now everything is written and unmounted, so nothing is lost by skipping them.
+func (in *Installer) reboot() {
+	if in.RebootFn != nil {
+		in.RebootFn()
+		return
+	}
+	unix.Sync()
+	if err := unix.Reboot(unix.LINUX_REBOOT_CMD_RESTART); err != nil {
+		in.R.Run("", "systemctl", "reboot", "--force", "--force")
+	}
+}
+
+// PinMemory keeps this program in memory, so that it still runs after the USB stick it
+// was loaded from is removed.
+func PinMemory() { unix.Mlockall(unix.MCL_CURRENT | unix.MCL_FUTURE) }
 
 // grubDefaults makes the installed machine start the way the installer did: no menu unless
 // a key is held, no kernel text, the Gatehouse splash, and nothing that names another product.
