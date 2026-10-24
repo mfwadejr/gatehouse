@@ -1,0 +1,4 @@
+// Written by Gatehouse. Switch this on the Updates page.
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "0";
+Unattended-Upgrade::Automatic-Reboot "false";

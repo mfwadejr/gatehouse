@@ -72,6 +72,10 @@ func main() {
 		}
 	case "screen":
 		installer.RunStatus("443")
+	case "update-apply":
+		updateApply()
+	case "update-build":
+		updateBuild(os.Args[2:])
 	case "recover":
 		recoverCmd(os.Args[2:])
 	case "user":
@@ -92,6 +96,7 @@ func main() {
 
 func daemon(args []string) {
 	cfg := app.DefaultConfig()
+	cfg.Version = version
 	fs := flag.NewFlagSet("daemon", flag.ExitOnError)
 	fs.StringVar(&cfg.DataDir, "data", cfg.DataDir, "directory for databases and keys")
 	fs.StringVar(&cfg.WebAddr, "web", cfg.WebAddr, "console listen address")

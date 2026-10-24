@@ -71,6 +71,22 @@ jobs:
           name: gatehouse-iso
           path: out/*
           retention-days: 14
+      - name: Sign the update package
+        # Machines that are already installed update from this, so they never need a new image.
+        # Needs the secret UPDATE_SIGNING_KEY (see docs/UPDATES.md); without it the release has only the image.
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        env:
+          KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+          VERSION: ${{ needs.binary.outputs.version }}
+        run: |
+          if [ -z "$KEY" ]; then echo "::warning::UPDATE_SIGNING_KEY is not set; this release has no update package"; exit 0; fi
+          umask 077
+          printf '%s\n' "$KEY" > "$RUNNER_TEMP/update.key"
+          chmod +x bin/gatehouse
+          git log -1 --format=%B > "$RUNNER_TEMP/notes.txt"
+          bin/gatehouse update-build -version "${VERSION}" -bin bin/gatehouse -units iso/config/includes.chroot/etc/systemd/system \
+            -key "$RUNNER_TEMP/update.key" -notes "$RUNNER_TEMP/notes.txt" -out out
+          rm -f "$RUNNER_TEMP/update.key"
       - name: Publish a release
         if: github.event_name == 'push'
         env:

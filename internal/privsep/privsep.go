@@ -33,6 +33,8 @@ type NetController interface {
 	SetSystem(hostname, zone string) error
 	WifiScan(iface string) ([]netd.WifiNetwork, error)
 	UPnPApply(ms []netd.UPnPMapping) error
+	UpdateStart(path string) error
+	OSSecurity(enabled bool) error
 }
 
 const maxRequest = 4 << 20
@@ -267,6 +269,22 @@ func (s *Server) dispatchNet(r request) (any, error) {
 			return nil, errors.New("bad parameters")
 		}
 		return nil, s.Net.UPnPApply(p.Maps)
+	case "update.start":
+		var p struct {
+			Path string `json:"path"`
+		}
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return nil, s.Net.UpdateStart(p.Path)
+	case "os.security":
+		var p struct {
+			Enabled bool `json:"enabled"`
+		}
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return nil, s.Net.OSSecurity(p.Enabled)
 	case "net.system":
 		var p struct {
 			Hostname string `json:"hostname"`
@@ -401,6 +419,16 @@ func (c *Client) WifiScan(iface string) ([]netd.WifiNetwork, error) {
 // UPnPApply replaces the set of ports opened on request by devices on the inside.
 func (c *Client) UPnPApply(ms []netd.UPnPMapping) error {
 	return c.call("net.upnp", map[string]any{"maps": ms}, nil)
+}
+
+// UpdateStart asks the helper to check and install a downloaded update.
+func (c *Client) UpdateStart(path string) error {
+	return c.call("update.start", map[string]string{"path": path}, nil)
+}
+
+// OSSecurity switches automatic operating-system security updates.
+func (c *Client) OSSecurity(enabled bool) error {
+	return c.call("os.security", map[string]bool{"enabled": enabled}, nil)
 }
 
 // FWBatch is a run of firewall events and the sequence number to ask for next.

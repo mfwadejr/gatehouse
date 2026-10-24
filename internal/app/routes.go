@@ -35,6 +35,7 @@ func (a *App) registerRoutes() {
 	a.registerVPNRoutes()
 	a.registerPortRoutes()
 	a.registerProtectRoutes()
+	a.registerUpdateRoutes()
 	s.Handle("GET /api/logs", a.logSearch)
 	s.HandleAdmin("DELETE /api/logs", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		a.QLog.Clear()

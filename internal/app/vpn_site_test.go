@@ -13,9 +13,18 @@ import (
 // siteBox starts a router with one LAN and returns a client logged in to it.
 func siteBox(t *testing.T, lan string) (*client, *fakeNet, *fakeFW) {
 	t.Helper()
+	return siteBoxWith(t, lan, nil)
+}
+
+func siteBoxWith(t *testing.T, lan string, tune func(*Config)) (*client, *fakeNet, *fakeFW) {
+	t.Helper()
 	web, dnsAddr := freeAddr(t), freeAddr(t)
 	fn, ff := &fakeNet{}, &fakeFW{}
-	a, err := New(Config{DataDir: t.TempDir(), WebAddr: web, DNSAddrs: []string{dnsAddr}, Net: fn, FW: ff})
+	cfg := Config{DataDir: t.TempDir(), WebAddr: web, DNSAddrs: []string{dnsAddr}, Net: fn, FW: ff}
+	if tune != nil {
+		tune(&cfg)
+	}
+	a, err := New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -75,3 +75,6 @@ amd64-microcode
 # Convenience on the local console
 nano
 less
+
+# Optional automatic Debian security updates (off until switched on in the console)
+unattended-upgrades

@@ -29,6 +29,9 @@ type fakeNet struct {
 	events   []netd.FWEvent
 	hostname string
 	zone     string
+
+	updatePath string
+	osSecurity bool
 }
 
 func (f *fakeNet) NetApply(p netd.Plan, w time.Duration) (string, time.Time, error) {
@@ -70,6 +73,20 @@ func (f *fakeNet) VPNStatus() (netd.VPNStatus, error) {
 
 func (f *fakeNet) WifiScan(string) ([]netd.WifiNetwork, error) {
 	return []netd.WifiNetwork{{SSID: "Home", Signal: -50, Security: "wpa2"}}, nil
+}
+
+func (f *fakeNet) UpdateStart(path string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.updatePath = path
+	return nil
+}
+
+func (f *fakeNet) OSSecurity(enabled bool) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.osSecurity = enabled
+	return nil
 }
 
 func (f *fakeNet) UPnPApply(ms []netd.UPnPMapping) error {

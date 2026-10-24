@@ -3,6 +3,7 @@ package app
 
 import (
 	"context"
+	"crypto/ed25519"
 	"fmt"
 	"log"
 	"net"
@@ -33,6 +34,12 @@ type Config struct {
 	TLSCert  string
 	TLSKey   string
 	Static   http.Handler // embedded console files
+	Version  string       // the version of this program
+	// Update settings; empty values use the real ones. Tests point these elsewhere.
+	UpdateAPI       string
+	UpdateAllowHTTP bool
+	UpdateKey       ed25519.PublicKey
+	UpdateState     string
 	// FW is the privileged firewall controller; tests inject one, production uses the helper socket.
 	FW fw.Controller
 	// Net is the privileged network controller; nil disables network editing.
@@ -67,6 +74,7 @@ type App struct {
 	upnp    upnpState
 	setupMu sync.Mutex
 	con     consoles
+	upd     updates
 
 	netApplyState struct {
 		mu     sync.Mutex
@@ -295,6 +303,7 @@ func (a *App) Run(ctx context.Context) error {
 	run(func() { a.collectFW(ctx) })
 	run(func() { a.collectTraffic(ctx) })
 	run(func() { a.runUPnP(ctx) })
+	run(func() { a.updateLoop(ctx) })
 
 	a.con.begin(ctx)
 	cs, err := a.startConsole(ctx, a.consoleAddr())
