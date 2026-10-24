@@ -162,6 +162,7 @@ export default function Wifi({ me }) {
   const { data: ifs, reload: ri } = useData('/api/net/interfaces', { topics: ['net.status'] });
   const { data: st, reload: rs } = useData('/api/net/status', { topics: ['net.status'], every: 5000 });
   const [edit, setEdit] = useState(null);
+  const [forget, setForget] = useState(null);
   const [run] = useAction();
   const cards = data?.cards || [];
   const all = () => { reload(); rw(); ri(); rs(); };
@@ -172,7 +173,7 @@ export default function Wifi({ me }) {
       for (const w of (wd?.wans || []).filter((x) => x.iface === c.iface)) await del(`/api/net/wans/${w.id}`);
       for (const i of (ifs || []).filter((x) => x.name === c.iface)) await del(`/api/net/interfaces/${i.id}`);
       return true;
-    }, 'Removed. Apply it to take effect.');
+    }, c.saved?.mode === 'ap' ? 'Removed. Apply it to take effect.' : 'Forgotten. Apply it to take effect.');
     all();
   };
 
@@ -185,12 +186,21 @@ export default function Wifi({ me }) {
         <Card key={c.iface} title={c.iface} desc={`${c.usb ? 'USB adapter' : 'Built-in card'}${c.driver ? ` · ${c.driver}` : ''}${c.caps.bands.length ? ` · ${c.caps.bands.map((b) => `${b} GHz`).join(' and ')}` : ''}`}
           actions={<>
             <Button icon="edit" small onClick={() => setEdit(c)}>{c.saved ? 'Edit' : 'Set up'}</Button>
-            {c.saved && <Button icon="trash" small onClick={() => remove(c)}>Remove</Button>}
+            {c.saved && (c.saved.mode === 'ap'
+              ? <Button icon="trash" small onClick={() => remove(c)}>Remove</Button>
+              : <Button icon="trash" small onClick={() => setForget(c)}>Forget network</Button>)}
           </>}>
           {!c.saved ? <p className="sec">Not set up. Nothing is broadcast and nothing is joined until you choose.</p> : <Live c={c} />}
           {!c.caps.ap && c.caps.bands.length > 0 && <p className="small muted">This card can join networks but cannot broadcast one.</p>}
         </Card>
       ))}
+      {forget && (
+        <Modal title={`Forget ${forget.saved.ssid}?`} onClose={() => setForget(null)}
+          footer={<><Button onClick={() => setForget(null)}>Keep it</Button><Button kind="primary" onClick={async () => { const c = forget; setForget(null); await remove(c); }}>Forget network</Button></>}>
+          <p>This card will stop using <b>{forget.saved.ssid}</b>. The saved password is deleted, and so is the internet connection that used this network. The card itself stays, ready to join a different network with Set up.</p>
+          <p className="small muted">Nothing changes until you apply it.</p>
+        </Modal>
+      )}
       {edit && <Setup card={edit} country={data?.country} wans={wd?.wans || []} ifs={ifs || []} onClose={() => setEdit(null)} onSaved={all} />}
       <ApplyBar kind="net" label="your network settings" status={st?.status} me={me} onChanged={all} />
     </Page>

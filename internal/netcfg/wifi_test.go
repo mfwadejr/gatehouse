@@ -1,8 +1,10 @@
 package netcfg
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestWifiAccessPointInBridge(t *testing.T) {
@@ -60,5 +62,43 @@ func TestWifiRejectsMistakes(t *testing.T) {
 		if _, err := Generate(c); err == nil {
 			t.Errorf("%s: expected an error", name)
 		}
+	}
+}
+
+// Changing the network a running card joins must restart it, or the old network and address stay.
+func TestChangedWifiIsRestarted(t *testing.T) {
+	e := newEnv(t)
+	e.in.WifiDir = filepath.Join(t.TempDir(), "wifi")
+	var restarted [][]string
+	e.in.Restart = func(u []string) { restarted = append(restarted, u) }
+	mk := func(ssid string) *Output {
+		c := &Config{
+			WANs: []WAN{{Name: "Phone", Iface: "wlan0", Type: "dhcp", Enabled: true, Priority: 1}},
+			Wifi: []Wifi{{Iface: "wlan0", Mode: "client", SSID: ssid, PSK: "password123", Country: "US", Enabled: true}},
+		}
+		o, err := Generate(c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return o
+	}
+	apply := func(o *Output) {
+		tok, _, err := e.in.Apply(o, time.Minute)
+		if err != nil {
+			t.Fatal(err)
+		}
+		e.in.Confirm(tok)
+	}
+	apply(mk("Home"))
+	if len(restarted) != 0 {
+		t.Fatalf("a new card is started, not restarted: %v", restarted)
+	}
+	apply(mk("Home"))
+	if len(restarted) != 0 {
+		t.Fatalf("nothing changed, yet restarted: %v", restarted)
+	}
+	apply(mk("Other"))
+	if len(restarted) != 1 || restarted[0][0] != "wifi-client:wlan0" {
+		t.Fatalf("changed network not restarted: %v", restarted)
 	}
 }

@@ -33,11 +33,15 @@ type Installer struct {
 	// Hooks for the parts that talk to systemd; replaced in tests.
 	Reload   func() error
 	Services func(start, stop []string) error
+	// Restart is told which wireless cards had their settings changed while running, so they can
+	// rejoin with the new settings and ask for a fresh address. Nil in tests.
+	Restart  func(units []string)
 	Sysctl   func(file string) error
 	Watchdog func(dir string, deadline time.Time, token string) error
 	Now      func() time.Time
 
-	mu sync.Mutex
+	mu      sync.Mutex
+	changed []string // wireless units whose files changed, until activate has acted on them
 }
 
 const filePrefix = "gatehouse-"
@@ -70,11 +74,62 @@ func NewInstaller() *Installer {
 			}
 			return nil
 		},
+		Restart: restartWifi,
 		Sysctl: func(file string) error {
 			return exec.Command("sysctl", "-p", file).Run()
 		},
 		Now: time.Now, Watchdog: StartWatchdogProcess,
 	}
+}
+
+// restartWifi makes a card that was already running use its new settings. Starting a service that
+// is already running does nothing, so without this a changed network name is never joined and the
+// old address stays.
+func restartWifi(units []string) {
+	for _, u := range units {
+		mode, dev, ok := strings.Cut(u, ":")
+		if !ok || !strings.HasPrefix(mode, "wifi-") {
+			continue
+		}
+		exec.Command("systemctl", "restart", "gatehouse-"+mode+"@"+dev+".service").Run()
+		if mode == "wifi-client" {
+			go func(dev string) {
+				// Give the card time to join, then make sure it asks the new network for an address.
+				for _, wait := range []time.Duration{6 * time.Second, 10 * time.Second} {
+					time.Sleep(wait)
+					exec.Command("networkctl", "renew", dev).Run()
+				}
+			}(dev)
+		}
+	}
+}
+
+// wifiChanged lists the wireless units whose file differs from what is on disk now.
+func (in *Installer) wifiChanged(want map[string]string) []string {
+	if in.WifiDir == "" {
+		return nil
+	}
+	var out []string
+	for path, body := range want {
+		if filepath.Dir(path) != filepath.Clean(in.WifiDir) {
+			continue
+		}
+		old, err := os.ReadFile(path)
+		if err == nil && string(old) == body {
+			continue
+		}
+		if err != nil {
+			continue // a new file: the card is started, not restarted
+		}
+		base := filepath.Base(path)
+		if dev, ok := strings.CutSuffix(base, ".supplicant.conf"); ok {
+			out = append(out, "wifi-client:"+dev)
+		} else if dev, ok := strings.CutSuffix(base, ".hostapd.conf"); ok {
+			out = append(out, "wifi-ap:"+dev)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 type pendingState struct {
@@ -264,6 +319,7 @@ func (in *Installer) install(o *Output) error {
 	if err != nil {
 		return err
 	}
+	in.changed = in.wifiChanged(want)
 	for path := range have {
 		if _, keep := want[path]; keep {
 			continue
@@ -335,10 +391,17 @@ func (in *Installer) activate(units []string) error {
 			return err
 		}
 	}
+	var err error
 	if in.Services != nil {
-		return in.Services(units, stop)
+		err = in.Services(units, stop)
 	}
-	return nil
+	if ch := in.changed; len(ch) > 0 {
+		in.changed = nil
+		if in.Restart != nil && err == nil {
+			in.Restart(ch)
+		}
+	}
+	return err
 }
 
 // Confirm keeps the change.
@@ -377,6 +440,7 @@ func (in *Installer) restoreLocked() error {
 	if err := json.Unmarshal(b, &prev); err != nil {
 		return err
 	}
+	in.changed = in.wifiChanged(prev)
 	have, _ := in.current()
 	for path := range have {
 		if _, ok := prev[path]; !ok && path != in.PPPSecrets && path != in.papSecrets() {
