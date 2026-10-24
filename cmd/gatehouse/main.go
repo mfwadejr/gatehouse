@@ -496,6 +496,9 @@ func recoverCmd(args []string) {
 	if err := installer.RunRecoveryConsole(env); err != nil {
 		log.Fatalf("recover: %v", err)
 	}
+	// "Leave recovery" goes back to the status screen. This program is restarted by systemd, so
+	// without this the same menu would simply appear again.
+	showStatusScreen()
 }
 
 // diagnose says what is running and shows the last lines the programs wrote.
