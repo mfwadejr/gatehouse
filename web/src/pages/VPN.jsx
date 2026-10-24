@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { del, post, put, useData } from '../api.js';
+import { del, get, post, put, useData } from '../api.js';
 import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, ToggleRow, useAction, fmt } from '../ui.jsx';
 
 const STATE = {
@@ -38,16 +38,30 @@ function download(name, text) {
 
 function AddVPN({ endpoint, onClose, onDone }) {
   const [run, busy] = useAction();
-  const [goal, setGoal] = useState('');          // out | in
+  const [goal, setGoal] = useState('');          // out | in | site
   const [tech, setTech] = useState('wireguard');
-  const [f, setF] = useState({ label: '', endpoint: endpoint || '', access: 'full', conf: '', username: '', password: '', check: '', killswitch: true });
+  const [f, setF] = useState({ label: '', endpoint: endpoint || '', route: 'all', reach: true, scope: 'all', conf: '', username: '', password: '', check: '', killswitch: true,
+    remote_lan: '', code: '', siteMode: 'create' });
+  const [made, setMade] = useState(null);       // site link: the code to take to the other site
+  const [warn, setWarn] = useState('');
+  const [copied, setCopied] = useState(false);
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
 
   const save = async () => {
     let path; let body;
+    if (goal === 'site') {
+      if (f.siteMode === 'create') {
+        const r = await run(() => post('/api/vpn/wireguard/site', { label: f.label, endpoint: f.endpoint, remote_lan: f.remote_lan }));
+        if (r) { setMade(r); onDone(r.id, 'site', 'wireguard'); }
+      } else {
+        const r = await run(() => post('/api/vpn/wireguard/site/join', { code: f.code, label: f.label }), 'Site link added.');
+        if (r) { onDone(r.id, 'site', 'wireguard'); if (r.warning) setWarn(r.warning); else onClose(); }
+      }
+      return;
+    }
     if (goal === 'in') {
       path = `/api/vpn/${tech}/server`;
-      body = { label: f.label, endpoint: f.endpoint, access: f.access };
+      body = { label: f.label, endpoint: f.endpoint, route: f.route, reach: f.route === 'home' ? true : f.reach };
     } else if (tech === 'wireguard') {
       path = '/api/vpn/wireguard/client';
       body = { label: f.label, conf: f.conf, check: f.check, killswitch: f.killswitch };
@@ -56,7 +70,13 @@ function AddVPN({ endpoint, onClose, onDone }) {
       body = { label: f.label, profile: f.conf, username: f.username, password: f.password, check: f.check, killswitch: f.killswitch };
     }
     const r = await run(() => post(path, body), 'VPN added.');
-    if (r) { onDone(r.id, goal, tech); onClose(); }
+    if (r && goal === 'out' && f.scope === 'all') {
+      // everything on the network uses the VPN: tick every network for them
+      const ch = await run(() => get('/api/vpn/choices'));
+      const uses = (ch?.networks || []).map((n) => ({ kind: 'network', value: n.name, label: '' }));
+      if (uses.length) await run(() => put(`/api/vpn/${tech}/${r.id}/uses`, { uses }));
+      onDone(r.id, 'out-all', tech); onClose();
+    } else if (r) { onDone(r.id, goal, tech); onClose(); }
   };
 
   if (!goal) {
@@ -71,6 +91,62 @@ function AddVPN({ endpoint, onClose, onDone }) {
             <span className="t">Connect to my home network from outside</span>
             <span className="d">Reach your devices and use your internet from your phone or laptop when you are away.</span>
           </button>
+          <button className="preset" onClick={() => { setGoal('site'); setTech('wireguard'); }}>
+            <span className="t">Join two sites together</span>
+            <span className="d">Link this network to another Gatehouse, like a second home or an office. Each side can reach the other automatically.</span>
+          </button>
+        </div>
+      </Modal>
+    );
+  }
+
+  if (goal === 'site') {
+    if (made) {
+      return (
+        <Modal title="Take this code to the other site" onClose={onClose} footer={<Button kind="primary" onClick={onClose}>Done</Button>}>
+          <div className="stack">
+            <Note tone="warn" title="Shown only once">The code contains the secret keys for the link. Anyone who has it can join the link, so send it privately.</Note>
+            <p className="sec">On the other Gatehouse, open VPN, choose Add a VPN, then Join two sites together, pick I have a code, and paste this in. The link then works in both directions with nothing else to set up.</p>
+            <textarea className="in mono" rows={6} readOnly value={made.code} onFocus={(e) => e.target.select()} />
+            <div className="actions">
+              <Button onClick={() => { navigator.clipboard?.writeText(made.code); setCopied(true); }}>{copied ? 'Copied' : 'Copy'}</Button>
+              <Button onClick={() => download(made.filename, made.code)}>Download as a file</Button>
+            </div>
+          </div>
+        </Modal>
+      );
+    }
+    if (warn) {
+      return (
+        <Modal title="Site link added" onClose={onClose} footer={<Button kind="primary" onClick={onClose}>Done</Button>}>
+          <Note tone="warn" title="Check the networks">{warn}</Note>
+        </Modal>
+      );
+    }
+    const create = f.siteMode === 'create';
+    return (
+      <Modal title="Join two sites" onClose={onClose}
+        footer={<><Button onClick={() => setGoal('')}>Back</Button><Button kind="primary" disabled={busy || (create ? !f.remote_lan.trim() : !f.code.trim())} onClick={save}>{create ? 'Create the link' : 'Join'}</Button></>}>
+        <div className="stack">
+          <Field label="This is the" hint="Start on one site and finish on the other.">
+            <Segmented value={f.siteMode} onChange={set('siteMode')} options={[{ value: 'create', label: 'First site' }, { value: 'join', label: 'Second site: I have a code' }]} />
+          </Field>
+          <Field label="Name" hint="Anything that helps you recognise it, like Cabin."><Input value={f.label} onChange={set('label')} placeholder="Cabin" /></Field>
+          {create ? (
+            <>
+              <Field label="Network at the other site" hint="The address range used there, like 192.168.50.0/24. It must be different from the ranges used here.">
+                <Input value={f.remote_lan} onChange={set('remote_lan')} placeholder="192.168.50.0/24" />
+              </Field>
+              <Field label="Address the other site connects to" hint="Your public IP address or a name like home.example.com.">
+                <Input value={f.endpoint} onChange={set('endpoint')} placeholder="home.example.com" />
+              </Field>
+              <p className="small muted">Both sites will be able to reach each other's devices. Gatehouse makes the routes and firewall rules on both sides for you.</p>
+            </>
+          ) : (
+            <Field label="Code from the first site" hint="Paste the whole code.">
+              <textarea className="in mono" rows={6} value={f.code} onChange={(e) => set('code')(e.target.value)} spellCheck={false} placeholder="GATEHOUSE-SITE-1:…" />
+            </Field>
+          )}
         </div>
       </Modal>
     );
@@ -90,9 +166,10 @@ function AddVPN({ endpoint, onClose, onDone }) {
             <Field label="Address devices connect to" hint="Your public IP address or a name like home.example.com. You only enter this once.">
               <Input value={f.endpoint} onChange={set('endpoint')} placeholder="home.example.com" />
             </Field>
-            <Field label="What can they reach?">
-              <Segmented value={f.access} onChange={set('access')} options={[{ value: 'full', label: 'My whole network' }, { value: 'internet', label: 'Internet only' }]} />
+            <Field label="What goes through the VPN?" hint={f.route === 'all' ? 'All of the device\'s internet and home traffic travels through your router. Best for public Wi-Fi.' : 'Only traffic for your home network goes through your router. Everything else uses the device\'s own connection.'}>
+              <Segmented value={f.route} onChange={set('route')} options={[{ value: 'all', label: 'Everything' }, { value: 'home', label: 'Only my home network' }]} />
             </Field>
+            <ToggleRow title="Can reach devices in my home network" desc={f.route === 'home' ? 'Needed, because the VPN carries only home traffic.' : 'Turn off to give connected devices the internet through your router and nothing else.'} checked={f.reach || f.route === 'home'} disabled={f.route === 'home'} onChange={set('reach')} />
           </>
         ) : (
           <>
@@ -106,6 +183,9 @@ function AddVPN({ endpoint, onClose, onDone }) {
               </div>
             )}
             <Field label="Test address" hint="Gatehouse checks the VPN is really working by reaching this address through it. Leave empty for 1.1.1.1."><Input value={f.check} onChange={set('check')} placeholder="1.1.1.1" /></Field>
+            <Field label="Who uses it?">
+              <Segmented value={f.scope} onChange={set('scope')} options={[{ value: 'all', label: 'Everything on my network' }, { value: 'pick', label: 'Only the networks and devices I pick' }]} />
+            </Field>
             <ToggleRow title="Kill switch" desc="If the VPN drops, the devices using it lose internet instead of falling back to your normal connection." checked={f.killswitch} onChange={set('killswitch')} />
           </>
         )}
@@ -200,7 +280,7 @@ function Settings({ v, onClose, onSaved }) {
             <Field label="Test address" hint="Reached through the VPN every 20 seconds to prove it works. If it stops answering you are alerted."><Input value={f.check} onChange={(x) => setF({ ...f, check: x })} placeholder="1.1.1.1" /></Field>
             <ToggleRow title="Kill switch" desc="If the VPN drops, the devices using it lose internet instead of falling back to your normal connection." checked={f.killswitch} onChange={(x) => setF({ ...f, killswitch: x })} />
           </>
-        ) : (
+        ) : v.site ? null : (
           <Field label="Address devices connect to" hint="Your public IP address or a name like home.example.com. Existing device files keep the old address."><Input value={f.endpoint} onChange={(x) => setF({ ...f, endpoint: x })} placeholder="home.example.com" /></Field>
         )}
       </div>
@@ -318,7 +398,8 @@ function Inbound({ v, reload, setModal }) {
         <div className="grid">
           <Fact label="Devices connect to">{v.endpoint ? `${v.endpoint}:${v.port}` : 'not set'}</Fact>
           <Fact label="VPN network">{v.subnet}</Fact>
-          <Fact label="They can reach">{v.access === 'full' ? 'Whole network' : 'Internet only'}</Fact>
+          <Fact label="Goes through the VPN">{v.route_all ? 'Everything' : 'Only the home network'}</Fact>
+          <Fact label="Can reach home devices">{v.access === 'full' ? 'Yes' : 'No, internet only'}</Fact>
         </div>
         <div className="list">
           {v.peers.map((p) => {
@@ -344,12 +425,41 @@ function Inbound({ v, reload, setModal }) {
   );
 }
 
+function Site({ v, reload, setModal }) {
+  const [run] = useAction();
+  const p = v.peers[0];
+  const s = STATE[v.state] || STATE.down;
+  return (
+    <Card>
+      <div className="stack">
+        <div className="spread">
+          <div className="inline"><span className="name" style={{ fontSize: 'var(--font-size-lg)' }}>{v.label}</span><span className="small muted">Site link · {v.dev}</span></div>
+          <Pill tone={v.connected ? 'good' : s.tone}>{v.connected ? 'Connected' : s.label}</Pill>
+        </div>
+        <p className="sec">{v.message}. Devices on both sides can reach each other.</p>
+        <div className="grid">
+          <Fact label="Networks at the other site">{(v.networks || []).join(', ') || '–'}</Fact>
+          <Fact label="Link address">{v.subnet}</Fact>
+          <Fact label="Last contact">{p?.last_seen ? fmt.ago(p.last_seen) : 'never'}</Fact>
+          {p?.state === 'connected' && <Fact label="Traffic">{`↓ ${bytes(p.rx)}  ↑ ${bytes(p.tx)}`}</Fact>}
+        </div>
+        <div className="actions">
+          <Button onClick={() => run(() => put(`/api/vpn/${v.kind}/${v.id}`, { enabled: !v.enabled }), v.enabled ? 'Turned off.' : 'Turned on.').then(reload)}>{v.enabled ? 'Turn off' : 'Turn on'}</Button>
+          <Button onClick={() => setModal({ t: 'settings', v })}>Rename</Button>
+          <Button kind="danger" icon="trash" onClick={() => window.confirm(`Remove the link ${v.label}? The two sites will no longer reach each other.`) && run(() => del(`/api/vpn/${v.kind}/${v.id}`), 'Removed.').then(reload)}>Remove</Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 export default function VPN() {
   const { data, reload } = useData('/api/vpn', { topics: ['vpn.status'], every: 15000 });
   const [modal, setModal] = useState(null);
   const vpns = data?.vpns || [];
   const out = vpns.filter((v) => v.role === 'client');
-  const inn = vpns.filter((v) => v.role === 'server');
+  const inn = vpns.filter((v) => v.role === 'server' && !v.site);
+  const sites = vpns.filter((v) => v.role === 'server' && v.site);
   const bad = out.filter((v) => v.enabled && (v.state === 'down' || v.state === 'degraded')).length;
   const sub = !vpns.length ? 'Reach home from anywhere, or send chosen devices through a VPN provider.'
     : bad ? `${bad} VPN${bad > 1 ? 's need' : ' needs'} attention` : 'Everything is working.';
@@ -372,6 +482,8 @@ export default function VPN() {
       {out.map((v) => <Outbound key={v.dev} v={v} reload={fresh} setModal={setModal} />)}
       {inn.length > 0 && <h2 className="sec">Connect from outside</h2>}
       {inn.map((v) => <Inbound key={v.dev} v={v} reload={fresh} setModal={setModal} />)}
+      {sites.length > 0 && <h2 className="sec">Linked sites</h2>}
+      {sites.map((v) => <Site key={v.dev} v={v} reload={fresh} setModal={setModal} />)}
 
       {modal?.t === 'add' && <AddVPN endpoint={data?.endpoint} onClose={close} onDone={(id, goal, tech) => { reload(); if (goal === 'out') setTimeout(() => setModal({ t: 'uses-new', id, kind: tech }), 0); }} />}
       {modal?.t === 'uses-new' && <UsesNew id={modal.id} kind={modal.kind} onClose={close} onSaved={reload} />}

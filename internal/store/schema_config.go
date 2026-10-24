@@ -368,4 +368,7 @@ CREATE TABLE wifi_radios(
   fast INTEGER NOT NULL DEFAULT 0,
   enabled INTEGER NOT NULL DEFAULT 1
 );
+`, `
+-- A WireGuard link between two sites: both ends route to each other's networks.
+ALTER TABLE vpn_wg ADD COLUMN site INTEGER NOT NULL DEFAULT 0;
 `}

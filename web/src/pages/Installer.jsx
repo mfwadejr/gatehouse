@@ -28,7 +28,12 @@ function Shell({ title, children, step }) {
 // the browser the first time Gatehouse starts, so there is nothing to write down or carry anywhere.
 export default function Installer() {
   const [step, setStep] = useState(0);
-  const [code, setCode] = useState('');
+  const [code, setCodeRaw] = useState('');
+  // Show the code as 0000-0000: the dash appears by itself after the fourth digit.
+  const setCode = (v) => {
+    const d = String(v).replace(/\D/g, '').slice(0, 8);
+    setCodeRaw(d.length > 4 ? `${d.slice(0, 4)}-${d.slice(4)}` : d.length === 4 && String(v).length >= 4 && !String(v).endsWith('-') && v.length > code.length ? `${d}-` : d);
+  };
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [disks, setDisks] = useState([]);

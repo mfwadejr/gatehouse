@@ -78,6 +78,8 @@ func (a *App) registerVPNRoutes() {
 
 	s.HandleAdmin("POST /api/vpn/wireguard/server", a.vpnNewWGServer)
 	s.HandleAdmin("POST /api/vpn/wireguard/client", a.vpnNewWGClient)
+	s.HandleAdmin("POST /api/vpn/wireguard/site", a.vpnNewSite)
+	s.HandleAdmin("POST /api/vpn/wireguard/site/join", a.vpnJoinSite)
 	s.HandleAdmin("POST /api/vpn/openvpn/server", a.vpnNewOVPNServer)
 	s.HandleAdmin("POST /api/vpn/openvpn/client", a.vpnNewOVPNClient)
 	s.HandleAdmin("PUT /api/vpn/{kind}/{id}", a.vpnUpdate)
@@ -103,7 +105,7 @@ func (a *App) vpnChoices(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		if z.Kind == fw.KindWan || z.Kind == fw.KindVpn {
 			continue
 		}
-		if strings.HasPrefix(z.Name, "VPN") {
+		if strings.HasPrefix(z.Name, "VPN") || z.Name == siteZoneName {
 			continue
 		}
 		nc := netChoice{Name: z.Name, Subnets: []string{}}
@@ -155,6 +157,29 @@ type newServer struct {
 	Access   string `json:"access"` // full or internet
 	Proto    string `json:"proto"`
 	RouteAll bool   `json:"route_all"`
+	// Route is what travels through the VPN: "all" (everything the device does) or "home"
+	// (only traffic for the home network). Reach says whether the device may use the devices
+	// at home. Both are empty for older callers, which still send Access and RouteAll.
+	Route string `json:"route"`
+	Reach *bool  `json:"reach"`
+}
+
+// resolve turns the plain choices into the zone kind (full access at home or internet only)
+// and whether the device sends all of its traffic through the router.
+func (in newServer) resolve() (full, routeAll bool, err error) {
+	if in.Route == "" {
+		full = in.Access != "internet"
+		return full, in.RouteAll || !full, nil
+	}
+	if in.Route != "all" && in.Route != "home" {
+		return false, false, errors.New("choose whether everything or only the home network goes through the VPN")
+	}
+	routeAll = in.Route == "all"
+	full = in.Reach == nil || *in.Reach
+	if !routeAll && !full {
+		return false, false, errors.New("with only the home network selected, devices must be allowed to reach the home network, otherwise the VPN would carry nothing")
+	}
+	return full, routeAll, nil
 }
 
 func (a *App) rememberEndpoint(h string) {
@@ -168,6 +193,11 @@ func (a *App) vpnNewWGServer(w http.ResponseWriter, r *http.Request, c *api.Ctx)
 	if !api.Decode(w, r, &in) || !a.needHelper(w) {
 		return
 	}
+	full, routeAll, err := in.resolve()
+	if err != nil {
+		fail(w, err)
+		return
+	}
 	in.Endpoint = strings.TrimSpace(in.Endpoint)
 	if in.Endpoint != "" {
 		if err := validHost(in.Endpoint); err != nil {
@@ -176,7 +206,7 @@ func (a *App) vpnNewWGServer(w http.ResponseWriter, r *http.Request, c *api.Ctx)
 		}
 	}
 	var id int64
-	err := a.mutateVPN(c.User.Username, func(tx *sql.Tx) error {
+	err = a.mutateVPN(c.User.Username, func(tx *sql.Tx) error {
 		name, err := freeName(tx, "vpn_wg", "wg")
 		if err != nil {
 			return err
@@ -197,13 +227,12 @@ func (a *App) vpnNewWGServer(w http.ResponseWriter, r *http.Request, c *api.Ctx)
 		if port == 0 {
 			port = a.freeWGPort(tx)
 		}
-		full := in.Access != "internet"
 		zone, err := a.ensureVPNZone(tx, full)
 		if err != nil {
 			return err
 		}
 		res, err := tx.Exec(`INSERT INTO vpn_wg(name,label,mode,listen_port,address,private_key,public_key,endpoint_host,zone_id,route_all,created_at) VALUES(?,?,'server',?,?,?,?,?,?,?,?)`,
-			name, cleanLabel(in.Label, "Remote access"), port, addr, a.Box.Seal(priv), pub, in.Endpoint, zone, b2i(in.RouteAll || !full), time.Now().Unix())
+			name, cleanLabel(in.Label, "Remote access"), port, addr, a.Box.Seal(priv), pub, in.Endpoint, zone, b2i(routeAll), time.Now().Unix())
 		if err != nil {
 			return friendlyDup(err, "a VPN with that name already exists")
 		}
@@ -287,6 +316,11 @@ func (a *App) vpnNewOVPNServer(w http.ResponseWriter, r *http.Request, c *api.Ct
 	if !api.Decode(w, r, &in) || !a.needHelper(w) {
 		return
 	}
+	full, routeAll, err := in.resolve()
+	if err != nil {
+		fail(w, err)
+		return
+	}
 	in.Endpoint = strings.TrimSpace(in.Endpoint)
 	if in.Endpoint != "" {
 		if err := validHost(in.Endpoint); err != nil {
@@ -341,14 +375,13 @@ func (a *App) vpnNewOVPNServer(w http.ResponseWriter, r *http.Request, c *api.Ct
 				}
 			}
 		}
-		full := in.Access != "internet"
 		zone, err := a.ensureVPNZone(tx, full)
 		if err != nil {
 			return err
 		}
 		res, err := tx.Exec(`INSERT INTO vpn_ovpn(name,label,mode,proto,port,subnet,endpoint_host,route_all,zone_id,ca_cert,ca_key,srv_cert,srv_key,tls_crypt,crl,crl_number,created_at)
 			VALUES(?,?,'server',?,?,?,?,?,?,?,?,?,?,?,?,1,?)`,
-			name, cleanLabel(in.Label, "Remote access (OpenVPN)"), in.Proto, port, subnet, in.Endpoint, b2i(in.RouteAll || !full), zone,
+			name, cleanLabel(in.Label, "Remote access (OpenVPN)"), in.Proto, port, subnet, in.Endpoint, b2i(routeAll), zone,
 			ca.CertPEM, a.Box.Seal(ca.KeyPEM), srv.CertPEM, a.Box.Seal(srv.KeyPEM), a.Box.Seal(tc), crl, now.Unix())
 		if err != nil {
 			return err
@@ -623,6 +656,9 @@ func (a *App) addWGPeer(author string, id int64, name string) (map[string]any, e
 	}
 	if srv == nil {
 		return nil, errors.New("that VPN no longer exists")
+	}
+	if srv.Site {
+		return nil, errors.New("this is a link to another site; devices cannot be added to it")
 	}
 	host := srv.Endpoint
 	if host == "" {

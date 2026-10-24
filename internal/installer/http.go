@@ -40,8 +40,8 @@ func (s *Server) authorised(w http.ResponseWriter, r *http.Request) bool {
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "too many wrong codes; wait a few minutes"})
 		return false
 	}
-	got := strings.TrimSpace(r.Header.Get("X-Install-Code"))
-	if subtle.ConstantTimeCompare([]byte(got), []byte(s.Code)) != 1 {
+	got := digitsOnly(r.Header.Get("X-Install-Code"))
+	if subtle.ConstantTimeCompare([]byte(got), []byte(digitsOnly(s.Code))) != 1 {
 		s.fails++
 		if s.fails >= 5 {
 			s.fails, s.locked = 0, time.Now().Add(10*time.Minute)
@@ -262,4 +262,14 @@ func privateAddr(ip net.IP) bool {
 	}
 	a = a.Unmap()
 	return a.IsPrivate() || a.IsLoopback() || a.IsLinkLocalUnicast() || netip.MustParsePrefix("100.64.0.0/10").Contains(a)
+}
+
+// digitsOnly lets the code be typed with or without its dash, or pasted with spaces.
+func digitsOnly(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r >= '0' && r <= '9' {
+			return r
+		}
+		return -1
+	}, s)
 }

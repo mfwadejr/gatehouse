@@ -96,6 +96,7 @@ type PeerView struct {
 	Rx       int64  `json:"rx"`
 	Tx       int64  `json:"tx"`
 	Created  int64  `json:"created"`
+	Networks string `json:"networks,omitempty"`
 }
 
 type VPNView struct {
@@ -120,7 +121,9 @@ type VPNView struct {
 	CheckedAt  int64      `json:"checked_at"`
 	KillSwitch bool       `json:"killswitch"`
 	RouteAll   bool       `json:"route_all"`
-	Access     string     `json:"access"` // full or internet
+	Access     string     `json:"access"`   // full or internet
+	Site       bool       `json:"site"`     // a link to another site
+	Networks   []string   `json:"networks"` // site link: the networks at the other end
 	Subnet     string     `json:"subnet"`
 	Uses       []UseView  `json:"uses"`
 	Peers      []PeerView `json:"peers"`
@@ -236,7 +239,7 @@ func (a *App) computeVPN(st netd.VPNStatus) ([]VPNView, error) {
 	var out []VPNView
 	for _, w := range wgs {
 		v := VPNView{ID: w.ID, Kind: "wireguard", Dev: w.Name, Label: w.Label, Role: w.Mode, Enabled: w.Enabled, Address: w.Address,
-			Check: w.Check, KillSwitch: w.KillSwitch, RouteAll: w.RouteAll, Created: w.CreatedAt, Port: w.Port, Proto: "udp"}
+			Check: w.Check, KillSwitch: w.KillSwitch, RouteAll: w.RouteAll, Created: w.CreatedAt, Port: w.Port, Proto: "udp", Site: w.Site}
 		if v.Label == "" {
 			v.Label = w.Name
 		}
@@ -285,6 +288,11 @@ func (a *App) computeVPN(st netd.VPNStatus) ([]VPNView, error) {
 					v.State, v.Message = "connecting", "Starting"
 				} else {
 					v.State, v.Message = "down", "The VPN is not running"
+				}
+			case w.Site:
+				v.State, v.Message = "up", "Waiting for the other site"
+				if v.Connected > 0 {
+					v.Message = "Connected to the other site"
 				}
 			case v.Endpoint == "":
 				v.State, v.Message = "degraded", "Set the address devices will connect to"

@@ -39,6 +39,7 @@ type wgRow struct {
 	KillSwitch bool
 	Check      string
 	CreatedAt  int64
+	Site       bool // a link between two sites rather than remote access
 }
 
 type wgPeerRow struct {
@@ -101,7 +102,7 @@ func (a *App) openSealed(s string) (string, error) {
 }
 
 func (a *App) listWG(q querier) ([]wgRow, error) {
-	rows, err := q.Query(`SELECT id,name,label,mode,listen_port,address,private_key,public_key,endpoint_host,dns,mtu,enabled,COALESCE(zone_id,0),route_all,killswitch,check_target,created_at FROM vpn_wg ORDER BY id`)
+	rows, err := q.Query(`SELECT id,name,label,mode,listen_port,address,private_key,public_key,endpoint_host,dns,mtu,enabled,COALESCE(zone_id,0),route_all,killswitch,check_target,created_at,site FROM vpn_wg ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -110,12 +111,12 @@ func (a *App) listWG(q querier) ([]wgRow, error) {
 	for rows.Next() {
 		var r wgRow
 		var s string
-		var en, ra, ks int
-		if err := rows.Scan(&r.ID, &r.Name, &r.Label, &r.Mode, &r.Port, &r.Address, &s, &r.PublicKey, &r.Endpoint, &r.DNS, &r.MTU, &en, &r.ZoneID, &ra, &ks, &r.Check, &r.CreatedAt); err != nil {
+		var en, ra, ks, site int
+		if err := rows.Scan(&r.ID, &r.Name, &r.Label, &r.Mode, &r.Port, &r.Address, &s, &r.PublicKey, &r.Endpoint, &r.DNS, &r.MTU, &en, &r.ZoneID, &ra, &ks, &r.Check, &r.CreatedAt, &site); err != nil {
 			rows.Close()
 			return nil, err
 		}
-		r.Enabled, r.RouteAll, r.KillSwitch = en == 1, ra == 1, ks == 1
+		r.Enabled, r.RouteAll, r.KillSwitch, r.Site = en == 1, ra == 1, ks == 1, site == 1
 		out = append(out, r)
 		sealed = append(sealed, s)
 	}
