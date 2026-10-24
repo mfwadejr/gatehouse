@@ -88,7 +88,10 @@ func TestMissingHelper(t *testing.T) {
 	}
 }
 
-type fakeNetCtl struct{ updatePath string }
+type fakeNetCtl struct {
+	updatePath    string
+	systemStarted bool
+}
 
 func (f *fakeNetCtl) Apply(netd.Plan, time.Duration) (string, time.Time, error) {
 	return "", time.Time{}, nil
@@ -104,7 +107,10 @@ func (f *fakeNetCtl) SetSystem(string, string) error                { return nil
 func (f *fakeNetCtl) WifiScan(string) ([]netd.WifiNetwork, error)   { return nil, nil }
 func (f *fakeNetCtl) UPnPApply([]netd.UPnPMapping) error            { return nil }
 func (f *fakeNetCtl) UpdateStart(p string) error                    { f.updatePath = p; return nil }
-func (f *fakeNetCtl) OSSecurity(bool) error                         { return nil }
+func (f *fakeNetCtl) SystemCheck() (netd.SystemUpdates, error) {
+	return netd.SystemUpdates{Count: 3, Names: []string{"libc6"}, RebootLikely: true}, nil
+}
+func (f *fakeNetCtl) SystemUpdateStart() error { f.systemStarted = true; return nil }
 
 // Every call the client can make must reach the helper. A call missing from the helper's routing
 // fails on a real machine with "unknown method" while every other test passes.
@@ -121,8 +127,11 @@ func TestEveryClientCallIsRouted(t *testing.T) {
 	if err := c.UpdateStart("/x/pkg.tar.gz"); err != nil || nc.updatePath != "/x/pkg.tar.gz" {
 		t.Fatalf("update.start: %v %q", err, nc.updatePath)
 	}
-	if err := c.OSSecurity(true); err != nil {
-		t.Fatalf("os.security: %v", err)
+	if su, err := c.SystemCheck(); err != nil || su.Count != 3 || !su.RebootLikely {
+		t.Fatalf("system.check: %v %+v", err, su)
+	}
+	if err := c.SystemUpdateStart(); err != nil || !nc.systemStarted {
+		t.Fatalf("system.start: %v", err)
 	}
 	if _, last, err := c.FWEvents(0, 10); err != nil || last != 7 {
 		t.Fatalf("fwlog.read: %v %d", err, last)

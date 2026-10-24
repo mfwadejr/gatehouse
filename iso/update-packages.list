@@ -1,0 +1,5 @@
+# Debian packages that every Gatehouse update installs on the machine, one per line.
+# Updates install these before the new Gatehouse program, so a feature that needs extra
+# software (high availability, threat detection, application identification) can arrive as an
+# ordinary update with no reinstall. Names must be exact Debian 13 package names.
+# Leave a package out of this list until a release actually needs it.

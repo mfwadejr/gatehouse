@@ -35,7 +35,8 @@ type NetController interface {
 	WifiScan(iface string) ([]netd.WifiNetwork, error)
 	UPnPApply(ms []netd.UPnPMapping) error
 	UpdateStart(path string) error
-	OSSecurity(enabled bool) error
+	SystemCheck() (netd.SystemUpdates, error)
+	SystemUpdateStart() error
 }
 
 const maxRequest = 4 << 20
@@ -161,6 +162,7 @@ func (s *Server) handle(c net.Conn) {
 		json.NewEncoder(c).Encode(response{Error: "bad request"})
 		return
 	}
+	c.SetDeadline(time.Now().Add(8 * time.Minute)) // some calls (asking Debian what is new) take minutes
 	res, err := s.dispatch(req)
 	out := response{}
 	if err != nil {
@@ -280,14 +282,10 @@ func (s *Server) dispatchNet(r request) (any, error) {
 			return nil, errors.New("bad parameters")
 		}
 		return nil, s.Net.UpdateStart(p.Path)
-	case "os.security":
-		var p struct {
-			Enabled bool `json:"enabled"`
-		}
-		if err := json.Unmarshal(r.Params, &p); err != nil {
-			return nil, errors.New("bad parameters")
-		}
-		return nil, s.Net.OSSecurity(p.Enabled)
+	case "system.check":
+		return s.Net.SystemCheck()
+	case "system.start":
+		return nil, s.Net.SystemUpdateStart()
 	case "net.system":
 		var p struct {
 			Hostname string `json:"hostname"`
@@ -317,12 +315,17 @@ type Client struct{ Path string }
 var _ fw.Controller = (*Client)(nil)
 
 func (c *Client) call(method string, params any, out any) error {
+	return c.callWithin(2*time.Minute, method, params, out)
+}
+
+// callWithin is call for requests that legitimately take longer, like asking Debian what is new.
+func (c *Client) callWithin(limit time.Duration, method string, params any, out any) error {
 	conn, err := net.DialTimeout("unix", c.Path, 3*time.Second)
 	if err != nil {
 		return fmt.Errorf("the network helper is not running: %w", err)
 	}
 	defer conn.Close()
-	conn.SetDeadline(time.Now().Add(2 * time.Minute))
+	conn.SetDeadline(time.Now().Add(limit))
 	p, _ := json.Marshal(params)
 	if err := json.NewEncoder(conn).Encode(request{Method: method, Params: p}); err != nil {
 		return err
@@ -429,9 +432,16 @@ func (c *Client) UpdateStart(path string) error {
 	return c.call("update.start", map[string]string{"path": path}, nil)
 }
 
-// OSSecurity switches automatic operating-system security updates.
-func (c *Client) OSSecurity(enabled bool) error {
-	return c.call("os.security", map[string]bool{"enabled": enabled}, nil)
+// SystemCheck refreshes the package lists and says what the operating system has waiting.
+func (c *Client) SystemCheck() (netd.SystemUpdates, error) {
+	var out netd.SystemUpdates
+	err := c.callWithin(7*time.Minute, "system.check", nil, &out)
+	return out, err
+}
+
+// SystemUpdateStart installs only the operating system's updates.
+func (c *Client) SystemUpdateStart() error {
+	return c.call("system.start", nil, nil)
 }
 
 // FWBatch is a run of firewall events and the sequence number to ask for next.

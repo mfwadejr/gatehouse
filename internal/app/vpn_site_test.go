@@ -35,7 +35,7 @@ func siteBoxWith(t *testing.T, lan string, tune func(*Config)) (*client, *fakeNe
 	go func() { done <- a.Run(ctx) }()
 	t.Cleanup(func() { cancel(); <-done })
 	jar, _ := cookiejar.New(nil)
-	c := &client{t: t, base: "http://" + web, hc: &http.Client{Jar: jar}}
+	c := &client{t: t, base: "http://" + web, hc: &http.Client{Jar: jar}, app: a}
 	for i := 0; i < 50; i++ {
 		if resp, err := c.hc.Get(c.base + "/api/health"); err == nil {
 			resp.Body.Close()

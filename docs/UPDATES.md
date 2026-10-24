@@ -45,22 +45,47 @@ to the release. Ordinary pushes only publish the `nightly` test image; machines 
 
 ## On the machine
 
-Settings, Updates. It checks shortly after start and then twice a day, or press Check now. Press
-Update now to install. The console restarts for about a minute, then reports the result.
+Settings, Updates. One button updates Gatehouse and the operating system underneath it together.
+Press Check now, or let it check twice a day. When something is ready the card lists it ("Gatehouse
+0.3.0" and "12 system updates"); press Update now. A step list shows where it is: download, check
+the signature, save a copy of the settings, install system updates, install Gatehouse, restart,
+check that it runs. The console restarts near the end and the page reconnects by itself.
 
-If the new version does not answer within about two minutes, the old program and service files are
-put back automatically and the Updates card says so. Your settings are never touched; a copy of the
-settings from before the update is kept in `/var/lib/gatehouse/update/`.
+Order matters. The system updates go first. If they fail, Gatehouse has not been touched and the
+card says so. If the new Gatehouse does not answer within about two minutes, the old program and
+service files are put back automatically (the system updates stay installed and the card says
+so). Your settings are never touched; a copy of the settings from before the update is kept in
+`/var/lib/gatehouse/update/`.
 
-## What an update can and cannot change
+A kernel or core library update only takes effect after a restart; the card and the Overview page
+show "A restart is needed" until the machine has been restarted.
 
-It replaces the Gatehouse program and its service files. It does not change the operating system
-or the boot loader; those need a fresh image. The optional "Debian security updates" switch handles
-the operating system's own fixes.
+### Off, Notify, Automatic
 
-## How it is kept safe
+- **Off:** nothing is checked on its own; use Check now.
+- **Notify** (the default): checks twice a day and shows a notice on Overview.
+- **Automatic:** also installs by itself, once a day at most, in the hour you choose. Gatehouse
+  restarts for about a minute. It does not restart the machine; the "restart needed" notice stays
+  until you do.
 
-* Packages are signed with ed25519; the machine checks the signature against the key built into it
-  (twice: once in the console, once more in the root helper that installs it).
-* Only the program and `gatehouse*.service` files can be installed.
-* Only tagged releases of the configured repository are offered.
+## What an update contains
+
+- The Gatehouse program and its service files (signed).
+- The Debian packages the release needs. They are listed in `iso/update-packages.list`, which
+  `update-build` puts into the signed package, so a feature that needs extra software (high
+  availability, threat detection, application identification) arrives as an ordinary update.
+  Add a package name there only when a release needs it. If Debian's servers cannot be reached,
+  a release that needs a package waits; a release that needs none still installs and the card says
+  the system updates were skipped.
+- The Debian updates for the release the machine is on (security and point-release fixes).
+
+## Staying on Debian 13
+
+The installed image names its apt sources by release name (`trixie`, `trixie-updates`,
+`trixie-security`), never `stable`. Before any system step the machine checks that it reports
+Debian 13 and that every apt source still names `trixie`; if not, the system step is refused with
+that reason. It never moves to a newer Debian by itself. Debian's own unattended upgrades are
+switched off, so this is the one update path.
+
+An update never changes the boot loader or the operating system image; those need a fresh
+install.

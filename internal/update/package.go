@@ -33,6 +33,9 @@ type Manifest struct {
 	Date    string `json:"date"`
 	Notes   string `json:"notes"`
 	Files   []File `json:"files"`
+	// Packages are Debian packages this release needs, installed in the same run before Gatehouse
+	// itself. The list is part of the signed package, so it cannot be changed from outside.
+	Packages []string `json:"packages,omitempty"`
 }
 
 const (
@@ -45,6 +48,11 @@ var reUnit = regexp.MustCompile(`^/etc/systemd/system/gatehouse[a-z0-9@._-]*\.se
 
 // allowedDest says what an update may overwrite: the program and Gatehouse's own services.
 func allowedDest(d string) bool { return d == BinaryDest || reUnit.MatchString(d) }
+
+// maxPackages keeps a signed package from asking for an unreasonable amount of software.
+const maxPackages = 40
+
+var reDebPackage = regexp.MustCompile(`^[a-z0-9][a-z0-9+.-]{1,99}$`)
 
 var reVersion = regexp.MustCompile(`^[0-9]+(\.[0-9]+){0,3}([-+][0-9A-Za-z.-]+)?$`)
 
@@ -137,6 +145,19 @@ func Open(data []byte, sig string, pub ed25519.PublicKey) (*Package, error) {
 	if !reVersion.MatchString(m.Version) {
 		return nil, errors.New("the update has an invalid version")
 	}
+	if len(m.Packages) > maxPackages {
+		return nil, errors.New("the update asks for too many system packages")
+	}
+	seenPkg := map[string]bool{}
+	for _, name := range m.Packages {
+		if !reDebPackage.MatchString(name) {
+			return nil, fmt.Errorf("the update names a system package that is not valid: %q", name)
+		}
+		if seenPkg[name] {
+			return nil, errors.New("the update lists a system package twice")
+		}
+		seenPkg[name] = true
+	}
 	seenBinary := false
 	seen := map[string]bool{}
 	for _, f := range m.Files {
@@ -174,11 +195,17 @@ func Open(data []byte, sig string, pub ed25519.PublicKey) (*Package, error) {
 // Build makes a package from files on disk and signs nothing: the caller signs the result.
 // files maps destination to source path.
 func Build(version, notes, date string, files map[string]string, modes map[string]uint32) ([]byte, error) {
+	return BuildWith(version, notes, date, nil, files, modes)
+}
+
+// BuildWith is Build for a release that also needs Debian packages installed.
+func BuildWith(version, notes, date string, packages []string, files map[string]string, modes map[string]uint32) ([]byte, error) {
 	var buf bytes.Buffer
 	gz := gzip.NewWriter(&buf)
 	tw := tar.NewWriter(gz)
 	var m Manifest
 	m.Version, m.Notes, m.Date = version, notes, date
+	m.Packages = packages
 	dests := make([]string, 0, len(files))
 	for d := range files {
 		dests = append(dests, d)

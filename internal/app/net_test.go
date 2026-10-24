@@ -31,7 +31,9 @@ type fakeNet struct {
 	zone     string
 
 	updatePath string
-	osSecurity bool
+	sysUpdates netd.SystemUpdates
+	sysErr     error
+	sysStarted bool
 }
 
 func (f *fakeNet) NetApply(p netd.Plan, w time.Duration) (string, time.Time, error) {
@@ -82,10 +84,16 @@ func (f *fakeNet) UpdateStart(path string) error {
 	return nil
 }
 
-func (f *fakeNet) OSSecurity(enabled bool) error {
+func (f *fakeNet) SystemCheck() (netd.SystemUpdates, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.osSecurity = enabled
+	return f.sysUpdates, f.sysErr
+}
+
+func (f *fakeNet) SystemUpdateStart() error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.sysStarted = true
 	return nil
 }
 

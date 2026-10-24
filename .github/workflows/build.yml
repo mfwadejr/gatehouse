@@ -84,7 +84,7 @@ jobs:
           printf '%s\n' "$KEY" > "$RUNNER_TEMP/update.key"
           chmod +x bin/gatehouse
           git log -1 --format=%B > "$RUNNER_TEMP/notes.txt"
-          bin/gatehouse update-build -version "${VERSION}" -bin bin/gatehouse -units iso/config/includes.chroot/etc/systemd/system \
+          bin/gatehouse update-build -version "${VERSION}" -bin bin/gatehouse -units iso/config/includes.chroot/etc/systemd/system -packages iso/update-packages.list \
             -key "$RUNNER_TEMP/update.key" -notes "$RUNNER_TEMP/notes.txt" -out out
           rm -f "$RUNNER_TEMP/update.key"
       - name: Publish a release

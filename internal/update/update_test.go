@@ -253,3 +253,133 @@ func TestReleaseLookup(t *testing.T) {
 		t.Fatal("plain http accepted outside tests")
 	}
 }
+
+func TestPackagesInTheManifest(t *testing.T) {
+	priv, _ := ParsePrivateKey(testPriv)
+	pub, _ := ParsePublicKey(testPub)
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "gatehouse")
+	os.WriteFile(bin, fakeProgram(), 0o755)
+	build := func(pk []string) *Package {
+		data, err := BuildWith("1.0.0", "n", "2026-10-24", pk, map[string]string{BinaryDest: bin}, map[string]uint32{BinaryDest: 0o755})
+		if err != nil {
+			t.Fatal(err)
+		}
+		p, err := Open(data, Sign(priv, data), pub)
+		if err != nil {
+			return nil
+		}
+		return p
+	}
+	if p := build([]string{"keepalived", "conntrack", "libndpi4.2"}); p == nil || len(p.Manifest.Packages) != 3 {
+		t.Fatal("a valid package list was refused")
+	}
+	for _, bad := range [][]string{{"Evil Name"}, {"-rf"}, {"a b"}, {"x;rm"}, {"keepalived", "keepalived"}, {"../x"}, {""}} {
+		if build(bad) != nil {
+			t.Fatalf("accepted %q", bad)
+		}
+	}
+	many := make([]string, maxPackages+1)
+	for i := range many {
+		many[i] = "pkg" + string(rune('a'+i%26)) + string(rune('a'+i/26))
+	}
+	if build(many) != nil {
+		t.Fatal("accepted far too many packages")
+	}
+	// The list is covered by the signature: changing it breaks the package.
+	data, _ := BuildWith("1.0.0", "n", "d", []string{"keepalived"}, map[string]string{BinaryDest: bin}, nil)
+	sig := Sign(priv, data)
+	other, _ := BuildWith("1.0.0", "n", "d", []string{"openssh-server"}, map[string]string{BinaryDest: bin}, nil)
+	if _, err := Open(other, sig, pub); err == nil {
+		t.Fatal("a different package list opened with the old signature")
+	}
+}
+
+func systemEnv(box *fakeBox, t *testing.T, sys func([]string) (SystemResult, error)) Env {
+	e := box.env(t)
+	e.System = sys
+	return e
+}
+
+func TestSystemUpdatesRunFirstAndGatehouseSecond(t *testing.T) {
+	box := setupBox(t, true)
+	data, sig, pub := makePkg(t, "1.0.0", nil)
+	p, _ := Open(data, sig, pub)
+	var order []string
+	e := systemEnv(box, t, func(req []string) (SystemResult, error) {
+		// at this point Gatehouse must still be the old program
+		b, _ := os.ReadFile(filepath.Join(box.root, BinaryDest))
+		order = append(order, "system:"+strings.Join(req, ","), "program:"+string(b[4:]))
+		return SystemResult{Packages: 7, RebootNeeded: true}, nil
+	})
+	p.Manifest.Packages = []string{"keepalived"}
+	res := Apply(e, p, "0.9.0")
+	if !res.OK || res.System == nil || res.System.Packages != 7 || !res.System.RebootNeeded {
+		t.Fatalf("%+v", res)
+	}
+	if strings.Join(order, "|") != "system:keepalived|program:old" {
+		t.Fatalf("order: %v", order)
+	}
+	b, _ := os.ReadFile(filepath.Join(box.root, BinaryDest))
+	if !strings.Contains(string(b), "program body") {
+		t.Fatal("Gatehouse was not installed after the system step")
+	}
+}
+
+func TestSystemFailureLeavesGatehouseUntouched(t *testing.T) {
+	box := setupBox(t, true)
+	data, sig, pub := makePkg(t, "1.0.0", nil)
+	p, _ := Open(data, sig, pub)
+	e := systemEnv(box, t, func([]string) (SystemResult, error) { return SystemResult{}, os.ErrPermission })
+	res := Apply(e, p, "0.9.0")
+	if res.OK || res.RolledBack || !strings.Contains(res.Error, "nothing was changed") {
+		t.Fatalf("%+v", res)
+	}
+	b, _ := os.ReadFile(filepath.Join(box.root, BinaryDest))
+	rel, _ := os.ReadFile(filepath.Join(box.root, "etc/gatehouse-release"))
+	if string(b) != "\x7fELFold" || strings.TrimSpace(string(rel)) != "0.9.0" || len(box.runs) != 0 {
+		t.Fatalf("Gatehouse was touched: %q %q %v", b, rel, box.runs)
+	}
+	if ReadState(e.StateDir) != "idle" {
+		t.Fatal("state left busy")
+	}
+}
+
+func TestSystemOnlyRunDoesNotRestartAnything(t *testing.T) {
+	box := setupBox(t, true)
+	e := systemEnv(box, t, func([]string) (SystemResult, error) { return SystemResult{Packages: 2}, nil })
+	res := Apply(e, nil, "0.9.0")
+	if !res.OK || res.From != "0.9.0" || res.To != "0.9.0" || res.System.Packages != 2 || len(box.runs) != 0 {
+		t.Fatalf("%+v %v", res, box.runs)
+	}
+}
+
+func TestRollbackKeepsTheSystemUpdatesAndSaysSo(t *testing.T) {
+	box := setupBox(t, false)
+	data, sig, pub := makePkg(t, "1.0.0", nil)
+	p, _ := Open(data, sig, pub)
+	e := systemEnv(box, t, func([]string) (SystemResult, error) { return SystemResult{Packages: 5}, nil })
+	res := Apply(e, p, "0.9.0")
+	if res.OK || !res.RolledBack || !strings.Contains(res.Error, "system updates stay installed") || res.System.Packages != 5 {
+		t.Fatalf("%+v", res)
+	}
+}
+
+func TestRebootNeeded(t *testing.T) {
+	dir := t.TempDir()
+	RebootRequiredFile, RunningKernelFile, ModulesDir = filepath.Join(dir, "none"), filepath.Join(dir, "osrelease"), filepath.Join(dir, "modules")
+	os.WriteFile(RunningKernelFile, []byte("6.12.48+deb13-amd64\n"), 0o644)
+	os.MkdirAll(filepath.Join(ModulesDir, "6.12.48+deb13-amd64"), 0o755)
+	if RebootNeeded() {
+		t.Fatal("no restart is needed when the newest kernel is running")
+	}
+	os.MkdirAll(filepath.Join(ModulesDir, "6.12.57+deb13-amd64"), 0o755)
+	if !RebootNeeded() {
+		t.Fatal("a newer installed kernel needs a restart")
+	}
+	os.RemoveAll(filepath.Join(ModulesDir, "6.12.57+deb13-amd64"))
+	os.WriteFile(RebootRequiredFile, nil, 0o644)
+	if !RebootNeeded() {
+		t.Fatal("the reboot-required marker was ignored")
+	}
+}

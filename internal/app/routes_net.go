@@ -36,7 +36,8 @@ type NetController interface {
 	WifiScan(iface string) ([]netd.WifiNetwork, error)
 	UPnPApply(ms []netd.UPnPMapping) error
 	UpdateStart(path string) error
-	OSSecurity(enabled bool) error
+	SystemCheck() (netd.SystemUpdates, error)
+	SystemUpdateStart() error
 }
 
 // IfaceRow is a LAN-side port or VLAN as the console edits it.

@@ -83,6 +83,13 @@ func (s *Service) UpdateStart(path string) error {
 	if err := os.WriteFile(filepath.Join(UpdateStage, "package.sig"), sig, 0o600); err != nil {
 		return err
 	}
+	return launchUpdate(update.Plan{Gatehouse: true, System: true})
+}
+
+// launchUpdate records what the run covers and starts it as its own service.
+func launchUpdate(plan update.Plan) error {
+	noAutoUpgrade()
+	update.WritePlan(UpdateState, plan)
 	os.WriteFile(filepath.Join(UpdateState, "state"), []byte("starting\n"), 0o644)
 	self, err := os.Executable()
 	if err != nil {
@@ -95,24 +102,24 @@ func (s *Service) UpdateStart(path string) error {
 	return nil
 }
 
-// OSSecurity switches automatic installation of Debian security updates on or off.
-func (s *Service) OSSecurity(enabled bool) error {
-	v := "0"
-	if enabled {
-		v = "1"
-	}
-	conf := "// Written by Gatehouse. Switch this on the Updates page.\n" +
-		"APT::Periodic::Update-Package-Lists \"1\";\n" +
-		"APT::Periodic::Unattended-Upgrade \"" + v + "\";\n" +
-		"Unattended-Upgrade::Automatic-Reboot \"false\";\n"
-	if err := os.MkdirAll(filepath.Dir(aptAutoFile), 0o755); err != nil {
+// SystemUpdateStart installs only the operating system's updates, for when there is no newer
+// Gatehouse. It runs the same way as a full update, so progress and results look the same.
+func (s *Service) SystemUpdateStart() error {
+	if err := onDebian13(); err != nil {
 		return err
 	}
-	if err := os.WriteFile(aptAutoFile, []byte(conf), 0o644); err != nil {
+	if st := update.ReadState(UpdateState); st != "idle" {
+		return update.ErrBusy
+	}
+	if err := os.MkdirAll(UpdateState, 0o755); err != nil {
 		return err
 	}
-	if enabled {
-		exec.Command("systemctl", "enable", "--now", "apt-daily.timer", "apt-daily-upgrade.timer").Run()
+	os.RemoveAll(UpdateStage)
+	if err := os.MkdirAll(UpdateStage, 0o700); err != nil {
+		return err
 	}
-	return nil
+	if err := os.WriteFile(filepath.Join(UpdateStage, "system-only"), nil, 0o600); err != nil {
+		return err
+	}
+	return launchUpdate(update.Plan{System: true})
 }

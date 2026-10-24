@@ -24,6 +24,7 @@ export default function Overview() {
   const { data: fw } = useData('/api/fw/overview', { topics: ['fw.status'] });
   const { data: vpn } = useData('/api/vpn', { topics: ['vpn.status'], every: 15000 });
   const { data: top } = useData('/api/dns/top?hours=24', { every: 30000 });
+  const { data: upd } = useData('/api/system/update', { every: 300000 });
 
   const st = dns?.stats;
   const links = net?.links || {};
@@ -46,6 +47,9 @@ export default function Overview() {
   });
   (util || []).forEach((s) => { if (s.size && s.active / s.size > 0.8) attention.push({ t: `${s.name} is ${Math.round((100 * s.active) / s.size)}% full`, s: 'Consider a larger address range.', to: 'dhcp' }); });
   (dns?.upstreams || []).forEach((u) => { if (u.state !== 'healthy') attention.push({ t: `DNS server ${u.name} is ${u.state}`, s: u.last_error || '', to: 'dns' }); });
+
+  if (upd?.available && upd.mode !== 'off' && upd.state === 'idle') attention.push({ t: 'Updates are ready to install', s: [upd.gatehouse_new && upd.latest ? `Gatehouse ${upd.latest.version}` : '', upd.system_count > 0 ? `${upd.system_count} system update${upd.system_count === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and '), to: 'settings' });
+  if (upd?.needs_reboot) attention.push({ t: 'A restart is needed', s: 'The system was updated and needs a restart to finish.', to: 'settings' });
 
   const outcomes = st ? [
     { k: 'Forwarded', v: st.outcomes.forwarded || 0 },

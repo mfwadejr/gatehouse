@@ -20,6 +20,7 @@ type client struct {
 	base string
 	hc   *http.Client
 	csrf string
+	app  *App // set by the boxes that build their own app, for tests that need to reach inside
 }
 
 func (c *client) call(method, path string, body any) (int, map[string]any, []byte) {

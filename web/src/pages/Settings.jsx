@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { del, get, post, put, useData } from '../api.js';
-import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, ToggleRow, useAction, fmt } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, Select, ToggleRow, useAction, fmt } from '../ui.jsx';
 import { Enrol } from './Auth.jsx';
 
 function Password() {
@@ -132,68 +132,128 @@ function ConsolePort() {
   );
 }
 
+const hourLabel = (h) => `${h === 0 ? 12 : h > 12 ? h - 12 : h}:00 ${h < 12 ? 'AM' : 'PM'}`;
+
+function UpdateSteps({ steps, rollingBack }) {
+  const mark = { done: '✓', active: '●', pending: '○' };
+  return (
+    <ol className="usteps" aria-label="Update progress">
+      {steps.map((st) => (
+        <li key={st.id} className={st.state}><span aria-hidden="true">{mark[st.state]}</span> {st.label}{st.state === 'active' && rollingBack ? ' (undoing)' : ''}</li>
+      ))}
+    </ol>
+  );
+}
+
 function Updates({ me }) {
   const { data, reload } = useData('/api/system/update', { every: 15000 });
   const [run, busy] = useAction();
   const [asking, setAsking] = useState(false);
   const [code, setCode] = useState('');
-  const [job, setJob] = useState(null); // { to, since } while an update is installing
+  const [job, setJob] = useState(null); // { since } while an update is going on
+  const [live, setLive] = useState(null); // fresher status while something is happening
+  const [lost, setLost] = useState(false);
   const [repo, setRepo] = useState(null);
   const [outcome, setOutcome] = useState(null);
+  const d = live || data;
 
-  // While installing, the console restarts, so errors are expected; keep asking until it answers.
+  // An update that is already going on (the page was opened or reloaded in the middle of it).
   useEffect(() => {
-    if (!job) return undefined;
+    if (!job && data && (data.working || data.state !== 'idle')) setJob({ since: 0 });
+  }, [data, job]);
+
+  // While installing the console restarts, so errors are expected; keep asking until it answers.
+  useEffect(() => {
+    if (!job && !data?.checking) return undefined;
+    let lastOk = Date.now();
     const t = setInterval(async () => {
       try {
-        const d = await get('/api/system/update');
-        const r = d.result;
-        if (r && r.at >= job.since && d.state === 'idle') {
-          setOutcome(r);
-          setJob(null);
+        const x = await get('/api/system/update');
+        lastOk = Date.now();
+        setLost(false);
+        setLive(x);
+        if (job) {
+          const r = x.result;
+          if (!x.working && x.state === 'idle' && (x.run_error || (r && r.at >= job.since))) {
+            setOutcome({ result: r && r.at >= job.since ? r : null, error: x.run_error });
+            setJob(null);
+            setLive(null);
+            reload();
+          }
+        } else if (!x.checking) {
+          setLive(null);
           reload();
         }
-      } catch { /* the console is restarting */ }
+      } catch {
+        if (Date.now() - lastOk > 180000) setLost(true);
+      }
     }, 3000);
     return () => clearInterval(t);
-  }, [job, reload]);
+  }, [job, data?.checking, reload]);
 
-  if (!data) return null;
+  if (!d) return null;
   const go = async () => {
     const r = await run(() => post('/api/system/update/install', { code }));
-    if (r) { setAsking(false); setCode(''); setOutcome(null); setJob({ to: r.to, since: Math.floor(Date.now() / 1000) - 5 }); }
+    if (r) { setAsking(false); setCode(''); setOutcome(null); setJob({ since: Math.floor(Date.now() / 1000) - 5 }); }
   };
   const start = () => { if (me?.user?.totp_enabled) setAsking(true); else go(); };
-  const l = data.latest;
+  const save = (patch) => run(() => put('/api/system/update/settings', patch)).then(reload);
+  const l = d.latest;
+  const steps = d.steps || [];
+  const working = !!job;
+  const res = outcome?.result;
   return (
-    <Card title="Updates" desc="Gatehouse updates itself from signed releases. Nothing is installed until you press Update now, and your settings are kept."
-      actions={<Button small disabled={busy || !!job || !data.key_set} onClick={() => run(() => post('/api/system/update/check', {}), 'Checked.').then(reload)}>Check now</Button>}>
+    <Card title="Updates" desc="Gatehouse and the system underneath it update together, from one button. Nothing is installed until you press Update now, unless you choose Automatic below. Your settings are kept."
+      actions={<Button small disabled={busy || working || d.checking || !d.key_set} onClick={() => run(() => post('/api/system/update/check', {})).then(() => { reload(); })}>Check now</Button>}>
       <div className="stack">
-        <div className="inline"><span>You are running version <b>{data.current}</b>.</span>{data.checked_at > 0 && <span className="small muted">Checked {fmt.ago(data.checked_at)}</span>}</div>
-        {!data.key_set && <Note tone="warn" title="Updates are not set up in this build">This copy of Gatehouse has no update signing key, so it cannot install updates. Build a new installer once with a key (docs/UPDATES.md); after that, updates need no installer.</Note>}
-        {data.key_set && data.error && <Note tone="warn" title="Could not look for updates">{data.error}</Note>}
-        {job && <Note tone="good" title={`Installing ${job.to}`}>This takes about a minute. The console restarts and this page reconnects by itself. If anything goes wrong the old version is put back automatically.</Note>}
-        {!job && outcome && (outcome.ok
-          ? <Note tone="good" title={`Updated to ${outcome.to}`}>Everything is running the new version.</Note>
-          : <Note tone="bad" title="The update did not work and was undone">Version {outcome.to} could not start, so {outcome.from} was put back. {outcome.error}</Note>)}
-        {!job && !outcome && data.result && !data.result.ok && <Note tone="warn" title="The last update was undone">{data.result.error}</Note>}
-        {!job && data.available && l && (
-          <Note tone="good" title={`Version ${l.version} is available`}>
-            {l.notes && <div style={{ whiteSpace: 'pre-wrap', margin: '.25rem 0 .5rem' }}>{l.notes}</div>}
-            <Button kind="primary" disabled={busy || data.state !== 'idle'} onClick={start}>Update now</Button>
+        <div className="inline"><span>You are running version <b>{d.current}</b>.</span>{d.checked_at > 0 && <span className="small muted">Checked {fmt.ago(d.checked_at)}</span>}</div>
+        {!d.key_set && <Note tone="warn" title="Updates are not set up in this build">This copy of Gatehouse has no update signing key, so it cannot install updates. Build a new installer once with a key (docs/UPDATES.md); after that, updates need no installer.</Note>}
+        {d.key_set && d.error && <Note tone="warn" title="Could not look for Gatehouse updates">{d.error}</Note>}
+        {d.key_set && d.system_error && <Note tone="warn" title="Could not look at the system updates">{d.system_error}</Note>}
+        {d.checking && !working && <p className="muted">Looking at what the system has waiting…</p>}
+        {working && (
+          <Note tone="good" title="Updating">
+            {steps.length > 0 && <UpdateSteps steps={steps} rollingBack={d.rolling_back} />}
+            <p className="small" style={{ margin: '.5rem 0 0' }}>{d.rolling_back ? 'Something went wrong, so the previous version is being put back.' : 'This takes a few minutes. The console restarts near the end and this page reconnects by itself. If anything goes wrong the old Gatehouse is put back automatically.'}</p>
+            {lost && <p className="small" style={{ margin: '.5rem 0 0' }}><b>This page cannot reach the machine.</b> Look at the machine's own screen: it shows what is happening.</p>}
           </Note>
         )}
-        {!job && data.key_set && !data.available && !data.error && data.checked_at > 0 && <p className="muted">You have the newest version.</p>}
-        {data.needs_reboot && <Note tone="warn" title="A restart is needed">Operating system updates were installed that need a restart to finish. Restart the machine when it suits you.</Note>}
-        <ToggleRow title="Install Debian security updates automatically" desc="Fixes for the operating system underneath Gatehouse. Off by default; when on, the machine checks daily." checked={data.os_security}
-          onChange={(v) => run(() => put('/api/system/update/os-security', { enabled: v })).then(reload)} />
+        {!working && outcome && (outcome.error
+          ? <Note tone="bad" title="The update could not start">{outcome.error}</Note>
+          : res?.ok
+            ? <Note tone="good" title={res.from === res.to ? 'System updates installed' : `Updated to ${res.to}`}>
+                {res.from === res.to ? 'Gatehouse was already the newest version.' : 'Everything is running the new version.'}
+                {res.system && res.system.packages > 0 && ` ${res.system.packages} system packages were updated.`}
+                {res.system?.skipped && ` The system updates were skipped: ${res.system.skipped}`}
+              </Note>
+            : <Note tone="bad" title={res?.rolled_back ? 'The update did not work and was undone' : 'The update did not work'}>{res?.error}</Note>)}
+        {!working && !outcome && d.result && !d.result.ok && <Note tone="warn" title={d.result.rolled_back ? 'The last update was undone' : 'The last update did not work'}>{d.result.error}</Note>}
+        {!working && d.available && (
+          <Note tone="good" title="Updates are ready">
+            <ul className="ulist">
+              {d.gatehouse_new && l && <li><b>Gatehouse {l.version}</b>{l.notes && <div style={{ whiteSpace: 'pre-wrap' }} className="small">{l.notes}</div>}</li>}
+              {d.system_count > 0 && <li><b>{d.system_count} system update{d.system_count === 1 ? '' : 's'}</b>{d.system_names?.length > 0 && <span className="small muted"> ({d.system_names.slice(0, 6).join(', ')}{d.system_count > 6 ? ', …' : ''})</span>}</li>}
+            </ul>
+            <Button kind="primary" disabled={busy || d.state !== 'idle'} onClick={start}>Update now</Button>
+          </Note>
+        )}
+        {!working && d.key_set && !d.available && !d.error && !d.system_error && !d.checking && d.checked_at > 0 && <p className="muted">Everything is up to date.</p>}
+        {d.needs_reboot && <Note tone="warn" title="A restart is needed">The system was updated and needs a restart to finish. Restart the machine when it suits you; the network is down for about a minute while it restarts.</Note>}
+        <Field label="Updating" hint="Off: only when you press Check now. Notify: Gatehouse looks twice a day and tells you when something is ready. Automatic: it installs by itself in the hour you choose below.">
+          <Segmented value={d.mode} onChange={(v) => save({ mode: v })} options={[{ value: 'off', label: 'Off' }, { value: 'notify', label: 'Notify' }, { value: 'auto', label: 'Automatic' }]} />
+        </Field>
+        {d.mode === 'auto' && (
+          <Field label="Start automatic updates at" hint="Gatehouse restarts for about a minute while it updates, so pick a quiet hour (the machine's own clock).">
+            <Select value={String(d.window)} onChange={(v) => save({ window: Number(v) })} options={Array.from({ length: 24 }, (_, h) => ({ value: String(h), label: hourLabel(h) }))} style={{ maxWidth: '10rem' }} />
+          </Field>
+        )}
         <Field label="Where releases come from" hint="The GitHub page that publishes Gatehouse releases, as owner/name. Only releases signed with this build's key are ever installed.">
-          <div className="inline"><Input value={repo ?? data.repo} onChange={setRepo} style={{ maxWidth: '18rem' }} />
-            <Button disabled={busy || repo === null || repo === data.repo} onClick={() => run(() => put('/api/system/update/settings', { repo }), 'Saved.').then(() => { setRepo(null); reload(); })}>Save</Button></div>
+          <div className="inline"><Input value={repo ?? d.repo} onChange={setRepo} style={{ maxWidth: '18rem' }} />
+            <Button disabled={busy || repo === null || repo === d.repo} onClick={() => run(() => put('/api/system/update/settings', { repo }), 'Saved.').then(() => { setRepo(null); reload(); })}>Save</Button></div>
         </Field>
       </div>
       {asking && (
-        <Modal title="Install the update" onClose={() => setAsking(false)}
+        <Modal title="Install the updates" onClose={() => setAsking(false)}
           footer={<><Button onClick={() => setAsking(false)}>Cancel</Button><Button kind="primary" disabled={busy || code.length < 6} onClick={go}>Install</Button></>}>
           <Field label="Code from your authenticator app"><Input value={code} onChange={setCode} inputMode="numeric" autoComplete="one-time-code" autoFocus /></Field>
         </Modal>

@@ -25,14 +25,17 @@ func updateApply() {
 	if err != nil {
 		log.Fatalf("update: %v", err)
 	}
-	data, err := os.ReadFile(filepath.Join(netd.UpdateStage, "package.tar.gz"))
-	if err != nil {
-		log.Fatalf("update: %v", err)
-	}
-	sig, _ := os.ReadFile(filepath.Join(netd.UpdateStage, "package.sig"))
-	p, err := update.Open(data, string(sig), pub)
-	if err != nil {
-		log.Fatalf("update: %v", err)
+	var p *update.Package // nil when only the operating system is being updated
+	if _, err := os.Stat(filepath.Join(netd.UpdateStage, "system-only")); err != nil {
+		data, err := os.ReadFile(filepath.Join(netd.UpdateStage, "package.tar.gz"))
+		if err != nil {
+			log.Fatalf("update: %v", err)
+		}
+		sig, _ := os.ReadFile(filepath.Join(netd.UpdateStage, "package.sig"))
+		p, err = update.Open(data, string(sig), pub)
+		if err != nil {
+			log.Fatalf("update: %v", err)
+		}
 	}
 	from := strings.TrimSpace(readFile(netd.ReleaseFile))
 	fw.ConsolePortFile = "/var/lib/gatehouse/console.port"
@@ -45,6 +48,7 @@ func updateApply() {
 			}
 			return nil
 		},
+		System:       netd.SystemUpgrade,
 		Health:       consoleAnswers,
 		Sleep:        time.Sleep,
 		Now:          time.Now,
@@ -55,10 +59,34 @@ func updateApply() {
 	res := update.Apply(env, p, from)
 	os.RemoveAll(netd.UpdateStage)
 	if res.OK {
-		log.Printf("update: now running %s", res.To)
+		log.Printf("update: now running %s (system packages changed: %d)", res.To, systemCount(res))
 	} else {
 		log.Printf("update: %s", res.Error)
 	}
+}
+
+// readPackageList reads one package name per line; blank lines and # comments are ignored.
+func readPackageList(path string) []string {
+	if path == "" {
+		return nil
+	}
+	var out []string
+	for _, l := range strings.Split(readFile(path), "\n") {
+		if i := strings.Index(l, "#"); i >= 0 {
+			l = l[:i]
+		}
+		if l = strings.TrimSpace(l); l != "" {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+func systemCount(r update.Result) int {
+	if r.System == nil {
+		return 0
+	}
+	return r.System.Packages
 }
 
 func readFile(p string) string {
@@ -91,6 +119,7 @@ func updateBuild(args []string) {
 	units := fs.String("units", "", "folder with the service files")
 	keyFile := fs.String("key", "", "the signing key (OpenSSH, no passphrase)")
 	out := fs.String("out", ".", "where to write the package and its signature")
+	pkgs := fs.String("packages", "", "file listing the Debian packages this release needs, one per line")
 	fs.Parse(args)
 	if *version == "" || *bin == "" || *keyFile == "" {
 		log.Fatal("update-build: -version, -bin and -key are required")
@@ -109,7 +138,7 @@ func updateBuild(args []string) {
 			}
 		}
 	}
-	data, err := update.Build(*version, readFile(*notes), time.Now().UTC().Format("2006-01-02"), files, modes)
+	data, err := update.BuildWith(*version, readFile(*notes), time.Now().UTC().Format("2006-01-02"), readPackageList(*pkgs), files, modes)
 	if err != nil {
 		log.Fatalf("update-build: %v", err)
 	}
