@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useId, useMemo, useState, 
 export const ICONS = {
   overview: 'M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z',
   internet: 'M2 9a15 15 0 0120 0M5 12.5a10 10 0 0114 0M8.5 16a5 5 0 017 0M12 19.5h.01',
+  networks: 'M9 3h6v5H9zM12 8v3M5 11h14M5 11v3M19 11v3M2 14h6v6H2zM16 14h6v6h-6z',
   wifi: 'M5 19v-3M10 19v-7M15 19V8M20 19V4',
   dns: 'M12 21a9 9 0 100-18 9 9 0 000 18zM3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18',
   dhcp: 'M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01',

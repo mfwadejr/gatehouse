@@ -4,7 +4,7 @@ import { Bar, Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page,
 
 const HOURS = [{ value: 3600, label: '1 hour' }, { value: 14400, label: '4 hours' }, { value: 43200, label: '12 hours' }, { value: 86400, label: '1 day' }, { value: 604800, label: '1 week' }];
 
-function ScopeForm({ initial, ifaces, onClose, onSaved }) {
+export function ScopeForm({ initial, ifaces, onClose, onSaved }) {
   const [s, setS] = useState({ mode: 'serve', lease_seconds: 43200, domain: 'lan', enabled: true, dns: '', ntp: '', relay_addr: '', ...initial });
   const [run, busy] = useAction();
   const set = (k) => (v) => setS((x) => ({ ...x, [k]: v }));
@@ -16,7 +16,7 @@ function ScopeForm({ initial, ifaces, onClose, onSaved }) {
     setS((x) => ({ ...x, range_start: x.range_start || `${base}.100`, range_end: x.range_end || `${base}.200`, router: x.router || `${base}.1`, dns: x.dns || `${base}.1` }));
   };
   return (
-    <Modal title={s.id ? `Edit ${s.name}` : 'Add a network for DHCP'} onClose={onClose}
+    <Modal title={s.id ? `DHCP for ${s.name}` : `Set up DHCP for ${s.name || 'this network'}`} onClose={onClose}
       footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy} onClick={async () => { if (await run(() => put('/api/dhcp/scopes', s), 'Saved.')) { onSaved(); onClose(); } }}>Save</Button></>}>
       <div className="formgrid">
         <Field label="Name"><Input value={s.name} onChange={set('name')} /></Field>
@@ -57,7 +57,7 @@ function Scopes() {
     if (r) setResult((x) => ({ ...x, [s.id]: r }));
   };
   return (
-    <Card title="Networks" desc="Each network gets its own pool of addresses." actions={<Button small icon="plus" onClick={() => setEdit({})}>Add network</Button>}>
+    <Card title="Address pools" desc="Each network gets its own pool of addresses. Add networks on the Networks page.">
       <div className="list">
         {(scopes || []).map((s) => {
           const u = (util || []).find((x) => x.scope_id === s.id);
@@ -80,7 +80,7 @@ function Scopes() {
             </div>
           );
         })}
-        {!scopes?.length && <Empty>No networks yet. Add one so devices get addresses automatically.</Empty>}
+        {!scopes?.length && <Empty>No networks yet. Add one on the Networks page and devices get addresses automatically.</Empty>}
       </div>
       {edit && <ScopeForm initial={edit} ifaces={ifs || []} onClose={() => setEdit(null)} onSaved={reload} />}
     </Card>
@@ -160,7 +160,7 @@ export default function DHCP() {
           {r.found.map((f) => f.server).join(', ')} hands out addresses here as well, so devices may get the wrong settings. Switch that device's DHCP off, or turn DHCP off for this network in Gatehouse.
         </Note>
       ))}
-      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'scopes', label: 'Networks' }, { value: 'leases', label: 'Devices' }, { value: 'resv', label: 'Reservations' }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'scopes', label: 'Address pools' }, { value: 'leases', label: 'Devices' }, { value: 'resv', label: 'Reservations' }]} />
       {tab === 'scopes' && <Scopes />}
       {tab === 'leases' && <Leases />}
       {tab === 'resv' && <Reservations />}

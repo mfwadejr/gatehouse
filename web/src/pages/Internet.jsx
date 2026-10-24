@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { del, put, useData } from '../api.js';
 import ApplyBar from '../ApplyBar.jsx';
-import AddNetwork from '../AddNetwork.jsx';
 import WanGroups, { Traffic } from './WanGroups.jsx';
 import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, ToggleRow, useAction, useToast, fmt } from '../ui.jsx';
 
@@ -12,7 +11,7 @@ const TYPES = [
 ];
 
 // Watches the network ports and reports the one whose cable was just plugged in.
-function usePortWatch(active) {
+export function usePortWatch(active) {
   const { data } = useData('/api/net/ports', { every: active ? 1500 : 5000, enabled: true });
   const base = useRef(null);
   const [found, setFound] = useState('');
@@ -26,7 +25,7 @@ function usePortWatch(active) {
   return { ports: data || [], found };
 }
 
-function PortPicker({ value, onChange, ports, found, exclude = [] }) {
+export function PortPicker({ value, onChange, ports, found, exclude = [] }) {
   const options = ports.filter((p) => !exclude.includes(p.name));
   if (!options.length) return <Input value={value} onChange={onChange} placeholder="eth0" />;
   return (
@@ -80,35 +79,6 @@ function WanForm({ initial, ports, found, onClose, onSaved, wans }) {
           <Field label="Packet size (MTU)" hint="0 for automatic"><NumberInput value={w.mtu} onChange={set('mtu')} /></Field>
         </div>
       )}
-    </Modal>
-  );
-}
-
-function IfaceForm({ initial, ports, found, onClose, onSaved, zones }) {
-  const [f, setF] = useState({ kind: 'phys', vlan: 10, ipv4: '192.168.1.1/24', enabled: true, zone_id: 0, ...initial });
-  const [run, busy] = useAction();
-  const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
-  const save = async () => {
-    const body = { ...f };
-    if (body.kind === 'vlan') body.name = body.name || `${body.parent}.${body.vlan}`;
-    const ok = await run(() => put('/api/net/interfaces', body), 'Saved. Apply it to start using it.');
-    if (ok) { onSaved(); onClose(); }
-  };
-  return (
-    <Modal title={f.id ? `Edit ${f.name}` : 'Add a network port'} onClose={onClose}
-      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" onClick={save} disabled={busy}>Save</Button></>}>
-      <Segmented value={f.kind} onChange={set('kind')} options={[{ value: 'phys', label: 'A port' }, { value: 'vlan', label: 'A separate network on a port (VLAN)' }]} />
-      {f.kind === 'phys' ? (
-        <Field label="Port"><PortPicker value={f.name} onChange={set('name')} ports={ports} found={found} /></Field>
-      ) : (
-        <div className="formgrid">
-          <Field label="Port it rides on"><PortPicker value={f.parent} onChange={set('parent')} ports={ports} found={found} /></Field>
-          <Field label="VLAN number"><NumberInput value={f.vlan} onChange={set('vlan')} /></Field>
-        </div>
-      )}
-      <Field label="This device's address on this network" hint="With the size, like 192.168.1.1/24. Devices here will use it as their gateway."><Input value={f.ipv4} onChange={set('ipv4')} /></Field>
-      <Field label="Firewall network"><Select value={String(f.zone_id || 0)} onChange={(v) => set('zone_id')(Number(v))} options={[{ value: '0', label: 'Not assigned yet' }, ...zones.map((z) => ({ value: String(z.id), label: z.name }))]} /></Field>
-      <ToggleRow title="In use" checked={f.enabled} onChange={set('enabled')} />
     </Modal>
   );
 }
@@ -170,19 +140,16 @@ export default function Internet({ me }) {
   const { data: zones } = useData('/api/fw/zones', { topics: ['fw.status'] });
   const { data: fwo, reload: rfw } = useData('/api/fw/overview', { topics: ['fw.status'] });
   const [edit, setEdit] = useState(null);
-  const [editIf, setEditIf] = useState(null);
-  const [addNet, setAddNet] = useState(false);
-  const toast = useToast();
   const [run] = useAction();
   const wans = wd?.wans || [];
   const isNew = wd && ifs && wans.length === 0 && ifs.length === 0;
-  const { ports, found } = usePortWatch(isNew || !!edit || !!editIf);
+  const { ports, found } = usePortWatch(isNew || !!edit);
   const all = () => { rw(); ri(); rs(); };
   const links = st?.links || {};
   const stat = st?.status;
 
   return (
-    <Page title="Internet" sub="How this device connects to your provider, and the ports your own networks use.">
+    <Page title="Internet" sub="How this device connects to your internet provider. Your own networks are on the Networks page.">
       {wd && ifs && isNew && <QuickSetup ports={ports} found={found} onDone={all} />}
       {!stat?.helper && stat && <Note tone="warn" title="Network changes are unavailable">The network helper is not running, so connections can be viewed but not changed.</Note>}
 
@@ -215,32 +182,7 @@ export default function Internet({ me }) {
       <WanGroups wans={wans} links={links} onChanged={all} />
       <Traffic wans={wans} links={links} />
 
-      {(ifs?.length > 0 || !isNew) && (
-        <Card title="Your networks and ports" actions={<><Button kind="primary" icon="plus" onClick={() => setAddNet(true)}>Add a network</Button><Button onClick={() => setEditIf({})}>Add port or VLAN</Button></>}
-          desc="Each one is a separate network. Give it a firewall network on the Firewall page to decide what it can reach.">
-          {!ifs?.length ? <Empty>None yet.</Empty> : (
-            <div className="list">
-              {ifs.map((i) => (
-                <div className="item" key={i.id}>
-                  <div><div className="name">{i.name} {!i.enabled && <Pill>Off</Pill>}</div><div className="meta">{i.kind === 'vlan' ? `VLAN ${i.vlan} on ${i.parent} · ` : ''}{i.ipv4 || 'no address'}{i.zone_id ? ` · ${zones?.find((z) => z.id === i.zone_id)?.name || ''}` : ' · not assigned to a firewall network'}</div></div>
-                  <div className="actions"><Button small icon="edit" onClick={() => setEditIf(i)}>Edit</Button><Button small kind="danger" icon="trash" onClick={() => { if (window.confirm(`Remove ${i.name}?`)) run(() => del(`/api/net/interfaces/${i.id}`)).then(all); }}>Remove</Button></div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
-      )}
-
-      <Card title="Network ports on this device" desc="Live status and addresses.">
-        <div className="list">
-          {ports.map((p) => <div className="item" key={p.name}><div><div className="name">{p.name} {p.usb && <Pill>USB</Pill>}</div><div className="meta mono">{p.mac}</div><div className="meta">{p.addrs?.length ? <>Address <span className="mono">{p.addrs.join(', ')}</span></> : 'No address'}</div></div><Pill tone={p.link ? 'good' : ''}>{p.wifi ? (p.link ? 'Wi-Fi connected' : 'Wi-Fi not connected') : p.link ? `Connected${p.speed > 0 ? ` · ${p.speed} Mb/s` : ''}` : 'No cable'}</Pill></div>)}
-          {!ports.length && <Empty>No network ports found.</Empty>}
-        </div>
-      </Card>
-
       {edit && <WanForm initial={edit} wans={wans} ports={ports} found={found} onClose={() => setEdit(null)} onSaved={all} />}
-      {addNet && <AddNetwork onClose={() => setAddNet(false)} onCreated={(n) => { setAddNet(false); toast(`${n} added. Review and apply it below.`); all(); rfw(); }} />}
-      {editIf && <IfaceForm initial={editIf} ports={ports} found={found} zones={zones || []} onClose={() => setEditIf(null)} onSaved={all} />}
       <ApplyBar kind="net" label="your network settings" status={stat} me={me} onChanged={all} />
       {!stat?.dirty && !stat?.pending && fwo?.status && <ApplyBar kind="fw" label="the firewall" status={fwo.status} me={me} onChanged={rfw} />}
     </Page>

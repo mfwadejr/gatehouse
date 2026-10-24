@@ -4,6 +4,7 @@ import { Icon, Loading } from './ui.jsx';
 import { Enrol, Login, Setup } from './pages/Auth.jsx';
 import Overview from './pages/Overview.jsx';
 import Internet from './pages/Internet.jsx';
+import Networks from './pages/Networks.jsx';
 import Wifi from './pages/Wifi.jsx';
 import DNS from './pages/DNS.jsx';
 import DHCP from './pages/DHCP.jsx';
@@ -18,6 +19,7 @@ import Wizard from './pages/Wizard.jsx';
 export const PAGES = [
   { id: 'overview', label: 'Overview', icon: 'overview', el: Overview },
   { id: 'internet', label: 'Internet', icon: 'internet', el: Internet },
+  { id: 'networks', label: 'Networks', icon: 'networks', el: Networks },
   { id: 'wifi', label: 'Wi-Fi', icon: 'wifi', el: Wifi },
   { id: 'dns', label: 'DNS', icon: 'dns', el: DNS },
   { id: 'dhcp', label: 'DHCP', icon: 'dhcp', el: DHCP },
@@ -59,7 +61,7 @@ function Shell({ me, onSignOut, reloadMe }) {
             <a key={p.id} href={`#/${p.id}`} className={p.id === page.id ? 'on' : ''} aria-current={p.id === page.id ? 'page' : undefined}>
               <Icon name={p.icon} />
               <span>{p.label}</span>
-              {(p.id === 'firewall' || p.id === 'internet') && (dirty || pending) && <span className={`dot ${pending ? 'bad' : 'warn'} badge-dot`} title={pending ? 'A change is waiting for your confirmation' : 'Changes not applied yet'} />}
+              {(p.id === 'firewall' || p.id === 'internet' || p.id === 'networks') && (dirty || pending) && <span className={`dot ${pending ? 'bad' : 'warn'} badge-dot`} title={pending ? 'A change is waiting for your confirmation' : 'Changes not applied yet'} />}
             </a>
           ))}
         </nav>
