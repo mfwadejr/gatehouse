@@ -13,7 +13,7 @@ func testEnv(in *Installer) *TextEnv {
 		Ports: func() []Port {
 			return []Port{{Name: "enp1s0"}, {Name: "enp2s0", Link: true, Speed: "1000"}, {Name: "enp3s0", USB: true}}
 		},
-		Refresh: func() {}, Poll: 5 * time.Millisecond, Settle: time.Millisecond, Serial: "ttyS0, 115200 baud, 8N1"}
+		Refresh: func() {}, Poll: 5 * time.Millisecond, Settle: time.Millisecond, Serial: "ttyS0, 115200 baud, 8N1", RestartWait: time.Millisecond}
 }
 
 func run(t *testing.T, script string, env *TextEnv) (string, error) {
@@ -132,5 +132,38 @@ func TestRecoveryScreen(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "Too short: 5 of the 12") || strings.Contains(out.String(), "a long enough pass") {
 		t.Fatal("password feedback wrong or the password was echoed")
+	}
+}
+
+// After the installation the program must stay alive until the machine has restarted. If it
+// returned straight away, the service would start the installer over again and the person would
+// see the welcome screen instead of a restart.
+func TestFinishedInstallWaitsForRestart(t *testing.T) {
+	in, _ := newTest(t)
+	restarted := make(chan struct{}, 1)
+	in.RebootFn = func() { restarted <- struct{}{} }
+	in.st.State = "done"
+	env := testEnv(in)
+	env.RestartWait = 200 * time.Millisecond
+	var out bytes.Buffer
+	done := make(chan struct{})
+	go func() {
+		// Enter at the "installed" screen.
+		finish(NewTerm(strings.NewReader("\r"), &out), env)
+		close(done)
+	}()
+	select {
+	case <-restarted:
+	case <-time.After(3 * time.Second):
+		t.Fatal("the machine was never restarted")
+	}
+	select {
+	case <-done:
+		// returned only after the wait, never before the restart was requested
+	case <-time.After(10 * time.Second):
+		t.Fatal("the screen never ended")
+	}
+	if !strings.Contains(out.String(), "Restarting") {
+		t.Fatalf("no restart message:\n%s", out.String())
 	}
 }

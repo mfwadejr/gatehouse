@@ -182,12 +182,21 @@ func (t *Term) password(prompt string) (string, error) {
 
 // TextEnv is what the wizard looks at. Tests replace the pieces.
 type TextEnv struct {
-	In      *Installer
-	Ports   func() []Port
-	Refresh func() // bring ports up so cables are noticed
-	Poll    time.Duration
-	Settle  time.Duration // how long to wait for a port to come up before listing
-	Serial  string        // description of the serial console, shown on the first screen
+	In          *Installer
+	Ports       func() []Port
+	Refresh     func() // bring ports up so cables are noticed
+	Poll        time.Duration
+	Settle      time.Duration // how long to wait for a port to come up before listing
+	Serial      string        // description of the serial console, shown on the first screen
+	RestartWait time.Duration // how long to wait for the restart; tests shorten it
+}
+
+// restartWait is how long the screen waits for the machine to restart before it says it could not.
+func (e *TextEnv) restartWait() time.Duration {
+	if e.RestartWait > 0 {
+		return e.RestartWait
+	}
+	return 30 * time.Second
 }
 
 func NewTextEnv(in *Installer, serial string) *TextEnv {
@@ -333,19 +342,7 @@ func textOnce(t *Term, env *TextEnv) error {
 		sc := NewScreen(t.W, t.H)
 		switch st.State {
 		case "done":
-			sc.header("Installed")
-			sc.mid(green + "●" + reset + bold + " Installation complete" + reset)
-			sc.blank()
-			sc.mid(fg + "Press Enter to restart." + reset)
-			sc.mid(fg + "Take the USB stick out as soon as the screen goes blank." + reset)
-			sc.blank()
-			sc.mid(dim + "After it starts, this screen shows an address. Open it in a browser" + reset)
-			sc.mid(dim + "to create your administrator account and finish setup." + reset)
-			t.show(sc)
-			if _, err := t.readLine(true); err != nil {
-				return err
-			}
-			return env.In.Reboot()
+			return finish(t, env)
 		case "error":
 			sc.header("Installation failed")
 			sc.mid(red + "●" + reset + bold + " " + trim(st.Error, t.W-8) + reset)
@@ -401,4 +398,43 @@ func lastLines(s string, n int) string {
 		ls = ls[len(ls)-n:]
 	}
 	return strings.Join(ls, "\n")
+}
+
+// finish is the screen after a successful installation. It does not return until the machine has
+// had time to restart, so the service never starts the installer over again.
+func finish(t *Term, env *TextEnv) error {
+	sc := NewScreen(t.W, t.H)
+	sc.header("Installed")
+	sc.mid(green + "●" + reset + bold + " Installation complete" + reset)
+	sc.blank()
+	sc.mid(fg + "Press Enter to restart." + reset)
+	sc.mid(fg + "Take the USB stick out as soon as the screen goes blank." + reset)
+	sc.blank()
+	sc.mid(dim + "After it starts, this screen shows an address. Open it in a browser" + reset)
+	sc.mid(dim + "to create your administrator account and finish setup." + reset)
+	t.show(sc)
+	if _, err := t.readLine(true); err != nil {
+		return err
+	}
+	if err := env.In.Reboot(); err != nil {
+		return err
+	}
+	// The restart happens a moment from now, in the background. Returning here would end
+	// this program before it, and the service would start the installer over again.
+	r := NewScreen(t.W, t.H)
+	r.header("Installed")
+	r.mid(green + "●" + reset + bold + " Restarting" + reset)
+	r.blank()
+	r.mid(fg + "Take the USB stick out as soon as the screen goes blank." + reset)
+	t.show(r)
+	time.Sleep(env.restartWait())
+	r = NewScreen(t.W, t.H)
+	r.header("Installed")
+	r.mid(amber + "●" + reset + bold + " Switch the machine off" + reset)
+	r.blank()
+	r.mid(fg + "It did not restart by itself. Hold the power button, take out the USB stick," + reset)
+	r.mid(fg + "then switch it on again." + reset)
+	t.show(r)
+	time.Sleep(20 * env.restartWait()) // nothing more to do; do not start over
+	return nil
 }
