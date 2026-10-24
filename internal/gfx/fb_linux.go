@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"image"
 	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 
 	"golang.org/x/sys/unix"
 )
@@ -17,6 +19,11 @@ const (
 	kdSetMode          = 0x4B3A
 	kdText             = 0
 	kdGraphics         = 1
+	vtSetMode          = 0x5602
+	vtRelDisp          = 0x5605
+	vtProcess          = 1
+	vtAuto             = 0
+	vtAckAcq           = 2
 )
 
 type channel struct{ off, length uint32 }
@@ -32,6 +39,9 @@ type Display struct {
 	stride, bpp int
 	r, g, b     channel
 	scale       int
+	last        *image.RGBA // what is on the screen, to draw again on return
+	away        bool        // another screen (the recovery screen, say) has the display
+	sig         chan os.Signal
 }
 
 func ioctl(fd uintptr, req uintptr, p []byte) error {
@@ -87,8 +97,54 @@ func OpenDisplay() (*Display, error) {
 	if t, err := os.OpenFile("/dev/tty1", os.O_RDWR, 0); err == nil {
 		ioctlVal(t.Fd(), kdSetMode, kdGraphics)
 		d.tty = t
+		d.handleSwitching()
 	}
 	return d, nil
+}
+
+func vtMode(mode byte, rel, acq syscall.Signal) []byte {
+	b := make([]byte, 8)
+	b[0] = mode
+	b[2], b[3] = byte(rel), byte(rel>>8)
+	b[4], b[5] = byte(acq), byte(acq>>8)
+	return b
+}
+
+// handleSwitching lets people switch to another screen (Alt+F2 is the recovery screen). The kernel
+// refuses to switch away from a screen in graphics mode unless that screen agrees to it, so this
+// asks to be told, gives the display back as text while away, and takes it back and redraws on return.
+func (d *Display) handleSwitching() {
+	d.sig = make(chan os.Signal, 4)
+	signal.Notify(d.sig, syscall.SIGUSR1, syscall.SIGUSR2)
+	if err := ioctl(d.tty.Fd(), vtSetMode, vtMode(vtProcess, syscall.SIGUSR1, syscall.SIGUSR2)); err != nil {
+		// Without this a graphics screen cannot be left; fall back to ordinary text mode.
+		signal.Stop(d.sig)
+		d.sig = nil
+		ioctlVal(d.tty.Fd(), kdSetMode, kdText)
+		return
+	}
+	go func(ch chan os.Signal) {
+		for s := range ch {
+			d.mu.Lock()
+			if d.tty == nil {
+				d.mu.Unlock()
+				return
+			}
+			if s == syscall.SIGUSR1 { // asked to let go of the display
+				d.away = true
+				ioctlVal(d.tty.Fd(), kdSetMode, kdText)
+				ioctlVal(d.tty.Fd(), vtRelDisp, 1)
+			} else { // got it back
+				ioctlVal(d.tty.Fd(), vtRelDisp, vtAckAcq)
+				d.away = false
+				ioctlVal(d.tty.Fd(), kdSetMode, kdGraphics)
+				if d.last != nil && d.mem != nil {
+					d.blit(d.last)
+				}
+			}
+			d.mu.Unlock()
+		}
+	}(d.sig)
 }
 
 // Size is the screen in characters.
@@ -102,7 +158,10 @@ func (d *Display) Write(p []byte) (int, error) {
 		return 0, errors.New("display closed")
 	}
 	d.emu.Write(p)
-	d.blit(d.emu.Render(d.w, d.h, d.scale))
+	d.last = d.emu.Render(d.w, d.h, d.scale)
+	if !d.away { // another screen owns the display; remember what to show when it comes back
+		d.blit(d.last)
+	}
 	return len(p), nil
 }
 
@@ -130,8 +189,13 @@ func (d *Display) Close() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if d.tty != nil {
+		if d.sig != nil {
+			signal.Stop(d.sig)
+			ioctl(d.tty.Fd(), vtSetMode, vtMode(vtAuto, 0, 0))
+		}
 		ioctlVal(d.tty.Fd(), kdSetMode, kdText)
 		d.tty.Close()
+		d.tty = nil
 	}
 	if d.mem != nil {
 		unix.Munmap(d.mem)
