@@ -30,7 +30,7 @@ function PortPicker({ value, onChange, ports, found, exclude = [] }) {
   if (!options.length) return <Input value={value} onChange={onChange} placeholder="eth0" />;
   return (
     <Select value={value} onChange={onChange}
-      options={[{ value: '', label: 'Choose a port…' }, ...options.map((p) => ({ value: p.name, label: `${p.name} — ${p.link ? 'cable connected' : 'no cable'}${p.speed && p.speed > 0 ? `, ${p.speed} Mb/s` : ''}${p.usb ? ', USB adapter' : ''}${found === p.name ? ' (just plugged in)' : ''}` }))]} />
+      options={[{ value: '', label: 'Choose a port…' }, ...options.map((p) => ({ value: p.name, label: `${p.name} — ${p.wifi ? 'Wi-Fi card' : p.link ? 'cable connected' : 'no cable'}${p.speed && p.speed > 0 ? `, ${p.speed} Mb/s` : ''}${p.usb ? ', USB adapter' : ''}${found === p.name ? ' (just plugged in)' : ''}` }))]} />
   );
 }
 
