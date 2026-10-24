@@ -278,14 +278,6 @@ details.more > summary { cursor: pointer; color: var(--color-text-secondary); ma
 .matrix .cell.self { opacity: .7; }
 
 /* Devices page */
-.devlayout { display: grid; grid-template-columns: 13rem minmax(0, 1fr); gap: 1rem; align-items: start; }
-@media (max-width: 52rem) { .devlayout { grid-template-columns: minmax(0, 1fr); } }
-.filters { display: flex; flex-direction: column; gap: .9rem; }
-.fgroup { display: flex; flex-direction: column; gap: .15rem; }
-.fgroup > strong { font-size: .8rem; color: var(--text-muted, inherit); margin-bottom: .1rem; }
-.filter { display: flex; justify-content: space-between; gap: .5rem; text-align: left; padding: .35rem .55rem; border-radius: .5rem; border: 1px solid transparent; background: none; color: inherit; cursor: pointer; font: inherit; }
-.filter:hover { background: var(--surface-2, rgba(127,127,127,.12)); }
-.filter.on { border-color: var(--accent, currentColor); background: var(--surface-2, rgba(127,127,127,.12)); }
 .clickrow { cursor: pointer; }
 .clickrow:hover { background: var(--surface-2, rgba(127,127,127,.08)); }
 .devicon { display: inline-flex; align-items: center; justify-content: center; width: 2.1rem; height: 2.1rem; border-radius: .6rem; background: var(--surface-2, rgba(127,127,127,.12)); flex: none; }

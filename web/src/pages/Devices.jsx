@@ -135,23 +135,16 @@ function Filters({ rows, f, setF }) {
   const count = (fn) => rows.filter(fn).length;
   const networks = [...new Set(rows.map((d) => d.network).filter(Boolean))].sort();
   const groups = [...new Set(rows.flatMap((d) => d.groups || []))].sort();
-  const toggle = (k, v) => setF((x) => ({ ...x, [k]: x[k] === v ? '' : v }));
-  const Item = ({ k, v, label, n }) => (
-    <button type="button" className={`filter ${f[k] === v ? 'on' : ''}`} onClick={() => toggle(k, v)}><span>{label}</span><span className="muted small">{n}</span></button>
-  );
+  const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
   return (
-    <div className="filters">
-      <div className="fgroup"><strong>Status</strong>
-        <Item k="state" v="online" label="Online" n={count((d) => d.online)} />
-        <Item k="state" v="offline" label="Offline" n={count((d) => !d.online)} />
-      </div>
-      <div className="fgroup"><strong>Connection</strong>
-        <Item k="conn" v="wired" label="Wired" n={count((d) => d.conn === 'wired')} />
-        <Item k="conn" v="wifi" label="Wi-Fi" n={count((d) => d.conn === 'wifi')} />
-        <Item k="conn" v="vpn" label="VPN" n={count((d) => d.conn === 'vpn')} />
-      </div>
-      {networks.length > 0 && <div className="fgroup"><strong>Network</strong>{networks.map((n) => <Item key={n} k="network" v={n} label={n} n={count((d) => d.network === n)} />)}</div>}
-      {groups.length > 0 && <div className="fgroup"><strong>Group</strong>{groups.map((g) => <Item key={g} k="group" v={g} label={g} n={count((d) => d.groups?.includes(g))} />)}</div>}
+    <div className="inline" style={{ marginBottom: 'var(--space-3)' }}>
+      <Segmented value={f.state} onChange={set('state')} options={[
+        { value: '', label: `All ${rows.length}` }, { value: 'online', label: `Online ${count((d) => d.online)}` }, { value: 'offline', label: `Offline ${count((d) => !d.online)}` }]} />
+      <Segmented value={f.conn} onChange={set('conn')} options={[
+        { value: '', label: 'Any connection' }, { value: 'wired', label: `Wired ${count((d) => d.conn === 'wired')}` },
+        { value: 'wifi', label: `Wi-Fi ${count((d) => d.conn === 'wifi')}` }, { value: 'vpn', label: `VPN ${count((d) => d.conn === 'vpn')}` }]} />
+      {networks.length > 0 && <div style={{ width: '11rem' }}><Select value={f.network} onChange={set('network')} aria-label="Network" options={[{ value: '', label: 'All networks' }, ...networks.map((n) => ({ value: n, label: n }))]} /></div>}
+      {groups.length > 0 && <div style={{ width: '11rem' }}><Select value={f.group} onChange={set('group')} aria-label="Group" options={[{ value: '', label: 'All groups' }, ...groups.map((g) => ({ value: g, label: g }))]} /></div>}
       {(f.state || f.conn || f.network || f.group) && <Button small onClick={() => setF({ state: '', conn: '', network: '', group: '' })}>Clear filters</Button>}
     </div>
   );
@@ -195,13 +188,13 @@ export default function Devices() {
   return (
     <Page title="Devices & access" sub="Every device that has joined your network. Rename it, give it an icon, filter it, or pause its internet."
       actions={<Button icon="plus" onClick={() => setAdding(true)}>Add a device</Button>}>
-      <div className="devlayout">
-        <Filters rows={all} f={f} setF={setF} />
+      <div>
         <Card actions={
           <div className="inline">
             <div style={{ width: '15rem' }}><Input value={q} onChange={setQ} placeholder="Search name, maker, address" aria-label="Search devices" /></div>
             <Button small onClick={() => setPick(true)}>Columns</Button>
           </div>}>
+          <Filters rows={all} f={f} setF={setF} />
           <div className="scroll">
             <table className="table">
               <thead><tr><th>Device</th>{COLUMNS.filter((c) => colIds.includes(c.id)).map((c) => <th key={c.id}>{c.label}</th>)}<th /></tr></thead>
