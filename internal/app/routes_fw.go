@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"net"
@@ -65,14 +66,7 @@ func (a *App) registerFWRoutes() {
 		a.markDirty()
 		ok(w)
 	})
-	s.Handle("GET /api/fw/rules", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-		l, err := fw.Rules(a.Config)
-		if err != nil {
-			fail(w, err)
-			return
-		}
-		api.JSON(w, 200, l)
-	})
+	s.Handle("GET /api/fw/rules", a.fwRulesView)
 	s.HandleAdmin("PUT /api/fw/rules", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		var in fw.RuleRow
 		if !api.Decode(w, r, &in) {
@@ -83,6 +77,7 @@ func (a *App) registerFWRoutes() {
 			fail(w, err)
 			return
 		}
+		a.fwSync()
 		a.markDirty()
 		api.JSON(w, 200, map[string]int64{"id": id})
 	})
@@ -184,6 +179,7 @@ func (a *App) registerFWRoutes() {
 			return
 		}
 		a.Config.Exec(`UPDATE fw_revisions SET status='rolled_back' WHERE status='pending'`)
+		a.fwSync()
 		a.publishFW()
 		ok(w)
 	})
@@ -263,6 +259,21 @@ func (a *App) fwOverview(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 	}
 	zones, _ := fw.Zones(a.Config)
 	out["zones"] = zones
+	// What the network types alone allow for each pair, so the matrix and the server agree.
+	pairs := map[string]bool{}
+	for _, x := range m.Zones {
+		for _, y := range m.Zones {
+			pairs[x.Name+"|"+y.Name] = fw.PairOpen(x, y)
+		}
+	}
+	out["pair_open"] = pairs
+	out["matrix_zones"] = func() []map[string]any {
+		var zs []map[string]any
+		for _, z := range m.Zones {
+			zs = append(zs, map[string]any{"name": z.Name, "kind": z.Kind})
+		}
+		return zs
+	}()
 	out["settings"] = map[string]any{
 		"dns_redirect": m.DNSRedirect, "block_dot": m.BlockDoT, "log_drops": m.LogDrops,
 		"dns_target": m.DNSTarget,
@@ -324,7 +335,7 @@ func (a *App) fwPreview(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 	}
 	res := map[string]any{"ok": true, "summary": fw.Describe(m), "changed": script != a.lastApplied()}
 	if a.FW != nil {
-		if err := a.FW.Check(script); err != nil {
+		if err := a.FW.Check(a.fullScript(m, script)); err != nil {
 			api.JSON(w, 200, map[string]any{"ok": false, "problems": []string{err.Error()}})
 			return
 		}
@@ -371,7 +382,12 @@ func (a *App) fwApply(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		fail(w, errors.New("this change would disconnect you; it was not applied"))
 		return
 	}
-	tok, deadline, err := a.FW.Apply(script, confirmWindow, c.User.Username)
+	if a.geoMissing(m) {
+		fail(w, errors.New("the country lists are still being downloaded; try again in a minute"))
+		a.geoMaybeRefreshIfNeeded(context.Background())
+		return
+	}
+	tok, deadline, err := a.FW.Apply(a.fullScript(m, script), confirmWindow, c.User.Username)
 	if err != nil {
 		if errors.Is(err, fw.ErrPending) {
 			api.Error(w, http.StatusConflict, err.Error())
@@ -420,6 +436,7 @@ func (a *App) fwConfirm(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 	}
 	a.Config.Exec(`UPDATE fw_revisions SET status='confirmed' WHERE version=?`, ver)
 	a.Config.Exec(`UPDATE fw_revisions SET status='superseded' WHERE status='confirmed' AND version<?`, ver)
+	a.fwSync()
 	a.publishFW()
 	ok(w)
 }

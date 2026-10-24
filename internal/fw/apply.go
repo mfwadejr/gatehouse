@@ -54,10 +54,103 @@ func NewApplier(dir string) *Applier {
 func (a *Applier) path(n string) string { return filepath.Join(a.Dir, n) }
 
 func (a *Applier) nftCmd(args ...string) *exec.Cmd {
+	var c *exec.Cmd
 	if a.Netns != "" {
-		return exec.Command("ip", append([]string{"netns", "exec", a.Netns, a.NFT}, args...)...)
+		c = exec.Command("ip", append([]string{"netns", "exec", a.Netns, a.NFT}, args...)...)
+	} else {
+		c = exec.Command(a.NFT, args...)
 	}
-	return exec.Command(a.NFT, args...)
+	// The kernel checks schedules against UTC. Running nft in UTC too means the times written into
+	// the ruleset are taken exactly as given and not converted a second time.
+	c.Env = append(os.Environ(), "TZ=UTC")
+	return c
+}
+
+// LoadSets fills the dynamic sets (devices, domains, countries) that exist in the loaded ruleset.
+// Sets that are not there are skipped, so a change not yet applied cannot make this fail.
+func (a *Applier) LoadSets(fills map[string]SetFill) error {
+	if len(fills) == 0 {
+		return nil
+	}
+	have, err := a.setNames()
+	if err != nil {
+		return err
+	}
+	script, err := BuildSetScript(fills, have)
+	if err != nil || strings.TrimSpace(script) == "" {
+		return err
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.run(script, false)
+}
+
+// setNames lists the sets in the loaded gatehouse table.
+func (a *Applier) setNames() (map[string]bool, error) {
+	c := a.nftCmd("-j", "list", "sets", "table", "inet", tableName)
+	out, err := c.Output()
+	if err != nil {
+		return map[string]bool{}, nil // no table loaded yet
+	}
+	var doc struct {
+		Nftables []struct {
+			Set *struct {
+				Name string `json:"name"`
+			} `json:"set"`
+		} `json:"nftables"`
+	}
+	if err := json.Unmarshal(out, &doc); err != nil {
+		return nil, err
+	}
+	names := map[string]bool{}
+	for _, it := range doc.Nftables {
+		if it.Set != nil {
+			names[it.Set.Name] = true
+		}
+	}
+	return names, nil
+}
+
+// Counter is how often a rule has matched since the ruleset was loaded.
+type Counter struct {
+	Packets uint64 `json:"packets"`
+	Bytes   uint64 `json:"bytes"`
+}
+
+// Counters sums the match counters of every rule by its comment (the rule's tag).
+func (a *Applier) Counters() (map[string]Counter, error) {
+	out, err := a.nftCmd("-j", "list", "table", "inet", tableName).Output()
+	if err != nil {
+		return map[string]Counter{}, nil
+	}
+	var doc struct {
+		Nftables []struct {
+			Rule *struct {
+				Comment string                       `json:"comment"`
+				Expr    []map[string]json.RawMessage `json:"expr"`
+			} `json:"rule"`
+		} `json:"nftables"`
+	}
+	if err := json.Unmarshal(out, &doc); err != nil {
+		return nil, err
+	}
+	res := map[string]Counter{}
+	for _, it := range doc.Nftables {
+		if it.Rule == nil || !strings.HasPrefix(it.Rule.Comment, "rule:") {
+			continue
+		}
+		var c Counter
+		for _, e := range it.Rule.Expr {
+			if raw, ok := e["counter"]; ok {
+				json.Unmarshal(raw, &c)
+			}
+		}
+		t := res[it.Rule.Comment]
+		t.Packets += c.Packets
+		t.Bytes += c.Bytes
+		res[it.Rule.Comment] = t
+	}
+	return res, nil
 }
 
 func (a *Applier) run(script string, check bool) error {
@@ -323,6 +416,10 @@ type Controller interface {
 	Confirm(token string) error
 	Rollback() error
 	Pending() (token string, deadline time.Time, ok bool)
+	// LoadSets fills the dynamic sets of the loaded ruleset.
+	LoadSets(fills map[string]SetFill) error
+	// Counters reports how often each rule has matched, by the rule's tag.
+	Counters() (map[string]Counter, error)
 }
 
 var _ Controller = (*Applier)(nil)

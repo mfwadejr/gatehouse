@@ -491,6 +491,34 @@ func recoverCmd(args []string) {
 			exec.Command("systemctl", "restart", "gatehouse").Run()
 			return nil
 		},
+		ResetToDefault: func(level string) (string, error) {
+			if err := open(); err != nil {
+				return "", err
+			}
+			defer fixOwner()
+			dir := filepath.Join(*data, "backups")
+			if err := os.MkdirAll(dir, 0o700); err != nil {
+				return "", err
+			}
+			saved := filepath.Join(dir, "before-reset-"+time.Now().Format("20060102-150405")+".db")
+			if _, err := db.Exec(`VACUUM INTO ?`, saved); err != nil {
+				return "", fmt.Errorf("could not save a copy of the settings first: %w", err)
+			}
+			if err := store.ResetConfig(db, level); err != nil {
+				return "", err
+			}
+			if level == store.ResetFactory {
+				if ldb, err := store.OpenLogs(filepath.Join(*data, "logs.db")); err == nil {
+					store.ResetLogs(ldb)
+					ldb.Close()
+				}
+				os.RemoveAll(filepath.Join(*data, "update"))
+			}
+			// The running console puts the empty network and safe firewall in place when it starts.
+			os.WriteFile(filepath.Join(*data, app.ResetMarker), []byte("1\n"), 0o600)
+			exec.Command("systemctl", "restart", "gatehouse").Run()
+			return saved, nil
+		},
 		Diagnose: diagnose,
 	}
 	if err := installer.RunRecoveryConsole(env); err != nil {

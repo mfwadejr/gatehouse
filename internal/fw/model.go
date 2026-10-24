@@ -6,6 +6,8 @@
 // typed into the console can never change the structure of the ruleset.
 package fw
 
+import "time"
+
 // Zone kinds. Wan is the internet side; Vpn zones behave like Private unless changed.
 const (
 	KindTrusted  = "trusted"  // may reach everything; nothing may start a connection to it
@@ -45,6 +47,17 @@ type Rule struct {
 	Limit   int    // packets per second, 0 for none
 	Log     bool
 	Enabled bool
+	IPVer   string // "" for both, "4" or "6"
+	CtState string // "" for any, "new" for new connections only
+	Sched   string // stored schedule, empty for always
+	Descr   string
+	AlsoMAC bool // the device's MAC address must match too (local networks only)
+}
+
+// DevGroup is a named set of devices.
+type DevGroup struct {
+	MACs         []string
+	ReservedOnly bool // members count only at the address reserved for them
 }
 
 // Forward is a port forward from a WAN to an internal address.
@@ -107,6 +120,17 @@ type Model struct {
 	// UPnP lets port mappings made by the automatic port mapping service (a separate table) through the
 	// firewall. It is on only when some network allows UPnP and some internet connection offers it.
 	UPnP bool
+	// Devices lists the known devices by MAC address, DevGroups the device groups, PortLists the
+	// reusable lists of ports.
+	Devices   map[string]bool
+	Names     map[string]string // device names by MAC, for plain-language summaries
+	DevGroups map[string]DevGroup
+	PortLists map[string][]string
+	// Loc and Now place rule schedules in time. They are filled in when the model is loaded.
+	Loc *time.Location
+	Now time.Time
+	// GeoExempt are addresses that region rules never match, such as the far end of a VPN.
+	GeoExempt []string
 	// LogAllowed records new connections that were allowed, with the reason, in the event log.
 	LogAllowed bool
 }

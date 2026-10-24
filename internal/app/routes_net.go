@@ -27,6 +27,7 @@ type NetController interface {
 	NetApply(p netd.Plan, window time.Duration) (string, time.Time, error)
 	NetConfirm(token string) error
 	NetRollback() error
+	NetReset() error
 	NetPending() (string, time.Time, bool)
 	WanStatus() (map[string]wanmon.State, error)
 	ApplyVPN(p netd.VPNPlan) error
@@ -38,6 +39,7 @@ type NetController interface {
 	UpdateStart(path string) error
 	SystemCheck() (netd.SystemUpdates, error)
 	SystemUpdateStart() error
+	Power(action string) error
 }
 
 // IfaceRow is a LAN-side port or VLAN as the console edits it.

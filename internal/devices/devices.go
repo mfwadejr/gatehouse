@@ -3,6 +3,7 @@
 package devices
 
 import (
+	"errors"
 	"net"
 	"strings"
 	"sync/atomic"
@@ -192,6 +193,24 @@ func (d *Directory) Update(id int64, u Update) error {
 	}
 	d.Rebuild()
 	return nil
+}
+
+// Create adds a device by hand, for one that has not been seen on the network yet.
+func (d *Directory) Create(mac, name string) (int64, error) {
+	mac = strings.ToLower(strings.TrimSpace(mac))
+	if hw, err := net.ParseMAC(mac); err != nil || len(hw) != 6 {
+		return 0, errors.New("a device address looks like aa:bb:cc:dd:ee:ff")
+	}
+	var id int64
+	if d.db.QueryRow(`SELECT id FROM devices WHERE mac=?`, mac).Scan(&id) == nil {
+		return 0, errors.New("that device is already in the list")
+	}
+	res, err := d.db.Exec(`INSERT INTO devices(mac,name,first_seen,last_seen) VALUES(?,?,?,0)`, mac, strings.TrimSpace(name), d.clock().Unix())
+	if err != nil {
+		return 0, err
+	}
+	d.Rebuild()
+	return res.LastInsertId()
 }
 
 // Forget removes a device from the list.

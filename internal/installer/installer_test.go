@@ -7,18 +7,28 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
 
 type fake struct {
+	mu    sync.Mutex
 	cmds  []string
 	stdin map[string]string
 	fail  string
 }
 
+func (f *fake) snap() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.cmds...)
+}
+
 func (f *fake) Run(stdin, name string, args ...string) (string, error) {
 	line := name + " " + strings.Join(args, " ")
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.cmds = append(f.cmds, line)
 	if stdin != "" {
 		if f.stdin == nil {
@@ -123,7 +133,7 @@ func TestInstallSequence(t *testing.T) {
 	if s.State != "done" {
 		t.Fatalf("%+v\n%s", s, s.Log)
 	}
-	all := strings.Join(f.cmds, "\n")
+	all := strings.Join(f.snap(), "\n")
 	order := []string{"wipefs -a /dev/nvme0n1", "sgdisk --zap-all", "sgdisk -n1:0:+1M", "mkfs.vfat", "mkfs.ext4 -F -L gatehouse-root /dev/nvme0n1p3", "unsquashfs -f -d", "grub-install --target=x86_64-efi", "update-grub", "chown -R gatehouse:gatehouse /var/lib/gatehouse"}
 	pos := -1
 	for _, o := range order {
@@ -134,7 +144,7 @@ func TestInstallSequence(t *testing.T) {
 		pos = i
 	}
 	// The installer no longer creates an account or a network: that happens in the browser.
-	for _, c := range f.cmds {
+	for _, c := range f.snap() {
 		if strings.Contains(c, "gatehouse user add") || strings.Contains(c, "gatehouse seed") {
 			t.Fatalf("installer should not set up accounts or networks: %s", c)
 		}
@@ -144,7 +154,7 @@ func TestInstallSequence(t *testing.T) {
 		t.Fatalf("fstab: %s", fs)
 	}
 	// Nothing may touch any other disk.
-	for _, c := range f.cmds {
+	for _, c := range f.snap() {
 		if strings.Contains(c, "/dev/sda") && !strings.HasPrefix(c, "lsblk") {
 			t.Fatalf("touched the live medium: %s", c)
 		}
@@ -159,7 +169,8 @@ func TestFailureStopsAndCleansUp(t *testing.T) {
 	if s.State != "error" || !strings.Contains(s.Error, "Formatting") {
 		t.Fatalf("%+v", s)
 	}
-	if strings.Contains(strings.Join(f.cmds, "\n"), "grub-install") {
+	joined := strings.Join(f.snap(), "\n")
+	if strings.Contains(joined, "grub-install") {
 		t.Fatal("continued after a failure")
 	}
 	if in.Start(good()) != nil {

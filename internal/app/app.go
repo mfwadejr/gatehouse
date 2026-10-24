@@ -75,6 +75,7 @@ type App struct {
 	setupMu sync.Mutex
 	con     consoles
 	upd     updates
+	dyn     *fwDyn
 
 	netApplyState struct {
 		mu     sync.Mutex
@@ -97,7 +98,7 @@ func New(cfg Config) (*App, error) {
 	if err := os.MkdirAll(cfg.DataDir, 0o750); err != nil {
 		return nil, err
 	}
-	a := &App{Cfg: cfg, Bus: events.NewBus()}
+	a := &App{Cfg: cfg, Bus: events.NewBus(), dyn: newFWDyn()}
 	var err error
 	if a.Config, err = store.OpenConfig(filepath.Join(cfg.DataDir, "config.db")); err != nil {
 		return nil, fmt.Errorf("config database: %w", err)
@@ -125,7 +126,7 @@ func New(cfg Config) (*App, error) {
 	}
 	a.DHCPSrv = dhcp.NewServer(a.DHCP, cfg.DHCPAddr)
 
-	a.DHCP.OnChange = func() { a.publishLeases() }
+	a.DHCP.OnChange = func() { a.publishLeases(); a.fwSync() }
 	a.DHCP.OnEvent = func(kind, mac string, ip net.IP, scope string) {
 		if kind == "ack" {
 			a.Devices.Seen(mac, ip, "")
@@ -304,6 +305,7 @@ func (a *App) Run(ctx context.Context) error {
 	run(func() { a.collectTraffic(ctx) })
 	run(func() { a.runUPnP(ctx) })
 	run(func() { a.updateLoop(ctx) })
+	run(func() { a.dynLoop(ctx) })
 
 	a.con.begin(ctx)
 	cs, err := a.startConsole(ctx, a.consoleAddr())

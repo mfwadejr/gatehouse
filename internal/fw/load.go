@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/netip"
 	"strconv"
 	"strings"
@@ -207,18 +208,70 @@ func Load(db Queryer) (*Model, error) {
 		}
 	}
 
-	rrows, err := db.Query(`SELECT name,from_zone,to_zone,src,dst,service,action,limit_rate,log,enabled FROM fw_rules ORDER BY position,id`)
+	rrows, err := db.Query(`SELECT name,from_zone,to_zone,src,dst,service,action,limit_rate,log,enabled,ipver,ctstate,sched,descr,also_mac FROM fw_rules ORDER BY position,id`)
 	if err != nil {
 		return nil, err
 	}
 	for rrows.Next() {
 		var r Rule
-		var lg, en int
-		rrows.Scan(&r.Name, &r.From, &r.To, &r.Src, &r.Dst, &r.Service, &r.Action, &r.Limit, &lg, &en)
-		r.Log, r.Enabled = lg == 1, en == 1
+		var lg, en, am int
+		rrows.Scan(&r.Name, &r.From, &r.To, &r.Src, &r.Dst, &r.Service, &r.Action, &r.Limit, &lg, &en, &r.IPVer, &r.CtState, &r.Sched, &r.Descr, &am)
+		r.Log, r.Enabled, r.AlsoMAC = lg == 1, en == 1, am == 1
 		m.Rules = append(m.Rules, r)
 	}
 	rrows.Close()
+
+	m.Now = time.Now()
+	m.Loc = time.UTC
+	if name := strings.TrimSpace(setting(db, "system.timezone", "")); name != "" {
+		if l, err := time.LoadLocation(name); err == nil {
+			m.Loc = l
+		}
+	}
+	m.Devices = map[string]bool{}
+	m.DevGroups = map[string]DevGroup{}
+	m.PortLists = map[string][]string{}
+	m.Names = map[string]string{}
+	if d, err := db.Query(`SELECT lower(mac),name FROM devices`); err == nil {
+		for d.Next() {
+			var mac, name string
+			d.Scan(&mac, &name)
+			m.Devices[mac] = true
+			if name != "" {
+				m.Names[mac] = name
+			}
+		}
+		d.Close()
+	}
+	if g, err := db.Query(`SELECT g.name,g.reserved_only,COALESCE(lower(x.mac),'') FROM device_groups g LEFT JOIN device_group_members x ON x.group_id=g.id ORDER BY g.id`); err == nil {
+		for g.Next() {
+			var name, mac string
+			var ro int
+			g.Scan(&name, &ro, &mac)
+			dg := m.DevGroups[name]
+			dg.ReservedOnly = ro == 1
+			if mac != "" {
+				dg.MACs = append(dg.MACs, mac)
+			}
+			m.DevGroups[name] = dg
+		}
+		g.Close()
+	}
+	// The far end of VPN connections is never matched by a region rule.
+	if e, err := db.Query(`SELECT endpoint FROM vpn_wg_peers WHERE endpoint<>'' UNION SELECT endpoint_host FROM vpn_wg WHERE endpoint_host<>''`); err == nil {
+		for e.Next() {
+			var ep string
+			e.Scan(&ep)
+			host := ep
+			if h, _, err := net.SplitHostPort(ep); err == nil {
+				host = h
+			}
+			if a, err := netip.ParseAddr(strings.Trim(host, "[]")); err == nil {
+				m.GeoExempt = append(m.GeoExempt, a.String())
+			}
+		}
+		e.Close()
+	}
 
 	frows, err := db.Query(`SELECT name,wan,proto,ext_port,int_addr,int_port,enabled FROM nat_forwards ORDER BY id`)
 	if err != nil {
@@ -233,16 +286,20 @@ func Load(db Queryer) (*Model, error) {
 	}
 	frows.Close()
 
-	orows, err := db.Query(`SELECT name,members FROM fw_objects WHERE kind='address'`)
+	orows, err := db.Query(`SELECT name,kind,members FROM fw_objects WHERE kind IN ('address','ports')`)
 	if err != nil {
 		return nil, err
 	}
 	for orows.Next() {
-		var name, members string
-		orows.Scan(&name, &members)
+		var name, kind, members string
+		orows.Scan(&name, &kind, &members)
 		var list []string
 		if json.Unmarshal([]byte(members), &list) == nil {
-			m.Groups[name] = list
+			if kind == "ports" {
+				m.PortLists[name] = list
+			} else {
+				m.Groups[name] = list
+			}
 		}
 	}
 	orows.Close()

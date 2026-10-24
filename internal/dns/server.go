@@ -44,7 +44,10 @@ type Server struct {
 
 	// OnRateLimited is called at most once per client per minute.
 	OnRateLimited func(client string)
-	limitedAt     sync.Map // client -> unix minute
+	// OnAnswer is told about every successful answer that came from an upstream server or the
+	// cache, so the firewall can follow the addresses of domains that rules refer to.
+	OnAnswer  func(qname string, answers []dns.RR)
+	limitedAt sync.Map // client -> unix minute
 
 	mu      sync.Mutex
 	servers []*dns.Server
@@ -150,6 +153,9 @@ func (s *Server) handle(client string, r *dns.Msg, start time.Time, udp bool) *d
 		s.stats.Record(out, lat, rc == dns.RcodeNameError)
 		if s.qlog != nil {
 			s.qlog.Add(entry)
+		}
+		if s.OnAnswer != nil && resp != nil && rc == dns.RcodeSuccess && len(resp.Answer) > 0 && (out == OutForwarded || out == OutCached) {
+			s.OnAnswer(strings.TrimSuffix(q.Name, "."), resp.Answer)
 		}
 		if resp != nil && udp {
 			resp.Truncate(udpSize(r))

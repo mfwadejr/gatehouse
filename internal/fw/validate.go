@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 )
 
 var (
@@ -178,16 +179,55 @@ func (m *Model) Validate() error {
 		default:
 			add("rule %q has an unknown action %q", r.Name, r.Action)
 		}
-		if _, err := ParseService(r.Service); err != nil {
+		if _, err := ParseServices(r.Service, m.PortLists); err != nil {
 			add("rule %q: %v", r.Name, err)
 		}
-		for _, a := range []string{r.Src, r.Dst} {
-			if _, _, err := parseAddrs(a, m.Groups, 0); err != nil {
-				add("rule %q: %v", r.Name, err)
-			}
+		for side, a := range []string{r.Src, r.Dst} {
+			m.checkSide(r, side == 0, a, add)
+		}
+		switch r.IPVer {
+		case "", "4", "6":
+		default:
+			add("rule %q: the IP version must be 4, 6 or both", r.Name)
+		}
+		switch r.CtState {
+		case "", "new":
+		default:
+			add("rule %q: unknown connection state %q", r.Name, r.CtState)
+		}
+		if len(r.Descr) > 300 || strings.ContainsAny(r.Descr, "\x00\r\n") {
+			add("rule %q: the description is too long or has line breaks", r.Name)
+		}
+		if sc, err := ParseSchedule(r.Sched); err != nil {
+			add("rule %q: %v", r.Name, err)
+		} else if err := sc.Check(m.location()); err != nil {
+			add("rule %q: %v", r.Name, err)
 		}
 		if r.Limit < 0 || r.Limit > 1000000 {
 			add("rule %q: rate limit is out of range", r.Name)
+		}
+	}
+	if n := len(m.DynamicSets()); n > MaxDynSets {
+		add("the rules use %d devices, groups, domains and countries; the limit is %d", n, MaxDynSets)
+	}
+	for name, items := range m.PortLists {
+		if !reName.MatchString(name) {
+			add("port list name %q is not allowed", name)
+		}
+		for _, it := range items {
+			if sp, err := ParseService(it); err != nil || sp == nil {
+				add("port list %q: %q is not a port", name, it)
+			}
+		}
+	}
+	for name, g := range m.DevGroups {
+		if !reName.MatchString(name) {
+			add("device group name %q is not allowed", name)
+		}
+		for _, mac := range g.MACs {
+			if !reMAC.MatchString(mac) {
+				add("device group %q: %q is not a device address", name, mac)
+			}
 		}
 	}
 	if m.DNSTarget != "" {
@@ -270,4 +310,54 @@ func (m *Model) Validate() error {
 		return errors.New(strings.Join(errs, "; "))
 	}
 	return nil
+}
+
+func (m *Model) location() *time.Location {
+	if m.Loc != nil {
+		return m.Loc
+	}
+	return time.UTC
+}
+
+// checkSide validates one address field of a rule, including devices, groups, domains and countries.
+func (m *Model) checkSide(r Rule, isSrc bool, field string, add func(string, ...any)) {
+	plain, macs, refs, err := SplitAddrField(field)
+	if err != nil {
+		add("rule %q: %v", r.Name, err)
+		return
+	}
+	if strings.TrimSpace(plain) != "" {
+		if _, _, err := parseAddrs(plain, m.Groups, 0); err != nil {
+			add("rule %q: %v", r.Name, err)
+		}
+	}
+	if len(macs) > 0 && !isSrc {
+		add("rule %q: a device address (MAC) can only say where traffic comes from, not where it goes", r.Name)
+	}
+	z, found := m.ZoneByName(r.From)
+	local := found && z.Kind != KindWan
+	if (len(macs) > 0 || r.AlsoMAC) && !local {
+		add("rule %q: device addresses (MAC) only work for devices on your own networks", r.Name)
+	}
+	if isSrc && r.AlsoMAC && len(refs) == 0 {
+		add("rule %q: \"also require the device's MAC\" needs a device or a group", r.Name)
+	}
+	for _, ref := range refs {
+		switch ref.Kind {
+		case RefDevice:
+			if !m.Devices[ref.Val] {
+				add("rule %q: the device %s does not exist", r.Name, ref.Val)
+			}
+		case RefGroup:
+			if _, ok := m.DevGroups[ref.Val]; !ok {
+				add("rule %q: there is no device group called %q", r.Name, ref.Val)
+			}
+		case RefDomain, RefGeo:
+			if isSrc {
+				add("rule %q: domains and countries can only be used as the destination", r.Name)
+			} else if r.To == "self" {
+				add("rule %q: domains and countries need a destination network or the internet", r.Name)
+			}
+		}
+	}
 }

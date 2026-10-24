@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const tableName = "gatehouse"
@@ -139,6 +140,9 @@ func (c *compiler) build() string {
 	c.line(0, "add table inet %s", tableName)
 	c.line(0, "delete table inet %s", tableName)
 	c.line(0, "table inet %s {", tableName)
+	for _, ds := range m.DynamicSets() {
+		c.line(1, "%s", ds.declaration())
+	}
 	c.input()
 	c.forward()
 	c.line(1, "chain output {")
@@ -346,7 +350,77 @@ func contains(s []string, v string) bool {
 	return false
 }
 
-// explicit renders one exception rule, expanding services and address families.
+// term is one way a side of a rule can match: an address family and the nft expression for it.
+type term struct {
+	fam  int // 4, 6, or 0 when it fits either
+	expr string
+}
+
+var privateV4 = []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "169.254.0.0/16", "127.0.0.0/8"}
+var privateV6 = []string{"fc00::/7", "fe80::/10", "::1"}
+
+// sideTerms turns a rule's address field into alternatives. src selects saddr or daddr.
+func (c *compiler) sideTerms(field string, src, alsoMAC bool) []term {
+	m := c.m
+	kw := "daddr"
+	if src {
+		kw = "saddr"
+	}
+	plain, macs, refs, _ := SplitAddrField(field)
+	if strings.TrimSpace(plain) == "" && len(macs) == 0 && len(refs) == 0 {
+		return []term{{0, ""}}
+	}
+	var out []term
+	if strings.TrimSpace(plain) != "" {
+		set, isAny, _ := parseAddrs(plain, m.Groups, 0)
+		if isAny {
+			out = append(out, term{0, ""})
+		} else {
+			if len(set.v4) > 0 {
+				out = append(out, term{4, "ip " + kw + " " + setLit(set.v4)})
+			}
+			if len(set.v6) > 0 {
+				out = append(out, term{6, "ip6 " + kw + " " + setLit(set.v6)})
+			}
+		}
+	}
+	if len(macs) > 0 && src {
+		out = append(out, term{0, "ether saddr " + setLit(macs)})
+	}
+	for _, ref := range refs {
+		switch ref.Kind {
+		case RefDevice, RefGroup:
+			e := fmt.Sprintf("ip %s @%s", kw, SetNameFor(ref, 4))
+			if alsoMAC && src {
+				e += " ether saddr @" + SetNameFor(ref, 0)
+			}
+			out = append(out, term{4, e})
+		case RefDomain:
+			out = append(out, term{4, fmt.Sprintf("ip %s @%s", kw, SetNameFor(ref, 4))}, term{6, fmt.Sprintf("ip6 %s @%s", kw, SetNameFor(ref, 6))})
+		case RefGeo:
+			ex4 := append(append([]string(nil), privateV4...), c.exempt(4)...)
+			ex6 := append(append([]string(nil), privateV6...), c.exempt(6)...)
+			out = append(out,
+				term{4, fmt.Sprintf("ip %s @%s ip %s != %s", kw, SetNameFor(ref, 4), kw, setLit(ex4))},
+				term{6, fmt.Sprintf("ip6 %s @%s ip6 %s != %s", kw, SetNameFor(ref, 6), kw, setLit(ex6))})
+		}
+	}
+	return out
+}
+
+// exempt lists the configured addresses of one family that region rules leave alone.
+func (c *compiler) exempt(fam int) []string {
+	var out []string
+	for _, e := range c.m.GeoExempt {
+		a, err := netip.ParseAddr(e)
+		if err == nil && ((fam == 4) == a.Is4()) {
+			out = append(out, a.String())
+		}
+	}
+	return out
+}
+
+// explicit renders one exception rule: every combination of who, what, and when.
 func (c *compiler) explicit(indent int, r Rule, forward bool) {
 	m := c.m
 	from := c.zoneIfaces(r.From)
@@ -359,79 +433,64 @@ func (c *compiler) explicit(indent int, r Rule, forward bool) {
 	} else if len(from) == 0 {
 		return
 	}
-	src, srcAny, _ := parseAddrs(r.Src, m.Groups, 0)
-	dst, dstAny, _ := parseAddrs(r.Dst, m.Groups, 0)
-	specs, _ := ParseService(r.Service)
-
-	type fam struct{ s, d string }
-	var fams []fam
-	add := func(s, d string) { fams = append(fams, fam{s, d}) }
-	sf := func(set addrSet, isAny bool, kw string) (a4, a6 string) {
-		if isAny {
-			return "", ""
-		}
-		if len(set.v4) > 0 {
-			a4 = "ip " + kw + " " + setLit(set.v4)
-		}
-		if len(set.v6) > 0 {
-			a6 = "ip6 " + kw + " " + setLit(set.v6)
-		}
-		return
-	}
-	s4, s6 := sf(src, srcAny, "saddr")
-	d4, d6 := sf(dst, dstAny, "daddr")
-	switch {
-	case srcAny && dstAny:
-		add("", "")
-	case srcAny:
-		if d4 != "" {
-			add("", d4)
-		}
-		if d6 != "" {
-			add("", d6)
-		}
-	case dstAny:
-		if s4 != "" {
-			add(s4, "")
-		}
-		if s6 != "" {
-			add(s6, "")
-		}
-	default:
-		if s4 != "" && d4 != "" {
-			add(s4, d4)
-		}
-		if s6 != "" && d6 != "" {
-			add(s6, d6)
-		}
-	}
+	srcT := c.sideTerms(r.Src, true, r.AlsoMAC)
+	dstT := c.sideTerms(r.Dst, false, false)
+	specs, _ := ParseServices(r.Service, m.PortLists)
 	if len(specs) == 0 {
 		specs = []PortSpec{{}}
 	}
-	for _, f := range fams {
-		for _, sp := range specs {
-			var b strings.Builder
-			b.WriteString("iifname " + ifSet(from))
-			if forward {
-				b.WriteString(" oifname " + ifSet(to))
+	sc, _ := ParseSchedule(r.Sched)
+	loc, now := m.Loc, m.Now
+	if loc == nil {
+		loc = time.UTC
+	}
+	if now.IsZero() {
+		now = time.Now()
+	}
+	times := sc.Clauses(loc, now)
+	tag := "rule:" + r.From + ":" + r.To + ":" + r.Name
+	for _, st := range srcT {
+		for _, dt := range dstT {
+			fam := st.fam
+			if dt.fam != 0 {
+				if fam != 0 && fam != dt.fam {
+					continue // an IPv4 address on one side and IPv6 on the other can never match
+				}
+				fam = dt.fam
 			}
-			if f.s != "" {
-				b.WriteString(" " + f.s)
+			if (r.IPVer == "4" && fam == 6) || (r.IPVer == "6" && fam == 4) {
+				continue
 			}
-			if f.d != "" {
-				b.WriteString(" " + f.d)
+			for _, tc := range times {
+				for _, sp := range specs {
+					var b strings.Builder
+					b.WriteString("iifname " + ifSet(from))
+					if forward {
+						b.WriteString(" oifname " + ifSet(to))
+					}
+					if fam == 0 && r.IPVer != "" {
+						b.WriteString(" meta nfproto ipv" + r.IPVer)
+					}
+					for _, x := range []string{st.expr, dt.expr, tc} {
+						if x != "" {
+							b.WriteString(" " + x)
+						}
+					}
+					if sp.Proto != "" {
+						b.WriteString(" " + sp.matchExpr())
+					}
+					if r.CtState == "new" {
+						b.WriteString(" ct state new")
+					}
+					if r.Limit > 0 {
+						fmt.Fprintf(&b, " limit rate %d/second", r.Limit)
+					}
+					if c.logs(r.Action) || r.Log {
+						c.line(indent, "%s ct state new limit rate 100/second burst 200 packets log prefix %s", b.String(), q(logPrefix(r.Action, tag)))
+					}
+					c.line(indent, "%s counter %s comment %s", b.String(), r.Action, q(tag))
+				}
 			}
-			if sp.Proto != "" {
-				b.WriteString(" " + sp.matchExpr())
-			}
-			if r.Limit > 0 {
-				fmt.Fprintf(&b, " limit rate %d/second", r.Limit)
-			}
-			tag := "rule:" + r.From + ":" + r.To + ":" + r.Name
-			if c.logs(r.Action) || r.Log {
-				c.line(indent, "%s ct state new limit rate 100/second burst 200 packets log prefix %s", b.String(), q(logPrefix(r.Action, tag)))
-			}
-			c.line(indent, "%s counter %s comment %s", b.String(), r.Action, q(tag))
 		}
 	}
 }

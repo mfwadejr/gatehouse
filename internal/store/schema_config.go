@@ -371,4 +371,29 @@ CREATE TABLE wifi_radios(
 `, `
 -- A WireGuard link between two sites: both ends route to each other's networks.
 ALTER TABLE vpn_wg ADD COLUMN site INTEGER NOT NULL DEFAULT 0;
+`, `
+-- Firewall rules: who and what they cover, and when. Devices and groups are keyed by MAC.
+ALTER TABLE fw_rules ADD COLUMN ipver TEXT NOT NULL DEFAULT '';      -- '', '4' or '6'
+ALTER TABLE fw_rules ADD COLUMN ctstate TEXT NOT NULL DEFAULT '';    -- '' (any) or 'new'
+ALTER TABLE fw_rules ADD COLUMN sched TEXT NOT NULL DEFAULT '';      -- JSON, empty for always
+ALTER TABLE fw_rules ADD COLUMN descr TEXT NOT NULL DEFAULT '';
+ALTER TABLE fw_rules ADD COLUMN also_mac INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE device_groups(
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  reserved_only INTEGER NOT NULL DEFAULT 0,
+  description TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE device_group_members(
+  group_id INTEGER NOT NULL REFERENCES device_groups(id) ON DELETE CASCADE,
+  mac TEXT NOT NULL,
+  PRIMARY KEY(group_id, mac)
+);
+-- How often each rule matched, kept across firewall reloads (which restart the kernel counters).
+CREATE TABLE fw_hits(
+  key TEXT PRIMARY KEY,
+  hits INTEGER NOT NULL DEFAULT 0,
+  bytes INTEGER NOT NULL DEFAULT 0,
+  last_hit INTEGER NOT NULL DEFAULT 0
+);
 `}

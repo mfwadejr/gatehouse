@@ -203,6 +203,132 @@ func NewTextEnv(in *Installer, serial string) *TextEnv {
 	return &TextEnv{In: in, Ports: WiredPorts, Refresh: EnsureLinksUp, Poll: 500 * time.Millisecond, Settle: time.Second, Serial: serial}
 }
 
+// portLine describes a port for the list.
+func portLine(p Port) string {
+	state := "no cable"
+	mark := dim + "○" + reset
+	if p.Link {
+		mark = green + "●" + reset
+		state = "cable connected"
+		if p.Speed != "" {
+			state += ", " + p.Speed + " Mb/s"
+		}
+	}
+	kind := ""
+	if p.USB {
+		kind = "  (USB adapter)"
+	}
+	return fmt.Sprintf("%s %-16s %s%s", mark, p.Name, state, kind)
+}
+
+func portsSignature(ps []Port) string {
+	var b strings.Builder
+	for _, p := range ps {
+		fmt.Fprintf(&b, "%s:%v;", p.Name, p.Link)
+	}
+	return b.String()
+}
+
+// pickMgmtPort asks which network port Gatehouse will be managed from. The list updates by itself
+// as a cable is plugged in or an adapter appears, so the person can plug a cable in and watch it
+// show up. A port with a cable is required, unless the person insists on one without.
+func (t *Term) pickMgmtPort(env *TextEnv) (Port, error) {
+	type lineRes struct {
+		s   string
+		err error
+	}
+	lines := make(chan lineRes, 1)
+	reading := false
+	read := func() {
+		if reading {
+			return
+		}
+		reading = true
+		go func() { s, err := t.readLine(true); lines <- lineRes{s, err} }()
+	}
+	env.Refresh()
+	time.Sleep(env.Settle)
+	var ports []Port
+	sig := "\x00"
+	def := 0
+	draw := func() {
+		t.banner(env, 2, steps, "Which network port will you manage Gatehouse from?")
+		t.p("  Plug a network cable into the port you want to use. After the restart you\n")
+		t.p("  finish setup from a computer connected to it. The list updates by itself.\n\n")
+		def = 0
+		withLink := 0
+		for i, p := range ports {
+			t.p("    %d) %s\n", i+1, portLine(p))
+			if p.Link {
+				withLink++
+				def = i + 1
+			}
+		}
+		if withLink != 1 {
+			def = 0
+		}
+		switch {
+		case len(ports) == 0:
+			t.p("    %sNo network port found yet. If you use a USB network adapter, plug it in now.%s\n", amber, reset)
+		case withLink == 0:
+			t.p("\n  %sNo cable is connected yet.%s\n", amber, reset)
+		}
+		t.p("\n")
+		if def > 0 {
+			t.p("  Number [%d]: ", def)
+		} else {
+			t.p("  Number: ")
+		}
+	}
+	tick := time.NewTicker(env.Poll)
+	defer tick.Stop()
+	for {
+		env.Refresh()
+		ports = env.Ports()
+		if s := portsSignature(ports); s != sig {
+			sig = s
+			draw()
+		}
+		read()
+		select {
+		case <-tick.C:
+			continue
+		case r := <-lines:
+			reading = false
+			if r.err != nil {
+				return Port{}, r.err
+			}
+			ans := strings.TrimSpace(r.s)
+			n := def
+			if ans != "" {
+				v, err := strconv.Atoi(ans)
+				if err != nil || v < 1 || v > len(ports) {
+					t.p("  %sEnter one of the numbers above.%s\n", red, reset)
+					t.p("  Number: ")
+					continue
+				}
+				n = v
+			}
+			if n == 0 {
+				t.p("  %sPick a port from the list. Plug a cable in first if none shows a cable.%s\n  Number: ", amber, reset)
+				continue
+			}
+			p := ports[n-1]
+			if !p.Link {
+				ok, err := t.yesno("No cable is plugged into "+p.Name+". Use it anyway?", false)
+				if err != nil {
+					return Port{}, err
+				}
+				if !ok {
+					sig = "\x00"
+					continue
+				}
+			}
+			return p, nil
+		}
+	}
+}
+
 // again redraws the current heading on a clean screen, so a long step does not scroll its
 // first questions off a 24-line terminal.
 func (t *Term) again(env *TextEnv) {
@@ -225,7 +351,7 @@ func (t *Term) heading(sub, title string) {
 	io.WriteString(t.w, t.M)
 }
 
-const steps = 2
+const steps = 3
 
 // RunText walks through the questions and installs. It returns when the machine is about to
 // reboot, when the input closes, or after a failed install the person gives up on.
@@ -301,11 +427,18 @@ func textOnce(t *Term, env *TextEnv) error {
 		break
 	}
 
-	// 2. Confirm
-	req := Request{Disk: disk.Path}
+	// 2. The port Gatehouse is managed from
+	mp, err := t.pickMgmtPort(env)
+	if err != nil {
+		return err
+	}
+
+	// 3. Confirm
+	req := Request{Disk: disk.Path, MgmtPort: mp.Name, MgmtMAC: mp.MAC}
 	for {
-		t.banner(env, 2, steps, "Confirm")
+		t.banner(env, 3, steps, "Confirm")
 		t.p("  Disk   %s%s %s%s  %s(everything on it will be erased)%s\n", bold, disk.Path, humanSize(disk.Size), reset, red, reset)
+		t.p("  Port   %s%s%s  %s(you finish setup from a computer plugged into it)%s\n", bold, mp.Name, reset, dim, reset)
 		t.p("\n  To go ahead, type %s%s%s below.\n  %sAnything else cancels.%s\n\n", bold, disk.Path, reset, dim, reset)
 		c, err := t.ask("Disk name", "", nil)
 		if err != nil {
@@ -326,7 +459,7 @@ func textOnce(t *Term, env *TextEnv) error {
 		break
 	}
 
-	// 3. Install
+	// 4. Install
 	for {
 		st := env.In.Status()
 		n, total := 0, len(st.Steps)
@@ -407,11 +540,12 @@ func finish(t *Term, env *TextEnv) error {
 	sc.header("Installed")
 	sc.mid(green + "●" + reset + bold + " Installation complete" + reset)
 	sc.blank()
-	sc.mid(fg + "Press Enter to restart." + reset)
-	sc.mid(fg + "Take the USB stick out as soon as the screen goes blank." + reset)
+	sc.mid(bold + "Remove the USB stick now," + reset)
+	sc.mid(fg + "then press Enter to restart." + reset)
 	sc.blank()
 	sc.mid(dim + "After it starts, this screen shows an address. Open it in a browser" + reset)
-	sc.mid(dim + "to create your administrator account and finish setup." + reset)
+	sc.mid(dim + "on a computer plugged into the port you chose, to create your" + reset)
+	sc.mid(dim + "administrator account and finish setup." + reset)
 	t.show(sc)
 	if _, err := t.readLine(true); err != nil {
 		return err
@@ -425,7 +559,7 @@ func finish(t *Term, env *TextEnv) error {
 	r.header("Installed")
 	r.mid(green + "●" + reset + bold + " Restarting" + reset)
 	r.blank()
-	r.mid(fg + "Take the USB stick out as soon as the screen goes blank." + reset)
+	r.mid(fg + "If you have not yet, take the USB stick out now." + reset)
 	t.show(r)
 	time.Sleep(env.restartWait())
 	r = NewScreen(t.W, t.H)

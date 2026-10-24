@@ -3,7 +3,11 @@ package installer
 import (
 	"bytes"
 	"errors"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -27,6 +31,7 @@ func TestTextInstallHappyPath(t *testing.T) {
 	script := strings.Join([]string{
 		"",             // welcome
 		"",             // disk: the only usable one
+		"",             // port: the only one with a cable
 		"/dev/nvme0n1", // confirm
 		"",             // reboot
 	}, "\r") + "\r"
@@ -34,12 +39,12 @@ func TestTextInstallHappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
-	for _, want := range []string{"115200", "Installation complete", "will be erased", "create your administrator account"} {
+	for _, want := range []string{"115200", "Installation complete", "will be erased", "Remove the USB stick", "administrator account", "enp2s0", "cable connected"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output lacks %q", want)
 		}
 	}
-	joined := strings.Join(f.cmds, "\n")
+	joined := strings.Join(f.snap(), "\n")
 	for _, c := range []string{"sgdisk --zap-all /dev/nvme0n1", "unsquashfs"} {
 		if !strings.Contains(joined, c) {
 			t.Errorf("missing command %q", c)
@@ -55,12 +60,12 @@ func TestTextInstallHappyPath(t *testing.T) {
 
 func TestTextWrongConfirmationStartsOverAndErasesNothing(t *testing.T) {
 	in, f := newTest(t)
-	script := strings.Join([]string{"", "", "nope"}, "\n") + "\n"
+	script := strings.Join([]string{"", "", "", "nope"}, "\n") + "\n"
 	_, err := run(t, script, testEnv(in))
 	if !errors.Is(err, errClosed) {
 		t.Fatalf("expected the script to run out after starting over, got %v", err)
 	}
-	for _, c := range f.cmds {
+	for _, c := range f.snap() {
 		if strings.HasPrefix(c, "sgdisk") || strings.HasPrefix(c, "wipefs") {
 			t.Fatalf("disk touched without confirmation: %s", c)
 		}
@@ -107,12 +112,13 @@ func TestSerialFromCmdline(t *testing.T) {
 func TestRecoveryScreen(t *testing.T) {
 	var got []string
 	env := RecoveryEnv{
-		Users:         func() []string { return []string{"marvin"} },
-		SetPassword:   func(n, p string) error { got = append(got, "pw:"+n+":"+p); return nil },
-		ClearTwoStep:  func(n string) error { got = append(got, "mfa:"+n); return nil },
-		ResetFirewall: func() error { got = append(got, "fw"); return nil },
-		ResetAccess:   func() error { got = append(got, "access"); return nil },
-		Diagnose:      func() string { return "gatehouse          failed" },
+		Users:          func() []string { return []string{"marvin"} },
+		SetPassword:    func(n, p string) error { got = append(got, "pw:"+n+":"+p); return nil },
+		ClearTwoStep:   func(n string) error { got = append(got, "mfa:"+n); return nil },
+		ResetFirewall:  func() error { got = append(got, "fw"); return nil },
+		ResetAccess:    func() error { got = append(got, "access"); return nil },
+		Diagnose:       func() string { return "gatehouse          failed" },
+		ResetToDefault: func(l string) (string, error) { got = append(got, "reset:"+l); return "/backup.db", nil },
 	}
 	script := strings.Join([]string{
 		"1", "short", "a long enough pass", "a long enough pass", "", // new password (too short first)
@@ -120,13 +126,15 @@ func TestRecoveryScreen(t *testing.T) {
 		"3", "y", "", // firewall
 		"4", "", // what is running
 		"5", "y", "", // port and management limit
-		"6",
+		"6", "2", "nope", "", // reset: wrong word changes nothing
+		"6", "1", "RESET", "", // network reset
+		"7",
 	}, "\r") + "\r"
 	var out bytes.Buffer
 	if err := RunRecovery(NewTerm(strings.NewReader(script), &out), env); err != nil {
 		t.Fatalf("%v\n%s", err, out.String())
 	}
-	if strings.Join(got, ",") != "pw:marvin:a long enough pass,mfa:marvin,fw,access" {
+	if strings.Join(got, ",") != "pw:marvin:a long enough pass,mfa:marvin,fw,access,reset:network" {
 		t.Fatalf("actions: %v\n%s", got, out.String())
 	}
 	if !strings.Contains(out.String(), "gatehouse          failed") {
@@ -169,3 +177,78 @@ func TestFinishedInstallWaitsForRestart(t *testing.T) {
 		t.Fatalf("no restart message:\n%s", out.String())
 	}
 }
+
+func TestManagementPortIsRememberedOnTheNewSystem(t *testing.T) {
+	in, _ := newTest(t)
+	env := testEnv(in)
+	env.Ports = func() []Port {
+		return []Port{{Name: "enp1s0", MAC: "aa:bb:cc:00:00:01"}, {Name: "enp2s0", MAC: "aa:bb:cc:00:00:02", Link: true}}
+	}
+	script := strings.Join([]string{"", "", "", "/dev/nvme0n1", ""}, "\r") + "\r"
+	if out, err := run(t, script, env); err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for in.Status().State != "done" && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	b, err := os.ReadFile(filepath.Join(in.Target, MgmtPortFile))
+	if err != nil || strings.TrimSpace(string(b)) != "enp2s0 aa:bb:cc:00:00:02" {
+		t.Fatalf("management port file: %q %v", b, err)
+	}
+}
+
+func TestManagementPortWithoutACableNeedsInsisting(t *testing.T) {
+	env := &TextEnv{Ports: func() []Port { return []Port{{Name: "enp1s0"}, {Name: "enp2s0"}} }, Refresh: func() {}, Poll: 5 * time.Millisecond, Settle: time.Millisecond}
+	// No cable anywhere: Enter alone gets nowhere; choosing a port asks, and "n" goes back.
+	script := strings.Join([]string{"", "2", "n", "2", "y"}, "\r") + "\r"
+	var out bytes.Buffer
+	p, err := NewTerm(strings.NewReader(script), &out).pickMgmtPort(env)
+	if err != nil || p.Name != "enp2s0" {
+		t.Fatalf("%v %v\n%s", p, err, out.String())
+	}
+	if !strings.Contains(out.String(), "No cable is connected yet") || !strings.Contains(out.String(), "Use it anyway?") {
+		t.Fatalf("missing warnings:\n%s", out.String())
+	}
+}
+
+// The list follows the cables: plugging one in while the screen waits makes it appear and
+// become the default.
+func TestManagementPortListUpdatesByItself(t *testing.T) {
+	var mu sync.Mutex
+	linked := false
+	env := &TextEnv{Ports: func() []Port { mu.Lock(); defer mu.Unlock(); return []Port{{Name: "enp1s0", Link: linked}} }, Refresh: func() {}, Poll: 5 * time.Millisecond, Settle: time.Millisecond}
+	pr, pw := io.Pipe()
+	var out safeBuf
+	done := make(chan Port, 1)
+	go func() {
+		p, _ := NewTerm(pr, &out).pickMgmtPort(env)
+		done <- p
+	}()
+	time.Sleep(60 * time.Millisecond)
+	mu.Lock()
+	linked = true
+	mu.Unlock()
+	time.Sleep(60 * time.Millisecond)
+	pw.Write([]byte("\r"))
+	select {
+	case p := <-done:
+		if p.Name != "enp1s0" || !p.Link {
+			t.Fatalf("%+v", p)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatalf("never finished:\n%s", out.String())
+	}
+	s := out.String()
+	if !strings.Contains(s, "no cable") || !strings.Contains(s, "cable connected") {
+		t.Fatalf("the list did not change when the cable was plugged in:\n%s", s)
+	}
+}
+
+type safeBuf struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (s *safeBuf) Write(p []byte) (int, error) { s.mu.Lock(); defer s.mu.Unlock(); return s.b.Write(p) }
+func (s *safeBuf) String() string              { s.mu.Lock(); defer s.mu.Unlock(); return s.b.String() }

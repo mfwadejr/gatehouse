@@ -3,16 +3,40 @@ package app
 import (
 	"context"
 	"log"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"gatehouse/internal/fw"
 )
 
+// ResetMarker is left in the data directory by the recovery screen, which can clear the settings
+// but not talk to the running programs. The next start puts the empty network and the safe
+// firewall in place.
+const ResetMarker = "reset-pending"
+
 // firstBoot applies the network and firewall that were chosen in the installer. Nothing was
 // running before this, so there is no earlier state to return to and no one to confirm it:
 // the change is applied and confirmed straight away.
 func (a *App) firstBoot(ctx context.Context) {
+	if marker := filepath.Join(a.Cfg.DataDir, ResetMarker); fileExists(marker) {
+		for i := 0; a.Net != nil && i < 30; i++ {
+			if _, err := a.Net.WanStatus(); err == nil {
+				break
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(2 * time.Second):
+			}
+		}
+		a.backToStart()
+		os.Remove(marker)
+		a.publishNet()
+		a.publishFW()
+		return
+	}
 	if a.Config.Setting("net.autoapply", "") != "1" || a.Net == nil || a.FW == nil {
 		return
 	}
@@ -78,3 +102,5 @@ func (a *App) applyStored() error {
 	a.Config.Exec(`INSERT INTO fw_revisions(created_at,author,summary,ruleset,status) VALUES(?,?,?,?,'confirmed')`, time.Now().Unix(), "setup", summary, script)
 	return nil
 }
+
+func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }

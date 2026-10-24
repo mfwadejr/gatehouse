@@ -119,6 +119,14 @@ func (a *App) registerSetupRoutes() {
 			api.Error(w, http.StatusForbidden, "first-time setup is only available from your own network")
 			return
 		}
+		// The installer asked which port the person would manage Gatehouse from; until the account
+		// exists, only that port answers setup, so a cable plugged in somewhere else cannot reach it.
+		if mp := installer.MgmtPort(); mp != "" {
+			if name, _ := localPort(r); name != "" && name != "lo" && name != mp {
+				api.Error(w, http.StatusForbidden, "first-time setup is only available through the management port ("+mp+"); plug the computer into that port")
+				return
+			}
+		}
 		var in struct {
 			Username string `json:"username"`
 			Password string `json:"password"`

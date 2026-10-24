@@ -34,6 +34,8 @@ type fakeNet struct {
 	sysUpdates netd.SystemUpdates
 	sysErr     error
 	sysStarted bool
+	powerCalls []string
+	resets     int
 }
 
 func (f *fakeNet) NetApply(p netd.Plan, w time.Duration) (string, time.Time, error) {
@@ -54,6 +56,7 @@ func (f *fakeNet) NetConfirm(t string) error {
 	f.pending = false
 	return nil
 }
+func (f *fakeNet) NetReset() error    { f.mu.Lock(); f.resets++; f.mu.Unlock(); return nil }
 func (f *fakeNet) NetRollback() error { f.mu.Lock(); f.pending = false; f.mu.Unlock(); return nil }
 func (f *fakeNet) NetPending() (string, time.Time, bool) {
 	f.mu.Lock()
@@ -257,4 +260,11 @@ func TestFirstRunSetup(t *testing.T) {
 	if rc, _, _ := c.call("POST", "/api/auth/login", map[string]string{"username": "admin", "password": "correct horse battery"}); rc != 200 {
 		t.Fatal("cannot log in as the new admin")
 	}
+}
+
+func (f *fakeNet) Power(action string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.powerCalls = append(f.powerCalls, action)
+	return nil
 }

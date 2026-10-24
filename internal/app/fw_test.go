@@ -15,11 +15,13 @@ import (
 )
 
 type fakeFW struct {
-	mu      sync.Mutex
-	script  string
-	token   string
-	pending bool
-	checked []string
+	mu       sync.Mutex
+	script   string
+	token    string
+	pending  bool
+	checked  []string
+	sets     map[string]fw.SetFill
+	counters map[string]fw.Counter
 }
 
 func (f *fakeFW) Check(s string) error {
@@ -45,6 +47,25 @@ func (f *fakeFW) Confirm(t string) error {
 	}
 	f.pending = false
 	return nil
+}
+func (f *fakeFW) LoadSets(fills map[string]fw.SetFill) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.sets == nil {
+		f.sets = map[string]fw.SetFill{}
+	}
+	for k, v := range fills {
+		if old, ok := f.sets[k]; ok && !v.Replace {
+			v.Elems = append(old.Elems, v.Elems...)
+		}
+		f.sets[k] = v
+	}
+	return nil
+}
+func (f *fakeFW) Counters() (map[string]fw.Counter, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.counters, nil
 }
 func (f *fakeFW) Rollback() error { f.mu.Lock(); defer f.mu.Unlock(); f.pending = false; return nil }
 func (f *fakeFW) Pending() (string, time.Time, bool) {

@@ -29,7 +29,11 @@ function bars(dbm) { return dbm > -55 ? 'Excellent' : dbm > -67 ? 'Good' : dbm >
 function Live({ c }) {
   const sv = c.saved, lv = c.live || {};
   const ap = sv.mode === 'ap';
-  const addrs = (lv.addrs || []).join(', ');
+  // Show the IPv4 address on the status line; IPv6 addresses stay out of sight until asked for.
+  const all = lv.addrs || [];
+  const v4 = all.filter((x) => !x.includes(':'));
+  const v6 = all.filter((x) => x.includes(':'));
+  const addrs = v4.join(', ');
   let tone = '', label;
   if (!sv.enabled) label = 'Switched off';
   else if (lv.linked) { tone = 'good'; label = ap ? 'Broadcasting' : 'Connected'; }
@@ -45,6 +49,12 @@ function Live({ c }) {
         </span>
       </div>
       <div className="small">{addrs ? <>Address <span className="mono">{addrs}</span></> : <span className="muted">{lv.linked ? 'Waiting for an address…' : 'No address yet.'}</span>}</div>
+      {v6.length > 0 && (
+        <details className="small">
+          <summary className="muted">{v6.length} IPv6 address{v6.length === 1 ? '' : 'es'}</summary>
+          <div className="mono" style={{ overflowWrap: 'anywhere' }}>{v6.join(', ')}</div>
+        </details>
+      )}
       {!lv.linked && sv.enabled && <p className="small muted">If you just saved, apply the change first. If it stays like this, check the password and that the network is in range.</p>}
     </div>
   );
@@ -57,6 +67,8 @@ function Setup({ card, country, wans, ifs, onClose, onSaved }) {
     iface: card.iface, mode: s?.mode || 'client', ssid: s?.ssid || '', psk: '', country: s?.country || country || 'US',
     band: s?.band || (card.caps.bands.includes('5') ? '5' : '2.4'), channel: s?.channel || 0, hidden: !!s?.hidden, wpa3: !!s?.wpa3, enabled: true,
   });
+  // IPv6 on a joined network defaults to Off, as on most gateways; most hotspots and guest networks gain nothing from it.
+  const [v6, setV6] = useState({ mode: 'none', addr: '', gateway: '' });
   const [where, setWhere] = useState(ifs.find((i) => i.kind === 'bridge' && i.members?.length) ? 'bridge' : 'own');
   const bridges = ifs.filter((i) => i.kind === 'bridge');
   const [bridge, setBridge] = useState(bridges[0]?.name || '');
@@ -79,7 +91,7 @@ function Setup({ card, country, wans, ifs, onClose, onSaved }) {
     const ok = await run(async () => {
       if (!ap) {
         if (!wans.some((w) => w.iface === card.iface)) {
-          await put('/api/net/wans', { name: `Wi-Fi ${f.ssid}`.slice(0, 32), iface: card.iface, type: 'dhcp', v6_mode: 'slaac', vlan: 0, enabled: true, priority: wans.length + 1, weight: 1 });
+          await put('/api/net/wans', { name: `Wi-Fi ${f.ssid}`.slice(0, 32), iface: card.iface, type: 'dhcp', v6_mode: v6.mode, v6_addr: v6.mode === 'static' ? v6.addr : '', v6_gateway: v6.mode === 'static' ? v6.gateway : '', vlan: 0, enabled: true, priority: wans.length + 1, weight: 1 });
         }
       } else if (where === 'bridge') {
         const b = bridges.find((x) => x.name === bridge);
@@ -99,7 +111,8 @@ function Setup({ card, country, wans, ifs, onClose, onSaved }) {
     if (ok) { onSaved(); onClose(); }
   };
 
-  const ready = f.ssid && f.country && (s?.has_psk || f.psk || (!ap)) && (!ap || s?.has_psk || f.psk) && (!ap || (where === 'bridge' ? bridge : /^\d+\.\d+\.\d+\.\d+\/\d+$/.test(cidr)));
+  const v6ok = ap || wans.some((w) => w.iface === card.iface) || v6.mode !== 'static' || (v6.addr && v6.gateway);
+  const ready = v6ok && f.ssid && f.country && (s?.has_psk || f.psk || (!ap)) && (!ap || s?.has_psk || f.psk) && (!ap || (where === 'bridge' ? bridge : /^\d+\.\d+\.\d+\.\d+\/\d+$/.test(cidr)));
   return (
     <Modal title={`Wi-Fi card ${card.iface}`} onClose={onClose}
       footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" onClick={save} disabled={busy || !ready}>Save</Button></>}>
@@ -132,6 +145,17 @@ function Setup({ card, country, wans, ifs, onClose, onSaved }) {
           {ap && <Button onClick={() => set('psk')(makePassword())}>Make one</Button>}
         </div>
       </Field>
+      {!ap && !wans.some((w) => w.iface === card.iface) && (
+        <Field label="IPv6" hint="Off is right for most hotspots and guest networks. Change it later under Internet.">
+          <Select value={v6.mode} onChange={(m) => setV6((x) => ({ ...x, mode: m }))} options={[{ value: 'none', label: 'Off' }, { value: 'slaac', label: 'Automatic' }, { value: 'static', label: 'Fixed address' }]} />
+        </Field>
+      )}
+      {!ap && !wans.some((w) => w.iface === card.iface) && v6.mode === 'static' && (
+        <>
+          <Field label="IPv6 address"><Input value={v6.addr} onChange={(x) => setV6((v) => ({ ...v, addr: x }))} placeholder="2001:db8::2/64" /></Field>
+          <Field label="IPv6 gateway"><Input value={v6.gateway} onChange={(x) => setV6((v) => ({ ...v, gateway: x }))} placeholder="2001:db8::1" /></Field>
+        </>
+      )}
       <Field label="Country this device is in" hint="Sets which channels and power levels are legal.">
         <Select value={f.country} onChange={set('country')} options={[...(COUNTRIES[f.country] ? [] : [{ value: f.country, label: f.country }]), ...Object.entries(COUNTRIES).map(([v, l]) => ({ value: v, label: l }))]} />
       </Field>

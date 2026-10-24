@@ -1,7 +1,6 @@
 [Unit]
 Description=Gatehouse text-mode installer
 ConditionKernelCommandLine=boot=live
-ConditionKernelCommandLine=gatehouse.text
 After=systemd-networkd.service getty@tty1.service
 Conflicts=getty@tty1.service serial-getty@ttyS0.service
 

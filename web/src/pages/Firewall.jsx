@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { del, post, put, useData } from '../api.js';
+import { del, post, put, useData, useStream } from '../api.js';
 import ApplyBar from '../ApplyBar.jsx';
+import { GroupsAndLists, Matrix, PairModal, RuleForm, RulesList } from './FirewallRules.jsx';
 import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Problems, Select, Tabs, ToggleRow, useAction, fmt } from '../ui.jsx';
 
 function ZoneForm({ initial, presets, ifaces, taken, onClose, onSaved }) {
@@ -78,98 +79,6 @@ function Networks({ ov, presets, reload }) {
       )}
       {edit && <ZoneForm initial={edit} presets={presets} ifaces={ifs || []} taken={taken} onClose={() => setEdit(null)} onSaved={reload} />}
     </>
-  );
-}
-
-function Matrix({ ov }) {
-  const zones = ov?.zones || [];
-  const cell = (a, b) => {
-    if (a.kind === 'wan') return ['deny', 'Blocked'];
-    if (a.name === b.name) return a.intra_allow ? ['allow', 'Open'] : ['deny', 'Blocked'];
-    if (b.kind === 'wan') return a.internet ? ['allow', 'Open'] : ['deny', 'Blocked'];
-    if (a.kind === 'trusted') return ['allow', 'Open'];
-    return ['deny', 'Blocked'];
-  };
-  if (zones.length < 2) return null;
-  return (
-    <Card title="Who can reach whom" desc="Traffic starting in the network on the left, going to the network along the top. Exceptions you add are not shown here.">
-      <div className="scroll">
-        <div className="matrix" style={{ gridTemplateColumns: `repeat(${zones.length + 1}, minmax(5rem, 1fr))` }}>
-          <div className="cell hd">From ↓ To →</div>
-          {zones.map((z) => <div className="cell hd" key={z.name}>{z.name}</div>)}
-          {zones.map((a) => (
-            <React.Fragment key={a.name}>
-              <div className="cell hd">{a.name}</div>
-              {zones.map((b) => { const [c, t] = cell(a, b); return <div key={b.name} className={`cell ${c}`}>{t}</div>; })}
-            </React.Fragment>
-          ))}
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-function RuleForm({ initial, zoneNames, onClose, onSaved }) {
-  const [r, setR] = useState({ name: '', from: zoneNames[0] || '', to: zoneNames[1] || '', src: '', dst: '', service: 'any', action: 'accept', limit: 0, log: false, enabled: true, ...initial });
-  const { data: p } = useData('/api/fw/presets');
-  const [run, busy] = useAction();
-  const set = (k) => (v) => setR((x) => ({ ...x, [k]: v }));
-  const all = [...zoneNames, 'self'];
-  return (
-    <Modal title={r.id ? 'Edit exception' : 'Add an exception'} onClose={onClose}
-      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy || !r.name} onClick={async () => { if (await run(() => put('/api/fw/rules', r), 'Saved. Apply it to start using it.')) { onSaved(); onClose(); } }}>Save</Button></>}>
-      <p className="sec small">Exceptions are checked before the network types, top to bottom. The first match wins.</p>
-      <Field label="Name"><Input value={r.name} onChange={set('name')} placeholder="Guests can print" /></Field>
-      <div className="formgrid">
-        <Field label="From network"><Select value={r.from} onChange={set('from')} options={zoneNames} /></Field>
-        <Field label="To"><Select value={r.to} onChange={set('to')} options={[...all.map((z) => ({ value: z, label: z === 'self' ? 'Gatehouse itself' : z })), { value: 'Internet', label: 'Internet' }].filter((o, i, a) => a.findIndex((x) => x.value === o.value) === i)} /></Field>
-        <Field label="Only from this device" hint="Address or network. Empty for any."><Input value={r.src} onChange={set('src')} /></Field>
-        <Field label="Only to this device" hint="Address or network. Empty for any."><Input value={r.dst} onChange={set('dst')} /></Field>
-        <Field label="What for"><Select value={r.service} onChange={set('service')} options={['any', ...(p?.services || [])]} /></Field>
-        <Field label="Then"><Select value={r.action} onChange={set('action')} options={[{ value: 'accept', label: 'Allow' }, { value: 'drop', label: 'Block silently' }, { value: 'reject', label: 'Block and tell the sender' }]} /></Field>
-        <Field label="Limit new connections per second" hint="0 for no limit"><NumberInput value={r.limit} onChange={set('limit')} /></Field>
-      </div>
-      <ToggleRow title="Keep a log of matches" checked={r.log} onChange={set('log')} />
-      <ToggleRow title="Turned on" checked={r.enabled} onChange={set('enabled')} />
-    </Modal>
-  );
-}
-
-function Exceptions({ ov, reload }) {
-  const { data: rules, reload: rr } = useData('/api/fw/rules');
-  const [edit, setEdit] = useState(null);
-  const [run] = useAction();
-  const names = (ov?.zones || []).map((z) => z.name);
-  const refresh = () => { rr(); reload(); };
-  const move = (i, d) => {
-    const ids = rules.map((r) => r.id);
-    const j = i + d;
-    if (j < 0 || j >= ids.length) return;
-    [ids[i], ids[j]] = [ids[j], ids[i]];
-    run(() => post('/api/fw/rules/order', { order: ids })).then(refresh);
-  };
-  return (
-    <Card title="Exceptions" desc="Special cases on top of your network types, such as letting guests use a printer." actions={<Button small icon="plus" disabled={names.length < 1} onClick={() => setEdit({})}>Add exception</Button>}>
-      <Note>The rule that keeps you able to manage Gatehouse is always first. It cannot be changed or removed, so you cannot lock yourself out.</Note>
-      <div className="list">
-        {(rules || []).map((r, i) => (
-          <div className="item" key={r.id}>
-            <div>
-              <div className="name">{r.name} {!r.enabled && <Pill>Off</Pill>}</div>
-              <div className="meta">{r.from} → {r.to === 'self' ? 'Gatehouse' : r.to}{r.src ? ` · from ${r.src}` : ''}{r.dst ? ` · to ${r.dst}` : ''} · {r.service} · {r.action === 'accept' ? 'allow' : r.action === 'drop' ? 'block' : 'reject'}{r.limit ? ` · max ${r.limit}/s` : ''}</div>
-            </div>
-            <div className="actions">
-              <Button small aria-label="Move up" onClick={() => move(i, -1)} disabled={i === 0}>↑</Button>
-              <Button small aria-label="Move down" onClick={() => move(i, 1)} disabled={i === rules.length - 1}>↓</Button>
-              <Button small icon="edit" onClick={() => setEdit(r)}>Edit</Button>
-              <Button small kind="danger" icon="trash" onClick={() => window.confirm(`Delete "${r.name}"?`) && run(() => del(`/api/fw/rules/${r.id}`)).then(refresh)}>Delete</Button>
-            </div>
-          </div>
-        ))}
-        {!rules?.length && <Empty>No exceptions. Network types are all you need for most setups.</Empty>}
-      </div>
-      {edit && <RuleForm initial={edit} zoneNames={names} onClose={() => setEdit(null)} onSaved={refresh} />}
-    </Card>
   );
 }
 
@@ -373,20 +282,36 @@ function History() {
 
 export default function Firewall({ me }) {
   const { data: ov, reload } = useData('/api/fw/overview', { topics: ['fw.status'] });
+  const { data: rules, reload: reloadRules } = useData('/api/fw/rules');
+  const { data: pickers, reload: reloadPickers } = useData('/api/fw/pickers');
+  // One live connection for both lists, since a browser only keeps a few open per site.
+  useStream(['fw.status', 'dhcp.leases'], (topic) => { if (topic === 'fw.status') reloadRules(); else reloadPickers(); });
   const { data: pr } = useData('/api/fw/presets');
   const [tab, setTab] = useState('networks');
+  const [filter, setFilter] = useState({});
+  const [pair, setPair] = useState(null);
+  const [newRule, setNewRule] = useState(null);
   const presets = pr?.presets || [];
+  const all = () => { reload(); reloadRules(); reloadPickers(); };
+  const names = (ov?.matrix_zones || []).map((z) => z.name);
   return (
     <Page title="Firewall" sub="Decide what each network may reach. Changes only take effect when you apply them.">
       <Protected reload={reload} />
-      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'networks', label: 'Networks' }, { value: 'exceptions', label: 'Exceptions' }, { value: 'ports', label: 'Open ports' }, { value: 'upnp', label: 'UPnP' }, { value: 'protection', label: 'Protection' }, { value: 'history', label: 'History' }]} />
-      {tab === 'networks' && <><Networks ov={ov} presets={presets} reload={reload} /><Matrix ov={ov} /></>}
-      {tab === 'exceptions' && <Exceptions ov={ov} reload={reload} />}
+      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'networks', label: 'Networks' }, { value: 'rules', label: `Rules${rules?.length ? ` (${rules.length})` : ''}` }, { value: 'groups', label: 'Groups & lists' }, { value: 'ports', label: 'Open ports' }, { value: 'upnp', label: 'UPnP' }, { value: 'protection', label: 'Protection' }, { value: 'history', label: 'History' }]} />
+      {tab === 'networks' && <><Networks ov={ov} presets={presets} reload={reload} /><Matrix ov={ov} rules={rules} onPick={(from, to, p) => setPair({ from, to, p })} /></>}
+      {tab === 'rules' && <RulesList ov={ov} rules={rules} pickers={pickers} reloadPickers={reloadPickers} reload={all} filter={filter} setFilter={setFilter} startNew={(init) => setNewRule(init)} />}
+      {tab === 'groups' && <GroupsAndLists pickers={pickers} reloadPickers={reloadPickers} reload={all} />}
       {tab === 'ports' && <Forwards reload={reload} />}
       {tab === 'upnp' && <UPnP />}
       {tab === 'protection' && <Protection ov={ov} reload={reload} />}
       {tab === 'history' && <History />}
-      <ApplyBar kind="fw" label="the firewall" status={ov?.status} me={me} onChanged={reload} />
+      {pair && (
+        <PairModal pair={pair} ov={ov} onClose={() => setPair(null)} onChanged={all}
+          onShowRules={(from, to) => { setFilter({ from, to }); setTab('rules'); }}
+          onAddRule={(from, to) => { setTab('rules'); setNewRule({ from, to }); }} />
+      )}
+      {newRule && <RuleForm initial={newRule} zoneNames={names} pickers={pickers} reloadPickers={reloadPickers} onClose={() => setNewRule(null)} onSaved={all} />}
+      <ApplyBar kind="fw" label="the firewall" status={ov?.status} me={me} onChanged={all} />
     </Page>
   );
 }

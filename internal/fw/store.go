@@ -2,6 +2,7 @@ package fw
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"strings"
 
@@ -151,21 +152,26 @@ func DeleteZone(tx *sql.Tx, id int64) error {
 
 // RuleRow is an exception rule as the console edits it.
 type RuleRow struct {
-	ID      int64  `json:"id"`
-	Name    string `json:"name"`
-	From    string `json:"from"`
-	To      string `json:"to"`
-	Src     string `json:"src"`
-	Dst     string `json:"dst"`
-	Service string `json:"service"`
-	Action  string `json:"action"`
-	Limit   int    `json:"limit"`
-	Log     bool   `json:"log"`
-	Enabled bool   `json:"enabled"`
+	ID      int64     `json:"id"`
+	Name    string    `json:"name"`
+	From    string    `json:"from"`
+	To      string    `json:"to"`
+	Src     string    `json:"src"`
+	Dst     string    `json:"dst"`
+	Service string    `json:"service"`
+	Action  string    `json:"action"`
+	Limit   int       `json:"limit"`
+	Log     bool      `json:"log"`
+	Enabled bool      `json:"enabled"`
+	IPVer   string    `json:"ipver"`
+	CtState string    `json:"ctstate"`
+	Sched   *Schedule `json:"sched"`
+	Descr   string    `json:"descr"`
+	AlsoMAC bool      `json:"also_mac"`
 }
 
 func Rules(db Queryer) ([]RuleRow, error) {
-	rows, err := db.Query(`SELECT id,name,from_zone,to_zone,src,dst,service,action,limit_rate,log,enabled FROM fw_rules ORDER BY position,id`)
+	rows, err := db.Query(`SELECT id,name,from_zone,to_zone,src,dst,service,action,limit_rate,log,enabled,ipver,ctstate,sched,descr,also_mac FROM fw_rules ORDER BY position,id`)
 	if err != nil {
 		return nil, err
 	}
@@ -173,11 +179,13 @@ func Rules(db Queryer) ([]RuleRow, error) {
 	out := []RuleRow{}
 	for rows.Next() {
 		var r RuleRow
-		var lg, en int
-		if err := rows.Scan(&r.ID, &r.Name, &r.From, &r.To, &r.Src, &r.Dst, &r.Service, &r.Action, &r.Limit, &lg, &en); err != nil {
+		var lg, en, am int
+		var sched string
+		if err := rows.Scan(&r.ID, &r.Name, &r.From, &r.To, &r.Src, &r.Dst, &r.Service, &r.Action, &r.Limit, &lg, &en, &r.IPVer, &r.CtState, &sched, &r.Descr, &am); err != nil {
 			return nil, err
 		}
-		r.Log, r.Enabled = lg == 1, en == 1
+		r.Log, r.Enabled, r.AlsoMAC = lg == 1, en == 1, am == 1
+		r.Sched, _ = ParseSchedule(sched)
 		out = append(out, r)
 	}
 	return out, rows.Err()
@@ -185,6 +193,7 @@ func Rules(db Queryer) ([]RuleRow, error) {
 
 func SaveRule(tx *sql.Tx, r RuleRow) (int64, error) {
 	r.Name = strings.TrimSpace(r.Name)
+	r.Descr = strings.TrimSpace(r.Descr)
 	if r.Src == "" {
 		r.Src = "any"
 	}
@@ -194,11 +203,16 @@ func SaveRule(tx *sql.Tx, r RuleRow) (int64, error) {
 	if r.Service == "" {
 		r.Service = "any"
 	}
+	sched := ""
+	if r.Sched != nil && r.Sched.Mode != "" && r.Sched.Mode != "always" {
+		b, _ := json.Marshal(r.Sched)
+		sched = string(b)
+	}
 	if r.ID == 0 {
 		var pos int
 		tx.QueryRow(`SELECT COALESCE(MAX(position),0)+1 FROM fw_rules`).Scan(&pos)
-		res, err := tx.Exec(`INSERT INTO fw_rules(from_zone,to_zone,position,name,src,dst,service,action,limit_rate,log,enabled) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
-			r.From, r.To, pos, r.Name, r.Src, r.Dst, r.Service, r.Action, r.Limit, b2i(r.Log), b2i(r.Enabled))
+		res, err := tx.Exec(`INSERT INTO fw_rules(from_zone,to_zone,position,name,src,dst,service,action,limit_rate,log,enabled,ipver,ctstate,sched,descr,also_mac) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			r.From, r.To, pos, r.Name, r.Src, r.Dst, r.Service, r.Action, r.Limit, b2i(r.Log), b2i(r.Enabled), r.IPVer, r.CtState, sched, r.Descr, b2i(r.AlsoMAC))
 		if err != nil {
 			if strings.Contains(err.Error(), "UNIQUE") {
 				return 0, errors.New("a rule with that name already exists between those networks")
@@ -207,8 +221,8 @@ func SaveRule(tx *sql.Tx, r RuleRow) (int64, error) {
 		}
 		return res.LastInsertId()
 	}
-	_, err := tx.Exec(`UPDATE fw_rules SET from_zone=?,to_zone=?,name=?,src=?,dst=?,service=?,action=?,limit_rate=?,log=?,enabled=? WHERE id=?`,
-		r.From, r.To, r.Name, r.Src, r.Dst, r.Service, r.Action, r.Limit, b2i(r.Log), b2i(r.Enabled), r.ID)
+	_, err := tx.Exec(`UPDATE fw_rules SET from_zone=?,to_zone=?,name=?,src=?,dst=?,service=?,action=?,limit_rate=?,log=?,enabled=?,ipver=?,ctstate=?,sched=?,descr=?,also_mac=? WHERE id=?`,
+		r.From, r.To, r.Name, r.Src, r.Dst, r.Service, r.Action, r.Limit, b2i(r.Log), b2i(r.Enabled), r.IPVer, r.CtState, sched, r.Descr, b2i(r.AlsoMAC), r.ID)
 	if err != nil && strings.Contains(err.Error(), "UNIQUE") {
 		return 0, errors.New("a rule with that name already exists between those networks")
 	}

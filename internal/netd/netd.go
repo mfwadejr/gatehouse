@@ -304,3 +304,28 @@ func (s *Service) FWEvents(since uint64, max int) ([]FWEvent, uint64) {
 	}
 	return s.Log.Since(since, max)
 }
+
+// ResetNetwork removes everything Gatehouse set up on the network side (networks, VPN tunnels,
+// Wi-Fi, connection monitor) and leaves the machine on the built-in default: every wired port
+// asks for an address. It skips the lock-out check on purpose, because an empty configuration is
+// exactly what a reset is for.
+func (s *Service) ResetNetwork() error {
+	tok, _, err := s.Inst.Apply(&netcfg.Output{}, time.Minute)
+	if err != nil {
+		return err
+	}
+	if err := s.Inst.Confirm(tok); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.staged = nil
+	os.Remove(s.path("monitor.json"))
+	s.runLocked(nil)
+	s.mu.Unlock()
+	if s.VPN != nil {
+		if err := s.VPN.Apply(VPNPlan{}); err != nil {
+			return err
+		}
+	}
+	return nil
+}

@@ -38,6 +38,10 @@ func (f *fake) Confirm(t string) error {
 	f.pending = false
 	return nil
 }
+func (f *fake) LoadSets(map[string]fw.SetFill) error { return nil }
+func (f *fake) Counters() (map[string]fw.Counter, error) {
+	return map[string]fw.Counter{"rule:a:b:c": {Packets: 3, Bytes: 40}}, nil
+}
 func (f *fake) Rollback() error { f.pending = false; return nil }
 func (f *fake) Pending() (string, time.Time, bool) {
 	return "tok", time.Now().Add(time.Minute), f.pending
@@ -79,6 +83,14 @@ func TestRoundTrip(t *testing.T) {
 	if _, _, ok := c.Pending(); ok {
 		t.Fatal("still pending after confirm")
 	}
+	// Set contents and rule counters travel through the helper too.
+	if err := c.LoadSets(map[string]fw.SetFill{"dv_aaaaaaaa_4": {Replace: true, Elems: []string{"192.168.1.5"}}}); err != nil {
+		t.Fatal(err)
+	}
+	cs, err := c.Counters()
+	if err != nil || cs["rule:a:b:c"].Packets != 3 {
+		t.Fatalf("counters: %v %v", cs, err)
+	}
 }
 
 func TestMissingHelper(t *testing.T) {
@@ -91,6 +103,7 @@ func TestMissingHelper(t *testing.T) {
 type fakeNetCtl struct {
 	updatePath    string
 	systemStarted bool
+	power         string
 }
 
 func (f *fakeNetCtl) Apply(netd.Plan, time.Duration) (string, time.Time, error) {
@@ -100,6 +113,7 @@ func (f *fakeNetCtl) Confirm(string) error                          { return nil
 func (f *fakeNetCtl) Rollback() error                               { return nil }
 func (f *fakeNetCtl) Pending() (string, time.Time, bool)            { return "", time.Time{}, false }
 func (f *fakeNetCtl) Status() map[string]wanmon.State               { return nil }
+func (f *fakeNetCtl) ResetNetwork() error                           { return nil }
 func (f *fakeNetCtl) ApplyVPN(netd.VPNPlan) error                   { return nil }
 func (f *fakeNetCtl) VPNStatus() netd.VPNStatus                     { return netd.VPNStatus{} }
 func (f *fakeNetCtl) FWEvents(uint64, int) ([]netd.FWEvent, uint64) { return nil, 7 }
@@ -133,6 +147,9 @@ func TestEveryClientCallIsRouted(t *testing.T) {
 	if err := c.SystemUpdateStart(); err != nil || !nc.systemStarted {
 		t.Fatalf("system.start: %v", err)
 	}
+	if err := c.Power("reboot"); err != nil || nc.power != "reboot" {
+		t.Fatalf("system.power: %v %q", err, nc.power)
+	}
 	if _, last, err := c.FWEvents(0, 10); err != nil || last != 7 {
 		t.Fatalf("fwlog.read: %v %d", err, last)
 	}
@@ -149,3 +166,5 @@ func TestEveryClientCallIsRouted(t *testing.T) {
 		t.Fatal("a made-up method was accepted")
 	}
 }
+
+func (f *fakeNetCtl) Power(a string) error { f.power = a; return nil }

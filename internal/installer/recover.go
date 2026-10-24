@@ -17,6 +17,9 @@ type RecoveryEnv struct {
 	Diagnose      func() string // what is running and the last error lines
 	// ResetAccess puts the console back on port 443 and removes any limit on who may manage.
 	ResetAccess func() error
+	// ResetToDefault clears the settings to "network" or "factory" level, after saving a copy.
+	// It returns where the copy was saved.
+	ResetToDefault func(level string) (string, error)
 }
 
 // RunRecovery is the screen for someone who is locked out and is standing at the machine. Physical
@@ -29,10 +32,11 @@ func RunRecovery(t *Term, env RecoveryEnv) error {
 		t.p("  3) Reset the firewall to the safe starting rules\n")
 		t.p("  4) Check what is running and why the console may be down\n")
 		t.p("  5) Let any management network in, and put the console back on port 443\n")
-		t.p("  6) Leave recovery\n\n")
-		n, err := t.ask("Number", "6", func(s string) error {
-			if s < "1" || s > "6" || len(s) != 1 {
-				return errors.New("enter a number from 1 to 6")
+		t.p("  6) Reset to default (network settings, or everything)\n")
+		t.p("  7) Leave recovery\n\n")
+		n, err := t.ask("Number", "7", func(s string) error {
+			if s < "1" || s > "7" || len(s) != 1 {
+				return errors.New("enter a number from 1 to 7")
 			}
 			return nil
 		})
@@ -138,6 +142,45 @@ func RunRecovery(t *Term, env RecoveryEnv) error {
 				pause(t)
 			}
 		case "6":
+			if env.ResetToDefault == nil {
+				t.p("\n  %sNot available on this machine.%s\n", red, reset)
+				pause(t)
+				continue
+			}
+			i, err := t.choose("What should be reset?", []string{
+				"Network settings: networks, firewall, DHCP, DNS, VPN and Wi-Fi (accounts stay)",
+				"Everything: factory reset, the setup wizard opens again",
+				"Cancel",
+			}, 3)
+			if err != nil {
+				if err == errRestart {
+					continue
+				}
+				return err
+			}
+			if i == 2 {
+				continue
+			}
+			level := []string{"network", "factory"}[i]
+			w, err := t.ask("Type RESET to continue", "", func(s string) error { return nil })
+			if err != nil {
+				if err == errRestart {
+					continue
+				}
+				return err
+			}
+			if strings.TrimSpace(w) != "RESET" {
+				t.p("\n  Nothing was changed.\n")
+				pause(t)
+				continue
+			}
+			if saved, err := env.ResetToDefault(level); err != nil {
+				t.p("\n  %s%v%s\n", red, err, reset)
+			} else {
+				t.p("\n  %sDone.%s A copy of the old settings is saved at %s.\n  Gatehouse restarts and the machine goes back to its starting state. Wait about a minute, then open the address shown on this screen.\n", green, reset, saved)
+			}
+			pause(t)
+		case "7":
 			t.clear()
 			return nil
 		}

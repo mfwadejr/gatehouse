@@ -132,6 +132,120 @@ function ConsolePort() {
   );
 }
 
+const POWER = {
+  reboot: { title: 'Restart this machine', verb: 'Restart', warn: 'The network is down for about a minute while it restarts. This page reconnects by itself.', waiting: 'Restarting…' },
+  poweroff: { title: 'Shut down this machine', verb: 'Shut down', warn: 'The network goes down and stays down until someone switches the machine back on.', waiting: 'Shutting down…' },
+  'restart-gatehouse': { title: 'Restart Gatehouse only', verb: 'Restart Gatehouse', warn: 'The console, DNS and DHCP are down for a few seconds. The machine itself keeps running.', waiting: 'Restarting Gatehouse…' },
+};
+
+// Waits until the machine stops answering and then answers again, then reloads the page.
+function useReconnect() {
+  const [waiting, setWaiting] = useState(false);
+  useEffect(() => {
+    if (!waiting) return undefined;
+    let down = false;
+    const started = Date.now();
+    const t = setInterval(async () => {
+      try {
+        const r = await fetch('/api/health', { cache: 'no-store' });
+        if (r.ok && (down || Date.now() - started > 45000)) { clearInterval(t); window.location.reload(); }
+      } catch { down = true; }
+    }, 3000);
+    return () => clearInterval(t);
+  }, [waiting]);
+  return [waiting, setWaiting];
+}
+
+function PowerModal({ action, me, onClose }) {
+  const meta = POWER[action];
+  const [code, setCode] = useState('');
+  const [run, busy] = useAction();
+  const [waiting, setWaiting] = useReconnect();
+  const needCode = !!me?.user?.totp_enabled;
+  const go = async () => { if (await run(() => post('/api/system/power', { action, code }))) setWaiting(true); };
+  if (waiting) {
+    return (
+      <Modal title={meta.waiting} onClose={() => {}} footer={null}>
+        <p>{action === 'poweroff' ? 'The machine is shutting down. You can close this page.' : 'Waiting for the machine to come back. This page reloads by itself when it does.'}</p>
+      </Modal>
+    );
+  }
+  return (
+    <Modal title={meta.title} onClose={onClose}
+      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy || (needCode && code.length < 6)} onClick={go}>{meta.verb}</Button></>}>
+      <p>{meta.warn}</p>
+      {needCode && <Field label="Code from your authenticator app"><Input value={code} onChange={setCode} inputMode="numeric" autoComplete="one-time-code" autoFocus /></Field>}
+    </Modal>
+  );
+}
+
+function PowerCard({ me }) {
+  const [action, setAction] = useState(null);
+  return (
+    <Card title="Power" desc="Restart or shut down this machine, or restart just the Gatehouse programs. Asks for your authenticator code if you use one.">
+      <div className="actions">
+        <Button onClick={() => setAction('reboot')}>Restart this machine</Button>
+        <Button onClick={() => setAction('restart-gatehouse')}>Restart Gatehouse only</Button>
+        <Button onClick={() => setAction('poweroff')}>Shut down</Button>
+      </div>
+      {action && <PowerModal action={action} me={me} onClose={() => setAction(null)} />}
+    </Card>
+  );
+}
+
+const RESET = {
+  network: {
+    title: 'Reset network settings',
+    verb: 'Reset network settings',
+    lines: ['Networks, firewall rules, port forwards, DHCP, DNS names and lists, VPNs, and Wi-Fi go back to a clean start.', 'Your accounts, sign-in settings, update settings and the console port stay.'],
+  },
+  factory: {
+    title: 'Factory reset',
+    verb: 'Erase everything',
+    lines: ['Everything is erased: all settings, accounts, logs and history. The setup wizard opens again.', 'Gatehouse itself and the installed system stay as they are.'],
+  },
+};
+
+function ResetModal({ level, me, onClose }) {
+  const meta = RESET[level];
+  const [code, setCode] = useState('');
+  const [word, setWord] = useState('');
+  const [run, busy] = useAction();
+  const [waiting, setWaiting] = useReconnect();
+  const needCode = !!me?.user?.totp_enabled;
+  const go = async () => { if (await run(() => post('/api/system/reset', { level, code, confirm: word }))) setWaiting(true); };
+  if (waiting) {
+    return (
+      <Modal title="Resetting…" onClose={() => {}} footer={null}>
+        <p>The machine is going back to its starting settings. This page reloads by itself when it answers again.</p>
+        <p className="small muted">If it does not come back, the address to use is shown on the machine's own screen. Wired ports ask for an address automatically.</p>
+      </Modal>
+    );
+  }
+  return (
+    <Modal title={meta.title} onClose={onClose}
+      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="danger" disabled={busy || (needCode && code.length < 6) || (level === 'factory' && word.toLowerCase() !== 'reset')} onClick={go}>{meta.verb}</Button></>}>
+      {meta.lines.map((l) => <p key={l}>{l}</p>)}
+      <p>A copy of the settings is saved on the machine first. <a href="/api/system/backup">Download a copy now</a> to keep it somewhere safe.</p>
+      {level === 'factory' && <Field label="Type the word reset to confirm"><Input value={word} onChange={setWord} autoFocus /></Field>}
+      {needCode && <Field label="Code from your authenticator app"><Input value={code} onChange={setCode} inputMode="numeric" autoComplete="one-time-code" /></Field>}
+    </Modal>
+  );
+}
+
+function ResetCard({ me }) {
+  const [level, setLevel] = useState(null);
+  return (
+    <Card title="Reset to default" desc="Start over. A copy of your settings is always saved first, and you can download it. Asks for your authenticator code only if you use one.">
+      <div className="actions">
+        <Button onClick={() => setLevel('network')}>Reset network settings…</Button>
+        <Button kind="danger" onClick={() => setLevel('factory')}>Factory reset…</Button>
+      </div>
+      {level && <ResetModal level={level} me={me} onClose={() => setLevel(null)} />}
+    </Card>
+  );
+}
+
 const hourLabel = (h) => `${h === 0 ? 12 : h > 12 ? h - 12 : h}:00 ${h < 12 ? 'AM' : 'PM'}`;
 
 function UpdateSteps({ steps, rollingBack }) {
@@ -155,6 +269,7 @@ function Updates({ me }) {
   const [lost, setLost] = useState(false);
   const [repo, setRepo] = useState(null);
   const [outcome, setOutcome] = useState(null);
+  const [restart, setRestart] = useState(false);
   const d = live || data;
 
   // An update that is already going on (the page was opened or reloaded in the middle of it).
@@ -238,7 +353,7 @@ function Updates({ me }) {
           </Note>
         )}
         {!working && d.key_set && !d.available && !d.error && !d.system_error && !d.checking && d.checked_at > 0 && <p className="muted">Everything is up to date.</p>}
-        {d.needs_reboot && <Note tone="warn" title="A restart is needed">The system was updated and needs a restart to finish. Restart the machine when it suits you; the network is down for about a minute while it restarts.</Note>}
+        {d.needs_reboot && !working && <Note tone="warn" title="A restart is needed">The system was updated and needs a restart to finish. The network is down for about a minute while it restarts; pick a moment that suits you.<div style={{ marginTop: '.5rem' }}><Button onClick={() => setRestart(true)}>Restart now</Button></div></Note>}
         <Field label="Updating" hint="Off: only when you press Check now. Notify: Gatehouse looks twice a day and tells you when something is ready. Automatic: it installs by itself in the hour you choose below.">
           <Segmented value={d.mode} onChange={(v) => save({ mode: v })} options={[{ value: 'off', label: 'Off' }, { value: 'notify', label: 'Notify' }, { value: 'auto', label: 'Automatic' }]} />
         </Field>
@@ -252,6 +367,7 @@ function Updates({ me }) {
             <Button disabled={busy || repo === null || repo === d.repo} onClick={() => run(() => put('/api/system/update/settings', { repo }), 'Saved.').then(() => { setRepo(null); reload(); })}>Save</Button></div>
         </Field>
       </div>
+      {restart && <PowerModal action="reboot" me={me} onClose={() => setRestart(false)} />}
       {asking && (
         <Modal title="Install the updates" onClose={() => setAsking(false)}
           footer={<><Button onClick={() => setAsking(false)}>Cancel</Button><Button kind="primary" disabled={busy || code.length < 6} onClick={go}>Install</Button></>}>
@@ -268,7 +384,9 @@ export default function Settings({ me, reloadMe }) {
     <Page title="Settings" sub="Your account and how you sign in.">
       <TwoStep me={me} data={data} reload={reload} boot={reloadMe} />
       {me?.user?.role === 'admin' && <Updates me={me} />}
+      {me?.user?.role === 'admin' && <PowerCard me={me} />}
       {me?.user?.role === 'admin' && <ConsolePort />}
+      {me?.user?.role === 'admin' && <ResetCard me={me} />}
       <Password />
       <Sessions />
       <Appearance />

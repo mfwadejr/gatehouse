@@ -10,6 +10,7 @@ import (
 	"gatehouse/internal/api"
 	"gatehouse/internal/devices"
 	dnssrv "gatehouse/internal/dns"
+	"gatehouse/internal/fw"
 )
 
 func pathID(r *http.Request) (int64, bool) {
@@ -36,6 +37,8 @@ func (a *App) registerRoutes() {
 	a.registerPortRoutes()
 	a.registerProtectRoutes()
 	a.registerUpdateRoutes()
+	a.registerPowerRoutes()
+	a.registerResetRoutes()
 	s.Handle("GET /api/logs", a.logSearch)
 	s.HandleAdmin("DELETE /api/logs", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		a.QLog.Clear()
@@ -273,6 +276,22 @@ func (a *App) registerRoutes() {
 		}
 		api.JSON(w, 200, l)
 	})
+	s.HandleAdmin("POST /api/devices", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		var in struct {
+			MAC  string `json:"mac"`
+			Name string `json:"name"`
+		}
+		if !api.Decode(w, r, &in) {
+			return
+		}
+		id, err := a.Devices.Create(in.MAC, in.Name)
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		a.fwSync()
+		api.JSON(w, 200, map[string]int64{"id": id})
+	})
 	s.HandleAdmin("PATCH /api/devices/{id}", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		id, good := pathID(r)
 		var u devices.Update
@@ -291,15 +310,24 @@ func (a *App) registerRoutes() {
 			fail(w, errBadID)
 			return
 		}
+		var mac string
+		a.Config.QueryRow(`SELECT lower(mac) FROM devices WHERE id=?`, id).Scan(&mac)
+		if err := fw.CheckDeviceRemovable(a.Config, mac); err != nil {
+			fail(w, err)
+			return
+		}
 		if err := a.Devices.Forget(id); err != nil {
 			fail(w, err)
 			return
 		}
+		a.Config.Exec(`DELETE FROM device_group_members WHERE lower(mac)=?`, mac)
+		a.fwSync()
 		ok(w)
 	})
 
 	a.registerDHCPRoutes()
 	a.registerFWRoutes()
+	a.registerFWObjectRoutes()
 	a.registerNetRoutes()
 	a.registerGroupRoutes()
 	a.registerWifiRoutes()

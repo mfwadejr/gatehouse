@@ -29,6 +29,7 @@ type NetController interface {
 	Pending() (string, time.Time, bool)
 	Status() map[string]wanmon.State
 	ApplyVPN(p netd.VPNPlan) error
+	ResetNetwork() error
 	VPNStatus() netd.VPNStatus
 	FWEvents(since uint64, max int) ([]netd.FWEvent, uint64)
 	SetSystem(hostname, zone string) error
@@ -37,9 +38,10 @@ type NetController interface {
 	UpdateStart(path string) error
 	SystemCheck() (netd.SystemUpdates, error)
 	SystemUpdateStart() error
+	Power(action string) error
 }
 
-const maxRequest = 4 << 20
+const maxRequest = 16 << 20
 
 type request struct {
 	Method string          `json:"method"`
@@ -209,6 +211,16 @@ func (s *Server) dispatch(r request) (any, error) {
 	case "fw.pending":
 		t, d, ok := s.FW.Pending()
 		return pendingResult{ok, t, d.Unix()}, nil
+	case "fw.sets":
+		var p struct {
+			Fills map[string]fw.SetFill `json:"fills"`
+		}
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return nil, s.FW.LoadSets(p.Fills)
+	case "fw.counters":
+		return s.FW.Counters()
 	}
 	// Everything that is not the firewall goes to the network side. It answers "unknown method"
 	// itself for names it does not know.
@@ -245,6 +257,8 @@ func (s *Server) dispatchNet(r request) (any, error) {
 		return nil, s.Net.Confirm(p.Token)
 	case "net.rollback":
 		return nil, s.Net.Rollback()
+	case "net.reset":
+		return nil, s.Net.ResetNetwork()
 	case "net.pending":
 		t, d, ok := s.Net.Pending()
 		return pendingResult{ok, t, d.Unix()}, nil
@@ -286,6 +300,14 @@ func (s *Server) dispatchNet(r request) (any, error) {
 		return s.Net.SystemCheck()
 	case "system.start":
 		return nil, s.Net.SystemUpdateStart()
+	case "system.power":
+		var p struct {
+			Action string `json:"action"`
+		}
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return nil, s.Net.Power(p.Action)
 	case "net.system":
 		var p struct {
 			Hostname string `json:"hostname"`
@@ -362,6 +384,18 @@ func (c *Client) Apply(script string, window time.Duration, author string) (stri
 func (c *Client) Confirm(token string) error { return c.call("fw.confirm", tokenParams{token}, nil) }
 func (c *Client) Rollback() error            { return c.call("fw.rollback", nil, nil) }
 
+func (c *Client) LoadSets(fills map[string]fw.SetFill) error {
+	return c.call("fw.sets", struct {
+		Fills map[string]fw.SetFill `json:"fills"`
+	}{fills}, nil)
+}
+
+func (c *Client) Counters() (map[string]fw.Counter, error) {
+	var out map[string]fw.Counter
+	err := c.call("fw.counters", nil, &out)
+	return out, err
+}
+
 func (c *Client) Pending() (string, time.Time, bool) {
 	var r pendingResult
 	if err := c.call("fw.pending", nil, &r); err != nil || !r.OK {
@@ -387,6 +421,7 @@ func (c *Client) NetConfirm(token string) error {
 	return c.call("net.confirm", tokenParams{token}, nil)
 }
 func (c *Client) NetRollback() error { return c.call("net.rollback", nil, nil) }
+func (c *Client) NetReset() error    { return c.call("net.reset", nil, nil) }
 
 func (c *Client) NetPending() (string, time.Time, bool) {
 	var r pendingResult
@@ -437,6 +472,12 @@ func (c *Client) SystemCheck() (netd.SystemUpdates, error) {
 	var out netd.SystemUpdates
 	err := c.callWithin(7*time.Minute, "system.check", nil, &out)
 	return out, err
+}
+
+// Power restarts or shuts down the machine, or restarts only Gatehouse ("reboot", "poweroff",
+// "restart-gatehouse").
+func (c *Client) Power(action string) error {
+	return c.call("system.power", map[string]string{"action": action}, nil)
 }
 
 // SystemUpdateStart installs only the operating system's updates.

@@ -19,6 +19,7 @@ import (
 // Port is a wired network port as the installer's own screen reports it.
 type Port struct {
 	Name  string
+	MAC   string
 	Link  bool // a cable is connected
 	USB   bool
 	Speed string
@@ -47,7 +48,8 @@ func WiredPorts() []Port {
 		if sp == "-1" {
 			sp = ""
 		}
-		out = append(out, Port{Name: n, Link: strings.TrimSpace(string(carrier)) == "1", USB: strings.Contains(real, "/usb"), Speed: sp})
+		mac, _ := os.ReadFile(base + "/address")
+		out = append(out, Port{Name: n, MAC: strings.TrimSpace(string(mac)), Link: strings.TrimSpace(string(carrier)) == "1", USB: strings.Contains(real, "/usb"), Speed: sp})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
@@ -307,9 +309,11 @@ func RunStatus(port string) {
 	var last string
 	first := true
 	d := openGraphics()
+	fb := newFallback()
 	for {
 		host, _ := os.Hostname()
 		EnsureLinksUp()
+		fb.update(readSetupState(), WiredPorts(), portHasAddress)
 		cw, ch := screenSize(d)
 		port := ReadConsolePort(port)
 		s := RenderStatus(host, WiredPorts(), usableAddresses(port), consoleState(port, readSetupState()), cw, ch)

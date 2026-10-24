@@ -123,3 +123,27 @@ func (s *Service) SystemUpdateStart() error {
 	}
 	return launchUpdate(update.Plan{System: true})
 }
+
+// Power restarts or shuts down the machine, or restarts only Gatehouse's own services. The action
+// happens a few seconds later, in a separate timer unit, so the answer reaches the browser first.
+func (s *Service) Power(action string) error {
+	var args []string
+	switch action {
+	case "reboot":
+		args = []string{"systemctl", "reboot"}
+	case "poweroff":
+		args = []string{"systemctl", "poweroff"}
+	case "restart-gatehouse":
+		args = []string{"systemctl", "restart", "gatehouse-netd", "gatehouse", "gatehouse-screen"}
+	default:
+		return errors.New("unknown power action")
+	}
+	return runPowerCmd(append([]string{"systemd-run", "--unit=gatehouse-power", "--collect", "--on-active=3s"}, args...))
+}
+
+var runPowerCmd = func(argv []string) error {
+	if out, err := exec.Command(argv[0], argv[1:]...).CombinedOutput(); err != nil {
+		return fmt.Errorf("%v: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}

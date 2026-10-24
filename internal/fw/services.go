@@ -92,3 +92,45 @@ func (p PortSpec) matchExpr() string {
 	}
 	return fmt.Sprintf("%s dport %s", p.Proto, p.portExpr())
 }
+
+// ParseServices reads a rule's "what for" field: one or more services, separated by commas, each
+// a name, tcp/8080 style ports, or list:Name for a saved list of ports.
+func ParseServices(s string, lists map[string][]string) ([]PortSpec, error) {
+	var out []PortSpec
+	any := false
+	for _, part := range strings.Split(s, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if name, ok := strings.CutPrefix(part, "list:"); ok {
+			items, found := lists[name]
+			if !found {
+				return nil, fmt.Errorf("there is no list of ports called %q", name)
+			}
+			for _, it := range items {
+				sp, err := ParseService(it)
+				if err != nil {
+					return nil, fmt.Errorf("list %q: %w", name, err)
+				}
+				if sp == nil {
+					any = true
+				}
+				out = append(out, sp...)
+			}
+			continue
+		}
+		sp, err := ParseService(part)
+		if err != nil {
+			return nil, err
+		}
+		if sp == nil {
+			any = true
+		}
+		out = append(out, sp...)
+	}
+	if any {
+		return nil, nil
+	}
+	return out, nil
+}

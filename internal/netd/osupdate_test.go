@@ -151,3 +151,19 @@ func TestNoSourcesIsAnError(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 }
+
+func TestPowerActions(t *testing.T) {
+	var got []string
+	old := runPowerCmd
+	defer func() { runPowerCmd = old }()
+	runPowerCmd = func(argv []string) error { got = argv; return nil }
+	s := &Service{}
+	for action, want := range map[string]string{"reboot": "systemctl reboot", "poweroff": "systemctl poweroff", "restart-gatehouse": "systemctl restart gatehouse-netd gatehouse gatehouse-screen"} {
+		if err := s.Power(action); err != nil || !strings.HasSuffix(strings.Join(got, " "), want) || !strings.Contains(strings.Join(got, " "), "--on-active") {
+			t.Fatalf("%s: %v %v", action, err, got)
+		}
+	}
+	if err := s.Power("rm -rf /"); err == nil {
+		t.Fatal("made-up action accepted")
+	}
+}

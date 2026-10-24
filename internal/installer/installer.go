@@ -53,6 +53,10 @@ type Disk struct {
 type Request struct {
 	Disk    string `json:"disk"`
 	Confirm string `json:"confirm"` // must repeat the disk path
+	// MgmtPort is the network port the person will manage Gatehouse from. It is remembered on the
+	// new system, which brings that port up first and answers first-time setup only there.
+	MgmtPort string `json:"mgmt_port,omitempty"`
+	MgmtMAC  string `json:"mgmt_mac,omitempty"`
 }
 
 // Step is one stage of the installation.
@@ -104,10 +108,17 @@ func (in *Installer) Status() Status {
 	return s
 }
 
+// MgmtPortFile is where the installer leaves the chosen management port on the new system
+// (relative to its root): the port's name and its MAC address, so it is found again even if the
+// kernel names the port differently.
+const MgmtPortFile = "var/lib/gatehouse/mgmt-port"
+
 const (
 	defaultHost = "gatehouse"
 	defaultZone = "UTC"
 )
+
+var reMgmtPort = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,14}$`)
 
 var (
 	reHost = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
@@ -128,6 +139,8 @@ func Validate(r *Request, disks []Disk) error {
 		return errors.New("choose one of the listed disks")
 	case found.InUse:
 		return errors.New("that disk holds the installer itself; choose another")
+	case r.MgmtPort != "" && !reMgmtPort.MatchString(r.MgmtPort):
+		return errors.New("that is not a valid network port name")
 	case r.Confirm != r.Disk:
 		return errors.New("type the disk name to confirm that everything on it will be erased")
 	}
@@ -376,6 +389,14 @@ func (in *Installer) plan(r Request) []step {
 		{"Preparing first start", func() error {
 			if err := in.chroot("", "install", "-d", "-o", "gatehouse", "-g", "gatehouse", "-m", "750", "/var/lib/gatehouse"); err != nil {
 				return err
+			}
+			if r.MgmtPort != "" {
+				if err := os.MkdirAll(filepath.Join(t, "var/lib/gatehouse"), 0o755); err != nil {
+					return err
+				}
+				if err := os.WriteFile(filepath.Join(t, MgmtPortFile), []byte(r.MgmtPort+" "+r.MgmtMAC+"\n"), 0o644); err != nil {
+					return err
+				}
 			}
 			return in.chroot("", "chown", "-R", "gatehouse:gatehouse", "/var/lib/gatehouse")
 		}},

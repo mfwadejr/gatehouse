@@ -48,7 +48,7 @@ menu margin 0
 menu hshift 17
 menu vshift 17
 menu width 46
-menu rows 4
+menu rows 3
 menu tabmsg
 menu timeoutrow 24
 menu autoboot Starting Gatehouse in # seconds
@@ -76,12 +76,6 @@ label basic
   linux $K
   initrd $I
   append $SAFE $EXTRA nomodeset gatehouse.text
-
-label web
-  menu label Install from another computer
-  linux $K
-  initrd $I
-  append $A $EXTRA
 
 label serial
   menu label Install with serial console (115200 8N1)
@@ -132,10 +126,6 @@ menuentry "Install Gatehouse" {
 }
 menuentry "Install Gatehouse (basic graphics)" {
   linux $SAFE $EXTRA nomodeset gatehouse.text
-  initrd $I
-}
-menuentry "Install from another computer" {
-  linux $L $EXTRA
   initrd $I
 }
 menuentry "Install with serial console (115200 8N1)" {
