@@ -91,7 +91,7 @@ function Setup({ card, country, wans, ifs, onClose, onSaved }) {
             <div className="stack">
               {found.length === 0 && <Empty>No networks found.</Empty>}
               {found.slice(0, 12).map((n) => (
-                <button key={n.ssid} type="button" className={`wg-member${f.ssid === n.ssid ? ' on' : ''}`} onClick={() => setF((x) => ({ ...x, ssid: n.ssid, wpa3: n.security === 'wpa3' }))}>
+                <button key={n.ssid} type="button" className={`wg-member${f.ssid === n.ssid ? ' on' : ''}`} onClick={() => { setF((x) => ({ ...x, ssid: n.ssid, wpa3: n.security === 'wpa3' })); setTimeout(() => document.getElementById('wifi-psk')?.focus(), 0); }}>
                   <span className="name grow">{n.ssid}</span>
                   <span className="small muted">{n.security === 'open' ? 'Open' : 'Password'} · {bars(n.signal)}</span>
                 </button>
@@ -103,7 +103,7 @@ function Setup({ card, country, wans, ifs, onClose, onSaved }) {
       <Field label="Network name"><Input value={f.ssid} onChange={set('ssid')} placeholder={ap ? 'Gatehouse' : 'Name of the network to join'} autoComplete="off" /></Field>
       <Field label="Password" hint={s?.has_psk ? 'Leave empty to keep the saved password.' : ap ? 'At least 8 characters.' : 'Leave empty for an open network.'}>
         <div className="actions" style={{ flexWrap: 'nowrap' }}>
-          <Input type={ap ? 'text' : 'password'} value={f.psk} onChange={set('psk')} autoComplete="new-password" />
+          <Input id="wifi-psk" type={ap ? 'text' : 'password'} value={f.psk} onChange={set('psk')} autoComplete="new-password" />
           {ap && <Button onClick={() => set('psk')(makePassword())}>Make one</Button>}
         </div>
       </Field>

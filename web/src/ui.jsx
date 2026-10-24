@@ -255,13 +255,17 @@ export function enterToPrimary(e, root) {
 // ---------- modal ----------
 export function Modal({ title, onClose, children, footer }) {
   const ref = useRef(null);
+  // The page behind a dialog refreshes itself and hands it a new onClose each time. The dialog must
+  // not treat that as "opened again" (it would grab focus back from the field being typed in).
+  const close = useRef(onClose);
+  close.current = onClose;
   useEffect(() => {
     const prev = document.activeElement;
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e) => { if (e.key === 'Escape') close.current(); };
     document.addEventListener('keydown', onKey);
     ref.current?.querySelector('input,select,textarea,button')?.focus();
     return () => { document.removeEventListener('keydown', onKey); prev?.focus?.(); };
-  }, [onClose]);
+  }, []);
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-label={title}>
       <div className="scrim" onClick={onClose} />
