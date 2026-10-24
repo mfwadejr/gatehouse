@@ -46,8 +46,10 @@ func TestKeysAndSignatures(t *testing.T) {
 	if VerifySignature(pub, []byte("hellO"), sig) == nil || VerifySignature(pub, []byte("hello"), "AAAA") == nil {
 		t.Fatal("bad signature accepted")
 	}
-	if _, err := EmbeddedKey(); err != ErrNoKey {
-		t.Fatalf("the placeholder key must switch updates off: %v", err)
+	if k, err := EmbeddedKey(); err != nil && err != ErrNoKey {
+		t.Fatalf("the built-in key is damaged: %v", err)
+	} else if err == nil && len(k) != ed25519.PublicKeySize {
+		t.Fatal("the built-in key is the wrong size")
 	}
 	other, _, _ := ed25519.GenerateKey(rand.Reader)
 	if VerifySignature(other, []byte("hello"), sig) == nil {
