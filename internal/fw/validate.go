@@ -127,6 +127,14 @@ func (m *Model) Validate() error {
 	if mgmt == 0 {
 		add("at least one network must be allowed to manage this device, otherwise you would be locked out")
 	}
+	if m.RescueIface != "" && !reIface.MatchString(m.RescueIface) {
+		add("the setup port name %q is not valid", m.RescueIface)
+	}
+	for _, c := range m.MgmtAllow {
+		if _, err := netip.ParsePrefix(c); err != nil {
+			add("%q is not a valid address range for management access", c)
+		}
+	}
 	if len(m.ConsolePorts) == 0 {
 		add("the console port is not set")
 	}

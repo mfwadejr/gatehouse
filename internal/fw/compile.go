@@ -3,6 +3,7 @@ package fw
 import (
 	"fmt"
 	"net"
+	"net/netip"
 	"sort"
 	"strconv"
 	"strings"
@@ -211,9 +212,37 @@ func (c *compiler) input() {
 			ssh = append(ssh, z.Ifaces...)
 		}
 	}
-	c.line(2, "iifname %s tcp dport %s accept comment \"protected: management console\"", ifSet(mgmt), portList(m.ConsolePorts))
-	if len(ssh) > 0 {
-		c.line(2, "iifname %s tcp dport 22 accept comment \"protected: management ssh\"", ifSet(ssh))
+	// An optional limit on who may manage: only these address ranges, on top of the network.
+	limits := []string{""} // one line, no limit
+	if len(m.MgmtAllow) > 0 {
+		var a4, a6 []string
+		for _, cidr := range m.MgmtAllow {
+			if p, err := netip.ParsePrefix(cidr); err == nil {
+				if p.Addr().Is4() {
+					a4 = append(a4, cidr)
+				} else {
+					a6 = append(a6, cidr)
+				}
+			}
+		}
+		limits = nil
+		if len(a4) > 0 {
+			limits = append(limits, " ip saddr "+setLit(a4))
+		}
+		if len(a6) > 0 {
+			limits = append(limits, " ip6 saddr "+setLit(a6))
+		}
+	}
+	for _, lim := range limits {
+		c.line(2, "iifname %s%s tcp dport %s accept comment \"protected: management console\"", ifSet(mgmt), lim, portList(m.ConsolePorts))
+		if len(ssh) > 0 {
+			c.line(2, "iifname %s%s tcp dport 22 accept comment \"protected: management ssh\"", ifSet(ssh), lim)
+		}
+	}
+	// The last resort: the port the device was set up from keeps reaching the console, whatever
+	// the networks look like. Never on an internet-facing port or one already covered above.
+	if r := m.RescueIface; r != "" && !contains(m.WanIfaces(), r) && !contains(mgmt, r) {
+		c.line(2, "iifname %s tcp dport %s accept comment \"protected: setup port\"", ifSet([]string{r}), portList(m.ConsolePorts))
 	}
 
 	// Basic protocol health.

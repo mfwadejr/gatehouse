@@ -66,6 +66,7 @@ type App struct {
 	traffic wanTraffic
 	upnp    upnpState
 	setupMu sync.Mutex
+	con     consoles
 
 	netApplyState struct {
 		mu     sync.Mutex
@@ -295,17 +296,22 @@ func (a *App) Run(ctx context.Context) error {
 	run(func() { a.collectTraffic(ctx) })
 	run(func() { a.runUPnP(ctx) })
 
-	l, err := net.Listen("tcp", a.Cfg.WebAddr)
+	a.con.begin(ctx)
+	cs, err := a.startConsole(ctx, a.consoleAddr())
 	if err != nil {
 		close(stopLog)
-		return fmt.Errorf("console listen on %s: %w", a.Cfg.WebAddr, err)
+		return fmt.Errorf("console listen on %s: %w", a.consoleAddr(), err)
 	}
-	srv := &http.Server{Handler: a.API.Handler(), ConnContext: api.ConnContext, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 2 * time.Minute}
-	log.Printf("console listening on %s", l.Addr())
-	err = api.Serve(ctx, srv, l, a.Cfg.TLSCert, a.Cfg.TLSKey)
+	a.con.add(cs)
+	a.con.mu.Lock()
+	a.con.primary = cs.port
+	a.con.mu.Unlock()
+	a.startupPort()
+	<-ctx.Done()
+	a.con.waitAll()
 	close(stopLog)
 	wg.Wait()
-	return err
+	return nil
 }
 
 func (a *App) housekeeping(ctx context.Context) {

@@ -2,10 +2,14 @@
 Description=Gatehouse (DNS, DHCP and web console)
 ConditionKernelCommandLine=!boot=live
 After=gatehouse-netd.service network.target
-Requires=gatehouse-netd.service
+# Wants, not Requires: if the helper restarts, the console keeps running and the helper comes back on its own.
+Wants=gatehouse-netd.service
+StartLimitIntervalSec=0
 
 [Service]
-Type=simple
+Type=notify
+NotifyAccess=main
+WatchdogSec=60
 User=gatehouse
 Group=gatehouse
 ExecStart=/usr/local/bin/gatehouse daemon -data /var/lib/gatehouse -web :443 -dns :53 -dhcp :67

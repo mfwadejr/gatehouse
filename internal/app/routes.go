@@ -33,6 +33,8 @@ func ok(w http.ResponseWriter) { api.JSON(w, 200, map[string]string{"status": "o
 func (a *App) registerRoutes() {
 	s := a.API
 	a.registerVPNRoutes()
+	a.registerPortRoutes()
+	a.registerProtectRoutes()
 	s.Handle("GET /api/logs", a.logSearch)
 	s.HandleAdmin("DELETE /api/logs", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		a.QLog.Clear()

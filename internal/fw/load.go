@@ -4,7 +4,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"net/netip"
+	"strconv"
 	"strings"
+	"time"
 )
 
 // Queryer is satisfied by *sql.DB, *sql.Tx and the store wrapper, so a model can be loaded
@@ -55,7 +58,9 @@ func sanitizeIf(s string) string {
 
 // Load builds the model from the configuration database.
 func Load(db Queryer) (*Model, error) {
-	m := &Model{Groups: map[string][]string{}, ConsolePorts: append([]int(nil), DefaultConsolePorts...)}
+	m := &Model{Groups: map[string][]string{}, ConsolePorts: ConsolePortsFrom(db, time.Now())}
+	m.RescueIface = strings.TrimSpace(setting(db, "mgmt.rescue_iface", ""))
+	m.MgmtAllow = MgmtAllowFrom(db).Resolved
 	m.DNSRedirect = setting(db, "fw.dns_redirect", "1") == "1"
 	m.BlockDoT = setting(db, "fw.block_dot", "1") == "1"
 	m.DNSTarget = strings.TrimSpace(setting(db, "fw.dns_target", ""))
@@ -247,7 +252,7 @@ func Load(db Queryer) (*Model, error) {
 // RecoveryModel is the safest useful model derived from m: every non-internet network may
 // manage the device, there are no exceptions or forwards, and the internet side stays closed.
 func RecoveryModel(m *Model) *Model {
-	r := &Model{Groups: map[string][]string{}, ConsolePorts: m.ConsolePorts}
+	r := &Model{Groups: map[string][]string{}, ConsolePorts: m.ConsolePorts, RescueIface: m.RescueIface}
 	for _, z := range m.Zones {
 		z2 := z
 		z2.Ifaces = append([]string(nil), z.Ifaces...)
@@ -258,4 +263,70 @@ func RecoveryModel(m *Model) *Model {
 		r.Zones = append(r.Zones, z2)
 	}
 	return r
+}
+
+// ConsolePortsFrom lists the ports the console answers on: the saved one, plus a new one that is
+// being tried and has not yet expired.
+func ConsolePortsFrom(db Queryer, now time.Time) []int {
+	ports := []int{DefaultConsolePorts[0]}
+	if n, err := strconv.Atoi(strings.TrimSpace(setting(db, "console.port", ""))); err == nil && n >= 1 && n <= 65535 {
+		ports[0] = n
+	}
+	if p, d, ok := strings.Cut(setting(db, "console.port.pending", ""), "|"); ok {
+		pn, e1 := strconv.Atoi(p)
+		dl, e2 := strconv.ParseInt(d, 10, 64)
+		if e1 == nil && e2 == nil && pn >= 1 && pn <= 65535 && now.Unix() < dl && pn != ports[0] {
+			ports = append(ports, pn)
+		}
+	}
+	return ports
+}
+
+// MgmtAllowSpec is what the administrator chose: networks by name and address ranges by hand.
+type MgmtAllowSpec struct {
+	Networks []string `json:"networks"`
+	CIDRs    []string `json:"cidrs"`
+	// Resolved is every address range the choice stands for, filled in on load.
+	Resolved []string `json:"resolved,omitempty"`
+}
+
+// MgmtAllowFrom reads the saved limit on who may manage this device.
+func MgmtAllowFrom(db Queryer) MgmtAllowSpec {
+	var spec MgmtAllowSpec
+	raw := setting(db, "mgmt.allow", "")
+	if raw == "" || json.Unmarshal([]byte(raw), &spec) != nil {
+		return MgmtAllowSpec{}
+	}
+	spec.Resolved = nil
+	seen := map[string]bool{}
+	add := func(c string) {
+		c = strings.TrimSpace(c)
+		if p, err := netip.ParsePrefix(c); err == nil {
+			c = p.Masked().String()
+		} else if a, err := netip.ParseAddr(c); err == nil {
+			c = netip.PrefixFrom(a, a.BitLen()).String()
+		} else {
+			return
+		}
+		if !seen[c] {
+			seen[c] = true
+			spec.Resolved = append(spec.Resolved, c)
+		}
+	}
+	for _, c := range spec.CIDRs {
+		add(c)
+	}
+	for _, n := range spec.Networks {
+		rows, err := db.Query(`SELECT i.ipv4_cidr FROM interfaces i JOIN zones z ON z.id=i.zone_id WHERE i.enabled=1 AND i.ipv4_cidr<>'' AND z.name=?`, n)
+		if err != nil {
+			continue
+		}
+		for rows.Next() {
+			var c string
+			rows.Scan(&c)
+			add(c)
+		}
+		rows.Close()
+	}
+	return spec
 }

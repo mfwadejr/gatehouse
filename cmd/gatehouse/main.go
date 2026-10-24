@@ -132,6 +132,8 @@ func daemon(args []string) {
 	defer a.Close()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	fw.ConsolePortFile = filepath.Join(cfg.DataDir, "console.port")
+	go watchdog(ctx, a, cfg)
 	if err := a.Run(ctx); err != nil {
 		log.Fatalf("run: %v", err)
 	}
@@ -186,6 +188,7 @@ func runNetd(args []string) {
 	}
 
 	gid := lookupGID(*group)
+	fw.ConsolePortFile = *state + "/console.port"
 	ap := fw.NewApplier(*state + "/fw")
 	ap.Baseline = fw.FirstBootBaseline
 	if err := ap.Boot(); err != nil {
@@ -456,11 +459,32 @@ func recoverCmd(args []string) {
 			return svc.ClearTOTP(u.ID)
 		},
 		ResetFirewall: func() error {
+			fw.ConsolePortFile = filepath.Join(*data, "console.port")
 			dir := filepath.Join(*data, "fw")
 			os.Remove(filepath.Join(dir, "lastgood.nft"))
 			ap := fw.NewApplier(dir)
 			ap.Baseline = fw.FirstBootBaseline
 			return ap.Rollback()
+		},
+		ResetAccess: func() error {
+			// Back to port 443, and anyone on a management network may manage again.
+			if err := open(); err != nil {
+				return err
+			}
+			defer fixOwner()
+			for _, k := range []string{"console.port", "console.port.pending", "mgmt.allow"} {
+				db.Exec(`DELETE FROM settings WHERE key=?`, k)
+			}
+			os.WriteFile(filepath.Join(*data, "console.port"), []byte("443\n"), 0o644)
+			os.Remove(filepath.Join(*data, "fw", "lastgood.nft"))
+			fw.ConsolePortFile = filepath.Join(*data, "console.port")
+			ap := fw.NewApplier(filepath.Join(*data, "fw"))
+			ap.Baseline = fw.FirstBootBaseline
+			if err := ap.Rollback(); err != nil {
+				return err
+			}
+			exec.Command("systemctl", "restart", "gatehouse").Run()
+			return nil
 		},
 		Diagnose: diagnose,
 	}

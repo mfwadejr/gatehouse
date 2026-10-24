@@ -111,6 +111,7 @@ func TestRecoveryScreen(t *testing.T) {
 		SetPassword:   func(n, p string) error { got = append(got, "pw:"+n+":"+p); return nil },
 		ClearTwoStep:  func(n string) error { got = append(got, "mfa:"+n); return nil },
 		ResetFirewall: func() error { got = append(got, "fw"); return nil },
+		ResetAccess:   func() error { got = append(got, "access"); return nil },
 		Diagnose:      func() string { return "gatehouse          failed" },
 	}
 	script := strings.Join([]string{
@@ -118,13 +119,14 @@ func TestRecoveryScreen(t *testing.T) {
 		"2", "", // two-step off
 		"3", "y", "", // firewall
 		"4", "", // what is running
-		"5",
+		"5", "y", "", // port and management limit
+		"6",
 	}, "\r") + "\r"
 	var out bytes.Buffer
 	if err := RunRecovery(NewTerm(strings.NewReader(script), &out), env); err != nil {
 		t.Fatalf("%v\n%s", err, out.String())
 	}
-	if strings.Join(got, ",") != "pw:marvin:a long enough pass,mfa:marvin,fw" {
+	if strings.Join(got, ",") != "pw:marvin:a long enough pass,mfa:marvin,fw,access" {
 		t.Fatalf("actions: %v\n%s", got, out.String())
 	}
 	if !strings.Contains(out.String(), "gatehouse          failed") {

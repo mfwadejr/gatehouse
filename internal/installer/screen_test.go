@@ -1,6 +1,7 @@
 package installer
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -81,5 +82,22 @@ func TestStatusSaysWhenTheConsoleIsDown(t *testing.T) {
 	}
 	if st := RenderStatus("gatehouse", p, []string{"https://192.168.1.20"}, "starting", 80, 24); !strings.Contains(st, "is starting") {
 		t.Fatalf("no start-up message:\n%s", st)
+	}
+}
+
+func TestLoopingAndPort(t *testing.T) {
+	out := RenderStatus("gatehouse", []Port{{Name: "enp1s0", Link: true}}, []string{"https://192.168.1.1:8443"}, "looping", 80, 24)
+	for _, w := range []string{"keeps stopping", "still protecting", "Alt+F2"} {
+		if !strings.Contains(out, w) {
+			t.Errorf("missing %q", w)
+		}
+	}
+	ConsolePortFile = t.TempDir() + "/console.port"
+	if got := ReadConsolePort(""); got != "443" {
+		t.Fatalf("default %s", got)
+	}
+	os.WriteFile(ConsolePortFile, []byte("8443\n"), 0o644)
+	if got := ReadConsolePort(""); got != "8443" {
+		t.Fatalf("saved %s", got)
 	}
 }

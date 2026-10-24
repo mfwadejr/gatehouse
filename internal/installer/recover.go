@@ -15,6 +15,8 @@ type RecoveryEnv struct {
 	ClearTwoStep  func(name string) error
 	ResetFirewall func() error
 	Diagnose      func() string // what is running and the last error lines
+	// ResetAccess puts the console back on port 443 and removes any limit on who may manage.
+	ResetAccess func() error
 }
 
 // RunRecovery is the screen for someone who is locked out and is standing at the machine. Physical
@@ -26,10 +28,11 @@ func RunRecovery(t *Term, env RecoveryEnv) error {
 		t.p("  2) Turn off two-step sign-in for an administrator\n")
 		t.p("  3) Reset the firewall to the safe starting rules\n")
 		t.p("  4) Check what is running and why the console may be down\n")
-		t.p("  5) Leave recovery\n\n")
-		n, err := t.ask("Number", "5", func(s string) error {
-			if s < "1" || s > "5" || len(s) != 1 {
-				return errors.New("enter a number from 1 to 5")
+		t.p("  5) Let any management network in, and put the console back on port 443\n")
+		t.p("  6) Leave recovery\n\n")
+		n, err := t.ask("Number", "6", func(s string) error {
+			if s < "1" || s > "6" || len(s) != 1 {
+				return errors.New("enter a number from 1 to 6")
 			}
 			return nil
 		})
@@ -117,6 +120,24 @@ func RunRecovery(t *Term, env RecoveryEnv) error {
 			}
 			pause(t)
 		case "5":
+			ok, err := t.yesno("Remove the limit on who may manage, and put the console back on port 443? The console restarts", false)
+			if err != nil {
+				if err == errRestart {
+					continue
+				}
+				return err
+			}
+			if ok {
+				if env.ResetAccess == nil {
+					t.p("\n  %sNot available on this machine.%s\n", red, reset)
+				} else if err := env.ResetAccess(); err != nil {
+					t.p("\n  %s%v%s\n", red, err, reset)
+				} else {
+					t.p("\n  %sDone.%s Open the console on port 443 from any management network. Wait about a minute for it to restart.\n", green, reset)
+				}
+				pause(t)
+			}
+		case "6":
 			t.clear()
 			return nil
 		}

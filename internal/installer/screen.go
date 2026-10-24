@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -261,6 +262,12 @@ func RenderStatus(host string, ports []Port, urls []string, setup string, w, h i
 		s.blank()
 		s.mid(fg + "Gatehouse is starting. This takes up to a minute." + reset)
 		s.mid(dim + "This screen updates by itself." + reset)
+	case setup == "looping" && len(urls) > 0:
+		s.mid(amber + "●" + reset + bold + " The console keeps stopping" + reset)
+		s.blank()
+		s.mid(fg + "Gatehouse restarts it by itself, but it keeps failing." + reset)
+		s.mid(fg + "Your firewall is still protecting the network." + reset)
+		s.mid(fg + "Press Alt+F2 on this keyboard, then choose 4, to see why." + reset)
 	case setup == "down" && len(urls) > 0:
 		s.mid(amber + "●" + reset + bold + " The console is not running" + reset)
 		s.blank()
@@ -304,7 +311,8 @@ func RunStatus(port string) {
 		host, _ := os.Hostname()
 		EnsureLinksUp()
 		cw, ch := screenSize(d)
-		s := RenderStatus(host, WiredPorts(), usableAddresses(port), readSetupState(), cw, ch)
+		port := ReadConsolePort(port)
+		s := RenderStatus(host, WiredPorts(), usableAddresses(port), consoleState(port, readSetupState()), cw, ch)
 		if s != last || first {
 			paint(d, s, first)
 			last, first = s, false
@@ -330,7 +338,36 @@ func consoleState(port, setup string) string {
 			return "starting"
 		}
 	}
+	if restarts() >= 3 {
+		return "looping"
+	}
 	return "down"
+}
+
+// restarts is how many times systemd has restarted the console by itself.
+func restarts() int {
+	out, err := exec.Command("systemctl", "show", "gatehouse", "-p", "NRestarts", "--value").Output()
+	if err != nil {
+		return 0
+	}
+	n, _ := strconv.Atoi(strings.TrimSpace(string(out)))
+	return n
+}
+
+// ConsolePortFile is the copy of the console's port that the console keeps for these screens.
+var ConsolePortFile = "/var/lib/gatehouse/console.port"
+
+// ReadConsolePort is the port the console is set to answer on, or def when none is saved.
+func ReadConsolePort(def string) string {
+	if b, err := os.ReadFile(ConsolePortFile); err == nil {
+		if n, err := strconv.Atoi(strings.TrimSpace(string(b))); err == nil && n >= 1 && n <= 65535 {
+			return strconv.Itoa(n)
+		}
+	}
+	if def == "" {
+		return "443"
+	}
+	return def
 }
 
 // consoleSize is the size of the machine's own display in characters.

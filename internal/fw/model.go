@@ -85,6 +85,12 @@ type Model struct {
 	Groups map[string][]string
 	// ConsolePorts are the TCP ports of the web console, always open to management zones.
 	ConsolePorts []int
+	// RescueIface is the network port the device was first set up from. It keeps reaching the
+	// console even if every network is edited wrongly. Empty when not known.
+	RescueIface string
+	// MgmtAllow, when not empty, limits management (console and SSH) to these address ranges.
+	// Empty means every management network may manage. The setup port is never limited by it.
+	MgmtAllow []string
 	// Tunnels are the outbound VPN connections.
 	Tunnels []Tunnel
 	// VPNPorts are the listening ports of enabled VPN servers.

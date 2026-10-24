@@ -142,6 +142,10 @@ func (a *App) registerSetupRoutes() {
 			return
 		}
 		a.writeSetupState()
+		// Remember the port this device was first set up from: it stays a last-resort way in.
+		if name, _ := localPort(r); name != "" && name != "lo" && a.Config.Setting("mgmt.rescue_iface", "") == "" {
+			a.Config.SetSetting("mgmt.rescue_iface", name)
+		}
 		api.JSON(w, 200, map[string]string{"status": "ok"})
 	})
 

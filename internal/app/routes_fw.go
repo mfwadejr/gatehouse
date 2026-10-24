@@ -296,10 +296,17 @@ func sessionSafe(m *fw.Model, clientIP string) (checked, safe bool, iface string
 	if iface == "" || iface == "lo" {
 		return false, true, iface
 	}
+	// The port the device was set up from keeps working whatever else changes.
+	if iface == m.RescueIface && !contains(m.WanIfaces(), iface) {
+		return true, true, iface
+	}
 	for _, z := range m.Zones {
 		if z.Management {
 			for _, i := range z.Ifaces {
 				if i == iface {
+					if len(m.MgmtAllow) > 0 && !inRanges(m.MgmtAllow, clientIP) {
+						return true, false, iface
+					}
 					return true, true, iface
 				}
 			}
@@ -327,7 +334,7 @@ func (a *App) fwPreview(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		res["you_stay_connected"] = safe
 		if !safe {
 			res["ok"] = false
-			res["problems"] = []string{"You are connected through " + ifc + ", which would no longer be allowed to manage this device. Mark that network as able to manage it, or connect from one that is."}
+			res["problems"] = []string{"You are connected through " + ifc + ", which would no longer be allowed to manage this device (the network is not marked for management, or your address is outside the limit on who may manage). Fix that first, or connect from a network that is allowed."}
 		}
 	}
 	api.JSON(w, 200, res)

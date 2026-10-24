@@ -36,7 +36,7 @@ function ZoneForm({ initial, presets, ifaces, taken, onClose, onSaved }) {
       </div>
       <ToggleRow title="Can reach the internet" checked={z.internet} onChange={set('internet')} />
       <ToggleRow title="Devices here can talk to each other" checked={z.intra_allow} onChange={set('intra_allow')} />
-      <ToggleRow title="Can manage Gatehouse" desc="Allows the console from this network." checked={z.management} onChange={set('management')} />
+      <ToggleRow title="Can manage Gatehouse" desc="Allows the console from this network. Keep at least one network on, so you can always get back in; Gatehouse refuses a change that would leave none." checked={z.management} onChange={set('management')} />
       <ToggleRow title="Gatehouse is the gateway" desc="Off if another router on this network does that job." checked={z.gateway} onChange={set('gateway')} />
       <ToggleRow title="Make devices here use the enforced DNS server" desc="Catches gadgets with a DNS server built in, such as smart TVs and cameras. Turn off for a network that needs its own DNS." checked={z.dns_force} onChange={set('dns_force')} />
       <ToggleRow title="Allow remote login (SSH)" checked={z.ssh} onChange={set('ssh')} />
@@ -277,6 +277,68 @@ function DnsTarget({ s, save }) {
   );
 }
 
+function Protected({ reload }) {
+  const { data, reload: again } = useData('/api/fw/protected', { topics: ['fw.status'] });
+  const [run, busy] = useAction();
+  const [edit, setEdit] = useState(false);
+  const [nets, setNets] = useState([]);
+  const [cidrs, setCidrs] = useState('');
+  const [res, setRes] = useState(null);
+  if (!data) return null;
+  const startEdit = () => { setNets(data.allow.networks || []); setCidrs((data.allow.cidrs || []).join('\n')); setEdit(true); };
+  const toggle = (n) => setNets((x) => (x.includes(n) ? x.filter((y) => y !== n) : [...x, n]));
+  const save = async () => {
+    const list = cidrs.split(/[\s,]+/).filter(Boolean);
+    if (await run(() => put('/api/fw/management-access', { networks: nets, cidrs: list }), 'Saved. Apply the firewall to put it into effect.')) { setEdit(false); again(); reload(); }
+  };
+  const test = async () => { const r = await run(() => post('/api/fw/access-check', {})); if (r) setRes(r); };
+  const limited = (data.allow.resolved || []).length > 0;
+  return (
+    <section className="protected" aria-label="Protected rules">
+      <div className="spread">
+        <div className="inline"><span className="lock" aria-hidden="true">🔒</span><span className="name" style={{ fontSize: 'var(--font-size-lg)' }}>Protected: you can always get back in</span></div>
+        <div className="inline">
+          <Button small onClick={test} disabled={busy}>Test my access</Button>
+          <Button small onClick={edit ? () => setEdit(false) : startEdit}>{limited ? 'Change who may manage' : 'Limit who may manage'}</Button>
+        </div>
+      </div>
+      <p className="small muted">These rules are built in. They sit above everything you can edit, and no change you make here can remove them. If you are ever locked out, press Alt+F2 on the machine itself.</p>
+      <div className="list">
+        {data.rules.map((r) => (
+          <div className="item" key={r.title}>
+            <div><div className="name">{r.title}</div><div className="meta">{r.text}</div>{r.note && <div className="meta muted">{r.note}</div>}</div>
+            <Pill tone={r.active ? 'good' : ''}>{r.active ? 'Always on' : 'Standing by'}</Pill>
+          </div>
+        ))}
+      </div>
+      {edit && (
+        <div className="stack" style={{ marginTop: 'var(--space-3)' }}>
+          <Note title="Who may manage this device">Choose the networks or addresses allowed to open this console. Leave everything empty to allow every management network. If you pick something that does not include the address you are using now, Gatehouse refuses, so you cannot lock yourself out this way.</Note>
+          <Field label="Networks">
+            <div className="stack" style={{ gap: 'var(--space-1)' }}>
+              {(data.networks || []).map((n) => (
+                <label key={n.name} className="inline"><input type="checkbox" checked={nets.includes(n.name)} onChange={() => toggle(n.name)} /> <span className="name">{n.name}</span> <span className="small muted mono">{n.subnets.join(', ')}</span></label>
+              ))}
+            </div>
+          </Field>
+          <Field label="Addresses or ranges" hint="One per line, like 192.168.1.0/24 or 10.8.0.5. You are connecting from the address shown below.">
+            <textarea className="in mono" rows={3} value={cidrs} onChange={(e) => setCidrs(e.target.value)} spellCheck={false} placeholder="192.168.1.0/24" />
+          </Field>
+          <span className="small muted">You are connecting from {data.you.ip}{data.you.iface ? ` (${data.you.iface})` : ''}.</span>
+          <div className="actions"><Button kind="primary" disabled={busy} onClick={save}>Save</Button><Button onClick={() => setEdit(false)}>Cancel</Button></div>
+        </div>
+      )}
+      {res && (
+        <div className="stack" style={{ marginTop: 'var(--space-3)' }}>
+          <Note tone={res.ok ? 'good' : 'bad'} title={res.ok ? 'You can still manage this device' : 'Something needs attention'}>
+            <ul>{res.checks.map((c, i) => <li key={i}>{c.ok ? '✓' : '✗'} {c.text}</li>)}</ul>
+          </Note>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function Protection({ ov, reload }) {
   const s = ov?.settings;
   const [run] = useAction();
@@ -316,6 +378,7 @@ export default function Firewall({ me }) {
   const presets = pr?.presets || [];
   return (
     <Page title="Firewall" sub="Decide what each network may reach. Changes only take effect when you apply them.">
+      <Protected reload={reload} />
       <Tabs value={tab} onChange={setTab} tabs={[{ value: 'networks', label: 'Networks' }, { value: 'exceptions', label: 'Exceptions' }, { value: 'ports', label: 'Open ports' }, { value: 'upnp', label: 'UPnP' }, { value: 'protection', label: 'Protection' }, { value: 'history', label: 'History' }]} />
       {tab === 'networks' && <><Networks ov={ov} presets={presets} reload={reload} /><Matrix ov={ov} /></>}
       {tab === 'exceptions' && <Exceptions ov={ov} reload={reload} />}

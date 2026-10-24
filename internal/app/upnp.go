@@ -62,7 +62,7 @@ func (a *App) upnpPolicy() upnp.Policy {
 		p.MaxLease = time.Duration(h) * time.Hour
 	}
 	reserved := map[int]bool{upnp.ControlPort: true}
-	for _, port := range fw.DefaultConsolePorts {
+	for _, port := range a.consolePorts() {
 		reserved[port] = true
 	}
 	if _, ps, err := net.SplitHostPort(a.Cfg.WebAddr); err == nil {

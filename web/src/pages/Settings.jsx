@@ -83,11 +83,61 @@ function TwoStep({ me, data, reload, boot }) {
   );
 }
 
+function ConsolePort() {
+  const { data, reload } = useData('/api/system/console-port', { every: 5000 });
+  const [run, busy] = useAction();
+  const [port, setPort] = useState('');
+  const [left, setLeft] = useState(0);
+  const pend = data?.pending;
+  useEffect(() => {
+    if (!pend) { setLeft(0); return undefined; }
+    const tick = () => setLeft(Math.max(0, pend.deadline - Math.floor(Date.now() / 1000)));
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, [pend?.deadline]);
+  if (!data) return null;
+  const url = (p) => `https://${window.location.hostname}${p === 443 ? '' : `:${p}`}/`;
+  const start = async () => {
+    const n = parseInt(port, 10);
+    const r = await run(() => post('/api/system/console-port', { port: n }));
+    if (r) { setPort(''); reload(); window.open(url(r.port), '_blank', 'noopener'); }
+  };
+  const onNew = pend && data.here === pend.port;
+  return (
+    <Card title="Console address" desc={`This console answers on port ${data.port}. Change it if something else needs port 443.`}>
+      {pend ? (
+        <div className="stack">
+          {onNew ? (
+            <Note tone="good" title={`You reached the console on port ${pend.port}`}>It works. Keep this port? The old one (port {data.port}) stops answering a moment after you confirm. {left > 0 && `${left} seconds left.`}</Note>
+          ) : (
+            <Note tone="warn" title={`Trying port ${pend.port}`}>Open the new address, sign in if asked, and press Keep this port there. If you do nothing, the change is undone after {left} seconds and nothing is lost.</Note>
+          )}
+          <div className="actions">
+            {onNew
+              ? <Button kind="primary" disabled={busy} onClick={() => run(() => post('/api/system/console-port/confirm', {}), 'Saved.').then(reload)}>Keep this port</Button>
+              : <Button kind="primary" onClick={() => window.open(url(pend.port), '_blank', 'noopener')}>Open {url(pend.port)}</Button>}
+            <Button disabled={busy} onClick={() => run(() => post('/api/system/console-port/cancel', {}), 'Undone.').then(reload)}>Cancel the change</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="stack">
+          <Field label="New port" hint="A number from 1 to 65535, like 8443. The old port keeps working until you confirm the new one. Ports used by DNS, DHCP, a VPN or a port forward are refused.">
+            <div className="inline"><Input value={port} onChange={setPort} placeholder="8443" inputMode="numeric" style={{ maxWidth: '8rem' }} /><Button kind="primary" disabled={busy || !port} onClick={start}>Try this port</Button></div>
+          </Field>
+          <p className="small muted">Forgot the port? The machine's own screen always shows the address, and the recovery screen (Alt+F2) can put it back to 443.</p>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 export default function Settings({ me, reloadMe }) {
   const { data, reload } = useData('/api/auth/me', { every: 60000 });
   return (
     <Page title="Settings" sub="Your account and how you sign in.">
       <TwoStep me={me} data={data} reload={reload} boot={reloadMe} />
+      {me?.user?.role === 'admin' && <ConsolePort />}
       <Password />
       <Sessions />
       <Appearance />

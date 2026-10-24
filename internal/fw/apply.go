@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -124,10 +125,7 @@ func (a *Applier) Apply(script string, window time.Duration, author string) (tok
 	}
 	// Make sure there is something to go back to before anything changes.
 	if _, err := os.Stat(a.path("lastgood.nft")); err != nil {
-		base := a.Baseline
-		if base == "" {
-			base = emptyBaseline
-		}
+		base := a.baseline()
 		if err := writeFileAtomic(a.path("lastgood.nft"), []byte(base)); err != nil {
 			return "", time.Time{}, err
 		}
@@ -203,11 +201,33 @@ func (a *Applier) rollbackLocked() error {
 	return nil
 }
 
+// ConsolePortFile holds the console's saved port, kept up to date by the console so the
+// starting rules and the machine's screens follow it.
+var ConsolePortFile = "/var/lib/gatehouse/console.port"
+
+// SavedConsolePort reads the saved console port, or 443 when none is saved.
+func SavedConsolePort() int {
+	if b, err := os.ReadFile(ConsolePortFile); err == nil {
+		if n, err := strconv.Atoi(strings.TrimSpace(string(b))); err == nil && n >= 1 && n <= 65535 {
+			return n
+		}
+	}
+	return 443
+}
+
 func (a *Applier) baseline() string {
+	if a.Baseline == FirstBootBaseline {
+		return FirstBootBaselineFor(SavedConsolePort())
+	}
 	if a.Baseline != "" {
 		return a.Baseline
 	}
 	return emptyBaseline
+}
+
+// FirstBootBaselineFor is the starting rules with the console on the given port.
+func FirstBootBaselineFor(port int) string {
+	return strings.Replace(FirstBootBaseline, "tcp dport 443 ct state new", fmt.Sprintf("tcp dport %d ct state new", port), 1)
 }
 
 // Boot is called before the console starts listening: it loads the last known good ruleset,

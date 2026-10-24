@@ -187,3 +187,48 @@ func TestUPnPLetsMappedConnectionsThrough(t *testing.T) {
 		t.Fatalf("UPnP mappings are not accepted:\n%s", out)
 	}
 }
+
+func TestSetupPortAndManagementLimit(t *testing.T) {
+	m := sample()
+	m.RescueIface = "eth2" // a port that is not a management network
+	m.MgmtAllow = []string{"192.168.1.0/24", "10.8.0.0/24"}
+	out, err := Compile(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		`iifname "eth1" ip saddr { 192.168.1.0/24, 10.8.0.0/24 } tcp dport 443 accept comment "protected: management console"`,
+		`iifname "eth2" tcp dport 443 accept comment "protected: setup port"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	// no limit saved: the plain protected rule, and no rule for a setup port that is already managing
+	m = sample()
+	m.RescueIface = "eth1"
+	out, _ = Compile(m)
+	if strings.Contains(out, "ip saddr {") && strings.Contains(out, "management console\"") && strings.Contains(out, "protected: setup port") {
+		t.Errorf("unexpected rules:\n%s", out)
+	}
+	if strings.Contains(out, "setup port") {
+		t.Errorf("a setup port that already manages got a second rule:\n%s", out)
+	}
+	// an internet-facing port is never a setup port
+	m = sample()
+	m.RescueIface = "eth0"
+	if out, _ = Compile(m); strings.Contains(out, "setup port") {
+		t.Errorf("internet port got the setup rule:\n%s", out)
+	}
+	m = sample()
+	m.MgmtAllow = []string{"not-a-range"}
+	if _, err := Compile(m); err == nil {
+		t.Fatal("bad management range accepted")
+	}
+}
+
+func TestStartingRulesFollowPort(t *testing.T) {
+	if got := FirstBootBaselineFor(8443); !strings.Contains(got, "tcp dport 8443 ct state new") || strings.Contains(got, "dport 443") {
+		t.Fatal(got)
+	}
+}
