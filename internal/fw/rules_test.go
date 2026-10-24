@@ -51,8 +51,8 @@ func TestRichRulesCompileAndLoad(t *testing.T) {
 	if !strings.Contains(script, `meta hour "02:00:00"-"11:59:59"`) {
 		t.Errorf("schedule was not converted to UTC:\n%s", script)
 	}
-	if _, err := exec.LookPath("nft"); err != nil {
-		t.Skip("needs nft")
+	if _, err := exec.LookPath("nft"); err != nil || os.Geteuid() != 0 {
+		t.Skip("needs nft and root")
 	}
 	ap := NewApplier(t.TempDir())
 	body, err := BuildSetScript(map[string]SetFill{
