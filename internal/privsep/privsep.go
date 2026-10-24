@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"strings"
 	"syscall"
 	"time"
 
@@ -207,7 +208,9 @@ func (s *Server) dispatch(r request) (any, error) {
 		t, d, ok := s.FW.Pending()
 		return pendingResult{ok, t, d.Unix()}, nil
 	}
-	if len(r.Method) > 4 && (r.Method[:4] == "net." || r.Method[:4] == "wan." || r.Method[:4] == "vpn.") {
+	// Everything that is not the firewall goes to the network side. It answers "unknown method"
+	// itself for names it does not know.
+	if !strings.HasPrefix(r.Method, "fw.") {
 		return s.dispatchNet(r)
 	}
 	return nil, errors.New("unknown method")
