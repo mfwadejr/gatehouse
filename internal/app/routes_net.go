@@ -280,7 +280,7 @@ func ports() []map[string]any {
 		speed, _ := os.ReadFile(base + "/speed")
 		out = append(out, map[string]any{"name": n, "mac": ifi.HardwareAddr.String(),
 			"link": strings.TrimSpace(string(carrier)) == "1", "speed": strings.TrimSpace(string(speed)),
-			"usb": strings.Contains(real, "/usb"), "wifi": werr == nil})
+			"usb": strings.Contains(real, "/usb"), "wifi": werr == nil, "addrs": ifaceAddrs(n)})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i]["name"].(string) < out[j]["name"].(string) })
 	return out

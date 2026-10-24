@@ -3,6 +3,7 @@ package app
 import (
 	"database/sql"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -96,14 +97,73 @@ func countryFromZone(zone string) string {
 	return ""
 }
 
+// WifiLive is what a card is doing right now, as opposed to what it was set up to do.
+type WifiLive struct {
+	Linked bool     `json:"linked"` // joined a network, or broadcasting one
+	SSID   string   `json:"ssid"`
+	Signal int      `json:"signal"` // dBm, joined networks only
+	Addrs  []string `json:"addrs"`
+}
+
+// ParseIwLink reads `iw dev <name> link`.
+func ParseIwLink(out string) (ssid string, signal int, ok bool) {
+	if !strings.HasPrefix(strings.TrimSpace(out), "Connected to") {
+		return "", 0, false
+	}
+	for _, l := range strings.Split(out, "\n") {
+		l = strings.TrimSpace(l)
+		switch {
+		case strings.HasPrefix(l, "SSID:"):
+			ssid = strings.TrimSpace(strings.TrimPrefix(l, "SSID:"))
+		case strings.HasPrefix(l, "signal:"):
+			fmt.Sscanf(strings.TrimSpace(strings.TrimPrefix(l, "signal:")), "%d", &signal)
+		}
+	}
+	return ssid, signal, true
+}
+
+// ifaceAddrs lists the addresses a port has: IPv4 with its prefix, and global IPv6.
+func ifaceAddrs(name string) []string {
+	out := []string{}
+	ifi, err := net.InterfaceByName(name)
+	if err != nil {
+		return out
+	}
+	as, _ := ifi.Addrs()
+	for _, a := range as {
+		ip, _, err := net.ParseCIDR(a.String())
+		if err != nil || ip.IsLinkLocalUnicast() {
+			continue
+		}
+		out = append(out, a.String())
+	}
+	return out
+}
+
+func liveWifi(name, mode string) WifiLive {
+	l := WifiLive{Addrs: ifaceAddrs(name)}
+	switch mode {
+	case "ap":
+		if b, err := exec.Command("iw", "dev", name, "info").Output(); err == nil {
+			l.Linked = strings.Contains(string(b), "type AP")
+		}
+	default:
+		if b, err := exec.Command("iw", "dev", name, "link").Output(); err == nil {
+			l.SSID, l.Signal, l.Linked = ParseIwLink(string(b))
+		}
+	}
+	return l
+}
+
 type wifiCard struct {
-	Iface   string   `json:"iface"`
-	MAC     string   `json:"mac"`
-	Driver  string   `json:"driver"`
-	USB     bool     `json:"usb"`
-	Caps    WifiCaps `json:"caps"`
-	Saved   *WifiRow `json:"saved"`
-	Present bool     `json:"present"`
+	Live    *WifiLive `json:"live,omitempty"`
+	Iface   string    `json:"iface"`
+	MAC     string    `json:"mac"`
+	Driver  string    `json:"driver"`
+	USB     bool      `json:"usb"`
+	Caps    WifiCaps  `json:"caps"`
+	Saved   *WifiRow  `json:"saved"`
+	Present bool      `json:"present"`
 }
 
 // WifiRow is a card's saved setup. The password is write-only.
@@ -195,6 +255,12 @@ func (a *App) wifiCards() []wifiCard {
 				c.Saved = &saved[i]
 			}
 		}
+		mode := "client"
+		if c.Saved != nil {
+			mode = c.Saved.Mode
+		}
+		lv := liveWifi(n, mode)
+		c.Live = &lv
 		out = append(out, c)
 	}
 	return out

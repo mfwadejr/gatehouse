@@ -12,7 +12,7 @@ const TYPES = [
 
 // Watches the network ports and reports the one whose cable was just plugged in.
 function usePortWatch(active) {
-  const { data } = useData('/api/net/ports', { every: active ? 1500 : 0, enabled: true });
+  const { data } = useData('/api/net/ports', { every: active ? 1500 : 5000, enabled: true });
   const base = useRef(null);
   const [found, setFound] = useState('');
   useEffect(() => {
@@ -228,9 +228,9 @@ export default function Internet({ me }) {
         </Card>
       )}
 
-      <Card title="Network ports on this device" desc="Live cable status.">
+      <Card title="Network ports on this device" desc="Live status and addresses.">
         <div className="list">
-          {ports.map((p) => <div className="item" key={p.name}><div><div className="name">{p.name} {p.usb && <Pill>USB</Pill>}</div><div className="meta mono">{p.mac}</div></div><Pill tone={p.link ? 'good' : ''}>{p.link ? `Connected${p.speed > 0 ? ` · ${p.speed} Mb/s` : ''}` : 'No cable'}</Pill></div>)}
+          {ports.map((p) => <div className="item" key={p.name}><div><div className="name">{p.name} {p.usb && <Pill>USB</Pill>}</div><div className="meta mono">{p.mac}</div><div className="meta">{p.addrs?.length ? <>Address <span className="mono">{p.addrs.join(', ')}</span></> : 'No address'}</div></div><Pill tone={p.link ? 'good' : ''}>{p.wifi ? (p.link ? 'Wi-Fi connected' : 'Wi-Fi not connected') : p.link ? `Connected${p.speed > 0 ? ` · ${p.speed} Mb/s` : ''}` : 'No cable'}</Pill></div>)}
           {!ports.length && <Empty>No network ports found.</Empty>}
         </div>
       </Card>

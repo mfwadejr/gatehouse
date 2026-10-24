@@ -25,6 +25,31 @@ function makePassword() {
 
 function bars(dbm) { return dbm > -55 ? 'Excellent' : dbm > -67 ? 'Good' : dbm > -78 ? 'Fair' : 'Weak'; }
 
+// What the card is doing right now, kept apart from what it was set up to do.
+function Live({ c }) {
+  const sv = c.saved, lv = c.live || {};
+  const ap = sv.mode === 'ap';
+  const addrs = (lv.addrs || []).join(', ');
+  let tone = '', label;
+  if (!sv.enabled) label = 'Switched off';
+  else if (lv.linked) { tone = 'good'; label = ap ? 'Broadcasting' : 'Connected'; }
+  else label = ap ? 'Starting the network…' : 'Not connected yet';
+  return (
+    <div className="stack">
+      <div className="wg-head">
+        <Pill tone={tone}>{label}</Pill>
+        <span className="name">{sv.ssid}</span>
+        <span className="small muted">
+          {ap ? `broadcasting on ${sv.band} GHz` : 'joins this network for internet'} · {sv.country}
+          {!ap && lv.linked && lv.signal ? ` · signal ${bars(lv.signal).toLowerCase()}` : ''}
+        </span>
+      </div>
+      <div className="small">{addrs ? <>Address <span className="mono">{addrs}</span></> : <span className="muted">{lv.linked ? 'Waiting for an address…' : 'No address yet.'}</span>}</div>
+      {!lv.linked && sv.enabled && <p className="small muted">If you just saved, apply the change first. If it stays like this, check the password and that the network is in range.</p>}
+    </div>
+  );
+}
+
 function Setup({ card, country, wans, ifs, onClose, onSaved }) {
   const s = card.saved;
   const canAP = card.caps.ap || card.caps.bands.length === 0; // unknown capabilities: let the driver decide
@@ -132,7 +157,7 @@ function Setup({ card, country, wans, ifs, onClose, onSaved }) {
 }
 
 export default function Wifi({ me }) {
-  const { data, reload } = useData('/api/net/wifi', { topics: ['net.status'] });
+  const { data, reload } = useData('/api/net/wifi', { topics: ['net.status'], every: 5000 });
   const { data: wd, reload: rw } = useData('/api/net/wans', { topics: ['net.status'] });
   const { data: ifs, reload: ri } = useData('/api/net/interfaces', { topics: ['net.status'] });
   const { data: st, reload: rs } = useData('/api/net/status', { topics: ['net.status'], every: 5000 });
@@ -162,13 +187,7 @@ export default function Wifi({ me }) {
             <Button icon="edit" small onClick={() => setEdit(c)}>{c.saved ? 'Edit' : 'Set up'}</Button>
             {c.saved && <Button icon="trash" small onClick={() => remove(c)}>Remove</Button>}
           </>}>
-          {!c.saved ? <p className="sec">Not set up. Nothing is broadcast and nothing is joined until you choose.</p> : (
-            <div className="wg-head">
-              <Pill tone={c.saved.enabled ? 'good' : ''}>{c.saved.mode === 'ap' ? 'Broadcasting' : 'Joining'}</Pill>
-              <span className="name">{c.saved.ssid}</span>
-              <span className="small muted">{c.saved.mode === 'ap' ? `${c.saved.band} GHz` : 'internet connection'} · {c.saved.country}</span>
-            </div>
-          )}
+          {!c.saved ? <p className="sec">Not set up. Nothing is broadcast and nothing is joined until you choose.</p> : <Live c={c} />}
           {!c.caps.ap && c.caps.bands.length > 0 && <p className="small muted">This card can join networks but cannot broadcast one.</p>}
         </Card>
       ))}
