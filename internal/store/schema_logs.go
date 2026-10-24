@@ -60,4 +60,15 @@ ALTER TABLE fw_events ADD COLUMN dst_name TEXT NOT NULL DEFAULT '';
 ALTER TABLE fw_events ADD COLUMN reason TEXT NOT NULL DEFAULT '';
 CREATE INDEX idx_fw_src ON fw_events(from_addr, ts);
 CREATE INDEX idx_fw_dst ON fw_events(to_addr, ts);
+`, `
+-- Data used, in buckets. mac is empty for the whole internet connection (one-minute buckets);
+-- devices are kept in five-minute buckets. up is from the device, down is to it.
+CREATE TABLE traffic(
+  ts INTEGER NOT NULL,
+  mac TEXT NOT NULL,
+  up INTEGER NOT NULL DEFAULT 0,
+  down INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY(ts, mac)
+);
+CREATE INDEX idx_traffic_mac ON traffic(mac, ts);
 `}

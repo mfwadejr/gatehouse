@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { del, put, useData } from '../api.js';
 import ApplyBar from '../ApplyBar.jsx';
+import AddNetwork from '../AddNetwork.jsx';
 import WanGroups, { Traffic } from './WanGroups.jsx';
-import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, ToggleRow, useAction, fmt } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, ToggleRow, useAction, useToast, fmt } from '../ui.jsx';
 
 const TYPES = [
   { value: 'dhcp', label: 'Automatic' },
@@ -170,6 +171,8 @@ export default function Internet({ me }) {
   const { data: fwo, reload: rfw } = useData('/api/fw/overview', { topics: ['fw.status'] });
   const [edit, setEdit] = useState(null);
   const [editIf, setEditIf] = useState(null);
+  const [addNet, setAddNet] = useState(false);
+  const toast = useToast();
   const [run] = useAction();
   const wans = wd?.wans || [];
   const isNew = wd && ifs && wans.length === 0 && ifs.length === 0;
@@ -213,7 +216,7 @@ export default function Internet({ me }) {
       <Traffic wans={wans} links={links} />
 
       {(ifs?.length > 0 || !isNew) && (
-        <Card title="Your networks and ports" actions={<Button icon="plus" onClick={() => setEditIf({})}>Add port or VLAN</Button>}
+        <Card title="Your networks and ports" actions={<><Button kind="primary" icon="plus" onClick={() => setAddNet(true)}>Add a network</Button><Button onClick={() => setEditIf({})}>Add port or VLAN</Button></>}
           desc="Each one is a separate network. Give it a firewall network on the Firewall page to decide what it can reach.">
           {!ifs?.length ? <Empty>None yet.</Empty> : (
             <div className="list">
@@ -236,6 +239,7 @@ export default function Internet({ me }) {
       </Card>
 
       {edit && <WanForm initial={edit} wans={wans} ports={ports} found={found} onClose={() => setEdit(null)} onSaved={all} />}
+      {addNet && <AddNetwork onClose={() => setAddNet(false)} onCreated={(n) => { setAddNet(false); toast(`${n} added. Review and apply it below.`); all(); rfw(); }} />}
       {editIf && <IfaceForm initial={editIf} ports={ports} found={found} zones={zones || []} onClose={() => setEditIf(null)} onSaved={all} />}
       <ApplyBar kind="net" label="your network settings" status={stat} me={me} onChanged={all} />
       {!stat?.dirty && !stat?.pending && fwo?.status && <ApplyBar kind="fw" label="the firewall" status={fwo.status} me={me} onChanged={rfw} />}

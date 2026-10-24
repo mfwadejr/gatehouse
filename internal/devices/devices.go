@@ -113,6 +113,8 @@ type Device struct {
 	Static   bool   `json:"static"`
 	LastSeen int64  `json:"last_seen"`
 	Notes    string `json:"notes"`
+	Icon     string `json:"icon"`    // a built-in icon chosen by the person; empty means guess
+	IconID   int64  `json:"icon_id"` // an uploaded picture, 0 for none
 }
 
 // List returns every known device with its live state merged in.
@@ -123,7 +125,7 @@ func (d *Directory) List() ([]Device, error) {
 			live[strings.ToLower(l.MAC)] = l
 		}
 	}
-	rows, err := d.db.Query(`SELECT d.id,d.mac,d.name,COALESCE(d.group_id,0),COALESCE(g.name,''),d.policy,d.internet,d.last_seen,d.last_ip,d.notes
+	rows, err := d.db.Query(`SELECT d.id,d.mac,d.name,COALESCE(d.group_id,0),COALESCE(g.name,''),d.policy,d.internet,d.last_seen,d.last_ip,d.notes,d.icon,d.icon_id
 		FROM devices d LEFT JOIN groups g ON g.id=d.group_id ORDER BY d.last_seen DESC`)
 	if err != nil {
 		return nil, err
@@ -133,7 +135,7 @@ func (d *Directory) List() ([]Device, error) {
 	for rows.Next() {
 		var x Device
 		var inet int
-		if err := rows.Scan(&x.ID, &x.MAC, &x.Name, &x.GroupID, &x.Group, &x.Policy, &inet, &x.LastSeen, &x.IP, &x.Notes); err != nil {
+		if err := rows.Scan(&x.ID, &x.MAC, &x.Name, &x.GroupID, &x.Group, &x.Policy, &inet, &x.LastSeen, &x.IP, &x.Notes, &x.Icon, &x.IconID); err != nil {
 			return nil, err
 		}
 		x.Internet = inet == 1
@@ -155,6 +157,8 @@ type Update struct {
 	Policy   *string `json:"policy"`
 	Internet *bool   `json:"internet"`
 	Notes    *string `json:"notes"`
+	Icon     *string `json:"icon"`
+	IconID   *int64  `json:"icon_id"`
 }
 
 func (d *Directory) Update(id int64, u Update) error {
@@ -188,6 +192,19 @@ func (d *Directory) Update(id int64, u Update) error {
 	}
 	if u.Notes != nil {
 		if _, err := d.db.Exec(`UPDATE devices SET notes=? WHERE id=?`, *u.Notes, id); err != nil {
+			return err
+		}
+	}
+	if u.Icon != nil {
+		if *u.Icon != "" && !ValidIcon(*u.Icon) {
+			return errors.New("that is not one of the icons")
+		}
+		if _, err := d.db.Exec(`UPDATE devices SET icon=? WHERE id=?`, *u.Icon, id); err != nil {
+			return err
+		}
+	}
+	if u.IconID != nil {
+		if _, err := d.db.Exec(`UPDATE devices SET icon_id=? WHERE id=?`, *u.IconID, id); err != nil {
 			return err
 		}
 	}

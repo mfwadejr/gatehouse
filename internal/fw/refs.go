@@ -135,6 +135,16 @@ func refSets(r Ref, alsoMAC bool) []DynSet {
 	return out
 }
 
+// The two sets that count each device's traffic. Elements are IPv4 addresses; the counters are
+// bytes and packets since the address was first seen.
+const (
+	AcctUp   = "acct_up4"   // from a device to the internet
+	AcctDown = "acct_down4" // from the internet to a device
+)
+
+// AcctKey is how a device's counter is named in what Counters reports.
+const AcctPrefix = "acct:"
+
 // MaxDynSets bounds how many sets one ruleset may declare.
 const MaxDynSets = 96
 

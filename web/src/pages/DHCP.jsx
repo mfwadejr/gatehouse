@@ -152,8 +152,14 @@ function Reservations() {
 
 export default function DHCP() {
   const [tab, setTab] = useState('scopes');
+  const { data: rogue } = useData('/api/dhcp/alerts', { topics: ['dhcp.alerts'] });
   return (
     <Page title="DHCP" sub="Gives every device an address when it joins the network.">
+      {(rogue || []).map((r) => (
+        <Note key={r.scope} tone="bad" title={`Another DHCP server is answering on ${r.name}`}>
+          {r.found.map((f) => f.server).join(', ')} hands out addresses here as well, so devices may get the wrong settings. Switch that device's DHCP off, or turn DHCP off for this network in Gatehouse.
+        </Note>
+      ))}
       <Tabs value={tab} onChange={setTab} tabs={[{ value: 'scopes', label: 'Networks' }, { value: 'leases', label: 'Devices' }, { value: 'resv', label: 'Reservations' }]} />
       {tab === 'scopes' && <Scopes />}
       {tab === 'leases' && <Leases />}

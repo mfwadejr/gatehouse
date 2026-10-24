@@ -236,6 +236,7 @@ func (a *App) syncSets(full bool) {
 
 // onDNSAnswer remembers the addresses behind the domains that rules name.
 func (a *App) onDNSAnswer(qname string, answers []dns.RR) {
+	a.names.remember(qname, answers)
 	a.dyn.mu.Lock()
 	defer a.dyn.mu.Unlock()
 	if len(a.dyn.watch) == 0 {
@@ -338,7 +339,11 @@ func (a *App) sampleHits() {
 		return
 	}
 	now := time.Now().Unix()
+	a.sampleDevices(cur, time.Now())
 	for tag, c := range cur {
+		if strings.HasPrefix(tag, fw.AcctPrefix) {
+			continue
+		}
 		prev := a.dyn.counts[tag]
 		dp, db := c.Packets-prev.Packets, c.Bytes-prev.Bytes
 		if c.Packets < prev.Packets { // the ruleset was loaded again, so counting restarted

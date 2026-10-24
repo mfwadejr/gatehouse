@@ -52,30 +52,35 @@ func DefaultConfig() Config {
 
 // App is the running daemon.
 type App struct {
-	Cfg     Config
-	Config  *store.DB
-	Logs    *store.DB
-	Box     *crypt.Box
-	Auth    *auth.Service
-	Bus     *events.Bus
-	API     *api.Server
-	DNS     *dnssrv.Server
-	Lists   *dnssrv.Manager
-	QLog    *dnssrv.QueryLog
-	DHCP    *dhcp.Engine
-	DHCPSrv *dhcp.Server
-	Devices *devices.Directory
-	FW      fw.Controller // nil when no privileged helper is available
-	Net     NetController
-	apply   applyState
-	vpn     vpnState
-	fwn     fwNames
-	traffic wanTraffic
-	upnp    upnpState
-	setupMu sync.Mutex
-	con     consoles
-	upd     updates
-	dyn     *fwDyn
+	Cfg          Config
+	Config       *store.DB
+	Logs         *store.DB
+	Box          *crypt.Box
+	Auth         *auth.Service
+	Bus          *events.Bus
+	API          *api.Server
+	DNS          *dnssrv.Server
+	Lists        *dnssrv.Manager
+	QLog         *dnssrv.QueryLog
+	DHCP         *dhcp.Engine
+	DHCPSrv      *dhcp.Server
+	Devices      *devices.Directory
+	FW           fw.Controller // nil when no privileged helper is available
+	Net          NetController
+	apply        applyState
+	vpn          vpnState
+	fwn          fwNames
+	traffic      wanTraffic
+	upnp         upnpState
+	setupMu      sync.Mutex
+	con          consoles
+	upd          updates
+	dyn          *fwDyn
+	rogue        rogueState
+	devt         devTraffic
+	names        nameCache
+	geoIdx       geoIndex
+	stationCache stationCache
 
 	netApplyState struct {
 		mu     sync.Mutex
@@ -98,7 +103,7 @@ func New(cfg Config) (*App, error) {
 	if err := os.MkdirAll(cfg.DataDir, 0o750); err != nil {
 		return nil, err
 	}
-	a := &App{Cfg: cfg, Bus: events.NewBus(), dyn: newFWDyn()}
+	a := &App{Cfg: cfg, Bus: events.NewBus(), dyn: newFWDyn(), rogue: rogueState{alerts: map[int64]rogueAlert{}, kick: make(chan struct{}, 1)}}
 	var err error
 	if a.Config, err = store.OpenConfig(filepath.Join(cfg.DataDir, "config.db")); err != nil {
 		return nil, fmt.Errorf("config database: %w", err)
@@ -128,16 +133,20 @@ func New(cfg Config) (*App, error) {
 
 	a.DHCP.OnChange = func() { a.publishLeases(); a.fwSync() }
 	a.DHCP.OnEvent = func(kind, mac string, ip net.IP, scope string) {
-		if kind == "ack" {
+		switch kind {
+		case "ack":
 			a.Devices.Seen(mac, ip, "")
+		case "conflict":
+			a.event("dhcp", "warn", "Address already in use", ip.String()+" on "+scope+" already answers, so it was not handed out. Another device may be set to this address by hand.")
 		}
 	}
+	a.DHCP.InUse = dhcp.PingInUse
 	a.Lists.OnChange = func() { a.Bus.Publish("dns.lists", map[string]int64{"at": time.Now().Unix()}) }
 
 	a.API = api.New(a.Auth, a.Bus)
 	a.API.Static = cfg.Static
 	a.API.Secure = cfg.TLSCert != ""
-	a.API.Topic("dns.stats", "dns.live", "dns.upstreams", "dns.lists", "dhcp.leases", "dhcp.utilisation", "fw.status", "net.status", "vpn.status", "logs.live", "upnp.maps")
+	a.API.Topic("dns.stats", "dns.live", "dns.upstreams", "dns.lists", "dhcp.leases", "dhcp.utilisation", "fw.status", "net.status", "vpn.status", "logs.live", "upnp.maps", "dhcp.alerts")
 	a.FW = cfg.FW
 	a.Net = cfg.Net
 	a.registerRoutes()
@@ -306,6 +315,7 @@ func (a *App) Run(ctx context.Context) error {
 	run(func() { a.runUPnP(ctx) })
 	run(func() { a.updateLoop(ctx) })
 	run(func() { a.dynLoop(ctx) })
+	run(func() { a.rogueLoop(ctx) })
 
 	a.con.begin(ctx)
 	cs, err := a.startConsole(ctx, a.consoleAddr())
@@ -345,6 +355,7 @@ func (a *App) housekeeping(ctx context.Context) {
 			days := int(a.settingFloat("dns.log_retention_days", 30))
 			a.QLog.Prune(days)
 			a.pruneFWLog(days)
+			a.pruneTraffic(int(a.settingFloat("logs.retention_days", 30)))
 			a.Auth.PurgeExpired()
 		}
 	}

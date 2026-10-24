@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { del, post, put, useData, useStream } from '../api.js';
 import ApplyBar from '../ApplyBar.jsx';
+import AddNetwork from '../AddNetwork.jsx';
+import { go } from '../App.jsx';
 import { GroupsAndLists, Matrix, PairModal, RuleForm, RulesList } from './FirewallRules.jsx';
-import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Problems, Select, Tabs, ToggleRow, useAction, fmt } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Problems, Select, Tabs, ToggleRow, useAction, useToast, fmt } from '../ui.jsx';
 
 function ZoneForm({ initial, presets, ifaces, taken, onClose, onSaved }) {
   const [z, setZ] = useState({ kind: 'trusted', name: '', ifaces: [], internet: true, management: true, intra_allow: true, gateway: true, upnp: false, ssh: false, dns_force: true, description: '', ...initial });
@@ -49,6 +51,8 @@ function ZoneForm({ initial, presets, ifaces, taken, onClose, onSaved }) {
 function Networks({ ov, presets, reload }) {
   const { data: ifs } = useData('/api/net/interfaces');
   const [edit, setEdit] = useState(null);
+  const [addNet, setAddNet] = useState(false);
+  const toast = useToast();
   const [run] = useAction();
   const zones = (ov?.zones || []).filter((z) => z.kind !== 'wan');
   const taken = {};
@@ -57,7 +61,7 @@ function Networks({ ov, presets, reload }) {
   return (
     <>
       {ov?.problems && zones.length > 0 && <Problems list={ov.problems} />}
-      <Card title="Your networks" desc="Each network has a type. The type decides what it can reach, in plain terms." actions={<Button small icon="plus" onClick={() => setEdit({})}>Add network</Button>}>
+      <Card title="Your networks" desc="Each network has a type. The type decides what it can reach, in plain terms." actions={<Button small icon="plus" onClick={() => setAddNet(true)}>Add a network</Button>}>
         {zones.length === 0 && <Empty>No networks yet. Add your first one so devices are protected.</Empty>}
         <div className="list">
           {zones.map((z) => (
@@ -77,6 +81,7 @@ function Networks({ ov, presets, reload }) {
           <ul className="stack" style={{ margin: 0, paddingLeft: '1.2rem' }}>{ov.summary.map((s, i) => <li key={i}>{s}</li>)}</ul>
         </Card>
       )}
+      {addNet && <AddNetwork onClose={() => setAddNet(false)} onCreated={(n) => { setAddNet(false); toast(`${n} added. Review and apply it on the Internet page.`); reload(); go('internet'); }} />}
       {edit && <ZoneForm initial={edit} presets={presets} ifaces={ifs || []} taken={taken} onClose={() => setEdit(null)} onSaved={reload} />}
     </>
   );

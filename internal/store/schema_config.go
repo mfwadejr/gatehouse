@@ -396,4 +396,15 @@ CREATE TABLE fw_hits(
   bytes INTEGER NOT NULL DEFAULT 0,
   last_hit INTEGER NOT NULL DEFAULT 0
 );
+`, `
+-- A device's icon: a built-in name, or an uploaded picture.
+ALTER TABLE devices ADD COLUMN icon TEXT NOT NULL DEFAULT '';
+ALTER TABLE devices ADD COLUMN icon_id INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE device_icons(
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL DEFAULT '',
+  mime TEXT NOT NULL,
+  data BLOB NOT NULL,
+  created_at INTEGER NOT NULL DEFAULT 0
+);
 `}

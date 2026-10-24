@@ -31,6 +31,21 @@ type LogItem struct {
 	What    string `json:"what"`
 	Detail  string `json:"detail"`
 	Why     string `json:"why"`
+
+	// The parts of a connection, so any of them can be clicked to filter by it or to make a rule.
+	Src       string `json:"src,omitempty"`
+	Dst       string `json:"dst,omitempty"`
+	DstName   string `json:"dst_name,omitempty"`
+	Port      int    `json:"port,omitempty"`
+	Proto     string `json:"proto,omitempty"`
+	Service   string `json:"service,omitempty"`
+	Country   string `json:"country,omitempty"`
+	FromZone  string `json:"from_zone,omitempty"`
+	ToZone    string `json:"to_zone,omitempty"`
+	Direction string `json:"direction,omitempty"`
+	Rule      string `json:"rule,omitempty"`
+	App       string `json:"app,omitempty"`
+	Category  string `json:"category,omitempty"`
 }
 
 // fwReason turns the comment of the rule that decided a connection into a sentence.
@@ -125,6 +140,9 @@ func (a *App) storeFW(evs []netd.FWEvent) {
 			to = "Router"
 		}
 		sn, dn := a.deviceName(e.Src), a.deviceName(e.Dst)
+		if dn == "" {
+			dn = a.names.get(e.Dst) // the name a device asked for before connecting
+		}
 		tx.Exec(`INSERT INTO fw_events(ts,action,from_zone,from_addr,to_zone,to_addr,proto,dport,rule,sport,src_name,dst_name,reason) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 			e.TS, e.Verdict, from, e.Src, to, e.Dst, e.Proto, e.DPort, e.Tag, e.SPort, sn, dn, fwReason(e.Verdict, e.Tag, from, to))
 	}
@@ -218,64 +236,7 @@ func orWord(s, d string) string {
 }
 
 func (a *App) searchFW(text, verdict string, since, before int64, limit int) []LogItem {
-	where := []string{"1=1"}
-	var args []any
-	if since > 0 {
-		where, args = append(where, "ts>=?"), append(args, since)
-	}
-	if before > 0 {
-		where, args = append(where, "ts<=?"), append(args, before)
-	}
-	switch verdict {
-	case "blocked":
-		where = append(where, "action='drop'")
-	case "allowed":
-		where = append(where, "action='allow'")
-	}
-	if strings.TrimSpace(text) != "" {
-		l := like(text)
-		where = append(where, `(from_addr LIKE ? OR to_addr LIKE ? OR src_name LIKE ? OR dst_name LIKE ? OR rule LIKE ? OR reason LIKE ? OR proto LIKE ? OR CAST(dport AS TEXT) LIKE ? OR from_zone LIKE ? OR to_zone LIKE ?)`)
-		for i := 0; i < 10; i++ {
-			args = append(args, l)
-		}
-	}
-	args = append(args, limit)
-	rows, err := a.Logs.Query(`SELECT id,ts,action,from_zone,from_addr,to_zone,to_addr,proto,dport,sport,src_name,dst_name,reason FROM fw_events WHERE `+strings.Join(where, " AND ")+` ORDER BY ts DESC,id DESC LIMIT ?`, args...)
-	if err != nil {
-		return nil
-	}
-	defer rows.Close()
-	var out []LogItem
-	for rows.Next() {
-		var id int64
-		var ts int64
-		var action, fz, fa, tz, ta, proto, sn, dn, reason string
-		var dport, sport int
-		if rows.Scan(&id, &ts, &action, &fz, &fa, &tz, &ta, &proto, &dport, &sport, &sn, &dn, &reason) != nil {
-			continue
-		}
-		it := LogItem{Key: "f" + strconv.FormatInt(id, 10), TS: ts, Kind: "firewall", Verdict: "allowed", Who: sn, Addr: fa, Why: reason}
-		if it.Who == "" {
-			it.Who = fa
-		}
-		if action == "drop" {
-			it.Verdict = "blocked"
-		}
-		dest := ta
-		if dn != "" {
-			dest = dn + " (" + ta + ")"
-		}
-		it.What = strings.ToUpper(proto)
-		if dport > 0 {
-			dest += ":" + strconv.Itoa(dport)
-		}
-		it.What += " to " + dest
-		if fz != "" || tz != "" {
-			it.Detail = fz + " to " + tz
-		}
-		out = append(out, it)
-	}
-	return out
+	return a.searchFWf(fwFilter{Text: text, Verdict: verdict, Since: since, Before: before, Limit: limit})
 }
 
 func (a *App) searchEvents(text string, since, before int64, limit int) []LogItem {
@@ -326,6 +287,16 @@ func (a *App) logSearch(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		since = time.Now().Add(-time.Duration(h) * time.Hour).Unix()
 	}
 	before, _ := strconv.ParseInt(q.Get("before"), 10, 64)
+	ff := logParams(r)
+	if ff.Since > 0 {
+		since = ff.Since
+	}
+	if ff.Device != "" && text == "" {
+		text = ff.Device
+	}
+	if ff.firewallOnly() && kind == "" {
+		kind = "firewall"
+	}
 	var items []LogItem
 	if kind == "" || kind == "dns" {
 		f := dnssrv.Filter{Text: text, Since: since, BeforeTS: before, Limit: limit}
@@ -342,7 +313,11 @@ func (a *App) logSearch(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		}
 	}
 	if kind == "" || kind == "firewall" {
-		items = append(items, a.searchFW(text, verdict, since, before, limit)...)
+		ff.Text, ff.Verdict, ff.Since, ff.Before, ff.Limit = text, verdict, since, before, limit
+		if ff.Device != "" && ff.Text == ff.Device {
+			ff.Text = ""
+		}
+		items = append(items, a.searchFWf(ff)...)
 	}
 	if (kind == "" || kind == "event") && verdict == "" {
 		items = append(items, a.searchEvents(text, since, before, limit)...)

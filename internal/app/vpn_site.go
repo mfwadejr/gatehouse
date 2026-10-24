@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/netip"
 	"strconv"
@@ -301,4 +302,175 @@ func (a *App) vpnJoinSite(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 	}
 	a.refreshVPN()
 	api.JSON(w, 200, map[string]any{"id": id, "warning": warning})
+}
+
+// vpnNewOtherSite joins this router to a router from another maker (UniFi, pfSense, MikroTik and
+// others) over plain WireGuard. The other side gives its public key, where it can be reached (if
+// it can) and its networks; the answer says what to enter at the other end.
+func (a *App) vpnNewOtherSite(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+	var in struct {
+		Label      string   `json:"label"`
+		PublicKey  string   `json:"public_key"`
+		Endpoint   string   `json:"endpoint"` // their address and port, if they have one we can dial
+		RemoteLANs []string `json:"remote_lans"`
+		PSK        string   `json:"psk"`  // optional pre-shared key they already use
+		Host       string   `json:"host"` // how they reach us; defaults to the remembered address
+		Port       int      `json:"port"`
+	}
+	if !api.Decode(w, r, &in) || !a.needHelper(w) {
+		return
+	}
+	in.PublicKey = strings.TrimSpace(in.PublicKey)
+	if !vpn.ValidKey(in.PublicKey) {
+		fail(w, errors.New("that is not a WireGuard public key. It is 44 characters long and ends with ="))
+		return
+	}
+	in.PSK = strings.TrimSpace(in.PSK)
+	if in.PSK != "" && !vpn.ValidKey(in.PSK) {
+		fail(w, errors.New("that pre-shared key is not valid. It is 44 characters long and ends with ="))
+		return
+	}
+	if len(in.RemoteLANs) == 0 {
+		fail(w, errors.New("enter the network at the other site, like 192.168.50.0/24"))
+		return
+	}
+	var remotes []netip.Prefix
+	for _, l := range in.RemoteLANs {
+		if strings.TrimSpace(l) == "" {
+			continue
+		}
+		p, err := mustPrefix(l)
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		if p.Bits() < 8 || p.Bits() > 30 {
+			fail(w, fmt.Errorf("the network %s must be between /8 and /30", p))
+			return
+		}
+		remotes = append(remotes, p)
+	}
+	if len(remotes) == 0 || len(remotes) > 16 {
+		fail(w, errors.New("enter between 1 and 16 networks at the other site"))
+		return
+	}
+	in.Endpoint = strings.TrimSpace(in.Endpoint)
+	if in.Endpoint != "" {
+		h, port, err := net.SplitHostPort(in.Endpoint)
+		if err != nil {
+			fail(w, errors.New("write their address like 203.0.113.9:51820"))
+			return
+		}
+		if n, err := strconv.Atoi(port); err != nil || n < 1 || n > 65535 {
+			fail(w, errors.New("the port in their address is not valid"))
+			return
+		}
+		if err := validHost(h); err != nil {
+			fail(w, err)
+			return
+		}
+	}
+	host := strings.TrimSpace(in.Host)
+	if host == "" {
+		host = a.Config.Setting(vpnEndpointSetting, "")
+	}
+	if host != "" {
+		if err := validHost(host); err != nil {
+			fail(w, err)
+			return
+		}
+	}
+	var id int64
+	var out map[string]any
+	err := a.mutateVPN(c.User.Username, func(tx *sql.Tx) error {
+		var n int
+		tx.QueryRow(`SELECT count(*) FROM vpn_wg_peers WHERE public_key=?`, in.PublicKey).Scan(&n)
+		if n > 0 {
+			return errors.New("a link with that public key already exists")
+		}
+		used := a.usedPrefixes(tx)
+		for _, rp := range remotes {
+			if u, clash := overlapping(rp, used); clash {
+				return fmt.Errorf("the other site's network %s overlaps %s, which is already used here. Two sites that are joined need different address ranges; change one of them first", rp, u)
+			}
+		}
+		name, err := freeName(tx, "vpn_wg", "wg")
+		if err != nil {
+			return err
+		}
+		subnet := vpn.SuggestSubnet(append(used, remotes...))
+		addr, err := vpn.ServerAddress(subnet)
+		if err != nil {
+			return err
+		}
+		priv, pub, err := vpn.NewKeyPair()
+		if err != nil {
+			return err
+		}
+		psk := in.PSK
+		if psk == "" {
+			if psk, err = vpn.NewPSK(); err != nil {
+				return err
+			}
+		}
+		port := in.Port
+		if port == 0 {
+			port = a.freeWGPort(tx)
+		}
+		peerIP, err := vpn.NextPeerAddress(addr, nil)
+		if err != nil {
+			return err
+		}
+		zone, err := a.ensureSiteZone(tx)
+		if err != nil {
+			return err
+		}
+		label := cleanLabel(in.Label, "Other router")
+		res, err := tx.Exec(`INSERT INTO vpn_wg(name,label,mode,listen_port,address,private_key,public_key,endpoint_host,zone_id,route_all,site,created_at) VALUES(?,?,'server',?,?,?,?,?,?,0,1,?)`,
+			name, label, port, addr, a.Box.Seal(priv), pub, host, zone, time.Now().Unix())
+		if err != nil {
+			return friendlyDup(err, "a VPN with that name already exists")
+		}
+		id, _ = res.LastInsertId()
+		allowed := []string{peerIP}
+		for _, rp := range remotes {
+			allowed = append(allowed, rp.String())
+		}
+		if _, err := tx.Exec(`INSERT INTO vpn_wg_peers(wg_id,name,public_key,psk,address,allowed_ips,endpoint,keepalive,enabled,created_at) VALUES(?,?,?,?,?,?,?,25,1,?)`,
+			id, label, in.PublicKey, a.Box.Seal(psk), peerIP, strings.Join(allowed, ","), in.Endpoint, time.Now().Unix()); err != nil {
+			return err
+		}
+		ours := []string{}
+		if ap, err := netip.ParsePrefix(addr); err == nil {
+			ours = append(ours, ap.Addr().String()+"/32")
+		}
+		ours = append(ours, a.siteLans(tx)...)
+		ep := ""
+		if host != "" {
+			ep = fmt.Sprintf("%s:%d", host, port)
+		}
+		out = map[string]any{
+			"id": id, "our_public_key": pub, "our_endpoint": ep, "our_port": port,
+			"their_address":     strings.TrimSuffix(peerIP, "/32") + "/" + strconv.Itoa(mustBits(addr)),
+			"their_allowed_ips": ours, "psk": psk, "keepalive": 25,
+		}
+		return nil
+	})
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	if host != "" {
+		a.rememberEndpoint(host)
+	}
+	a.refreshVPN()
+	api.JSON(w, 200, out)
+}
+
+func mustBits(cidr string) int {
+	p, err := netip.ParsePrefix(cidr)
+	if err != nil {
+		return 24
+	}
+	return p.Bits()
 }

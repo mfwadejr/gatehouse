@@ -12,8 +12,10 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -188,4 +190,79 @@ func (a *App) geoMaybeRefresh(ctx context.Context, needed bool) {
 	a.Config.SetSetting("geo.updated", strconv.FormatInt(time.Now().Unix(), 10))
 	a.event("system", "info", "Country address lists updated", "Downloaded from the regional internet registries.")
 	a.fwSyncAll()
+}
+
+// geoIndex answers "which country is this address in" from the same registry lists the country
+// rules use. It reads the list once and again whenever the file is replaced.
+type geoIndex struct {
+	mu    sync.Mutex
+	mtime time.Time
+	rows  []geoRange // sorted by start; ranges do not overlap
+}
+
+type geoRange struct {
+	start, end netip.Addr
+	cc         string
+}
+
+func (a *App) geoLoad() {
+	g := &a.geoIdx
+	st, err := os.Stat(a.geoFile())
+	if err != nil {
+		return
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if st.ModTime().Equal(g.mtime) && g.rows != nil {
+		return
+	}
+	f, err := os.Open(a.geoFile())
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	var rows []geoRange
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		p := strings.SplitN(sc.Text(), " ", 3)
+		if len(p) != 3 {
+			continue
+		}
+		pf, err := netip.ParsePrefix(p[2])
+		if err != nil {
+			continue
+		}
+		pf = pf.Masked()
+		rows = append(rows, geoRange{pf.Addr(), lastAddr(pf), p[0]})
+	}
+	sort.Slice(rows, func(i, j int) bool { return rows[i].start.Compare(rows[j].start) < 0 })
+	g.rows, g.mtime = rows, st.ModTime()
+}
+
+// lastAddr is the final address of a network.
+func lastAddr(p netip.Prefix) netip.Addr {
+	b := p.Addr().AsSlice()
+	for i := p.Bits(); i < len(b)*8; i++ {
+		b[i/8] |= 1 << (7 - uint(i%8))
+	}
+	a, _ := netip.AddrFromSlice(b)
+	return a
+}
+
+// country gives the two-letter country code of a public address, or "" when it is not known.
+func (a *App) country(ip string) string {
+	addr, err := netip.ParseAddr(ip)
+	if err != nil || addr.IsPrivate() || addr.IsLoopback() || addr.IsLinkLocalUnicast() || addr.IsMulticast() {
+		return ""
+	}
+	addr = addr.Unmap()
+	a.geoLoad()
+	g := &a.geoIdx
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	i := sort.Search(len(g.rows), func(i int) bool { return g.rows[i].start.Compare(addr) > 0 }) - 1
+	if i >= 0 && g.rows[i].end.Compare(addr) >= 0 && g.rows[i].start.Is4() == addr.Is4() {
+		return g.rows[i].cc
+	}
+	return ""
 }

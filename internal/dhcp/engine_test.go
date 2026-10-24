@@ -244,3 +244,42 @@ func TestInformAndLeaseList(t *testing.T) {
 		t.Fatal("revoke did not remove the lease")
 	}
 }
+
+func TestAddressInUseIsSkipped(t *testing.T) {
+	e := newEngine(t)
+	var asked []string
+	e.InUse = func(iface string, ip net.IP) bool {
+		asked = append(asked, ip.String())
+		return ip.String() == "192.168.1.100"
+	}
+	var events []string
+	e.OnEvent = func(kind, mac string, ip net.IP, scope string) {
+		if kind == "conflict" {
+			events = append(events, ip.String())
+		}
+	}
+	ack := dora(t, e, lan, "aa:bb:cc:00:00:07")
+	if ack.YIAddr.String() != "192.168.1.101" {
+		t.Fatalf("got %s, want the next free address", ack.YIAddr)
+	}
+	if len(events) != 1 || events[0] != "192.168.1.100" {
+		t.Fatalf("conflict not reported: %v", events)
+	}
+	// The same device asking again keeps its address and is not probed again.
+	asked = nil
+	dora(t, e, lan, "aa:bb:cc:00:00:07")
+	if len(asked) != 0 {
+		t.Fatalf("a device that holds an address was probed: %v", asked)
+	}
+	// Another device does not ask about the set-aside address.
+	asked = nil
+	ack = dora(t, e, lan, "aa:bb:cc:00:00:08")
+	for _, a := range asked {
+		if a == "192.168.1.100" {
+			t.Fatal("asked again about an address that was set aside")
+		}
+	}
+	if ack.YIAddr.String() != "192.168.1.102" {
+		t.Fatalf("got %s", ack.YIAddr)
+	}
+}

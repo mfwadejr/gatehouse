@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { del, get, post, put, useData } from '../api.js';
-import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, ToggleRow, useAction, fmt } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, ToggleRow, useAction, fmt, Switch } from '../ui.jsx';
 
 const STATE = {
   up: { tone: 'good', label: 'Working' },
@@ -34,6 +34,80 @@ function download(name, text) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+// A box that takes a dropped or chosen file and hands back its text. Pasting stays possible.
+function FileDrop({ onText, accept, label }) {
+  const [over, setOver] = useState(false);
+  const [name, setName] = useState('');
+  const [err, setErr] = useState('');
+  const take = (file) => {
+    if (!file) return;
+    if (file.size > 200 * 1024) { setErr('That file is too large to be a VPN file.'); return; }
+    const rd = new FileReader();
+    rd.onload = () => { setErr(''); setName(file.name); onText(String(rd.result)); };
+    rd.onerror = () => setErr('That file could not be read.');
+    rd.readAsText(file);
+  };
+  return (
+    <div className={`dropzone ${over ? 'over' : ''}`} onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
+      onDrop={(e) => { e.preventDefault(); setOver(false); take(e.dataTransfer.files?.[0]); }}>
+      <span>{name ? `Loaded ${name}` : label}</span>
+      <label className="btn small">Choose a file<input type="file" accept={accept} hidden onChange={(e) => take(e.target.files?.[0])} /></label>
+      {err && <span className="small" style={{ color: 'var(--color-status-serious)' }}>{err}</span>}
+    </div>
+  );
+}
+
+function OtherResult({ r, onClose }) {
+  const [copied, setCopied] = useState(false);
+  const text = [
+    '[Interface]',
+    '# Use the private key you made on your router. Gatehouse never sees it.',
+    `Address = ${r.their_address}`,
+    '',
+    '[Peer]',
+    `PublicKey = ${r.our_public_key}`,
+    `PresharedKey = ${r.psk}`,
+    r.our_endpoint ? `Endpoint = ${r.our_endpoint}` : '# Endpoint: not needed if this router has a fixed address you gave Gatehouse',
+    `AllowedIPs = ${(r.their_allowed_ips || []).join(', ')}`,
+    `PersistentKeepalive = ${r.keepalive}`,
+  ].join('\n');
+  return (
+    <Modal title="Enter this on the other router" onClose={onClose} footer={<Button kind="primary" onClick={onClose}>Done</Button>}>
+      <div className="stack">
+        <Note tone="warn" title="Shown only once">The pre-shared key below protects the link. Copy it now.</Note>
+        <p className="sec small">Add a peer on the other router with these details. The names differ between makers, but the values are the same. Gatehouse has set up its side, including the routes and firewall rules.</p>
+        <textarea className="in mono" rows={11} readOnly value={text} onFocus={(e) => e.target.select()} />
+        <div className="actions">
+          <Button onClick={() => { navigator.clipboard?.writeText(text); setCopied(true); }}>{copied ? 'Copied' : 'Copy'}</Button>
+          <Button onClick={() => download('gatehouse-peer.conf', text)}>Download</Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function DeviceResult({ res, onClose }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <Modal title={`${res.name} is ready`} onClose={onClose} footer={<Button kind="primary" onClick={onClose}>Done</Button>}>
+      <div className="stack">
+        <Note tone="warn" title="Shown only once">This contains the device's secret key. Import it now; Gatehouse cannot show it again.</Note>
+        {res.qr && (
+          <div className="stack" style={{ alignItems: 'center' }}>
+            <img src={res.qr} alt="QR code for the WireGuard app" width="240" height="240" style={{ background: '#fff', padding: 8, borderRadius: 8 }} />
+            <span className="small muted">On a phone: open the WireGuard app, tap +, then Scan from QR code.</span>
+          </div>
+        )}
+        <div className="actions">
+          <Button icon="plus" onClick={() => download(res.filename, res.config)}>Download {res.filename}</Button>
+          <Button onClick={() => { navigator.clipboard?.writeText(res.config); setCopied(true); }}>{copied ? 'Copied' : 'Copy'}</Button>
+        </div>
+        {!res.qr && <span className="small muted">On a computer or phone: open the downloaded file with the OpenVPN app.</span>}
+      </div>
+    </Modal>
+  );
+}
+
 // ---------------------------------------------------------------- add a VPN
 
 function AddVPN({ endpoint, onClose, onDone }) {
@@ -41,7 +115,9 @@ function AddVPN({ endpoint, onClose, onDone }) {
   const [goal, setGoal] = useState('');          // out | in | site
   const [tech, setTech] = useState('wireguard');
   const [f, setF] = useState({ label: '', endpoint: endpoint || '', route: 'all', reach: true, scope: 'all', conf: '', username: '', password: '', check: '', killswitch: true,
-    remote_lan: '', code: '', siteMode: 'create' });
+    remote_lan: '', code: '', siteMode: 'create', device: '', other_key: '', other_lans: '', other_ep: '', other_psk: '' });
+  const [first, setFirst] = useState(null);   // the first device made with a new server
+  const [other, setOther] = useState(null);    // the answer for a router from another maker
   const [made, setMade] = useState(null);       // site link: the code to take to the other site
   const [warn, setWarn] = useState('');
   const [copied, setCopied] = useState(false);
@@ -59,9 +135,14 @@ function AddVPN({ endpoint, onClose, onDone }) {
       }
       return;
     }
+    if (goal === 'other') {
+      const r = await run(() => post('/api/vpn/wireguard/site/other', { label: f.label, public_key: f.other_key, remote_lans: f.other_lans.split(/[\s,]+/).filter(Boolean), endpoint: f.other_ep, psk: f.other_psk, host: f.endpoint }));
+      if (r) { setOther(r); onDone(r.id, 'site', 'wireguard'); }
+      return;
+    }
     if (goal === 'in') {
       path = `/api/vpn/${tech}/server`;
-      body = { label: f.label, endpoint: f.endpoint, route: f.route, reach: f.route === 'home' ? true : f.reach };
+      body = { label: f.label, endpoint: f.endpoint, route: f.route, reach: f.route === 'home' ? true : f.reach, device: f.device.trim() };
     } else if (tech === 'wireguard') {
       path = '/api/vpn/wireguard/client';
       body = { label: f.label, conf: f.conf, check: f.check, killswitch: f.killswitch };
@@ -70,6 +151,11 @@ function AddVPN({ endpoint, onClose, onDone }) {
       body = { label: f.label, profile: f.conf, username: f.username, password: f.password, check: f.check, killswitch: f.killswitch };
     }
     const r = await run(() => post(path, body), 'VPN added.');
+    if (r && goal === 'in' && (r.device || r.device_error)) {
+      onDone(r.id, goal, tech);
+      if (r.device_error) window.alert(`The VPN was created, but the device could not be added: ${r.device_error}`);
+      if (r.device) { setFirst(r.device); return; }
+    }
     if (r && goal === 'out' && f.scope === 'all') {
       // everything on the network uses the VPN: tick every network for them
       const ch = await run(() => get('/api/vpn/choices'));
@@ -78,6 +164,9 @@ function AddVPN({ endpoint, onClose, onDone }) {
       onDone(r.id, 'out-all', tech); onClose();
     } else if (r) { onDone(r.id, goal, tech); onClose(); }
   };
+
+  if (first) return <DeviceResult res={first} onClose={onClose} />;
+  if (other) return <OtherResult r={other} onClose={onClose} />;
 
   if (!goal) {
     return (
@@ -94,6 +183,10 @@ function AddVPN({ endpoint, onClose, onDone }) {
           <button className="preset" onClick={() => { setGoal('site'); setTech('wireguard'); }}>
             <span className="t">Join two sites together</span>
             <span className="d">Link this network to another Gatehouse, like a second home or an office. Each side can reach the other automatically.</span>
+          </button>
+          <button className="preset" onClick={() => { setGoal('other'); setTech('wireguard'); }}>
+            <span className="t">Join a router from another maker</span>
+            <span className="d">Link to a UniFi, pfSense, MikroTik or other router that supports WireGuard. You copy a few details across.</span>
           </button>
         </div>
       </Modal>
@@ -152,6 +245,25 @@ function AddVPN({ endpoint, onClose, onDone }) {
     );
   }
 
+  if (goal === 'other') {
+    return (
+      <Modal title="Join a router from another maker" onClose={onClose}
+        footer={<><Button onClick={() => setGoal('')}>Back</Button><Button kind="primary" disabled={busy || !f.other_key.trim() || !f.other_lans.trim()} onClick={save}>Create the link</Button></>}>
+        <div className="stack">
+          <p className="sec small">Create a WireGuard tunnel on the other router first, and copy its public key and networks here. Gatehouse then shows what to enter on that router.</p>
+          <Field label="Name"><Input value={f.label} onChange={set('label')} placeholder="Office" /></Field>
+          <Field label="Their public key" hint="44 characters, ending in =."><Input value={f.other_key} onChange={set('other_key')} className="mono" spellCheck={false} /></Field>
+          <Field label="Networks at the other site" hint="Separate several with commas, like 192.168.50.0/24, 192.168.60.0/24."><Input value={f.other_lans} onChange={set('other_lans')} placeholder="192.168.50.0/24" /></Field>
+          <Field label="Address of the other router" hint="Only if it has a fixed address Gatehouse can connect to, like 203.0.113.9:51820. Leave empty if it will connect to you."><Input value={f.other_ep} onChange={set('other_ep')} placeholder="203.0.113.9:51820" /></Field>
+          <Field label="Address the other router connects to" hint="Your public IP address or a name like home.example.com."><Input value={f.endpoint} onChange={set('endpoint')} placeholder="home.example.com" /></Field>
+          <details className="more"><summary>More options</summary>
+            <Field label="Pre-shared key" hint="Only if the other router already has one. Otherwise Gatehouse makes one."><Input value={f.other_psk} onChange={set('other_psk')} className="mono" spellCheck={false} /></Field>
+          </details>
+        </div>
+      </Modal>
+    );
+  }
+
   const server = goal === 'in';
   return (
     <Modal title={server ? 'Connect from outside' : 'Use a VPN provider'} onClose={onClose}
@@ -169,11 +281,13 @@ function AddVPN({ endpoint, onClose, onDone }) {
             <Field label="What goes through the VPN?" hint={f.route === 'all' ? 'All of the device\'s internet and home traffic travels through your router. Best for public Wi-Fi.' : 'Only traffic for your home network goes through your router. Everything else uses the device\'s own connection.'}>
               <Segmented value={f.route} onChange={set('route')} options={[{ value: 'all', label: 'Everything' }, { value: 'home', label: 'Only my home network' }]} />
             </Field>
+            <Field label="First device (optional)" hint="Give the first phone or laptop a name and you get its file and QR code straight away, like Marvins iPhone."><Input value={f.device} onChange={set('device')} placeholder="Marvins iPhone" /></Field>
             <ToggleRow title="Can reach devices in my home network" desc={f.route === 'home' ? 'Needed, because the VPN carries only home traffic.' : 'Turn off to give connected devices the internet through your router and nothing else.'} checked={f.reach || f.route === 'home'} disabled={f.route === 'home'} onChange={set('reach')} />
           </>
         ) : (
           <>
-            <Field label={tech === 'wireguard' ? 'WireGuard file' : 'OpenVPN file (.ovpn)'} hint="Open the file from your provider in any text editor, copy everything, and paste it here.">
+            <Field label={tech === 'wireguard' ? 'WireGuard file' : 'OpenVPN file (.ovpn)'} hint="Drop the file from your provider here, or choose it. You can also paste its contents.">
+              <FileDrop accept={tech === 'wireguard' ? '.conf,text/plain' : '.ovpn,.conf,text/plain'} label="Drop your file here" onText={set('conf')} />
               <textarea className="in" rows={7} value={f.conf} onChange={(e) => set('conf')(e.target.value)} spellCheck={false} placeholder={tech === 'wireguard' ? '[Interface]\nPrivateKey = …' : 'client\nremote …'} />
             </Field>
             {tech === 'openvpn' && (
@@ -237,6 +351,13 @@ function Uses({ v, onClose, onSaved }) {
             {ch && !ch.networks.length && <span className="muted small">No networks yet.</span>}
           </div>
         </Field>
+        {(ch?.groups || []).length > 0 && (
+          <Field label="Device groups" hint="Everyone in the group, now and as the group changes.">
+            <div className="stack" style={{ gap: 'var(--space-1)' }}>
+              {ch.groups.map((g) => <label key={g} className="inline"><input type="checkbox" checked={sel.has(`group|${g}`)} onChange={() => toggle(`group|${g}`)} /> <span className="name">{g}</span></label>)}
+            </div>
+          </Field>
+        )}
         <Field label="Individual devices" hint="Gatehouse keeps the device's address fixed so it stays in the VPN.">
           <Input value={q} onChange={setQ} placeholder="Search devices" aria-label="Search devices" />
           <div className="stack" style={{ gap: 'var(--space-1)', maxHeight: '14rem', overflow: 'auto', marginTop: 'var(--space-2)' }}>
@@ -265,10 +386,11 @@ function Uses({ v, onClose, onSaved }) {
 function Settings({ v, onClose, onSaved }) {
   const [run, busy] = useAction();
   const client = v.role === 'client';
-  const [f, setF] = useState({ label: v.label, check: v.check_target || '', killswitch: v.killswitch, endpoint: v.endpoint || '' });
+  const [f, setF] = useState({ label: v.label, check: v.check_target || '', killswitch: v.killswitch, endpoint: v.endpoint || '', mtu: v.mtu || 0 });
   const save = async () => {
     const body = { label: f.label };
-    if (client) { body.check = f.check; body.killswitch = f.killswitch; } else body.endpoint = f.endpoint;
+    if (client) { body.check = f.check; body.killswitch = f.killswitch; } else if (!v.site) body.endpoint = f.endpoint;
+    if (v.kind === 'wireguard') body.mtu = Number(f.mtu) || 0;
     if (await run(() => put(`/api/vpn/${v.kind}/${v.id}`, body), 'Saved.')) { onSaved(); onClose(); }
   };
   return (
@@ -283,6 +405,13 @@ function Settings({ v, onClose, onSaved }) {
         ) : v.site ? null : (
           <Field label="Address devices connect to" hint="Your public IP address or a name like home.example.com. Existing device files keep the old address."><Input value={f.endpoint} onChange={(x) => setF({ ...f, endpoint: x })} placeholder="home.example.com" /></Field>
         )}
+        {v.kind === 'wireguard' && (
+          <details className="more"><summary>More options</summary>
+            <Field label="Packet size (MTU)" hint="Leave at 0 for automatic, which suits nearly every connection. Gatehouse already trims connections to fit. Only set a number between 1280 and 1500 if your provider asks for one.">
+              <Input type="number" min="0" max="1500" value={f.mtu} onChange={(x) => setF({ ...f, mtu: x })} />
+            </Field>
+          </details>
+        )}
       </div>
     </Modal>
   );
@@ -294,7 +423,6 @@ function AddDevice({ v, endpoint, onClose, onSaved }) {
   const [run, busy] = useAction();
   const [name, setName] = useState('');
   const [res, setRes] = useState(null);
-  const [copied, setCopied] = useState(false);
   const [host, setHost] = useState(v.endpoint || endpoint || '');
   const needHost = !v.endpoint && !endpoint;
   const create = async () => {
@@ -304,30 +432,11 @@ function AddDevice({ v, endpoint, onClose, onSaved }) {
     const r = await run(() => post(`/api/vpn/${v.kind}/${v.id}/peers`, { name }));
     if (r) { setRes(r); onSaved(); }
   };
-  if (res) {
-    return (
-      <Modal title={`${res.name} is ready`} onClose={onClose} footer={<Button kind="primary" onClick={onClose}>Done</Button>}>
-        <div className="stack">
-          <Note tone="warn" title="Shown only once">This contains the device's secret key. Import it now; Gatehouse cannot show it again.</Note>
-          {res.qr && (
-            <div className="stack" style={{ alignItems: 'center' }}>
-              <img src={res.qr} alt="QR code for the WireGuard app" width="240" height="240" style={{ background: '#fff', padding: 8, borderRadius: 8 }} />
-              <span className="small muted">On a phone: open the WireGuard app, tap +, then Scan from QR code.</span>
-            </div>
-          )}
-          <div className="actions">
-            <Button icon="plus" onClick={() => download(res.filename, res.config)}>Download {res.filename}</Button>
-            <Button onClick={() => { navigator.clipboard?.writeText(res.config); setCopied(true); }}>{copied ? 'Copied' : 'Copy'}</Button>
-          </div>
-          {!res.qr && <span className="small muted">On a computer or phone: open the downloaded file with the OpenVPN app.</span>}
-        </div>
-      </Modal>
-    );
-  }
+  if (res) return <DeviceResult res={res} onClose={onClose} />;
   return (
     <Modal title="Add a device" onClose={onClose} footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy || !name.trim()} onClick={create}>Create</Button></>}>
       <div className="stack">
-        <Field label="Device name" hint="Like Marvin's iPhone."><Input value={name} onChange={setName} onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) create(); }} /></Field>
+        <Field label="Device name" hint="Like Marvins iPhone."><Input value={name} onChange={setName} onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) create(); }} /></Field>
         {needHost && (
           <Field label="Address devices connect to" hint="Your public IP address or a name like home.example.com. You only enter this once.">
             <Input value={host} onChange={setHost} placeholder="home.example.com" />
@@ -339,6 +448,10 @@ function AddDevice({ v, endpoint, onClose, onSaved }) {
 }
 
 // ---------------------------------------------------------------- cards
+
+function Warnings({ v }) {
+  return (v.warnings || []).map((w) => <Note key={w} tone="warn" title="Needs attention">{w}</Note>);
+}
 
 function Header({ v }) {
   const s = STATE[v.state] || STATE.down;
@@ -394,6 +507,7 @@ function Inbound({ v, reload, setModal }) {
     <Card>
       <div className="stack">
         <Header v={v} />
+        <Warnings v={v} />
         <p className="sec">{v.message}</p>
         <div className="grid">
           <Fact label="Devices connect to">{v.endpoint ? `${v.endpoint}:${v.port}` : 'not set'}</Fact>
@@ -407,7 +521,8 @@ function Inbound({ v, reload, setModal }) {
             return (
               <div className="item" key={p.id}>
                 <div><div className="name">{p.name}</div><div className="meta">{p.address || ''}{p.real ? ` · from ${p.real}` : ''}{p.state === 'connected' ? ` · ↓ ${bytes(p.rx)} ↑ ${bytes(p.tx)}` : p.last_seen ? ` · last seen ${fmt.ago(p.last_seen)}` : ''}</div></div>
-                <div className="inline"><Pill tone={s.tone}>{s.label}</Pill>
+                <div className="inline">{p.paused ? <Pill tone="">Paused</Pill> : <Pill tone={s.tone}>{s.label}</Pill>}
+                  {v.kind === 'wireguard' && <Switch checked={!p.paused} label={`${p.name} allowed to connect`} onChange={(on) => run(() => put(`/api/vpn/${v.kind}/${v.id}/peers/${p.id}`, { enabled: on }), on ? 'Allowed again.' : 'Paused.').then(reload)} />}
                   <Button small kind="danger" icon="trash" onClick={() => window.confirm(`Remove ${p.name}? It will no longer be able to connect.`) && run(() => del(`/api/vpn/${v.kind}/${v.id}/peers/${p.id}`), 'Removed.').then(reload)}>Remove</Button></div>
               </div>
             );

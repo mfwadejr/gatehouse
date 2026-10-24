@@ -127,6 +127,7 @@ func (a *App) registerFWRoutes() {
 			return
 		}
 		a.markDirty()
+		a.refreshVPN() // a port clash with a VPN shows up at once
 		api.JSON(w, 200, map[string]int64{"id": id})
 	})
 	s.HandleAdmin("DELETE /api/fw/forwards/{id}", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
@@ -140,6 +141,7 @@ func (a *App) registerFWRoutes() {
 			return
 		}
 		a.markDirty()
+		a.refreshVPN()
 		ok(w)
 	})
 	s.HandleAdmin("PUT /api/fw/settings", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {

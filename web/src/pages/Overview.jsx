@@ -25,6 +25,7 @@ export default function Overview() {
   const { data: vpn } = useData('/api/vpn', { topics: ['vpn.status'], every: 15000 });
   const { data: top } = useData('/api/dns/top?hours=24', { every: 30000 });
   const { data: upd } = useData('/api/system/update', { every: 300000 });
+  const { data: rogue } = useData('/api/dhcp/alerts', { topics: ['dhcp.alerts'] });
 
   const st = dns?.stats;
   const links = net?.links || {};
@@ -39,6 +40,7 @@ export default function Overview() {
   if (fw && !fw.zones?.length) attention.push({ t: 'No networks defined in the firewall', s: 'Create your first network so devices are protected.', to: 'firewall' });
   if (fw?.status?.dirty) attention.push({ t: 'Firewall changes are waiting to be applied', s: 'Review and apply them.', to: 'firewall' });
   if (net?.status?.dirty) attention.push({ t: 'Internet settings are waiting to be applied', s: 'Review and apply them.', to: 'internet' });
+  (rogue || []).forEach((r) => attention.push({ t: `Another DHCP server is answering on ${r.name}`, s: `${r.found.map((f) => f.server).join(', ')} hands out addresses too. Switch it off, or devices may get the wrong settings.`, to: 'dhcp' }));
   Object.entries(links).forEach(([n, v]) => { if (v.up === false) attention.push({ t: `${n} is down`, s: v.error || 'The connection check is failing.', to: 'internet' }); });
   (vpn?.vpns || []).forEach((v) => {
     if (!v.enabled) return;

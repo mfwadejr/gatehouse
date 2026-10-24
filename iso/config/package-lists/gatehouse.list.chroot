@@ -79,3 +79,6 @@ less
 # Optional automatic Debian security updates (off until switched on in the console)
 unattended-upgrades
 debian-archive-keyring
+
+# Names of network card makers on the Devices page (the IEEE registry, refreshed by Debian updates)
+ieee-data

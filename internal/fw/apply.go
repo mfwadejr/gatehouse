@@ -129,6 +129,10 @@ func (a *Applier) Counters() (map[string]Counter, error) {
 				Comment string                       `json:"comment"`
 				Expr    []map[string]json.RawMessage `json:"expr"`
 			} `json:"rule"`
+			Set *struct {
+				Name string          `json:"name"`
+				Elem json.RawMessage `json:"elem"`
+			} `json:"set"`
 		} `json:"nftables"`
 	}
 	if err := json.Unmarshal(out, &doc); err != nil {
@@ -136,6 +140,16 @@ func (a *Applier) Counters() (map[string]Counter, error) {
 	}
 	res := map[string]Counter{}
 	for _, it := range doc.Nftables {
+		if it.Set != nil && (it.Set.Name == AcctUp || it.Set.Name == AcctDown) {
+			dir := "up:"
+			if it.Set.Name == AcctDown {
+				dir = "down:"
+			}
+			for ip, c := range acctElems(it.Set.Elem) {
+				res[AcctPrefix+dir+ip] = c
+			}
+			continue
+		}
 		if it.Rule == nil || !strings.HasPrefix(it.Rule.Comment, "rule:") {
 			continue
 		}
@@ -151,6 +165,26 @@ func (a *Applier) Counters() (map[string]Counter, error) {
 		res[it.Rule.Comment] = t
 	}
 	return res, nil
+}
+
+// acctElems reads the elements of a counting set. nft writes each one as {"elem": {...}}.
+func acctElems(raw json.RawMessage) map[string]Counter {
+	out := map[string]Counter{}
+	var items []struct {
+		Elem struct {
+			Val     string  `json:"val"`
+			Counter Counter `json:"counter"`
+		} `json:"elem"`
+	}
+	if json.Unmarshal(raw, &items) != nil {
+		return out
+	}
+	for _, it := range items {
+		if it.Elem.Val != "" {
+			out[it.Elem.Val] = it.Elem.Counter
+		}
+	}
+	return out
 }
 
 func (a *Applier) run(script string, check bool) error {

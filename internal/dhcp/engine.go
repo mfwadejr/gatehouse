@@ -58,6 +58,24 @@ type Engine struct {
 	OnChange func()
 	// OnEvent receives notable events: "ack", "nak", "decline", "release".
 	OnEvent func(kind, mac string, ip net.IP, scope string)
+	// InUse says whether something on the network already answers at an address. It is asked
+	// before a new address is offered, so two devices never get the same one. Nil means no check.
+	InUse func(iface string, ip net.IP) bool
+}
+
+// conflictHold is how long an address that something else was found using is left alone.
+const conflictHold = 15 * time.Minute
+
+// free reports whether a candidate address is not already taken by a device that Gatehouse did
+// not hand it to. An address found in use is set aside for a while, so it is not asked about again
+// for every new device.
+func (e *Engine) free(s *Scope, ip net.IP) bool {
+	if e.InUse == nil || !e.InUse(s.Iface, ip) {
+		return true
+	}
+	e.putLease(s, ip, "in-use", "", "", "declined", conflictHold)
+	e.event("conflict", "", ip, s.Name)
+	return false
 }
 
 func NewEngine(db *store.DB) *Engine {
@@ -235,7 +253,9 @@ func (e *Engine) choose(s *Scope, mac string, requested net.IP, serverIP net.IP)
 	}
 	if requested != nil && inRange(s, requested) && !reserved(requested) && !e.heldByOther(s.ID, requested, mac) {
 		if l := e.leaseAt(s.ID, requested); l == nil || l.state != "declined" || !l.expires.After(e.now()) {
-			return requested, nil
+			if e.free(s, requested) {
+				return requested, nil
+			}
 		}
 	}
 	lo, hi := ipToU32(s.Start), ipToU32(s.End)
@@ -248,6 +268,9 @@ func (e *Engine) choose(s *Scope, mac string, requested net.IP, serverIP net.IP)
 			continue
 		}
 		if l := e.leaseAt(s.ID, ip); l != nil && l.state == "declined" && l.expires.After(e.now()) {
+			continue
+		}
+		if !e.free(s, ip) {
 			continue
 		}
 		return ip, nil

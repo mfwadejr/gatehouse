@@ -59,18 +59,43 @@ func resolveSources(db Queryer, rs []routeEntry) map[string][]string {
 			}
 			ir.Close()
 		case "device":
-			mac := strings.ToLower(r.value)
-			var ip string
-			ip = firstString(db, `SELECT ip FROM dhcp_reservations WHERE lower(mac)=? LIMIT 1`, mac)
-			if ip == "" {
-				ip = firstString(db, `SELECT ip FROM dhcp_leases WHERE lower(mac)=? AND state='active' ORDER BY expires DESC LIMIT 1`, mac)
+			if a := deviceIP(db, r.value); a != "" {
+				add(r.tunnel, a)
 			}
-			if a := net.ParseIP(ip); a != nil && a.To4() != nil {
-				add(r.tunnel, a.To4().String()+"/32")
+		case "group":
+			// every device in a device group, as they are today
+			gr, err := db.Query(`SELECT m.mac FROM device_group_members m JOIN device_groups g ON g.id=m.group_id WHERE g.name=?`, r.value)
+			if err != nil {
+				continue
+			}
+			var macs []string
+			for gr.Next() {
+				var m string
+				gr.Scan(&m)
+				macs = append(macs, m)
+			}
+			gr.Close()
+			for _, m := range macs {
+				if a := deviceIP(db, m); a != "" {
+					add(r.tunnel, a)
+				}
 			}
 		}
 	}
 	return out
+}
+
+// deviceIP is the address a device has or is promised, as a /32, or "" when it has none.
+func deviceIP(db Queryer, macIn string) string {
+	mac := strings.ToLower(macIn)
+	ip := firstString(db, `SELECT ip FROM dhcp_reservations WHERE lower(mac)=? LIMIT 1`, mac)
+	if ip == "" {
+		ip = firstString(db, `SELECT ip FROM dhcp_leases WHERE lower(mac)=? AND state='active' ORDER BY expires DESC LIMIT 1`, mac)
+	}
+	if a := net.ParseIP(ip); a != nil && a.To4() != nil {
+		return a.To4().String() + "/32"
+	}
+	return ""
 }
 
 func firstString(db Queryer, query string, arg any) string {

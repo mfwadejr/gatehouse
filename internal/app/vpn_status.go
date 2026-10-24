@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -97,6 +98,7 @@ type PeerView struct {
 	Tx       int64  `json:"tx"`
 	Created  int64  `json:"created"`
 	Networks string `json:"networks,omitempty"`
+	Paused   bool   `json:"paused,omitempty"` // switched off without being deleted
 }
 
 type VPNView struct {
@@ -128,6 +130,8 @@ type VPNView struct {
 	Uses       []UseView  `json:"uses"`
 	Peers      []PeerView `json:"peers"`
 	Connected  int        `json:"connected"`
+	MTU        int        `json:"mtu"` // 0 means automatic
+	Warnings   []string   `json:"warnings,omitempty"`
 	Created    int64      `json:"created"`
 }
 
@@ -207,6 +211,8 @@ func (a *App) usesOf(dev string, srcs map[string][]string) []UseView {
 			u.Detail = "Address range"
 		case "network":
 			u.Detail = "Everything on this network"
+		case "group":
+			u.Detail = "Every device in this group"
 		}
 		if u.Label == "" {
 			u.Label = u.Value
@@ -239,7 +245,7 @@ func (a *App) computeVPN(st netd.VPNStatus) ([]VPNView, error) {
 	var out []VPNView
 	for _, w := range wgs {
 		v := VPNView{ID: w.ID, Kind: "wireguard", Dev: w.Name, Label: w.Label, Role: w.Mode, Enabled: w.Enabled, Address: w.Address,
-			Check: w.Check, KillSwitch: w.KillSwitch, RouteAll: w.RouteAll, Created: w.CreatedAt, Port: w.Port, Proto: "udp", Site: w.Site}
+			Check: w.Check, KillSwitch: w.KillSwitch, RouteAll: w.RouteAll, Created: w.CreatedAt, Port: w.Port, Proto: "udp", Site: w.Site, MTU: w.MTU}
 		if v.Label == "" {
 			v.Label = w.Name
 		}
@@ -264,7 +270,7 @@ func (a *App) computeVPN(st netd.VPNStatus) ([]VPNView, error) {
 			}
 			v.Endpoint = ep
 			for _, p := range peers {
-				pv := PeerView{ID: p.ID, Name: p.Name, Address: strings.TrimSuffix(p.Allowed, "/32"), State: "never", Created: p.CreatedAt}
+				pv := PeerView{ID: p.ID, Name: p.Name, Address: strings.TrimSuffix(p.Allowed, "/32"), State: "never", Created: p.CreatedAt, Paused: !p.Enabled}
 				if lp, ok := live[p.PublicKey]; ok {
 					pv.Rx, pv.Tx, pv.LastSeen, pv.Real = lp.Rx, lp.Tx, lp.Handshake, lp.Endpoint
 					switch {
@@ -396,7 +402,43 @@ func (a *App) computeVPN(st netd.VPNStatus) ([]VPNView, error) {
 		}
 		out = append(out, v)
 	}
+	for i := range out {
+		if out[i].Role == "server" && out[i].Port > 0 && out[i].Enabled {
+			out[i].Warnings = append(out[i].Warnings, a.portClash(out[i].Proto, out[i].Port)...)
+		}
+	}
 	return out, nil
+}
+
+// portClash says, in plain words, when a port forward uses the port this VPN listens on.
+func (a *App) portClash(proto string, port int) []string {
+	rows, err := a.Config.Query(`SELECT name,proto,ext_port FROM nat_forwards WHERE enabled=1`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var name, fp, ext string
+		rows.Scan(&name, &fp, &ext)
+		if fp != "both" && fp != "tcp+udp" && fp != proto {
+			continue
+		}
+		for _, part := range strings.Split(ext, ",") {
+			lo, hi, isRange := strings.Cut(strings.TrimSpace(part), "-")
+			a1, e1 := strconv.Atoi(lo)
+			b1 := a1
+			var e2 error
+			if isRange {
+				b1, e2 = strconv.Atoi(hi)
+			}
+			if e1 == nil && e2 == nil && port >= a1 && port <= b1 {
+				out = append(out, fmt.Sprintf("The port forward %q also uses port %d (%s), so devices cannot reach this VPN. Change one of them.", name, port, strings.ToUpper(proto)))
+				break
+			}
+		}
+	}
+	return out
 }
 
 // refreshVPN reads live status, updates the cache, raises alerts on changes, and tells the console.

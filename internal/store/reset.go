@@ -22,7 +22,7 @@ var networkTables = []string{
 }
 
 // A factory reset also removes the accounts, the device list and the firewall history.
-var factoryExtra = []string{"recovery_codes", "sessions", "users", "device_group_members", "device_groups", "devices", "fw_revisions"}
+var factoryExtra = []string{"recovery_codes", "sessions", "users", "device_group_members", "device_groups", "devices", "device_icons", "fw_revisions"}
 
 // networkKeep are the settings a network reset leaves alone: how people sign in, the time zone,
 // the update settings, and the way back into the console.
@@ -92,7 +92,7 @@ func ResetLogs(db *DB) error {
 		return err
 	}
 	defer tx.Rollback()
-	for _, t := range []string{"dns_queries", "dns_daily", "fw_events", "events", "metrics"} {
+	for _, t := range []string{"dns_queries", "dns_daily", "fw_events", "events", "metrics", "traffic"} {
 		if _, err := tx.Exec("DELETE FROM " + t); err != nil {
 			return err
 		}

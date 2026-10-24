@@ -114,11 +114,14 @@ func TestDeviceRulesFollowAddresses(t *testing.T) {
 
 	// Things in use cannot be removed.
 	_, _, raw = c.call("GET", "/api/devices", nil)
-	var devs []struct {
-		ID  int64
-		MAC string
+	var devsOut struct {
+		Devices []struct {
+			ID  int64
+			MAC string
+		}
 	}
-	json.Unmarshal(raw, &devs)
+	json.Unmarshal(raw, &devsOut)
+	devs := devsOut.Devices
 	for _, tc := range []struct{ path, what string }{{"/api/fw/groups/" + istr(int(gid)), "Kids no games"}, {"/api/fw/portlists/1", "Kids no games"}} {
 		rc, _, body := c.call("DELETE", tc.path, nil)
 		if rc == 200 || !strings.Contains(string(body), tc.what) {

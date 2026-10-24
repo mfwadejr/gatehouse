@@ -268,14 +268,6 @@ func (a *App) registerRoutes() {
 	})
 
 	// Devices
-	s.Handle("GET /api/devices", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-		l, err := a.Devices.List()
-		if err != nil {
-			fail(w, err)
-			return
-		}
-		api.JSON(w, 200, l)
-	})
 	s.HandleAdmin("POST /api/devices", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		var in struct {
 			MAC  string `json:"mac"`
@@ -332,5 +324,10 @@ func (a *App) registerRoutes() {
 	a.registerGroupRoutes()
 	a.registerWifiRoutes()
 	a.registerRogueRoutes()
+	a.registerAddNetRoutes()
 	a.registerTrafficRoutes()
+	a.registerDevTrafficRoutes()
+	a.registerLogExtraRoutes()
+	a.registerAppRoutes()
+	a.registerDeviceViewRoutes()
 }

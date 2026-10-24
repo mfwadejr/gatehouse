@@ -143,6 +143,11 @@ func (c *compiler) build() string {
 	for _, ds := range m.DynamicSets() {
 		c.line(1, "%s", ds.declaration())
 	}
+	// Each device's traffic to and from the internet is counted by the firewall itself, in two
+	// sets the kernel fills as packets pass. An address that goes quiet drops out after an hour.
+	for _, n := range []string{AcctUp, AcctDown} {
+		c.line(1, "set %s { type ipv4_addr; flags dynamic, timeout; timeout 1h; size 8192; counter; }", n)
+	}
 	c.input()
 	c.forward()
 	c.line(1, "chain output {")
@@ -286,8 +291,12 @@ func (c *compiler) forward() {
 	c.line(1, "chain forward {")
 	c.line(2, "type filter hook forward priority filter; policy drop;")
 	c.line(2, "ct state invalid drop")
-	c.line(2, "ct state { established, related } accept")
 	wan := m.WanIfaces()
+	if toNet := append(append([]string(nil), wan...), m.TunnelIfaces()...); len(toNet) > 0 {
+		c.line(2, "oifname %s add @%s { ip saddr }", ifSet(toNet), AcctUp)
+		c.line(2, "iifname %s add @%s { ip daddr }", ifSet(toNet), AcctDown)
+	}
+	c.line(2, "ct state { established, related } accept")
 	if m.BlockDoT && len(wan) > 0 {
 		lo, re, _ := c.dnsEnforced()
 		if forced := append(append([]string(nil), lo...), re...); len(forced) > 0 {

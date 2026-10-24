@@ -80,12 +80,14 @@ func (a *App) registerVPNRoutes() {
 	s.HandleAdmin("POST /api/vpn/wireguard/client", a.vpnNewWGClient)
 	s.HandleAdmin("POST /api/vpn/wireguard/site", a.vpnNewSite)
 	s.HandleAdmin("POST /api/vpn/wireguard/site/join", a.vpnJoinSite)
+	s.HandleAdmin("POST /api/vpn/wireguard/site/other", a.vpnNewOtherSite)
 	s.HandleAdmin("POST /api/vpn/openvpn/server", a.vpnNewOVPNServer)
 	s.HandleAdmin("POST /api/vpn/openvpn/client", a.vpnNewOVPNClient)
 	s.HandleAdmin("PUT /api/vpn/{kind}/{id}", a.vpnUpdate)
 	s.HandleAdmin("DELETE /api/vpn/{kind}/{id}", a.vpnDelete)
 	s.HandleAdmin("POST /api/vpn/{kind}/{id}/peers", a.vpnAddPeer)
 	s.HandleAdmin("DELETE /api/vpn/{kind}/{id}/peers/{pid}", a.vpnDeletePeer)
+	s.HandleAdmin("PUT /api/vpn/{kind}/{id}/peers/{pid}", a.vpnPausePeer)
 	s.HandleAdmin("PUT /api/vpn/{kind}/{id}/uses", a.vpnSetUses)
 }
 
@@ -136,7 +138,16 @@ func (a *App) vpnChoices(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 	if nets == nil {
 		nets = []netChoice{}
 	}
-	api.JSON(w, 200, map[string]any{"networks": nets, "devices": devs})
+	groups := []string{}
+	if rows, err := a.Config.Query(`SELECT name FROM device_groups ORDER BY name`); err == nil {
+		for rows.Next() {
+			var n string
+			rows.Scan(&n)
+			groups = append(groups, n)
+		}
+		rows.Close()
+	}
+	api.JSON(w, 200, map[string]any{"networks": nets, "devices": devs, "groups": groups})
 }
 
 func (a *App) needHelper(w http.ResponseWriter) bool {
@@ -162,6 +173,8 @@ type newServer struct {
 	// at home. Both are empty for older callers, which still send Access and RouteAll.
 	Route string `json:"route"`
 	Reach *bool  `json:"reach"`
+	// Device is optional: the first device to add, so the dialog can end with a working config.
+	Device string `json:"device"`
 }
 
 // resolve turns the plain choices into the zone kind (full access at home or internet only)
@@ -245,7 +258,32 @@ func (a *App) vpnNewWGServer(w http.ResponseWriter, r *http.Request, c *api.Ctx)
 	}
 	a.rememberEndpoint(in.Endpoint)
 	a.refreshVPN()
-	api.JSON(w, 200, map[string]int64{"id": id})
+	a.serverCreated(w, "wireguard", id, in.Device, c.User.Username)
+}
+
+// serverCreated answers a new-server request, adding the first device when one was asked for.
+// The server stays even if the device cannot be added; the reason is returned beside it.
+func (a *App) serverCreated(w http.ResponseWriter, kind string, id int64, device, author string) {
+	out := map[string]any{"id": id}
+	if device = strings.TrimSpace(device); device != "" {
+		var dev map[string]any
+		var err error
+		switch {
+		case !vpn.ValidName(device):
+			err = errors.New("give the device a name with letters, numbers, spaces, dots or dashes, like Marvins iPhone")
+		case kind == "wireguard":
+			dev, err = a.addWGPeer(author, id, device)
+		default:
+			dev, err = a.addOVPNUser(author, id, device)
+		}
+		if err != nil {
+			out["device_error"] = err.Error()
+		} else {
+			out["device"] = dev
+			a.refreshVPN()
+		}
+	}
+	api.JSON(w, 200, out)
 }
 
 func (a *App) vpnNewWGClient(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
@@ -395,7 +433,7 @@ func (a *App) vpnNewOVPNServer(w http.ResponseWriter, r *http.Request, c *api.Ct
 	}
 	a.rememberEndpoint(in.Endpoint)
 	a.refreshVPN()
-	api.JSON(w, 200, map[string]int64{"id": id})
+	a.serverCreated(w, "openvpn", id, in.Device, c.User.Username)
 }
 
 func (a *App) vpnNewOVPNClient(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
@@ -486,9 +524,20 @@ func (a *App) vpnUpdate(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		Check      *string `json:"check"`
 		Endpoint   *string `json:"endpoint"`
 		RouteAll   *bool   `json:"route_all"`
+		MTU        *int    `json:"mtu"` // WireGuard only; 0 means automatic
 	}
 	if !api.Decode(w, r, &in) || !a.needHelper(w) {
 		return
+	}
+	if in.MTU != nil {
+		if kind != "wireguard" {
+			fail(w, errors.New("a custom MTU can only be set on WireGuard connections. OpenVPN sizes its packets automatically"))
+			return
+		}
+		if m := *in.MTU; m != 0 && (m < 1280 || m > 1500) {
+			fail(w, errors.New("the MTU must be between 1280 and 1500, or 0 for automatic"))
+			return
+		}
 	}
 	if in.Check != nil {
 		*in.Check = strings.TrimSpace(*in.Check)
@@ -545,6 +594,11 @@ func (a *App) vpnUpdate(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		}
 		if in.RouteAll != nil {
 			if err := set("route_all", b2i(*in.RouteAll)); err != nil {
+				return err
+			}
+		}
+		if in.MTU != nil {
+			if err := set("mtu", *in.MTU); err != nil {
 				return err
 			}
 		}
@@ -611,7 +665,7 @@ func (a *App) vpnAddPeer(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 	}
 	in.Name = strings.TrimSpace(in.Name)
 	if !vpn.ValidName(in.Name) {
-		fail(w, errors.New("give the device a name with letters, numbers, spaces, dots or dashes, like Marvin's iPhone"))
+		fail(w, errors.New("give the device a name with letters, numbers, spaces, dots or dashes, like Marvins iPhone"))
 		return
 	}
 	var out map[string]any
@@ -804,6 +858,43 @@ func (a *App) vpnDeletePeer(w http.ResponseWriter, r *http.Request, c *api.Ctx) 
 	ok(w)
 }
 
+// vpnPausePeer switches one device of a WireGuard server on or off without deleting it.
+func (a *App) vpnPausePeer(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+	kind, good := kindOf(r)
+	id, idOK := pathID(r)
+	pid, err := parseInt(r.PathValue("pid"))
+	if !good || !idOK || err != nil {
+		fail(w, errBadID)
+		return
+	}
+	if kind != "wireguard" {
+		fail(w, errors.New("OpenVPN devices cannot be paused. Remove the device to cut its access; you can add it again afterwards"))
+		return
+	}
+	var in struct {
+		Enabled bool `json:"enabled"`
+	}
+	if !api.Decode(w, r, &in) || !a.needHelper(w) {
+		return
+	}
+	err = a.mutateVPN(c.User.Username, func(tx *sql.Tx) error {
+		res, err := tx.Exec(`UPDATE vpn_wg_peers SET enabled=? WHERE id=? AND wg_id=?`, b2i(in.Enabled), pid, id)
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return errors.New("that device no longer exists")
+		}
+		return nil
+	})
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	a.refreshVPN()
+	ok(w)
+}
+
 func (a *App) rebuildCRL(tx *sql.Tx, id int64) error {
 	ovs, err := a.listOVPN(tx)
 	if err != nil {
@@ -901,6 +992,12 @@ func (a *App) vpnSetUses(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 				if err := a.reserveForDevice(tx, d); err != nil {
 					warnings = append(warnings, err.Error())
 				}
+			case "group":
+				var n int
+				tx.QueryRow(`SELECT count(*) FROM device_groups WHERE name=?`, u.Value).Scan(&n)
+				if n == 0 {
+					return fmt.Errorf("there is no device group called %q", u.Value)
+				}
 			case "cidr":
 				if p, err := netip.ParsePrefix(u.Value); err != nil || !p.Addr().Is4() {
 					if ad, err2 := netip.ParseAddr(u.Value); err2 != nil || !ad.Is4() {
@@ -908,7 +1005,7 @@ func (a *App) vpnSetUses(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 					}
 				}
 			default:
-				return errors.New("choose a network, a device or an address range")
+				return errors.New("choose a network, a device group, a device or an address range")
 			}
 			if _, err := tx.Exec(`DELETE FROM vpn_routes WHERE kind=? AND value=? AND tunnel<>?`, u.Kind, u.Value, dev); err != nil {
 				return err
