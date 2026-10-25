@@ -310,16 +310,21 @@ func RunStatus(port string) {
 	first := true
 	d := openGraphics()
 	fb := newFallback()
+	ser := newSerialStatus() // also speak on the serial port when the machine was set up over one
 	for {
 		host, _ := os.Hostname()
 		EnsureLinksUp()
 		fb.update(readSetupState(), WiredPorts(), portHasAddress)
 		cw, ch := screenSize(d)
 		port := ReadConsolePort(port)
-		s := RenderStatus(host, WiredPorts(), usableAddresses(port), consoleState(port, readSetupState()), cw, ch)
+		ports, urls, state := WiredPorts(), usableAddresses(port), consoleState(port, readSetupState())
+		s := RenderStatus(host, ports, urls, state, cw, ch)
 		if s != last || first {
 			paint(d, s, first)
 			last, first = s, false
+		}
+		if ser != nil {
+			ser.show(RenderStatus(host, ports, urls, state, 80, 24))
 		}
 		time.Sleep(2 * time.Second)
 	}

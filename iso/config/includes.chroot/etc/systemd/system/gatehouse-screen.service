@@ -2,7 +2,7 @@
 Description=Gatehouse status screen
 ConditionKernelCommandLine=!boot=live
 After=gatehouse.service systemd-networkd.service
-Conflicts=getty@tty1.service
+Conflicts=getty@tty1.service serial-getty@ttyS0.service
 After=getty@tty1.service
 
 [Service]

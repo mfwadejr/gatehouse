@@ -189,6 +189,9 @@ type TextEnv struct {
 	Settle      time.Duration // how long to wait for a port to come up before listing
 	Serial      string        // description of the serial console, shown on the first screen
 	RestartWait time.Duration // how long to wait for the restart; tests shorten it
+	// SerialUsed says which serial console ("ttyS0,115200") the person typed on during this
+	// installation, or "". The installed machine then talks on that port too.
+	SerialUsed func() string
 }
 
 // restartWait is how long the screen waits for the machine to restart before it says it could not.
@@ -436,6 +439,9 @@ func textOnce(t *Term, env *TextEnv) error {
 
 	// 3. Confirm
 	req := Request{Disk: disk.Path, MgmtPort: mp.Name, MgmtMAC: mp.MAC}
+	if env.SerialUsed != nil {
+		req.Serial = env.SerialUsed()
+	}
 	for {
 		t.banner(env, 3, steps, "Confirm")
 		t.p("  Disk   %s%s %s%s  %s(everything on it will be erased)%s\n", bold, disk.Path, humanSize(disk.Size), reset, red, reset)

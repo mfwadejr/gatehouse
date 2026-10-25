@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 var reConsole = regexp.MustCompile(`(?:^|\s)console=(ttyS\d+)(?:,(\d+))?`)
@@ -59,6 +60,7 @@ func RunTextInstaller() error {
 	var outs []io.Writer
 	pr, pw := io.Pipe()
 	var wg sync.WaitGroup
+	var serialUsed atomic.Bool
 	pump := func(f *os.File) {
 		wg.Add(1)
 		go func() {
@@ -67,6 +69,13 @@ func RunTextInstaller() error {
 			for {
 				n, err := f.Read(buf)
 				if n > 0 {
+					if f.Name() == "/dev/"+sdev {
+						for _, c := range buf[:n] {
+							if c == '\r' || (c >= 0x20 && c < 0x7f) {
+								serialUsed.Store(true) // someone typed on the serial console
+							}
+						}
+					}
 					pw.Write(buf[:n])
 				}
 				if err != nil {
@@ -106,6 +115,14 @@ func RunTextInstaller() error {
 		}
 	}
 	env := NewTextEnv(New(), serial)
+	if serial != "" {
+		env.SerialUsed = func() string {
+			if serialUsed.Load() {
+				return fmt.Sprintf("%s,%d", sdev, baud)
+			}
+			return ""
+		}
+	}
 	err := RunText(t, env)
 	if err == errClosed {
 		select {} // never exit on a lost console; the service would only restart the wizard

@@ -57,6 +57,9 @@ type Request struct {
 	// new system, which brings that port up first and answers first-time setup only there.
 	MgmtPort string `json:"mgmt_port,omitempty"`
 	MgmtMAC  string `json:"mgmt_mac,omitempty"`
+	// Serial, like "ttyS0,115200", is set when the person ran the installer over a serial console.
+	// The new system then also shows its status screen and boot messages there.
+	Serial string `json:"serial,omitempty"`
 }
 
 // Step is one stage of the installation.
@@ -118,6 +121,8 @@ const (
 	defaultZone = "UTC"
 )
 
+var reSerial = regexp.MustCompile(`^ttyS[0-9]{1,2},[0-9]{4,6}$`)
+
 var reMgmtPort = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,14}$`)
 
 var (
@@ -141,6 +146,8 @@ func Validate(r *Request, disks []Disk) error {
 		return errors.New("that disk holds the installer itself; choose another")
 	case r.MgmtPort != "" && !reMgmtPort.MatchString(r.MgmtPort):
 		return errors.New("that is not a valid network port name")
+	case r.Serial != "" && !reSerial.MatchString(r.Serial):
+		return errors.New("that is not a valid serial console")
 	case r.Confirm != r.Disk:
 		return errors.New("type the disk name to confirm that everything on it will be erased")
 	}
@@ -373,7 +380,7 @@ func (in *Installer) plan(r Request) []step {
 			} else if err := in.chroot("", "grub-install", "--target=i386-pc", d); err != nil {
 				return err
 			}
-			if err := in.brand(t); err != nil {
+			if err := in.brand(t, r.Serial); err != nil {
 				return err
 			}
 			if err := in.chroot("", "update-initramfs", "-u", "-k", "all"); err != nil {
@@ -463,13 +470,35 @@ GRUB_DISABLE_RECOVERY=true
 GRUB_DISABLE_SUBMENU=y
 `
 
+// grubConfig is grubDefaults, and for a machine installed over a serial console it also sends the
+// kernel messages and the boot loader to that port (the screen stays the main display).
+func grubConfig(serial string) string {
+	if serial == "" {
+		return grubDefaults
+	}
+	dev, speed, _ := strings.Cut(serial, ",")
+	unit := strings.TrimPrefix(dev, "ttyS")
+	c := strings.Replace(grubDefaults, `vt.global_cursor_default=0"`, `vt.global_cursor_default=0 console=tty0 console=`+dev+`,`+speed+`n8"`, 1)
+	c = strings.Replace(c, "GRUB_TERMINAL_OUTPUT=gfxterm\n", "GRUB_TERMINAL_OUTPUT=\"gfxterm serial\"\n", 1)
+	return c + `GRUB_TERMINAL_INPUT="console serial"
+GRUB_SERIAL_COMMAND="serial --unit=` + unit + ` --speed=` + speed + ` --word=8 --parity=no --stop=1"
+`
+}
+
 // brand puts the Gatehouse boot menu and splash into the installed system.
-func (in *Installer) brand(t string) error {
+func (in *Installer) brand(t, serial string) error {
 	if err := os.MkdirAll(filepath.Join(t, "etc/default/grub.d"), 0o755); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(t, "etc/default/grub.d/gatehouse.cfg"), []byte(grubDefaults), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(t, "etc/default/grub.d/gatehouse.cfg"), []byte(grubConfig(serial)), 0o644); err != nil {
 		return err
+	}
+	if serial != "" {
+		// Remembered so the status screen knows to speak on the serial port too.
+		os.MkdirAll(filepath.Join(t, "var/lib/gatehouse"), 0o755)
+		if err := os.WriteFile(filepath.Join(t, strings.TrimPrefix(SerialMarker, "/")), []byte(strings.ReplaceAll(serial, ",", " ")+"\n"), 0o644); err != nil {
+			return err
+		}
 	}
 	// The theme ships inside the image; copy it to where the boot loader reads it.
 	if err := in.sh("", "mkdir", "-p", filepath.Join(t, "boot/grub/themes")); err != nil {
