@@ -49,7 +49,7 @@ menu vshift 17
 menu width 46
 menu rows 3
 menu tabmsg Choose with the arrow keys, then press Enter to continue
-menu tabmsgrow 24
+menu tabmsgrow 22
 menu color screen 0 #ffc3c2b7 #00000000 none
 menu color border 0 #00000000 #00000000 none
 menu color title 0 #fff0efec #00000000 none
@@ -64,7 +64,7 @@ menu color cmdmark 0 #00000000 #00000000 none
 menu color cmdline 0 #00000000 #00000000 none
 
 label gatehouse
-  menu label Install Gatehouse
+  menu label Install Gatehouse  (press Enter to start)
   linux $K
   initrd $I
   append $A $EXTRA gatehouse.text
@@ -104,6 +104,9 @@ if [ -d "$D"/boot/grub ]; then
 $KEEP
 set default=0
 set timeout=-1
+# On a serial console the menu is plain text: make the chosen entry stand out.
+set menu_color_normal=light-gray/black
+set menu_color_highlight=black/light-gray
 insmod all_video
 insmod gfxterm
 insmod png
