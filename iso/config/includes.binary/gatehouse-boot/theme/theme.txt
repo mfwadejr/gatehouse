@@ -28,12 +28,11 @@ terminal-font: "Unifont Regular 16"
 }
 
 + label {
-  id = "__timeout__"
   left = 50%-220
   top = 58%+200
   width = 440
   align = "center"
   font = "Unifont Regular 16"
   color = "#898781"
-  text = "Starting in %d seconds. Press any key to choose."
+  text = "Choose with the arrow keys, then press Enter to continue."
 }

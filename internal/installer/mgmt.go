@@ -3,6 +3,7 @@ package installer
 import (
 	"fmt"
 	"net"
+	"net/netip"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -40,11 +41,13 @@ func MgmtPort() string {
 	if len(f) == 0 {
 		return ""
 	}
+	mac := ""
 	if len(f) > 1 {
-		for _, p := range WiredPorts() {
-			if strings.EqualFold(p.MAC, f[1]) {
-				return p.Name
-			}
+		mac = f[1]
+	}
+	for _, p := range WiredPorts() {
+		if mac != "" && strings.EqualFold(p.MAC, mac) {
+			return p.Name
 		}
 	}
 	for _, p := range WiredPorts() {
@@ -56,20 +59,33 @@ func MgmtPort() string {
 }
 
 // FallbackConfig is the network file for the management port's own address.
-func FallbackConfig(port string) string {
-	return fmt.Sprintf(`# Written by Gatehouse while setup is not finished and no router answered.
+func FallbackConfig(port string) string { return FallbackConfigFor(port, FallbackAddr+"/24") }
+
+// FallbackConfigFor is the same with the address the person chose during the install (with its
+// size). The address pool for devices that connect sits in the upper half of the network.
+func FallbackConfigFor(port, addr string) string {
+	p, err := netip.ParsePrefix(addr)
+	if err != nil {
+		p = netip.MustParsePrefix(FallbackAddr + "/24")
+	}
+	hosts := (1 << (32 - p.Bits())) - 2
+	offset, size := 100, 100
+	if hosts < 254 {
+		offset, size = hosts/2, max(hosts/2-1, 1)
+	}
+	return fmt.Sprintf(`# Written by Gatehouse while setup is not finished: the management port's own address.
 [Match]
 Name=%s
 
 [Network]
-Address=%s/24
+Address=%s
 DHCPServer=yes
 
 [DHCPServer]
-PoolOffset=100
-PoolSize=100
+PoolOffset=%d
+PoolSize=%d
 EmitDNS=no
-`, port, FallbackAddr)
+`, port, p.String(), offset, size)
 }
 
 // fallbackPort says which port should carry the fallback address right now, or "". It wants one
@@ -125,10 +141,12 @@ type fallback struct {
 	active string    // the port carrying the fallback address now
 	now    func() time.Time
 	reload func(port string)
+	// addr is the management address chosen during the install ("" when none was).
+	addr func() string
 }
 
 func newFallback() *fallback {
-	return &fallback{now: time.Now, reload: func(port string) {
+	return &fallback{now: time.Now, addr: func() string { return ReadInstallNet().MgmtAddr }, reload: func(port string) {
 		exec.Command("networkctl", "reload").Run()
 		if port != "" {
 			exec.Command("networkctl", "reconfigure", port).Run()
@@ -139,6 +157,16 @@ func newFallback() *fallback {
 // update is called every couple of seconds with how far setup has got.
 func (f *fallback) update(setup string, ports []Port, hasAddr func(string) bool) {
 	mgmt := MgmtPort()
+	// An address chosen during the install is served at once. There is nothing to wait for: no
+	// router is needed to reach the setup page from a computer plugged into the management port.
+	chosen := ""
+	if f.addr != nil {
+		chosen = f.addr()
+	}
+	if chosen != "" {
+		hasAddr = func(string) bool { return false }
+		f.since = f.now().Add(-fallbackWait)
+	}
 	// Time without an address starts counting once there is a cable and nothing else on the port.
 	waiting := false
 	for _, p := range ports {
@@ -166,7 +194,7 @@ func (f *fallback) update(setup string, ports []Port, hasAddr func(string) bool)
 	switch {
 	case want != "" && want != f.active:
 		os.MkdirAll(filepath.Dir(FallbackFile), 0o755)
-		if os.WriteFile(FallbackFile, []byte(FallbackConfig(want)), 0o644) == nil {
+		if os.WriteFile(FallbackFile, []byte(FallbackConfigFor(want, f.addrOrDefault())), 0o644) == nil {
 			old := f.active
 			f.active = want
 			f.reload(want)
@@ -180,4 +208,13 @@ func (f *fallback) update(setup string, ports []Port, hasAddr func(string) bool)
 		f.active = ""
 		f.reload(old)
 	}
+}
+
+func (f *fallback) addrOrDefault() string {
+	if f.addr != nil {
+		if a := f.addr(); a != "" {
+			return a
+		}
+	}
+	return FallbackAddr + "/24"
 }

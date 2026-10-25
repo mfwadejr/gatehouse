@@ -31,8 +31,10 @@ func TestTextInstallHappyPath(t *testing.T) {
 	in, f := newTest(t)
 	script := strings.Join([]string{
 		"",             // welcome
+		"1",            // internet port: enp1s0, which has no cable yet (allowed)
+		"",             // management port: the only other one with a cable
+		"",             // management address: the suggestion
 		"1",            // disk: the only usable one (must be typed; Enter alone does not choose)
-		"",             // port: the only one with a cable
 		"/dev/nvme0n1", // confirm
 		"",             // reboot
 	}, "\r") + "\r"
@@ -40,7 +42,7 @@ func TestTextInstallHappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
-	for _, want := range []string{"115200", "Installation complete", "will be erased", "Remove the USB stick", "administrator account", "enp2s0", "cable connected"} {
+	for _, want := range []string{"115200", "Installation complete", "will be erased", "Remove the USB stick", "administrator account", "enp2s0", "cable connected", "Which network port is the internet", "not plugged in yet", "Review and confirm", "192.168.50.1"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output lacks %q", want)
 		}
@@ -61,7 +63,7 @@ func TestTextInstallHappyPath(t *testing.T) {
 
 func TestTextWrongConfirmationStartsOverAndErasesNothing(t *testing.T) {
 	in, f := newTest(t)
-	script := strings.Join([]string{"", "1", "", "nope"}, "\n") + "\n"
+	script := strings.Join([]string{"", "1", "", "", "1", "nope"}, "\n") + "\n"
 	_, err := run(t, script, testEnv(in))
 	if !errors.Is(err, errClosed) {
 		t.Fatalf("expected the script to run out after starting over, got %v", err)
@@ -185,7 +187,7 @@ func TestManagementPortIsRememberedOnTheNewSystem(t *testing.T) {
 	env.Ports = func() []Port {
 		return []Port{{Name: "enp1s0", MAC: "aa:bb:cc:00:00:01"}, {Name: "enp2s0", MAC: "aa:bb:cc:00:00:02", Link: true}}
 	}
-	script := strings.Join([]string{"", "1", "", "/dev/nvme0n1", ""}, "\r") + "\r"
+	script := strings.Join([]string{"", "1", "", "", "1", "/dev/nvme0n1", ""}, "\r") + "\r"
 	if out, err := run(t, script, env); err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
@@ -197,14 +199,19 @@ func TestManagementPortIsRememberedOnTheNewSystem(t *testing.T) {
 	if err != nil || strings.TrimSpace(string(b)) != "enp2s0 aa:bb:cc:00:00:02" {
 		t.Fatalf("management port file: %q %v", b, err)
 	}
+	nb, err := os.ReadFile(filepath.Join(in.Target, InstallNetFile))
+	if err != nil || string(nb) != "wan enp1s0 aa:bb:cc:00:00:01\nmgmt 192.168.50.1/24\n" {
+		t.Fatalf("network choices file: %q %v", nb, err)
+	}
 }
 
 func TestManagementPortWithoutACableNeedsInsisting(t *testing.T) {
+	ask := portAsk{step: 2, title: "Which port will you manage Gatehouse from?"}
 	env := &TextEnv{Ports: func() []Port { return []Port{{Name: "enp1s0"}, {Name: "enp2s0"}} }, Refresh: func() {}, Poll: 5 * time.Millisecond, Settle: time.Millisecond}
 	// No cable anywhere: Enter alone gets nowhere; choosing a port asks, and "n" goes back.
 	script := strings.Join([]string{"", "2", "n", "2", "y"}, "\r") + "\r"
 	var out bytes.Buffer
-	p, err := NewTerm(strings.NewReader(script), &out).pickMgmtPort(env)
+	p, err := NewTerm(strings.NewReader(script), &out).pickPort(env, ask)
 	if err != nil || p.Name != "enp2s0" {
 		t.Fatalf("%v %v\n%s", p, err, out.String())
 	}
@@ -218,12 +225,17 @@ func TestManagementPortWithoutACableNeedsInsisting(t *testing.T) {
 func TestManagementPortListUpdatesByItself(t *testing.T) {
 	var mu sync.Mutex
 	linked := false
-	env := &TextEnv{Ports: func() []Port { mu.Lock(); defer mu.Unlock(); return []Port{{Name: "enp1s0", Link: linked}} }, Refresh: func() {}, Poll: 5 * time.Millisecond, Settle: time.Millisecond}
+	ask := portAsk{step: 2, title: "Which port will you manage Gatehouse from?"}
+	env := &TextEnv{Ports: func() []Port {
+		mu.Lock()
+		defer mu.Unlock()
+		return []Port{{Name: "enp1s0", Link: linked}, {Name: "enp9s0"}}
+	}, Refresh: func() {}, Poll: 5 * time.Millisecond, Settle: time.Millisecond}
 	pr, pw := io.Pipe()
 	var out safeBuf
 	done := make(chan Port, 1)
 	go func() {
-		p, _ := NewTerm(pr, &out).pickMgmtPort(env)
+		p, _ := NewTerm(pr, &out).pickPort(env, ask)
 		done <- p
 	}()
 	time.Sleep(60 * time.Millisecond)
@@ -269,13 +281,13 @@ func TestScreensResetCharset(t *testing.T) {
 
 func TestStrayEnterNeverChoosesTheDisk(t *testing.T) {
 	in, _ := newTest(t)
-	// Welcome, then four empty lines (a noisy serial line): the disk list must still be waiting.
+	// Welcome, then four empty lines (a noisy serial line): no port or disk may get chosen.
 	script := strings.Join([]string{"", "", "", "", ""}, "\r") + "\r"
 	out, err := run(t, script, testEnv(in))
 	if !errors.Is(err, errClosed) {
 		t.Fatalf("expected the script to run out, got %v", err)
 	}
-	if strings.Contains(out, "step 2 of 3") {
+	if strings.Contains(out, "Review and confirm") || strings.Contains(out, "step 3 of 4") {
 		t.Fatalf("a stray Enter moved past the disk choice:\n%s", out)
 	}
 }
@@ -326,5 +338,78 @@ func TestShowAlwaysDrawsEvenWhenUnchanged(t *testing.T) {
 	term.show(s)
 	if out.Len() == 0 {
 		t.Fatal("a screen shown after a prompt must be drawn again so typed text is cleared")
+	}
+}
+
+func TestAMachineWithOnePortIsToldItNeedsTwo(t *testing.T) {
+	var mu sync.Mutex
+	two := false
+	env := &TextEnv{Ports: func() []Port {
+		mu.Lock()
+		defer mu.Unlock()
+		if two {
+			return []Port{{Name: "enp1s0", Link: true}, {Name: "enp5s0", USB: true}}
+		}
+		return []Port{{Name: "enp1s0", Link: true}}
+	}, Refresh: func() {}, Poll: 5 * time.Millisecond, Settle: time.Millisecond}
+	pr, pw := io.Pipe()
+	var out safeBuf
+	done := make(chan Port, 1)
+	go func() {
+		p, _ := NewTerm(pr, &out).pickPort(env, portAsk{step: 1, title: "Which network port is the internet?", wan: true})
+		done <- p
+	}()
+	time.Sleep(60 * time.Millisecond)
+	pw.Write([]byte("1\r")) // typed while there is nothing to choose: ignored
+	time.Sleep(60 * time.Millisecond)
+	select {
+	case p := <-done:
+		t.Fatalf("a port was chosen with only one on the machine: %+v", p)
+	default:
+	}
+	if !strings.Contains(out.String(), "needs at least two network ports") {
+		t.Fatalf("no explanation:\n%s", out.String())
+	}
+	mu.Lock()
+	two = true
+	mu.Unlock()
+	time.Sleep(60 * time.Millisecond)
+	pw.Write([]byte("2\r"))
+	select {
+	case p := <-done:
+		if p.Name != "enp5s0" {
+			t.Fatalf("%+v", p)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatalf("never finished:\n%s", out.String())
+	}
+}
+
+func TestInternetPortDefaultsToTheOneThatHasAnAddress(t *testing.T) {
+	env := &TextEnv{Ports: func() []Port {
+		return []Port{{Name: "enp1s0", Link: true}, {Name: "enp2s0", Link: true, Addr: "203.0.113.9/24"}}
+	}, Refresh: func() {}, Poll: 5 * time.Millisecond, Settle: time.Millisecond}
+	var out bytes.Buffer
+	p, err := NewTerm(strings.NewReader("\r"), &out).pickPort(env, portAsk{step: 1, title: "x", wan: true})
+	if err != nil || p.Name != "enp2s0" {
+		t.Fatalf("%+v %v\n%s", p, err, out.String())
+	}
+	if !strings.Contains(out.String(), "address 203.0.113.9") || !strings.Contains(out.String(), "no address yet") {
+		t.Fatalf("addresses not shown:\n%s", out.String())
+	}
+}
+
+func TestManagementAddressAvoidsAndRefusesClashes(t *testing.T) {
+	env := &TextEnv{Ports: func() []Port {
+		return []Port{{Name: "enp1s0", Link: true, Addr: "192.168.50.20/24"}, {Name: "enp2s0", Link: true, Addr: "192.168.1.77/24"}}
+	}}
+	var out bytes.Buffer
+	// The suggestion skips the network the internet port is on; a typed clash is refused.
+	a, err := NewTerm(strings.NewReader("192.168.50.1\r\r"), &out).askMgmtAddr(env, Port{Name: "enp2s0"})
+	if err != nil || a != "192.168.77.1/24" {
+		t.Fatalf("%q %v\n%s", a, err, out.String())
+	}
+	if !strings.Contains(out.String(), "overlaps") {
+		t.Fatalf("a clash was not refused:\n%s", out.String())
 	}
 }

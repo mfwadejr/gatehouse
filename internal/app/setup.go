@@ -176,10 +176,18 @@ func (a *App) registerSetupRoutes() {
 			}
 		}
 		host, _ := os.Hostname()
+		suggested := seed.Suggest(used)
+		// What was chosen during the install: the address is already on the management port, so
+		// it is offered again and the network keeps working while it is applied.
+		chosen := installer.ReadInstallNet()
+		install := map[string]string{"lan_port": installer.MgmtPort(), "wan_port": chosen.WanPort, "address": chosen.MgmtAddr}
+		if chosen.MgmtAddr != "" {
+			suggested = chosen.MgmtAddr
+		}
 		api.JSON(w, 200, map[string]any{
 			"pending": a.wizardPending(), "ports": ports(), "here": here, "here_addr": hereAddr,
-			"suggested_lan": seed.Suggest(used), "hostname": host, "timezone": currentZone(),
-			"timezones": installer.Timezones(), "country": countryFromZone(currentZone()),
+			"suggested_lan": suggested, "hostname": host, "timezone": currentZone(),
+			"timezones": installer.Timezones(), "country": countryFromZone(currentZone()), "install": install,
 		})
 	})
 	s.HandleAdmin("POST /api/setup/wizard", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {

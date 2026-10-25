@@ -54,8 +54,12 @@ export default function Wizard({ data, me, onDone }) {
   const [scanning, setScanning] = useState(false);
   const [step, setStep] = useState('mode');
   const [net, setNet] = useState(() => {
-    const n = empty(data.here || (wired.find((p) => p.link) || wired[0])?.name || '');
+    // The installer already asked which port is the internet and which is your network.
+    const ins = data.install || {};
+    const has = (name) => wired.some((p) => p.name === name);
+    const n = empty((has(ins.lan_port) && ins.lan_port) || data.here || (wired.find((p) => p.link) || wired[0])?.name || '');
     n.lan.address = data.suggested_lan || '192.168.1.1/24';
+    if (has(ins.wan_port) && ins.wan_port !== n.lan.port) n.wan = { type: 'dhcp', addr: '', gateway: '', dns: '', pppoe_user: '', pppoe_pass: '', port: ins.wan_port };
     return n;
   });
   const [host, setHost] = useState(data.hostname || 'gatehouse');
@@ -264,7 +268,7 @@ export default function Wizard({ data, me, onDone }) {
       <Field label="Name of this device" hint="Shown on your network, for example gatehouse"><Input value={host} onChange={setHost} /></Field>
       <Field label="Time zone"><Select value={zone} onChange={setZone} options={data.timezones || ['UTC']} /></Field>
       <ToggleRow title="Require two-step sign-in" desc="Optional. Asks for a code from an authenticator app each time you sign in. You can change this later in Settings." checked={mfa} onChange={setMfa} />
-      {router && hereIsLan && <Note tone="warn" title="Your connection will move">Gatehouse becomes your router on this port. After you finish, unplug and replug the cable on this computer so it gets a new address. The next page shows where to go.</Note>}
+      {router && hereIsLan && !(data.install?.address && lan.address === data.install.address) && <Note tone="warn" title="Your connection will move">Gatehouse becomes your router on this port. After you finish, unplug and replug the cable on this computer so it gets a new address. The next page shows where to go.</Note>}
       {err && <Note tone="bad">{err}</Note>}
       <div className="actions"><Button onClick={() => setStep('network')}>Back</Button><Button kind="primary" disabled={busy || !host} onClick={() => finish(false)}>Finish setup</Button></div>
     </Frame>

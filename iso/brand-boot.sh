@@ -38,7 +38,7 @@ if [ -f "$D"/isolinux/live.cfg ]; then
 path
 prompt 0
 noescape 1
-timeout 40
+timeout 0
 ui vesamenu.c32
 default gatehouse
 menu title
@@ -48,9 +48,8 @@ menu hshift 17
 menu vshift 17
 menu width 46
 menu rows 3
-menu tabmsg
-menu timeoutrow 24
-menu autoboot Starting Gatehouse in # seconds
+menu tabmsg Choose with the arrow keys, then press Enter to continue
+menu tabmsgrow 24
 menu color screen 0 #ffc3c2b7 #00000000 none
 menu color border 0 #00000000 #00000000 none
 menu color title 0 #fff0efec #00000000 none
@@ -60,7 +59,7 @@ menu color hotsel 0 #ffffffff #ff3987e5 none
 menu color hotkey 0 #ffc3c2b7 #00000000 none
 menu color timeout 0 #ff898781 #00000000 none
 menu color timeout_msg 0 #ff898781 #00000000 none
-menu color tabmsg 0 #00000000 #00000000 none
+menu color tabmsg 0 #ff898781 #00000000 none
 menu color cmdmark 0 #00000000 #00000000 none
 menu color cmdline 0 #00000000 #00000000 none
 
@@ -104,7 +103,7 @@ if [ -d "$D"/boot/grub ]; then
 		cat > "$D"/boot/grub/grub.cfg <<CFG
 $KEEP
 set default=0
-set timeout=4
+set timeout=-1
 insmod all_video
 insmod gfxterm
 insmod png

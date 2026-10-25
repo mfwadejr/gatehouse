@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/netip"
 	"strconv"
 	"strings"
 	"time"
@@ -245,25 +246,47 @@ func portLine(p Port) string {
 			state += ", " + p.Speed + " Mb/s"
 		}
 	}
+	if p.Addr != "" {
+		a := p.Addr
+		if i := strings.IndexByte(a, '/'); i > 0 {
+			a = a[:i]
+		}
+		state += ", address " + a
+	} else if p.Link {
+		state += ", no address yet"
+	}
 	kind := ""
 	if p.USB {
 		kind = "  (USB adapter)"
 	}
-	return fmt.Sprintf("%s %-16s %s%s", mark, p.Name, state, kind)
+	return fmt.Sprintf("%s %-14s %s%s", mark, p.Name, state, kind)
 }
 
 func portsSignature(ps []Port) string {
 	var b strings.Builder
 	for _, p := range ps {
-		fmt.Fprintf(&b, "%s:%v;", p.Name, p.Link)
+		fmt.Fprintf(&b, "%s:%v:%s;", p.Name, p.Link, p.Addr)
 	}
 	return b.String()
 }
 
-// pickMgmtPort asks which network port Gatehouse will be managed from. The list updates by itself
-// as a cable is plugged in or an adapter appears, so the person can plug a cable in and watch it
-// show up. A port with a cable is required, unless the person insists on one without.
-func (t *Term) pickMgmtPort(env *TextEnv) (Port, error) {
+// portAsk describes one "which port?" question.
+type portAsk struct {
+	step    int
+	title   string
+	intro   []string
+	exclude string // a port already chosen for the other job
+	wan     bool   // the internet port: it may be unplugged now, and a port with an address is the likely one
+}
+
+// pickPort asks which network port to use. The list updates by itself as a cable is plugged in
+// or an adapter appears, so the person can plug a cable in and watch it show up. A choice is
+// always required. The management port needs a cable, unless the person insists on one without;
+// the internet port may be unplugged for now.
+//
+// With fewer than two wired ports the question cannot be answered: Gatehouse needs one port for
+// the internet and one for the network, so the screen says so and waits for an adapter.
+func (t *Term) pickPort(env *TextEnv, a portAsk) (Port, error) {
 	type lineRes struct {
 		s   string
 		err error
@@ -279,29 +302,49 @@ func (t *Term) pickMgmtPort(env *TextEnv) (Port, error) {
 	}
 	env.Refresh()
 	time.Sleep(env.Settle)
-	var ports []Port
+	var all, ports []Port
 	sig := "\x00"
 	def := 0
+	short := false
 	draw := func() {
-		t.banner(env, 2, steps, "Which network port will you manage Gatehouse from?")
-		t.p("  Plug a network cable into the port you want to use. After the restart you\n")
-		t.p("  finish setup from a computer connected to it. The list updates by itself.\n\n")
+		t.banner(env, a.step, steps, a.title)
+		short = len(all) < 2
+		if short {
+			t.p("  %sGatehouse needs at least two network ports.%s One carries\n", amber, reset)
+			t.p("  the internet, one carries your own network. This machine has %d.\n\n", len(all))
+			for i, p := range all {
+				t.p("    %d) %s\n", i+1, portLine(p))
+			}
+			t.p("\n  Plug in a USB network adapter. This screen updates by itself.\n")
+			return
+		}
+		for _, l := range a.intro {
+			t.p("  %s\n", l)
+		}
+		t.p("\n")
 		def = 0
-		withLink := 0
+		withLink, withAddr := 0, 0
+		var cand int
 		for i, p := range ports {
 			t.p("    %d) %s\n", i+1, portLine(p))
 			if p.Link {
 				withLink++
-				def = i + 1
+				if !a.wan {
+					cand = i + 1
+				}
+			}
+			if a.wan && p.Link && p.Addr != "" {
+				withAddr++
+				cand = i + 1
 			}
 		}
-		if withLink != 1 {
-			def = 0
-		}
 		switch {
-		case len(ports) == 0:
-			t.p("    %sNo network port found yet. If you use a USB network adapter, plug it in now.%s\n", amber, reset)
-		case withLink == 0:
+		case a.wan && withAddr == 1:
+			def = cand
+		case !a.wan && withLink == 1:
+			def = cand
+		}
+		if !a.wan && withLink == 0 {
 			t.p("\n  %sNo cable is connected yet.%s\n", amber, reset)
 		}
 		t.p("\n")
@@ -315,8 +358,14 @@ func (t *Term) pickMgmtPort(env *TextEnv) (Port, error) {
 	defer tick.Stop()
 	for {
 		env.Refresh()
-		ports = env.Ports()
-		if s := portsSignature(ports); s != sig {
+		all = env.Ports()
+		ports = ports[:0:0]
+		for _, p := range all {
+			if p.Name != a.exclude {
+				ports = append(ports, p)
+			}
+		}
+		if s := portsSignature(all); s != sig {
 			sig = s
 			draw()
 		}
@@ -328,6 +377,9 @@ func (t *Term) pickMgmtPort(env *TextEnv) (Port, error) {
 			reading = false
 			if r.err != nil {
 				return Port{}, r.err
+			}
+			if short {
+				continue // nothing to choose yet; the list is waiting for an adapter
 			}
 			ans := strings.TrimSpace(r.s)
 			n := def
@@ -341,11 +393,15 @@ func (t *Term) pickMgmtPort(env *TextEnv) (Port, error) {
 				n = v
 			}
 			if n == 0 {
-				t.p("  %sPick a port from the list. Plug a cable in first if none shows a cable.%s\n  Number: ", amber, reset)
+				if a.wan {
+					t.p("  %sPick the port the internet will come in on, even if it is not plugged in yet.%s\n  Number: ", amber, reset)
+				} else {
+					t.p("  %sPick a port from the list. Plug a cable in first if none shows a cable.%s\n  Number: ", amber, reset)
+				}
 				continue
 			}
 			p := ports[n-1]
-			if !p.Link {
+			if !p.Link && !a.wan {
 				ok, err := t.yesno("No cable is plugged into "+p.Name+". Use it anyway?", false)
 				if err != nil {
 					return Port{}, err
@@ -358,6 +414,48 @@ func (t *Term) pickMgmtPort(env *TextEnv) (Port, error) {
 			return p, nil
 		}
 	}
+}
+
+// usedNetworks lists the networks the ports are already on, so the management network can avoid them.
+func usedNetworks(ports []Port) []netip.Prefix {
+	var out []netip.Prefix
+	for _, p := range ports {
+		if pf, err := netip.ParsePrefix(p.Addr); err == nil {
+			out = append(out, pf)
+		}
+	}
+	return out
+}
+
+// askMgmtAddr asks for the management port's address. The suggestion avoids every network the
+// ports are on now, and a typed address that overlaps one is refused, because the machine could
+// not tell the two networks apart.
+func (t *Term) askMgmtAddr(env *TextEnv, mgmt Port) (string, error) {
+	var others []Port
+	for _, p := range env.Ports() {
+		if p.Name != mgmt.Name { // what this port is on now is replaced by the new network
+			others = append(others, p)
+		}
+	}
+	used := usedNetworks(others)
+	def := SuggestMgmtAddr(used)
+	t.p("\n  This is the address of Gatehouse on your own network, and the\n")
+	t.p("  one you open in a browser. A computer plugged into %s%s%s gets\n  its address from Gatehouse.\n\n", bold, mgmt.Name, reset)
+	v, err := t.ask("Address", def, func(s string) error {
+		p, err := ParseMgmtAddr(s)
+		if err != nil {
+			return err
+		}
+		if ClashesWith(p, used) {
+			return errors.New("a port is already on a network that overlaps this one; choose a different address")
+		}
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	p, _ := ParseMgmtAddr(v)
+	return p.String(), nil
 }
 
 // again redraws the current heading on a clean screen, so a long step does not scroll its
@@ -382,7 +480,7 @@ func (t *Term) heading(sub, title string) {
 	io.WriteString(t.w, t.M)
 }
 
-const steps = 3
+const steps = 4
 
 // RunText walks through the questions and installs. It returns when the machine is about to
 // reboot, when the input closes, or after a failed install the person gives up on.
@@ -418,10 +516,33 @@ func textOnce(t *Term, env *TextEnv) error {
 		return err
 	}
 
-	// 1. Disk
+	// 1. The internet port
+	wan, err := t.pickPort(env, portAsk{step: 1, title: "Which network port is the internet?",
+		intro: []string{"Choose the port your modem's cable goes into.",
+			"It can be unplugged for now. You can change it later."},
+		wan: true})
+	if err != nil {
+		return err
+	}
+
+	// 2. The management port and its address
+	mp, err := t.pickPort(env, portAsk{step: 2, title: "Which port will you manage Gatehouse from?",
+		intro: []string{"This port is your own network. Plug it into your",
+			"computer or a switch, not into another router.",
+			"After the restart you finish setup from a computer on it."},
+		exclude: wan.Name})
+	if err != nil {
+		return err
+	}
+	mgmtAddr, err := t.askMgmtAddr(env, mp)
+	if err != nil {
+		return err
+	}
+
+	// 3. Disk
 	var disk Disk
 	for {
-		t.banner(env, 1, steps, "Where should Gatehouse be installed?")
+		t.banner(env, 3, steps, "Where should Gatehouse be installed?")
 		disks, err := env.In.Disks()
 		if err != nil {
 			t.p("\n  %s%v%s\n", red, err, reset)
@@ -459,21 +580,20 @@ func textOnce(t *Term, env *TextEnv) error {
 		break
 	}
 
-	// 2. The port Gatehouse is managed from
-	mp, err := t.pickMgmtPort(env)
-	if err != nil {
-		return err
-	}
-
-	// 3. Confirm
-	req := Request{Disk: disk.Path, MgmtPort: mp.Name, MgmtMAC: mp.MAC}
+	// 4. Confirm
+	req := Request{Disk: disk.Path, MgmtPort: mp.Name, MgmtMAC: mp.MAC, WanPort: wan.Name, WanMAC: wan.MAC, MgmtAddr: mgmtAddr}
 	if env.SerialUsed != nil {
 		req.Serial = env.SerialUsed()
 	}
 	for {
-		t.banner(env, 3, steps, "Confirm")
-		t.p("  Disk   %s%s %s%s  %s(everything on it will be erased)%s\n", bold, disk.Path, humanSize(disk.Size), reset, red, reset)
-		t.p("  Port   %s%s%s  %s(you finish setup from a computer plugged into it)%s\n", bold, mp.Name, reset, dim, reset)
+		t.banner(env, 4, steps, "Review and confirm")
+		wanState := "not plugged in yet"
+		if wan.Link {
+			wanState = "cable connected"
+		}
+		t.p("  Internet     %s%s%s  %s(%s)%s\n", bold, wan.Name, reset, dim, wanState, reset)
+		t.p("  Your network %s%s%s  %s(Gatehouse is at %s)%s\n", bold, mp.Name, reset, dim, strings.Split(mgmtAddr, "/")[0], reset)
+		t.p("  Disk         %s%s %s%s  %s(everything on it will be erased)%s\n", bold, disk.Path, humanSize(disk.Size), reset, red, reset)
 		t.p("\n  To go ahead, type %s%s%s below.\n  %sAnything else cancels.%s\n\n", bold, disk.Path, reset, dim, reset)
 		c, err := t.ask("Disk name", "", nil)
 		if err != nil {

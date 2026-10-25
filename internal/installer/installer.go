@@ -57,6 +57,11 @@ type Request struct {
 	// new system, which brings that port up first and answers first-time setup only there.
 	MgmtPort string `json:"mgmt_port,omitempty"`
 	MgmtMAC  string `json:"mgmt_mac,omitempty"`
+	// WanPort is the port the internet comes in on, and MgmtAddr the address the management port
+	// serves (with its size, like 192.168.50.1/24). Both are optional for the browser installer.
+	WanPort  string `json:"wan_port,omitempty"`
+	WanMAC   string `json:"wan_mac,omitempty"`
+	MgmtAddr string `json:"mgmt_addr,omitempty"`
 	// Serial, like "ttyS0,115200", is set when the person ran the installer over a serial console.
 	// The new system then also shows its status screen and boot messages there.
 	Serial string `json:"serial,omitempty"`
@@ -146,6 +151,12 @@ func Validate(r *Request, disks []Disk) error {
 		return errors.New("that disk holds the installer itself; choose another")
 	case r.MgmtPort != "" && !reMgmtPort.MatchString(r.MgmtPort):
 		return errors.New("that is not a valid network port name")
+	case r.WanPort != "" && !reMgmtPort.MatchString(r.WanPort):
+		return errors.New("that is not a valid network port name")
+	case r.WanPort != "" && r.WanPort == r.MgmtPort:
+		return errors.New("the internet port and the management port must be different ports")
+	case r.MgmtAddr != "" && !validMgmtAddr(r.MgmtAddr):
+		return errors.New("the management address must be a private address like 192.168.50.1")
 	case r.Serial != "" && !reSerial.MatchString(r.Serial):
 		return errors.New("that is not a valid serial console")
 	case r.Confirm != r.Disk:
@@ -153,6 +164,8 @@ func Validate(r *Request, disks []Disk) error {
 	}
 	return nil
 }
+
+func validMgmtAddr(s string) bool { _, err := ParseMgmtAddr(s); return err == nil }
 
 // partition returns the path of partition n on a disk (nvme0n1p2, sda2).
 func partition(disk string, n int) string {
@@ -402,6 +415,14 @@ func (in *Installer) plan(r Request) []step {
 					return err
 				}
 				if err := os.WriteFile(filepath.Join(t, MgmtPortFile), []byte(r.MgmtPort+" "+r.MgmtMAC+"\n"), 0o644); err != nil {
+					return err
+				}
+			}
+			if body := r.installNetBody(); body != "" {
+				if err := os.MkdirAll(filepath.Join(t, "var/lib/gatehouse"), 0o755); err != nil {
+					return err
+				}
+				if err := os.WriteFile(filepath.Join(t, InstallNetFile), []byte(body), 0o644); err != nil {
 					return err
 				}
 			}

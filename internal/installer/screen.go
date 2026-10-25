@@ -23,6 +23,7 @@ type Port struct {
 	Link  bool // a cable is connected
 	USB   bool
 	Speed string
+	Addr  string // its IPv4 address, if it has one that is not link-local
 }
 
 // WiredPorts lists real Ethernet ports, USB adapters included.
@@ -49,7 +50,7 @@ func WiredPorts() []Port {
 			sp = ""
 		}
 		mac, _ := os.ReadFile(base + "/address")
-		out = append(out, Port{Name: n, MAC: strings.TrimSpace(string(mac)), Link: strings.TrimSpace(string(carrier)) == "1", USB: strings.Contains(real, "/usb"), Speed: sp})
+		out = append(out, Port{Name: n, MAC: strings.TrimSpace(string(mac)), Link: strings.TrimSpace(string(carrier)) == "1", USB: strings.Contains(real, "/usb"), Speed: sp, Addr: portAddr(n)})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
@@ -141,8 +142,9 @@ func RenderScreen(ports []Port, urls []string, code string, w, h int) string {
 // it is shown bare; with several, each says which port it belongs to.
 func usableAddresses(port string) []string {
 	wired := map[string]bool{}
+	wan := ReadInstallNet().WanPort // the internet side is not somewhere to open the console from
 	for _, p := range WiredPorts() {
-		if p.Link {
+		if p.Link && (wan == "" || p.Name != wan) {
 			wired[p.Name] = true
 		}
 	}
@@ -400,4 +402,19 @@ func readSetupState() string {
 		return "ready"
 	}
 	return strings.TrimSpace(string(b))
+}
+
+// portAddr is the first IPv4 address on a port that is not link-local, with its size.
+func portAddr(name string) string {
+	ifi, err := net.InterfaceByName(name)
+	if err != nil {
+		return ""
+	}
+	as, _ := ifi.Addrs()
+	for _, a := range as {
+		if n, ok := a.(*net.IPNet); ok && n.IP.To4() != nil && !n.IP.IsLinkLocalUnicast() {
+			return n.String()
+		}
+	}
+	return ""
 }
