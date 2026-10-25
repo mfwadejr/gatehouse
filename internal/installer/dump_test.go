@@ -39,7 +39,7 @@ func TestDumpScreens(t *testing.T) {
 	w("21-installer-web-ready", RenderScreen(ports, []string{"https://192.168.1.20"}, "1234-5678", W, H))
 
 	in, _ := newTest(t)
-	script := strings.Join([]string{"", "", "/dev/nvme0n1", ""}, "\r") + "\r"
+	script := strings.Join([]string{"", "1", "", "/dev/nvme0n1", ""}, "\r") + "\r"
 	var out strings.Builder
 	tm := NewTerm(strings.NewReader(script), &out)
 	tm.W, tm.H = W, H

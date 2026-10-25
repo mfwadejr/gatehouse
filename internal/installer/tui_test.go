@@ -30,7 +30,7 @@ func TestTextInstallHappyPath(t *testing.T) {
 	in, f := newTest(t)
 	script := strings.Join([]string{
 		"",             // welcome
-		"",             // disk: the only usable one
+		"1",            // disk: the only usable one (must be typed; Enter alone does not choose)
 		"",             // port: the only one with a cable
 		"/dev/nvme0n1", // confirm
 		"",             // reboot
@@ -60,7 +60,7 @@ func TestTextInstallHappyPath(t *testing.T) {
 
 func TestTextWrongConfirmationStartsOverAndErasesNothing(t *testing.T) {
 	in, f := newTest(t)
-	script := strings.Join([]string{"", "", "", "nope"}, "\n") + "\n"
+	script := strings.Join([]string{"", "1", "", "nope"}, "\n") + "\n"
 	_, err := run(t, script, testEnv(in))
 	if !errors.Is(err, errClosed) {
 		t.Fatalf("expected the script to run out after starting over, got %v", err)
@@ -184,7 +184,7 @@ func TestManagementPortIsRememberedOnTheNewSystem(t *testing.T) {
 	env.Ports = func() []Port {
 		return []Port{{Name: "enp1s0", MAC: "aa:bb:cc:00:00:01"}, {Name: "enp2s0", MAC: "aa:bb:cc:00:00:02", Link: true}}
 	}
-	script := strings.Join([]string{"", "", "", "/dev/nvme0n1", ""}, "\r") + "\r"
+	script := strings.Join([]string{"", "1", "", "/dev/nvme0n1", ""}, "\r") + "\r"
 	if out, err := run(t, script, env); err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
@@ -263,5 +263,18 @@ func TestScreensResetCharset(t *testing.T) {
 	NewTerm(strings.NewReader(""), &b).clear()
 	if !strings.HasPrefix(b.String(), asciiReset) {
 		t.Fatalf("clear must select ASCII, got %q", b.String())
+	}
+}
+
+func TestStrayEnterNeverChoosesTheDisk(t *testing.T) {
+	in, _ := newTest(t)
+	// Welcome, then four empty lines (a noisy serial line): the disk list must still be waiting.
+	script := strings.Join([]string{"", "", "", "", ""}, "\r") + "\r"
+	out, err := run(t, script, testEnv(in))
+	if !errors.Is(err, errClosed) {
+		t.Fatalf("expected the script to run out, got %v", err)
+	}
+	if strings.Contains(out, "step 2 of 3") {
+		t.Fatalf("a stray Enter moved past the disk choice:\n%s", out)
 	}
 }

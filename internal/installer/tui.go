@@ -418,8 +418,9 @@ func textOnce(t *Term, env *TextEnv) error {
 			}
 			continue
 		}
-		def := 1
-		n, err := t.choose("Everything on the disk you choose will be erased.", opts, def)
+		// No default: the disk is erased, so a stray Enter (a noisy serial line can send one) must
+		// never be able to pick it. The person has to type the number.
+		n, err := t.choose("Everything on the disk you choose will be erased.", opts, 0)
 		if err != nil {
 			return err
 		}
