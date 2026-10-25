@@ -47,7 +47,7 @@ export function Setup({ onDone }) {
         <Field label="Password" hint={pwHint(f.password)}><Input type="password" value={f.password} onChange={set('password')} autoComplete="new-password" /></Field>
         <Field label="Password again" hint={f.again && f.again !== f.password ? 'These do not match yet.' : undefined}><Input type="password" value={f.again} onChange={set('again')} autoComplete="new-password" /></Field>
         {err && <Note tone="bad">{err}</Note>}
-        <Button kind="primary" disabled={busy} onClick={go}>Create account</Button>
+        <Button kind="primary" type="submit" disabled={busy}>Create account</Button>
       </form>
     </Frame>
   );
@@ -88,7 +88,7 @@ export function Login({ onSession, prefill }) {
           </Field>
         )}
         {err && <Note tone="bad">{err}</Note>}
-        <Button kind="primary" disabled={busy} onClick={go}>{ticket ? 'Verify' : 'Sign in'}</Button>
+        <Button kind="primary" type="submit" disabled={busy}>{ticket ? 'Verify' : 'Sign in'}</Button>
       </form>
     </Frame>
   );
@@ -128,9 +128,11 @@ export function Enrol({ onDone }) {
       <p className="sec">Scan this with an authenticator app (Google Authenticator, Authy, 1Password and similar), then type the 6-digit code it shows.</p>
       {info && <Qr text={info.uri} />}
       {info && <details><summary className="small muted">Can't scan? Enter this key by hand</summary><p className="mono" style={{ wordBreak: 'break-all' }}>{info.secret}</p></details>}
-      <Field label="6-digit code"><Input className="codebox" value={code} onChange={setCode} inputMode="numeric" autoComplete="one-time-code" /></Field>
-      {err && <Note tone="bad">{err}</Note>}
-      <Button kind="primary" onClick={confirm} disabled={!info}>Turn on</Button>
+      <form className="stack" onSubmit={submitOnEnter(confirm)}>
+        <Field label="6-digit code"><Input className="codebox" value={code} onChange={setCode} inputMode="numeric" autoComplete="one-time-code" /></Field>
+        {err && <Note tone="bad">{err}</Note>}
+        <Button kind="primary" type="submit" disabled={!info}>Turn on</Button>
+      </form>
     </Frame>
   );
 }

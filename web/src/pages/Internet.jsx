@@ -109,7 +109,7 @@ function QuickSetup({ ports, found, onDone }) {
   const wanOK = wan.iface && wan.name && (wan.type !== 'pppoe' || (wan.pppoe_user && wan.pppoe_pass)) && (wan.type !== 'static' || (wan.addr && wan.gateway));
   const lanOK = lan.iface && lan.iface !== wan.iface && /^\d+\.\d+\.\d+\.\d+\/\d+$/.test(lan.cidr);
   return (
-    <Card title={step === 0 ? 'Step 1 of 2 · Connect to the internet' : 'Step 2 of 2 · Your own network'} desc="Gatehouse does the rest: addressing, DNS, and a safe firewall.">
+    <Card enter title={step === 0 ? 'Step 1 of 2 · Connect to the internet' : 'Step 2 of 2 · Your own network'} desc="Gatehouse does the rest: addressing, DNS, and a safe firewall.">
       {step === 0 ? (
         <>
           <Note tone="good" title="Plug the internet cable in now">Plug the cable from your modem or provider into the port you want to use. Gatehouse will notice which port it is.</Note>

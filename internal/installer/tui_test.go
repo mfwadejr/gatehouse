@@ -3,6 +3,7 @@ package installer
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -276,5 +277,54 @@ func TestStrayEnterNeverChoosesTheDisk(t *testing.T) {
 	}
 	if strings.Contains(out, "step 2 of 3") {
 		t.Fatalf("a stray Enter moved past the disk choice:\n%s", out)
+	}
+}
+
+func TestRedrawingAScreenDoesNotWipeTheDisplay(t *testing.T) {
+	var out strings.Builder
+	term := NewTerm(strings.NewReader(""), &out)
+	mk := func(n int) *Screen { s := NewScreen(80, 24); s.add("progress " + fmt.Sprint(n)); return s }
+	term.show(mk(1))
+	if !strings.Contains(out.String(), "\x1b[2J") {
+		t.Fatal("the first screen should start from a clean display")
+	}
+	out.Reset()
+	term.show(mk(2))
+	if strings.Contains(out.String(), "\x1b[2J") {
+		t.Fatalf("a repaint must not clear the whole display (it makes it blink): %q", out.String())
+	}
+	if !strings.Contains(out.String(), "progress 2") || !strings.Contains(out.String(), "\x1b[K") {
+		t.Fatalf("repaint: %q", out.String())
+	}
+	term.clear()
+	out.Reset()
+	term.show(mk(3))
+	if !strings.Contains(out.String(), "\x1b[2J") {
+		t.Fatal("after a clear the next screen starts clean again")
+	}
+}
+
+func TestAnUnchangedScreenIsNotSentAgain(t *testing.T) {
+	var out strings.Builder
+	term := NewTerm(strings.NewReader(""), &out)
+	mk := func() *Screen { s := NewScreen(80, 24); s.add("same"); return s }
+	term.refresh(mk())
+	out.Reset()
+	term.refresh(mk())
+	if out.Len() != 0 {
+		t.Fatalf("an identical screen should send nothing, sent %q", out.String())
+	}
+}
+
+func TestShowAlwaysDrawsEvenWhenUnchanged(t *testing.T) {
+	var out strings.Builder
+	term := NewTerm(strings.NewReader(""), &out)
+	s := NewScreen(80, 24)
+	s.add("same")
+	term.show(s)
+	out.Reset()
+	term.show(s)
+	if out.Len() == 0 {
+		t.Fatal("a screen shown after a prompt must be drawn again so typed text is cleared")
 	}
 }

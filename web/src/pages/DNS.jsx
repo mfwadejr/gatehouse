@@ -94,7 +94,7 @@ function Lists() {
         </div>
       </Card>
 
-      <Card title="Always allow or always block" desc="Your own exceptions beat every list.">
+      <Card enter title="Always allow or always block" desc="Your own exceptions beat every list.">
         <div className="inline">
           <div style={{ flex: '1 1 14rem' }}><Input value={rule.domain} onChange={(v) => setRule({ ...rule, domain: v })} placeholder="example.com" /></div>
           <Select value={rule.action} onChange={(v) => setRule({ ...rule, action: v })} options={[{ value: 'block', label: 'Block' }, { value: 'allow', label: 'Allow' }]} />
@@ -157,7 +157,7 @@ function Records() {
   const [f, setF] = useState({ name: '', type: 'A', value: '', ttl: 300 });
   const [run] = useAction();
   return (
-    <Card title="Your own names" desc="Make a name point somewhere on your network, like nas.lan → 192.168.1.10. Devices that get an address from Gatehouse already have a name automatically.">
+    <Card enter title="Your own names" desc="Make a name point somewhere on your network, like nas.lan → 192.168.1.10. Devices that get an address from Gatehouse already have a name automatically.">
       <div className="inline">
         <div style={{ flex: '1 1 10rem' }}><Input value={f.name} onChange={(v) => setF({ ...f, name: v })} placeholder="nas.lan" /></div>
         <Select value={f.type} onChange={(v) => setF({ ...f, type: v })} options={['A', 'AAAA', 'CNAME', 'TXT', 'MX']} />

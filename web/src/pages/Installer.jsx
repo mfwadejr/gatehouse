@@ -79,7 +79,7 @@ export default function Installer() {
         <form className="stack" onSubmit={(e) => { e.preventDefault(); unlock(); }}>
           <Field label="Installer code"><Input className="codebox" value={code} onChange={setCode} placeholder="0000-0000" inputMode="numeric" autoComplete="off" autoFocus /></Field>
           {err && <Note tone="bad">{err}</Note>}
-          <Button kind="primary" disabled={busy || !code} onClick={unlock}>Continue</Button>
+          <Button kind="primary" type="submit" disabled={busy || !code}>Continue</Button>
         </form>
       </Shell>
     );

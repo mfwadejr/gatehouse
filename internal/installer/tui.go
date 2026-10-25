@@ -27,18 +27,46 @@ type Term struct {
 	cur  [3]any // the heading on screen: step, of, title
 	W, H int    // screen size in characters
 	M    string // left margin that centres the prompts under a themed heading
+
+	last  string // the last screen drawn, so an unchanged one is not sent again
+	drawn bool   // a screen is already showing, so the next one can be drawn over it
 }
 
 func NewTerm(r io.Reader, w io.Writer) *Term { return &Term{r: bufio.NewReader(r), w: w, W: 80, H: 24} }
 
 // show draws a finished screen and leaves the cursor visible for the next prompt.
-func (t *Term) show(s *Screen) { io.WriteString(t.w, s.String()+"\x1b[?25h") }
+//
+// A screen drawn over another one is written in place (each line erased to its end as it is
+// written) instead of wiping the display first, so a progress bar that updates every moment
+// does not make the whole screen blink.
+func (t *Term) show(s *Screen) { t.draw(s, false) }
+
+// refresh redraws a screen that updates by itself, such as a progress bar, and sends nothing
+// at all when it looks exactly as it did.
+func (t *Term) refresh(s *Screen) { t.draw(s, true) }
+
+func (t *Term) draw(s *Screen, skipSame bool) {
+	out := s.String()
+	if skipSame && t.drawn && out == t.last {
+		return
+	}
+	t.last = out
+	if t.drawn {
+		out = strings.Replace(out, "\x1b[2J\x1b[H", "\x1b[H", 1)
+		out = strings.ReplaceAll(out, "\r\n", "\x1b[K\r\n") + "\x1b[K\x1b[J"
+	}
+	t.drawn = true
+	io.WriteString(t.w, out+"\x1b[?25h")
+}
 
 func (t *Term) p(f string, a ...any) {
 	fmt.Fprintf(t.w, strings.ReplaceAll(f, "\n", "\r\n"+t.M), a...)
 }
 
-func (t *Term) clear() { io.WriteString(t.w, asciiReset+"\x1b[0m\x1b[2J\x1b[H") }
+func (t *Term) clear() {
+	t.drawn, t.last = false, ""
+	io.WriteString(t.w, asciiReset+"\x1b[0m\x1b[2J\x1b[H")
+}
 
 // readLine reads until Enter. Backspace edits, Ctrl-U clears, Ctrl-C starts over, and arrow
 // keys and other escape sequences are ignored. With echo off each character shows as a star.
@@ -507,7 +535,7 @@ func textOnce(t *Term, env *TextEnv) error {
 		sc.mid(bold + cur + reset + dim + fmtf("   step %d of %d", min(n+1, total), total) + reset)
 		sc.blank()
 		sc.mid(dim + "This takes a few minutes. Do not switch the machine off." + reset)
-		t.show(sc)
+		t.refresh(sc)
 		time.Sleep(env.Poll)
 	}
 }

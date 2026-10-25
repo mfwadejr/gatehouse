@@ -30,9 +30,12 @@ export function Icon({ name, size = 18, d }) {
   );
 }
 
-export function Card({ title, desc, actions, children, className = '' }) {
+// enter: Enter in a text box of this card does what its one green button does. It is opt-in, so a
+// card with a separate dangerous button (like "Update now") never fires it from an unrelated box.
+export function Card({ title, desc, actions, children, className = '', enter = false }) {
+  const ref = useRef(null);
   return (
-    <section className={`card ${className}`}>
+    <section className={`card ${className}`} ref={ref} onKeyDown={enter ? (e) => enterInScope(e, ref.current) : undefined}>
       {(title || actions) && (
         <div className="ch">
           <div>
@@ -102,15 +105,18 @@ export function Field({ label, hint, children }) {
   );
 }
 
-export function Input({ value, onChange, ...rest }) {
-  return <input className="in" value={value ?? ''} onChange={(e) => onChange(e.target.value)} {...rest} />;
+// A text box always keeps its own look ("in"); a caller's class is added to it, never instead of it.
+export const inClass = (extra) => ['in', ...String(extra || '').split(/\s+/).filter((c) => c && c !== 'in')].join(' ');
+
+export function Input({ value, onChange, className, ...rest }) {
+  return <input value={value ?? ''} onChange={(e) => onChange(e.target.value)} {...rest} className={inClass(className)} />;
 }
-export function NumberInput({ value, onChange, ...rest }) {
-  return <input className="in" type="number" value={value ?? ''} onChange={(e) => onChange(e.target.value === '' ? 0 : Number(e.target.value))} {...rest} />;
+export function NumberInput({ value, onChange, className, ...rest }) {
+  return <input type="number" value={value ?? ''} onChange={(e) => onChange(e.target.value === '' ? 0 : Number(e.target.value))} {...rest} className={inClass(className)} />;
 }
-export function Select({ value, onChange, options, ...rest }) {
+export function Select({ value, onChange, options, className, ...rest }) {
   return (
-    <select className="in" value={value ?? ''} onChange={(e) => onChange(e.target.value)} {...rest}>
+    <select value={value ?? ''} onChange={(e) => onChange(e.target.value)} {...rest} className={inClass(className)}>
       {options.map((o) => (typeof o === 'string' ? <option key={o} value={o}>{o}</option> : <option key={o.value} value={o.value}>{o.label}</option>))}
     </select>
   );
@@ -251,6 +257,25 @@ export function enterToPrimary(e, root) {
   if (tag === 'INPUT' && ['checkbox', 'radio'].includes(t.type)) return;
   const b = root.querySelector('.btn.primary:not([disabled])');
   if (b) { e.preventDefault(); b.click(); }
+}
+
+// Enter in a text box of a card or page (not in a dialog, which handles its own Enter) does what the
+// card's one green button does. With no green button ready, or more than one, it does nothing, so a
+// filter box or a half-filled form never fires something by accident.
+export function enterInScope(e, root) {
+  const t = e.target;
+  if (e.key !== 'Enter' || e.defaultPrevented || e.isComposing || e.shiftKey || !root || t?.tagName !== 'INPUT') return;
+  if (['checkbox', 'radio', 'search', 'file', 'button', 'submit'].includes(t.type) || t.dataset?.noenter != null) return;
+  if (t.closest('.modal, [role="dialog"], form')) return;
+  const ready = [...root.querySelectorAll('.btn.primary:not([disabled])')].filter((b) => !b.closest('.ch, .modal, [role="dialog"]'));
+  if (ready.length !== 1) return;
+  e.preventDefault();
+  ready[0].click();
+}
+
+// A form whose Enter key submits it (see Button type="submit").
+export function Form({ onSubmit, children, ...rest }) {
+  return <form {...rest} onSubmit={(e) => { e.preventDefault(); onSubmit?.(e); }}>{children}</form>;
 }
 
 // ---------- modal ----------

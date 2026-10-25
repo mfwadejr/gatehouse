@@ -3,7 +3,7 @@ import { del, get, put, useData } from '../api.js';
 import ApplyBar from '../ApplyBar.jsx';
 import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, Select, ToggleRow, useAction } from '../ui.jsx';
 
-const COUNTRIES = {
+export const COUNTRIES = {
   US: 'United States', CA: 'Canada', GB: 'United Kingdom', IE: 'Ireland', AU: 'Australia', NZ: 'New Zealand', DE: 'Germany', FR: 'France',
   ES: 'Spain', IT: 'Italy', NL: 'Netherlands', BE: 'Belgium', CH: 'Switzerland', AT: 'Austria', SE: 'Sweden', NO: 'Norway', DK: 'Denmark',
   FI: 'Finland', PL: 'Poland', PT: 'Portugal', CZ: 'Czechia', JP: 'Japan', KR: 'South Korea', SG: 'Singapore', IN: 'India', BR: 'Brazil',

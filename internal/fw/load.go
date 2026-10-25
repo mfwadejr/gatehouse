@@ -60,7 +60,7 @@ func sanitizeIf(s string) string {
 // Load builds the model from the configuration database.
 func Load(db Queryer) (*Model, error) {
 	m := &Model{Groups: map[string][]string{}, ConsolePorts: ConsolePortsFrom(db, time.Now())}
-	m.RescueIface = strings.TrimSpace(setting(db, "mgmt.rescue_iface", ""))
+	m.RescueIface = rescueDevice(db, strings.TrimSpace(setting(db, "mgmt.rescue_iface", "")))
 	m.MgmtAllow = MgmtAllowFrom(db).Resolved
 	m.DNSRedirect = setting(db, "fw.dns_redirect", "1") == "1"
 	m.BlockDoT = setting(db, "fw.block_dot", "1") == "1"
@@ -386,4 +386,29 @@ func MgmtAllowFrom(db Queryer) MgmtAllowSpec {
 		rows.Close()
 	}
 	return spec
+}
+
+// rescueDevice returns the name traffic from the setup port arrives under. A port that has
+// joined a bridge no longer shows up in the firewall by its own name, only as the bridge.
+func rescueDevice(db Queryer, port string) string {
+	if port == "" {
+		return ""
+	}
+	rows, err := db.Query(`SELECT name,members FROM interfaces WHERE kind='bridge' AND enabled=1`)
+	if err != nil {
+		return port
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name, members string
+		if rows.Scan(&name, &members) != nil {
+			continue
+		}
+		for _, m := range strings.Split(members, ",") {
+			if strings.TrimSpace(m) == port {
+				return name
+			}
+		}
+	}
+	return port
 }

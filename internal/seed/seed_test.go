@@ -156,3 +156,86 @@ func TestApplyBehindAnotherRouter(t *testing.T) {
 		t.Fatalf("dhcp client %d, scopes %d", dhcp, n2)
 	}
 }
+
+func TestApplyWifiAsTheInternet(t *testing.T) {
+	db, box := open(t)
+	n := &Network{LAN: LAN{Port: "enp2s0", Mode: "router", Address: "192.168.1.1/24"},
+		WAN: &WAN{Port: "wlp3s0", Wifi: &WifiJoin{SSID: "TMOBILE-1234", PSK: "hotspot-pass", Country: "us"}}}
+	if err := Apply(db, box, n); err != nil {
+		t.Fatal(err)
+	}
+	var iface, typ, name string
+	db.QueryRow(`SELECT iface,type,name FROM wan_links`).Scan(&iface, &typ, &name)
+	if iface != "wlp3s0" || typ != "dhcp" || name != "Internet (Wi-Fi)" {
+		t.Fatalf("wan: %s %s %s", iface, typ, name)
+	}
+	var mode, ssid, psk, country string
+	var en int
+	db.QueryRow(`SELECT mode,ssid,psk,country,enabled FROM wifi_radios WHERE iface='wlp3s0'`).Scan(&mode, &ssid, &psk, &country, &en)
+	if mode != "client" || ssid != "TMOBILE-1234" || country != "US" || en != 1 || psk == "" || strings.Contains(psk, "hotspot-pass") {
+		t.Fatalf("radio: %s %s %q %s %d", mode, ssid, psk, country, en)
+	}
+}
+
+func TestWifiInternetIsChecked(t *testing.T) {
+	base := func(j *WifiJoin) *Network {
+		return &Network{LAN: LAN{Port: "enp2s0", Mode: "router", Address: "192.168.1.1/24"}, WAN: &WAN{Port: "wlp3s0", Wifi: j}}
+	}
+	for name, j := range map[string]*WifiJoin{
+		"no name":        {SSID: " ", Country: "US"},
+		"short password": {SSID: "x", PSK: "short", Country: "US"},
+		"no country":     {SSID: "x", PSK: "longenough1", Country: ""},
+	} {
+		if err := base(j).Validate(); err == nil {
+			t.Errorf("%s: should be refused", name)
+		}
+	}
+	if err := base(&WifiJoin{SSID: "cafe", Country: "GB"}).Validate(); err != nil {
+		t.Errorf("an open network is allowed: %v", err)
+	}
+}
+
+func TestApplyWifiShareMakesAOnePortBridge(t *testing.T) {
+	db, box := open(t)
+	n := &Network{LAN: LAN{Port: "enp2s0", Mode: "router", Address: "192.168.1.1/24"}, WifiShare: true,
+		WAN: &WAN{Port: "enp1s0", Type: "dhcp"}}
+	if err := Apply(db, box, n); err != nil {
+		t.Fatal(err)
+	}
+	m, err := fw.Load(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	home, _ := m.ZoneByName("Home")
+	if home == nil || len(home.Ifaces) != 1 || home.Ifaces[0] != "br-lan" || !home.Management {
+		t.Fatalf("home zone: %+v", home)
+	}
+	if _, err := fw.Compile(m); err != nil {
+		t.Fatal(err)
+	}
+	var kind, members string
+	db.QueryRow(`SELECT kind,members FROM interfaces WHERE name='br-lan'`).Scan(&kind, &members)
+	if kind != "bridge" || members != "enp2s0" {
+		t.Fatalf("bridge row: %s %q", kind, members)
+	}
+	db.SetSetting("mgmt.rescue_iface", "enp2s0")
+	m2, err := fw.Load(db)
+	if err != nil || m2.RescueIface != "br-lan" {
+		t.Fatalf("the setup port must be reached as the bridge it joined: %v %v", m2.RescueIface, err)
+	}
+	var scopeIface string
+	db.QueryRow(`SELECT iface FROM dhcp_scopes`).Scan(&scopeIface)
+	if scopeIface != "br-lan" {
+		t.Fatalf("dhcp must follow the bridge, got %s", scopeIface)
+	}
+	// Behind another router there is no LAN to share, so the flag changes nothing.
+	db2, box2 := open(t)
+	if err := Apply(db2, box2, &Network{LAN: LAN{Port: "enp1s0", Mode: "behind", Addressing: "dhcp"}, WifiShare: true}); err != nil {
+		t.Fatal(err)
+	}
+	var k2 string
+	db2.QueryRow(`SELECT kind FROM interfaces WHERE name='enp1s0'`).Scan(&k2)
+	if k2 != "phys" {
+		t.Fatalf("behind mode must stay a plain port, got %s", k2)
+	}
+}

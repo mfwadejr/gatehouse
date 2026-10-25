@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { del, get, post, put, useData } from '../api.js';
-import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, Select, ToggleRow, useAction, fmt } from '../ui.jsx';
+import { Button, Card, Empty, Field, Form, Input, Modal, Note, Page, Pill, Segmented, Select, ToggleRow, useAction, fmt } from '../ui.jsx';
 import { Enrol } from './Auth.jsx';
 
 function Password() {
@@ -8,7 +8,7 @@ function Password() {
   const [run, busy] = useAction();
   const mismatch = f.next && f.again && f.next !== f.again;
   return (
-    <Card title="Password" desc="Use at least 12 characters. A few random words is easy to remember and hard to guess.">
+    <Card enter title="Password" desc="Use at least 12 characters. A few random words is easy to remember and hard to guess.">
       <div className="formgrid">
         <Field label="Current password"><Input type="password" value={f.current} onChange={(v) => setF({ ...f, current: v })} autoComplete="current-password" /></Field>
         <Field label="New password"><Input type="password" value={f.next} onChange={(v) => setF({ ...f, next: v })} autoComplete="new-password" /></Field>
@@ -105,7 +105,7 @@ function ConsolePort() {
   };
   const onNew = pend && data.here === pend.port;
   return (
-    <Card title="Console address" desc={`This console answers on port ${data.port}. Change it if something else needs port 443.`}>
+    <Card enter title="Console address" desc={`This console answers on port ${data.port}. Change it if something else needs port 443.`}>
       {pend ? (
         <div className="stack">
           {onNew ? (
@@ -363,8 +363,8 @@ function Updates({ me }) {
           </Field>
         )}
         <Field label="Where releases come from" hint="The GitHub page that publishes Gatehouse releases, as owner/name. Only releases signed with this build's key are ever installed.">
-          <div className="inline"><Input value={repo ?? d.repo} onChange={setRepo} style={{ maxWidth: '18rem' }} />
-            <Button disabled={busy || repo === null || repo === d.repo} onClick={() => run(() => put('/api/system/update/settings', { repo }), 'Saved.').then(() => { setRepo(null); reload(); })}>Save</Button></div>
+          <Form className="inline" onSubmit={() => run(() => put('/api/system/update/settings', { repo }), 'Saved.').then(() => { setRepo(null); reload(); })}><Input value={repo ?? d.repo} onChange={setRepo} style={{ maxWidth: '18rem' }} />
+            <Button type="submit" disabled={busy || repo === null || repo === d.repo}>Save</Button></Form>
         </Field>
       </div>
       {restart && <PowerModal action="reboot" me={me} onClose={() => setRestart(false)} />}
