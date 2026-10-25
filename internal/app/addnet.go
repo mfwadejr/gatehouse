@@ -263,8 +263,16 @@ func (a *App) addNetwork(in addNetIn) (int64, error) {
 	if !in.Internet {
 		kindZone = fw.KindIsolated
 	}
+	// The first network on a machine that has none able to manage it is the one you manage it
+	// from: it becomes a trusted network, so the lock-out check is satisfied by what you built
+	// rather than refusing the very first network you add.
+	manage := false
+	if cur, err := fw.Load(tx); err == nil && !hasManagementNetwork(cur) {
+		manage = true
+		kindZone = fw.KindTrusted
+	}
 	zid, err := fw.SaveZone(tx, fw.ZoneRow{Name: in.Name, Kind: kindZone, Ifaces: []string{name}, Internet: in.Internet,
-		IntraAllow: true, Gateway: true, DNSForce: true})
+		Management: manage, IntraAllow: true, Gateway: true, DNSForce: true})
 	if err != nil {
 		return 0, err
 	}
@@ -421,3 +429,13 @@ func (a *App) registerAddNetRoutes() {
 }
 
 var _ = sql.ErrNoRows
+
+// hasManagementNetwork says whether any local network with a port may manage this device.
+func hasManagementNetwork(m *fw.Model) bool {
+	for _, z := range m.Zones {
+		if z.Management && z.Kind != fw.KindWan && len(z.Ifaces) > 0 {
+			return true
+		}
+	}
+	return false
+}

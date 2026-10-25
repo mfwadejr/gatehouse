@@ -128,3 +128,24 @@ func TestAddNetworkMakesAllThreeParts(t *testing.T) {
 		t.Fatalf("overlap not reported: %v", m)
 	}
 }
+
+func TestFirstNetworkOnAMachineWithNoManagementNetworkCanManage(t *testing.T) {
+	c, _, _ := siteBox(t, "192.168.1.1/24")
+	// Take management away from every network, as on a machine with no network of its own yet.
+	if _, err := c.app.Config.Exec(`UPDATE zones SET management=0`); err != nil {
+		t.Fatal(err)
+	}
+	var zs []map[string]any
+	rc, _, raw := c.call("POST", "/api/networks/add", map[string]any{"name": "Trusted", "port": "eth2", "internet": true, "isolate": false})
+	if rc != 200 {
+		t.Fatalf("the first network was refused: %d %s", rc, raw)
+	}
+	_, _, raw = c.call("GET", "/api/fw/zones", nil)
+	json.Unmarshal(raw, &zs)
+	for _, z := range zs {
+		if z["name"] == "Trusted" && z["management"] == true && z["kind"] == "trusted" {
+			return
+		}
+	}
+	t.Fatalf("the new network should manage the device: %s", raw)
+}
