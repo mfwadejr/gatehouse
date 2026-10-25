@@ -30,7 +30,38 @@ function makePassword() {
   return `${part(0)}-${part(4)}-${part(8)}-${part(12)}`;
 }
 
+const STD = { n: 'Wi-Fi 4', ac: 'Wi-Fi 5', ax: 'Wi-Fi 6', be: 'Wi-Fi 7' };
+
+// What a card can do, in words. A band the card lists but may not broadcast on says so.
+function bandsText(c) {
+  const caps = c.caps;
+  const parts = (caps.listed?.length ? caps.listed : caps.bands).map((b) => {
+    if (!caps.ap) return `${b} GHz`;
+    if (b === '6') return '6 GHz (join only for now)';
+    return caps.ap_bands.includes(b) ? `${b} GHz` : `${b} GHz (join only until a country allows it)`;
+  });
+  return parts.join(' and ') + (caps.std && STD[caps.std] ? ` · ${STD[caps.std]}` : '');
+}
+
 function bars(dbm) { return dbm > -55 ? 'Excellent' : dbm > -67 ? 'Good' : dbm > -78 ? 'Fair' : 'Weak'; }
+
+// A card that broadcasts does not ask for an address: it carries a network, and the router's
+// address lives on that network (or on the bridge the card belongs to).
+function Serves({ lv, enabled }) {
+  const sv = lv.serves;
+  if (!enabled) return null;
+  if (!sv) {
+    return <div className="small" style={{ color: 'var(--color-status-warning)' }}>This card is broadcasting, but no network is attached to it, so devices that join get no address. Add it to a network under Networks, or put it in a bridge.</div>;
+  }
+  const name = sv.zone || sv.name;
+  const addr = sv.addr ? sv.addr.replace(/\/\d+$/, '') : '';
+  return (
+    <div className="small">
+      Carries the network <b>{name}</b>{sv.via ? <> through the bridge <span className="mono">{sv.via}</span></> : null}
+      {addr ? <> · router address <span className="mono">{addr}</span></> : null}
+    </div>
+  );
+}
 
 // What the card is doing right now, kept apart from what it was set up to do.
 function Live({ c }) {
@@ -55,7 +86,9 @@ function Live({ c }) {
           {!ap && lv.linked && lv.signal ? ` · signal ${bars(lv.signal).toLowerCase()}` : ''}
         </span>
       </div>
-      <div className="small">{addrs ? <>Address <span className="mono">{addrs}</span></> : <span className="muted">{lv.linked ? 'Waiting for an address…' : 'No address yet.'}</span>}</div>
+      {ap ? <Serves lv={lv} enabled={sv.enabled} /> : (
+        <div className="small">{addrs ? <>Address <span className="mono">{addrs}</span></> : <span className="muted">{lv.linked ? 'Waiting for an address…' : 'No address yet.'}</span>}</div>
+      )}
       {v6.length > 0 && (
         <details className="small">
           <summary className="muted">{v6.length} IPv6 address{v6.length === 1 ? '' : 'es'}</summary>
@@ -67,12 +100,22 @@ function Live({ c }) {
   );
 }
 
+// The bands a card can broadcast on in a country. The driver's list is for the country in force
+// now; for any other country only the hardware's bands are known, so they are all offered and the
+// card is checked again once that country is applied.
+function apBandsFor(card, cc) {
+  const caps = card.caps;
+  if (!caps.listed?.length) return ['5', '2.4'];
+  if (card.reg && cc === card.reg) return caps.ap_bands;
+  return caps.listed.filter((b) => b !== '6');
+}
+
 function Setup({ card, country, wans, ifs, onClose, onSaved }) {
   const s = card.saved;
   const canAP = card.caps.ap || card.caps.bands.length === 0; // unknown capabilities: let the driver decide
   const [f, setF] = useState({
     iface: card.iface, mode: s?.mode || 'client', ssid: s?.ssid || '', psk: '', country: s?.country || country || 'US',
-    band: s?.band || (card.caps.bands.includes('5') ? '5' : '2.4'), channel: s?.channel || 0, hidden: !!s?.hidden, wpa3: !!s?.wpa3, enabled: true,
+    band: s?.band || (apBandsFor(card, country || 'US').includes('5') ? '5' : '2.4'), channel: s?.channel || 0, hidden: !!s?.hidden, wpa3: !!s?.wpa3, enabled: true,
   });
   // IPv6 on a joined network defaults to Off, as on most gateways; most hotspots and guest networks gain nothing from it.
   const [v6, setV6] = useState({ mode: 'none', addr: '', gateway: '' });
@@ -88,6 +131,8 @@ function Setup({ card, country, wans, ifs, onClose, onSaved }) {
   const [run, busy] = useAction();
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
   const ap = f.mode === 'ap';
+  const apBands = apBandsFor(card, f.country);
+  const chans = f.country === card.reg ? (card.caps.channels || []).filter((c) => c.band === f.band && c.Usable !== false && !c.disabled && !c.no_ir && !c.radar) : [];
 
   const scan = async () => {
     const r = await run(() => get(`/api/net/wifi/${card.iface}/scan`));
@@ -113,7 +158,7 @@ function Setup({ card, country, wans, ifs, onClose, onSaved }) {
         await put('/api/fw/zones', { name: z.name, kind: z.kind, ifaces: [card.iface], internet: z.internet, management: false, gateway: true, intra_allow: z.intra });
         await put('/api/dhcp/scopes', { name: z.name, iface: card.iface, mode: 'serve', subnet: net, range_start: `${o[0]}.${o[1]}.${o[2]}.100`, range_end: `${o[0]}.${o[1]}.${o[2]}.200`, router: ip, dns: ip, domain: 'lan', ntp: '', lease_seconds: z.kind === 'guest' ? 3600 * 4 : 43200, relay_addr: '', enabled: true });
       }
-      await put('/api/net/wifi', f);
+      await put('/api/net/wifi', ap && apBands.length && !apBands.includes(f.band) ? { ...f, band: apBands[0], channel: 0 } : f);
       return true;
     }, 'Saved. Apply it to start using it.');
     if (ok) { onSaved(); onClose(); }
@@ -169,9 +214,20 @@ function Setup({ card, country, wans, ifs, onClose, onSaved }) {
       </Field>
       {ap && (
         <>
-          <Field label="Speed band" hint="5 GHz is faster and less crowded; 2.4 GHz reaches farther.">
-            <Segmented value={f.band} onChange={set('band')} options={[{ value: '5', label: '5 GHz' }, { value: '2.4', label: '2.4 GHz' }].filter((o) => !card.caps.bands.length || card.caps.bands.includes(o.value))} />
-          </Field>
+          {apBands.length === 0 ? (
+            <Note tone="warn" title="This card cannot broadcast here">It may not start a network on any band in {f.country}. Choose another country, or use another card.</Note>
+          ) : (
+            <>
+              <Field label="Speed band" hint="5 GHz is faster and less crowded; 2.4 GHz reaches farther.">
+                <Segmented value={apBands.includes(f.band) ? f.band : apBands[0]} onChange={(v) => setF((x) => ({ ...x, band: v, channel: 0 }))} options={[{ value: '5', label: '5 GHz' }, { value: '2.4', label: '2.4 GHz' }].filter((o) => apBands.includes(o.value))} />
+              </Field>
+              {chans.length > 0 && (
+                <Field label="Channel" hint={`${f.country === card.reg ? `Channels this card may use in ${card.reg}.` : `This list is for ${card.reg || 'the country now in force'}; it is read again once ${f.country} is applied.`} Automatic is the best choice for most people.`}>
+                  <Select value={String(f.channel || 0)} onChange={(v) => set('channel')(Number(v))} options={[{ value: '0', label: 'Automatic' }, ...chans.map((c) => ({ value: String(c.num), label: `Channel ${c.num} (${c.mhz} MHz)` }))]} />
+                </Field>
+              )}
+            </>
+          )}
           <Field label="Who will use this Wi-Fi?" hint={where === 'bridge' ? 'Devices join the same network as your wired ones.' : where === 'guest' ? 'Visitors: internet only, they cannot reach your other networks.' : where === 'iot' ? 'Cameras and smart-home gadgets: no internet and no other networks.' : 'Your own phones and laptops: their own address range, able to reach your other networks.'}>
             <Segmented value={where} onChange={setWhere} options={[{ value: 'own', label: 'My own devices' }, ...(bridges.length ? [{ value: 'bridge', label: 'Same network as wired' }] : []), { value: 'guest', label: 'Guests' }, { value: 'iot', label: 'Smart-home gadgets' }]} />
           </Field>
@@ -215,7 +271,7 @@ export default function Wifi({ me }) {
         <Card><Empty>No wireless card found in this device. A USB Wi-Fi adapter also works; plug it in and it will appear here.</Empty></Card>
       )}
       {cards.map((c) => (
-        <Card key={c.iface} title={c.iface} desc={`${c.usb ? 'USB adapter' : 'Built-in card'}${c.driver ? ` · ${c.driver}` : ''}${c.caps.bands.length ? ` · ${c.caps.bands.map((b) => `${b} GHz`).join(' and ')}` : ''}`}
+        <Card key={c.iface} title={c.iface} desc={`${c.usb ? 'USB adapter' : 'Built-in card'}${c.driver ? ` · ${c.driver}` : ''}${c.caps.bands.length ? ` · ${bandsText(c)}` : ''}`}
           actions={<>
             <Button icon="edit" small onClick={() => setEdit(c)}>{c.saved ? 'Edit' : 'Set up'}</Button>
             {c.saved && (c.saved.mode === 'ap'

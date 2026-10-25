@@ -520,6 +520,12 @@ func recoverCmd(args []string) {
 			return saved, nil
 		},
 		Diagnose: diagnose,
+		Services: func() string {
+			if open() != nil {
+				return "Gatehouse has not been set up yet."
+			}
+			return app.ServicesText(db, "")
+		},
 	}
 	if err := installer.RunRecoveryConsole(env); err != nil {
 		log.Fatalf("recover: %v", err)

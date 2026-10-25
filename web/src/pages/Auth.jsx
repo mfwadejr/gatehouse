@@ -124,7 +124,7 @@ export function Enrol({ onDone }) {
     );
   }
   return (
-    <Frame title="Turn on two-step sign-in">
+    <Frame title="Turn on two-factor sign-in">
       <p className="sec">Scan this with an authenticator app (Google Authenticator, Authy, 1Password and similar), then type the 6-digit code it shows.</p>
       {info && <Qr text={info.uri} />}
       {info && <details><summary className="small muted">Can't scan? Enter this key by hand</summary><p className="mono" style={{ wordBreak: 'break-all' }}>{info.secret}</p></details>}

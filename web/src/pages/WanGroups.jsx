@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { del, put, useData } from '../api.js';
 import SourcePicker from '../SourcePicker.jsx';
-import { Button, Card, Empty, Field, Input, Modal, Note, Pill, Segmented, Select, Trend, useAction } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, Pill, Segmented, Select, Trend, useAction, confirmBox, noticeBox } from '../ui.jsx';
+import { linkState } from '../linkstate.js';
 
 // ---------------------------------------------------------------- rates
 
@@ -37,7 +38,7 @@ export function Traffic({ wans, links }) {
             <div key={w.id} className="wg-traffic">
               <div className="wg-head">
                 <span className="name">{w.name}</span>
-                <Pill tone={!l ? '' : !l.up ? 'bad' : 'good'}>{!l ? 'Not checked yet' : !l.up ? 'Down' : l.active ? 'In use' : 'Standby'}</Pill>
+                <Pill tone={linkState(l).tone}>{linkState(l).health === 'working' ? (l.active ? 'In use' : 'Standby') : linkState(l).text}</Pill>
                 <span className="small muted">Download <strong>{rate(rx[rx.length - 1])}</strong> · Upload <strong>{rate(tx[tx.length - 1])}</strong></span>
               </div>
               <div className="wg-charts">
@@ -125,7 +126,7 @@ function GroupForm({ initial, wans, onClose, onSaved }) {
   const save = async () => {
     const body = { ...g, members: g.members.map((m) => ({ wan_id: m.wan_id, weight: m.weight })) };
     const r = await run(() => put('/api/net/groups', body), 'Saved. Apply it to start using it.');
-    if (r) { (r.warnings || []).forEach((w) => window.alert(w)); onSaved(); onClose(); }
+    if (r) { if (r.warnings?.length) noticeBox(r.warnings.join('\n')); onSaved(); onClose(); }
   };
   return (
     <Modal title={g.id ? `Edit ${initial.name}` : 'New connection group'} onClose={onClose}
@@ -227,7 +228,7 @@ export default function WanGroups({ wans, links, onChanged }) {
               <div className="actions">
                 <Pill tone={tone}>{text}</Pill>
                 <Button small icon="edit" onClick={() => setEdit(g)}>Edit</Button>
-                <Button small kind="danger" icon="trash" onClick={() => { if (window.confirm(`Remove the group ${g.name}? Its devices go back to the default connections.`)) run(() => del(`/api/net/groups/${g.id}`)).then(done); }}>Remove</Button>
+                <Button small kind="danger" icon="trash" onClick={async () => { if (await confirmBox(`Remove the group ${g.name}? Its devices go back to the default connections.`)) run(() => del(`/api/net/groups/${g.id}`)).then(done); }}>Remove</Button>
               </div>
             </div>
           );

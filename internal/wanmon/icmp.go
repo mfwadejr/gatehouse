@@ -13,11 +13,16 @@ import (
 
 // icmpPing sends one echo request out of the link's interface and waits for the reply.
 func icmpPing(ctx context.Context, l Link) (time.Duration, error) {
-	dst := net.ParseIP(l.Target)
+	return icmpPingTo(ctx, l.Dev, l.Target)
+}
+
+// icmpPingTo is icmpPing for any device and address.
+func icmpPingTo(ctx context.Context, dev, target string) (time.Duration, error) {
+	dst := net.ParseIP(target)
 	if dst == nil || dst.To4() == nil {
 		return 0, errors.New("the check address must be an IPv4 address")
 	}
-	lc := net.ListenConfig{Control: bindTo(l.Dev)}
+	lc := net.ListenConfig{Control: bindTo(dev)}
 	pc, err := lc.ListenPacket(ctx, "ip4:icmp", "0.0.0.0")
 	if err != nil {
 		return 0, err

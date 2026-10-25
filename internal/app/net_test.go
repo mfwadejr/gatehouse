@@ -14,6 +14,7 @@ import (
 	"gatehouse/internal/auth"
 	"gatehouse/internal/netcfg"
 	"gatehouse/internal/netd"
+	"gatehouse/internal/speedtest"
 	"gatehouse/internal/wanmon"
 )
 
@@ -36,6 +37,8 @@ type fakeNet struct {
 	sysStarted bool
 	powerCalls []string
 	resets     int
+	speedCalls []speedtest.Params
+	speedErr   error
 }
 
 func (f *fakeNet) NetApply(p netd.Plan, w time.Duration) (string, time.Time, error) {
@@ -262,6 +265,15 @@ func TestFirstRunSetup(t *testing.T) {
 	}
 }
 
+func (f *fakeNet) SpeedTest(p speedtest.Params) (speedtest.Result, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.speedCalls = append(f.speedCalls, p)
+	if f.speedErr != nil {
+		return speedtest.Result{}, f.speedErr
+	}
+	return speedtest.Result{DownBps: 412e6, UpBps: 38e6, DelayMS: 9, JitterMS: 1, LoadedMS: 25, Grade: "A", Server: "Cloudflare TST", BytesUsed: 100e6, Seconds: 20}, nil
+}
 func (f *fakeNet) Power(action string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()

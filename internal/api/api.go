@@ -368,7 +368,7 @@ func (s *Server) mfaPolicy(w http.ResponseWriter, r *http.Request, c *Ctx) {
 		return
 	}
 	if in.Require && !c.User.TOTPEnabled {
-		Error(w, http.StatusBadRequest, "turn on two-step sign-in for your own account first, so you are not locked out")
+		Error(w, http.StatusBadRequest, "turn on two-factor sign-in for your own account first, so you are not locked out")
 		return
 	}
 	if err := s.Auth.SetMFARequired(in.Require); err != nil {

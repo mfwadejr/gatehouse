@@ -68,7 +68,7 @@ func (a *App) checklist(username string) []checkItem {
 		two = en == 1
 	}
 	items = append(items, checkItem{ID: "twostep", Done: two, To: "settings",
-		Text: "Turn on two-step sign-in",
+		Text: "Turn on two-factor sign-in",
 		Why:  "Asks for a code from an authenticator app each time you sign in."})
 	return items
 }

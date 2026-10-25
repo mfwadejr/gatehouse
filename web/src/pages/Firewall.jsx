@@ -3,8 +3,9 @@ import { del, post, put, useData, useStream } from '../api.js';
 import ApplyBar from '../ApplyBar.jsx';
 import AddNetwork from '../AddNetwork.jsx';
 import { go } from '../App.jsx';
+import { linkState } from '../linkstate.js';
 import { GroupsAndLists, Matrix, PairModal, RuleForm, RulesList } from './FirewallRules.jsx';
-import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Problems, Select, Tabs, ToggleRow, useAction, useToast, fmt } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Problems, Select, Tabs, ToggleRow, useAction, useToast, fmt, confirmBox } from '../ui.jsx';
 
 function ZoneForm({ initial, presets, ifaces, taken, onClose, onSaved }) {
   const [z, setZ] = useState({ kind: 'trusted', name: '', ifaces: [], internet: true, management: true, intra_allow: true, gateway: true, upnp: false, ssh: false, dns_force: true, description: '', ...initial });
@@ -48,13 +49,42 @@ function ZoneForm({ initial, presets, ifaces, taken, onClose, onSaved }) {
   );
 }
 
+function InternetRow({ ov }) {
+  const { data: wd } = useData('/api/net/wans', { topics: ['net.status'] });
+  const { data: st } = useData('/api/net/status', { topics: ['net.status'], every: 5000 });
+  const wans = (wd?.wans || []).filter((w) => w.enabled);
+  const links = st?.links || {};
+  let tone = '', text = 'Not set up';
+  if (wans.length) {
+    const states = wans.map((w) => linkState(links[w.name]));
+    const ok = states.filter((x) => x.health === 'working');
+    if (ok.length) { tone = 'good'; text = wans.length > 1 ? `${ok.length} of ${wans.length} working` : 'Connected'; }
+    else if (states.every((x) => x.health === 'unknown' || x.health === 'none')) { text = 'Checking…'; }
+    else { tone = 'bad'; text = states[0].text; }
+  }
+  return (
+    <div className="item">
+      <div>
+        <div className="name">Internet <Pill>Internet</Pill><Pill tone={tone}>{text}</Pill></div>
+        <div className="meta">{wans.length ? wans.map((w) => `${w.name} (${w.iface})`).join(', ') : 'no connection yet'} · managed automatically</div>
+        <div className="meta">Devices on your networks can go out. Nothing from the internet can come in unless you open a port.</div>
+      </div>
+      <div className="actions"><Button small icon="edit" onClick={() => go('internet')}>Edit</Button></div>
+    </div>
+  );
+}
+
 function Networks({ ov, presets, reload }) {
   const { data: ifs } = useData('/api/net/interfaces');
   const [edit, setEdit] = useState(null);
   const [addNet, setAddNet] = useState(false);
   const toast = useToast();
   const [run] = useAction();
-  const zones = (ov?.zones || []).filter((z) => z.kind !== 'wan');
+  // The same order as the "Who can reach whom" grid: your networks as they were made, Internet last.
+  const stored = (ov?.zones || []).filter((z) => z.kind !== 'wan');
+  const order = (ov?.matrix_zones || []).map((z) => z.name);
+  const rank = (z) => { const i = order.indexOf(z.name); return i < 0 ? 999 : i; };
+  const zones = [...stored].sort((a, b) => rank(a) - rank(b));
   const taken = {};
   zones.forEach((z) => z.ifaces?.forEach((n) => { taken[n] = z.name; }));
   const kindTitle = (k) => presets.find((p) => p.kind === k)?.title || k;
@@ -71,9 +101,10 @@ function Networks({ ov, presets, reload }) {
                 <div className="meta">{z.ifaces?.length ? z.ifaces.join(', ') : 'no ports yet'}</div>
               </div>
               <div className="actions"><Button small icon="edit" onClick={() => setEdit(z)}>Edit</Button>
-                <Button small kind="danger" icon="trash" onClick={() => window.confirm(`Remove ${z.name}?`) && run(() => del(`/api/fw/zones/${z.id}`)).then(reload)}>Remove</Button></div>
+                <Button small kind="danger" icon="trash" onClick={async () => await confirmBox(`Remove ${z.name}?`) && run(() => del(`/api/fw/zones/${z.id}`)).then(reload)}>Remove</Button></div>
             </div>
           ))}
+          <InternetRow ov={ov} />
         </div>
       </Card>
       {ov?.summary && (
@@ -99,7 +130,7 @@ function Forwards({ reload }) {
         {(data || []).map((f) => (
           <div className="item" key={f.id}>
             <div><div className="name">{f.name} {!f.enabled && <Pill>Off</Pill>}</div><div className="meta">{f.proto.toUpperCase()} port {f.ext_port} → {f.int_addr}:{f.int_port || f.ext_port}{f.wan ? ` via ${f.wan}` : ''}</div></div>
-            <div className="actions"><Button small icon="edit" onClick={() => setEdit(f)}>Edit</Button><Button small kind="danger" icon="trash" onClick={() => window.confirm(`Delete "${f.name}"?`) && run(() => del(`/api/fw/forwards/${f.id}`)).then(refresh)}>Delete</Button></div>
+            <div className="actions"><Button small icon="edit" onClick={() => setEdit(f)}>Edit</Button><Button small kind="danger" icon="trash" onClick={async () => await confirmBox(`Delete "${f.name}"?`) && run(() => del(`/api/fw/forwards/${f.id}`)).then(refresh)}>Delete</Button></div>
           </div>
         ))}
         {!data?.length && <Empty>No ports are open to the internet.</Empty>}

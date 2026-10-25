@@ -41,7 +41,7 @@ export default function SourcePicker({ value, onChange }) {
       </Field>
       <Field label="Address or range" hint="For anything else, like 192.168.1.50 or 192.168.20.0/24.">
         <div className="inline">
-          <Input value={range} onChange={setRange} placeholder="192.168.1.50" onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addRange(); } }} />
+          <Input value={range} onChange={setRange} aria-label="Address or range" placeholder="192.168.1.50" onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addRange(); } }} />
           <Button onClick={addRange}>Add</Button>
         </div>
         {extra.map((r) => (

@@ -51,11 +51,28 @@ type State struct {
 	Error   string        `json:"error,omitempty"`
 	Since   time.Time     `json:"since"`
 	Active  bool          `json:"active"` // carrying traffic now
+	// Checked is false until the first probe has finished: before that nothing is known, and the
+	// console must say "not checked yet" instead of calling the connection healthy.
+	Checked bool `json:"checked"`
+	// Health is one of: unknown (not probed yet), working, no-internet (the next hop answers but
+	// the wider internet does not) and no-link (nothing answers, or there is no next hop).
+	Health string `json:"health"`
+	// GwRTT is the answer time of the next hop (the modem or hotspot); zero when it did not answer.
+	GwRTT time.Duration `json:"gw_rtt"`
+	// Loss is the share of the last probes (percent) that got no answer.
+	Loss int `json:"loss"`
+	// Last is when the connection was last probed.
+	Last time.Time `json:"last"`
 	// Via names the connections a group is using right now (groups only; their key starts with "group:").
 	Via   []string `json:"via,omitempty"`
 	fails int
 	succ  int
+	win   []bool // the last probes, true = answered
+	gwOK  bool   // the last time the internet probe failed, did the next hop answer?
 }
+
+// lossWindow is how many probes the loss figure looks at.
+const lossWindow = 30
 
 // Nexthop is one entry of the default route.
 type Nexthop struct {
@@ -128,6 +145,9 @@ type Monitor struct {
 	Router  Router
 	// OnChange is called when a link goes up or down or the active set changes.
 	OnChange func(map[string]State)
+	// Watch makes the monitor observe only: it measures and reports, and never installs routes
+	// or rules. It is used for a single connection, where systemd-networkd owns the route.
+	Watch bool
 
 	mu     sync.Mutex
 	states map[string]*State
@@ -160,6 +180,11 @@ func (m *Monitor) snapshotLocked() map[string]State {
 	for _, l := range m.Links {
 		s := *m.states[l.Name]
 		s.Active = on[l.Dev] && s.Up
+		if m.Watch {
+			s.Active = s.Up // the only connection carries everything
+		}
+		s.Health = healthOf(&s)
+		s.Loss = lossOf(m.states[l.Name].win)
 		out[l.Name] = s
 	}
 	devName := map[string]string{}
@@ -190,6 +215,14 @@ func (m *Monitor) Observe(l Link, rtt time.Duration, err error) {
 	m.mu.Lock()
 	s := m.states[l.Name]
 	changed := false
+	if !s.Checked && m.Watch {
+		changed = true // the first answer turns "not checked yet" into a real state
+	}
+	s.Checked, s.Last = true, m.now()
+	s.win = append(s.win, err == nil)
+	if len(s.win) > lossWindow {
+		s.win = s.win[len(s.win)-lossWindow:]
+	}
 	fail, rec := l.Failures, l.Recover
 	if fail < 1 {
 		fail = 3
@@ -208,6 +241,7 @@ func (m *Monitor) Observe(l Link, rtt time.Duration, err error) {
 		s.succ++
 		s.fails = 0
 		s.Error = ""
+		s.gwOK, s.GwRTT = true, 0 // an answer from beyond the next hop proves the next hop works
 		s.RTT = rtt
 		if !s.Up && s.succ >= rec {
 			s.Up, s.Since, changed = true, m.now(), true
@@ -241,7 +275,15 @@ func (m *Monitor) replan(force bool) {
 		}
 	}
 	snap := m.snapshotLocked()
+	watch := m.Watch
 	m.mu.Unlock()
+	if watch {
+		// Observe only: the route belongs to systemd-networkd. Report, never change.
+		if (force || mainChanged) && m.OnChange != nil {
+			m.OnChange(snap)
+		}
+		return
+	}
 	if mainChanged && len(plan) > 0 {
 		if err := m.Router.SetDefault(plan); err != nil {
 			m.mu.Lock()
@@ -272,14 +314,14 @@ func (m *Monitor) Refresh() error {
 		m.mu.Lock()
 		m.states[l.Name].Gateway = gw
 		m.mu.Unlock()
-		if err != nil || gw == "" {
+		if err != nil || gw == "" || m.Watch {
 			continue
 		}
 		if err := m.Router.EnsureLink(l, gw); err != nil {
 			errs = append(errs, err)
 		}
 	}
-	if gr, ok := m.Router.(GroupRouter); ok {
+	if gr, ok := m.Router.(GroupRouter); ok && !m.Watch {
 		if err := gr.Prune(m.Groups); err != nil {
 			errs = append(errs, err)
 		}
@@ -313,6 +355,10 @@ func (m *Monitor) Run(ctx context.Context) {
 			for {
 				cctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 				rtt, err := m.Checker.Check(cctx, l)
+				if err != nil {
+					// Tell "the modem is there but the internet is not" from "nothing answers".
+					m.probeGateway(cctx, l)
+				}
 				cancel()
 				if ctx.Err() != nil {
 					return
@@ -333,6 +379,58 @@ func (m *Monitor) Run(ctx context.Context) {
 	wg.Wait()
 }
 
+// GatewayChecker is implemented by checkers that can also probe the next hop of a link.
+type GatewayChecker interface {
+	CheckGateway(ctx context.Context, l Link, gw string) (time.Duration, error)
+}
+
+// probeGateway asks the link's next hop (modem or hotspot) whether it is there, and remembers
+// the answer for the health the console shows.
+func (m *Monitor) probeGateway(ctx context.Context, l Link) {
+	gc, ok := m.Checker.(GatewayChecker)
+	m.mu.Lock()
+	gw := m.states[l.Name].Gateway
+	m.mu.Unlock()
+	if !ok || gw == "" {
+		m.mu.Lock()
+		m.states[l.Name].gwOK, m.states[l.Name].GwRTT = false, 0
+		m.mu.Unlock()
+		return
+	}
+	rtt, err := gc.CheckGateway(ctx, l, gw)
+	m.mu.Lock()
+	m.states[l.Name].gwOK, m.states[l.Name].GwRTT = err == nil, rtt
+	m.mu.Unlock()
+}
+
+// healthOf names what a link's measurements add up to.
+func healthOf(s *State) string {
+	switch {
+	case !s.Checked:
+		return "unknown"
+	case s.Up:
+		return "working"
+	case s.gwOK:
+		return "no-internet"
+	default:
+		return "no-link"
+	}
+}
+
+// lossOf is the percentage of the recent probes that went unanswered.
+func lossOf(win []bool) int {
+	if len(win) == 0 {
+		return 0
+	}
+	bad := 0
+	for _, ok := range win {
+		if !ok {
+			bad++
+		}
+	}
+	return bad * 100 / len(win)
+}
+
 // NetChecker probes through the link's own interface, so a healthy backup cannot hide a
 // dead primary.
 type NetChecker struct{}
@@ -345,6 +443,11 @@ func bindTo(dev string) func(network, address string, c syscall.RawConn) error {
 		}
 		return serr
 	}
+}
+
+// CheckGateway pings the link's next hop out of the link's own interface.
+func (NetChecker) CheckGateway(ctx context.Context, l Link, gw string) (time.Duration, error) {
+	return icmpPingTo(ctx, l.Dev, gw)
 }
 
 func (NetChecker) Check(ctx context.Context, l Link) (time.Duration, error) {

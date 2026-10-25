@@ -407,4 +407,8 @@ CREATE TABLE device_icons(
   data BLOB NOT NULL,
   created_at INTEGER NOT NULL DEFAULT 0
 );
+`, `
+-- The order the person wants DNS servers asked in (1 is first).
+ALTER TABLE dns_upstreams ADD COLUMN position INTEGER NOT NULL DEFAULT 0;
+UPDATE dns_upstreams SET position = id;
 `}

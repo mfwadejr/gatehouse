@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { del, post, put, useData } from '../api.js';
 import { AddrPicker, Chip, NewDevice, ScheduleEditor, ServicePicker, tokens } from '../AddrPicker.jsx';
-import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Pill, Segmented, Select, ToggleRow, useAction, fmt } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Pill, Segmented, Select, ToggleRow, useAction, fmt, confirmBox } from '../ui.jsx';
 
 const ACTIONS = [{ value: 'accept', label: 'Allow' }, { value: 'drop', label: 'Block silently' }, { value: 'reject', label: 'Block and tell the sender' }];
 // Only the fields the server stores; it refuses anything else.
@@ -240,7 +240,7 @@ export function RulesList({ ov, rules, pickers, reloadPickers, reload, filter, s
               <Button small aria-label="Move down" onClick={() => move(pos, 1)} disabled={pos === visible.length - 1}>↓</Button>
               <Button small onClick={() => toggle(r)}>{r.enabled ? 'Turn off' : 'Turn on'}</Button>
               <Button small icon="edit" onClick={() => setEdit(r)}>Edit</Button>
-              <Button small kind="danger" icon="trash" onClick={() => window.confirm(`Delete "${r.name}"?`) && run(() => del(`/api/fw/rules/${r.id}`)).then(reload)}>Delete</Button>
+              <Button small kind="danger" icon="trash" onClick={async () => await confirmBox(`Delete "${r.name}"?`) && run(() => del(`/api/fw/rules/${r.id}`)).then(reload)}>Delete</Button>
             </div>
           </div>
         ))}
@@ -311,7 +311,7 @@ export function GroupsAndLists({ pickers, reloadPickers, reload }) {
               <div><div className="name">👥 {g.name} {g.reserved_only && <Pill>Reserved addresses only</Pill>}</div>
                 <div className="meta">{g.members.length ? g.members.slice(0, 6).map(deviceName).join(', ') + (g.members.length > 6 ? ` and ${g.members.length - 6} more` : '') : 'No devices yet'}</div></div>
               <div className="actions"><Button small icon="edit" onClick={() => setEg(g)}>Edit</Button>
-                <Button small kind="danger" icon="trash" onClick={() => window.confirm(`Delete the group "${g.name}"?`) && run(() => del(`/api/fw/groups/${g.id}`)).then(refresh)}>Delete</Button></div>
+                <Button small kind="danger" icon="trash" onClick={async () => await confirmBox(`Delete the group "${g.name}"?`) && run(() => del(`/api/fw/groups/${g.id}`)).then(refresh)}>Delete</Button></div>
             </div>
           ))}
           {!pickers?.groups?.length && <Empty>No groups yet.</Empty>}
@@ -323,7 +323,7 @@ export function GroupsAndLists({ pickers, reloadPickers, reload }) {
             <div className="item" key={l.id}>
               <div><div className="name">{l.name}</div><div className="meta mono">{l.ports.join(', ')}</div></div>
               <div className="actions"><Button small icon="edit" onClick={() => setEp(l)}>Edit</Button>
-                <Button small kind="danger" icon="trash" onClick={() => window.confirm(`Delete the list "${l.name}"?`) && run(() => del(`/api/fw/portlists/${l.id}`)).then(refresh)}>Delete</Button></div>
+                <Button small kind="danger" icon="trash" onClick={async () => await confirmBox(`Delete the list "${l.name}"?`) && run(() => del(`/api/fw/portlists/${l.id}`)).then(refresh)}>Delete</Button></div>
             </div>
           ))}
           {!pickers?.port_lists?.length && <Empty>No lists yet.</Empty>}

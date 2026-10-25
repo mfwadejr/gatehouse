@@ -37,11 +37,18 @@ jobs:
         run: node ../tokens/check-tokens.mjs src/styles.css || true
       - name: Test
         run: |
+          set -o pipefail
           go vet ./...
           go test ./...
-          # The firewall and routing tests build real networks, which needs root.
-          sudo apt-get install -y nftables iproute2 >/dev/null
-          sudo -E env "PATH=$PATH" go test -count=1 ./internal/fw ./internal/wanmon ./internal/privsep
+          # The firewall and routing tests build real networks out of namespaces, which needs root.
+          # They skip themselves without it, so this step fails if any of them was skipped: a
+          # silent skip would hide the very tests that prove the rules work.
+          sudo apt-get install -y nftables iproute2 python3 util-linux >/dev/null
+          sudo -E env "PATH=$PATH" go test -count=1 -v ./internal/fw ./internal/wanmon ./internal/privsep ./internal/netd ./internal/speedtest 2>&1 | tee root-tests.log
+          if grep -E -- '--- SKIP|^\s+.*_test.go:[0-9]+: (needs|requires)' root-tests.log; then
+            echo "A test that needs root was skipped."; exit 1
+          fi
+          grep -q -- '--- PASS: TestNetnsPolicy' root-tests.log
       - name: Build the program
         run: CGO_ENABLED=1 go build -trimpath -ldflags "-s -w -X main.version=${{ steps.v.outputs.version }}" -o gatehouse ./cmd/gatehouse
       - uses: actions/upload-artifact@v4

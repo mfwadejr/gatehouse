@@ -1,13 +1,16 @@
 package netd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 
+	"gatehouse/internal/speedtest"
 	"gatehouse/internal/update"
 )
 
@@ -146,4 +149,22 @@ var runPowerCmd = func(argv []string) error {
 		return fmt.Errorf("%v: %s", err, strings.TrimSpace(string(out)))
 	}
 	return nil
+}
+
+var speedMu sync.Mutex
+
+// SpeedTest measures one connection through its own device. It runs here, as the helper, because
+// binding a socket to one device needs the helper's privileges.
+func (s *Service) SpeedTest(ctx context.Context, p speedtest.Params) (speedtest.Result, error) {
+	if !speedMu.TryLock() {
+		return speedtest.Result{}, errors.New("another speed test is running. Wait for it to finish")
+	}
+	defer speedMu.Unlock()
+	if !speedtest.ValidDevice(p.Dev) {
+		return speedtest.Result{}, errors.New("that is not a network device")
+	}
+	if _, err := os.Stat(filepath.Join("/sys/class/net", p.Dev)); err != nil {
+		return speedtest.Result{}, errors.New("that connection's port is not present right now")
+	}
+	return speedtest.Run(ctx, p)
 }

@@ -1,6 +1,7 @@
 package wanmon
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -132,5 +133,97 @@ func TestOnChangeFires(t *testing.T) {
 	}
 	if n != 1 {
 		t.Fatalf("OnChange calls = %d", n)
+	}
+}
+
+// gwChecker answers for the internet probe and the next hop separately.
+type gwChecker struct{ gw bool }
+
+func (gwChecker) Check(ctx context.Context, l Link) (time.Duration, error) {
+	return 0, errors.New("no answer")
+}
+func (g gwChecker) CheckGateway(ctx context.Context, l Link, gw string) (time.Duration, error) {
+	if g.gw {
+		return 2 * time.Millisecond, nil
+	}
+	return 0, errors.New("no answer")
+}
+
+func oneLink() []Link {
+	return []Link{{Name: "Fibre", Dev: "eth0", Priority: 1, Weight: 1, Table: 101, Mark: 1, Kind: "icmp", Target: "1.1.1.1", Failures: 3, Recover: 2}}
+}
+
+func TestSingleLinkIsNotHealthyUntilChecked(t *testing.T) {
+	r := &fakeRouter{gws: map[string]string{"eth0": "192.0.2.1"}}
+	m := New(oneLink(), Failover, nil, r)
+	m.Watch = true
+	m.Refresh()
+	st := m.Snapshot()["Fibre"]
+	if st.Checked || st.Health != "unknown" {
+		t.Fatalf("a link nobody has probed must be unknown: %+v", st)
+	}
+	m.Observe(m.Links[0], 9*time.Millisecond, nil)
+	st = m.Snapshot()["Fibre"]
+	if !st.Checked || st.Health != "working" || !st.Active || st.RTT != 9*time.Millisecond {
+		t.Fatalf("after one answer: %+v", st)
+	}
+}
+
+func TestWatchModeNeverTouchesRoutes(t *testing.T) {
+	r := &fakeRouter{gws: map[string]string{"eth0": "192.0.2.1"}}
+	m := New(oneLink(), Failover, nil, r)
+	m.Watch = true
+	m.Refresh()
+	boom := errors.New("x")
+	for i := 0; i < 5; i++ {
+		m.Observe(m.Links[0], 0, boom)
+	}
+	m.Observe(m.Links[0], time.Millisecond, nil)
+	m.Observe(m.Links[0], time.Millisecond, nil)
+	if len(r.defs) != 0 {
+		t.Fatalf("watch-only changed the default route: %v", r.defs)
+	}
+	if len(r.ensured) != 0 {
+		t.Fatalf("watch-only installed link state: %v", r.ensured)
+	}
+}
+
+func TestHealthTellsNoInternetFromNoLink(t *testing.T) {
+	for _, tc := range []struct {
+		gw   bool
+		want string
+	}{{true, "no-internet"}, {false, "no-link"}} {
+		r := &fakeRouter{gws: map[string]string{"eth0": "192.0.2.1"}}
+		m := New(oneLink(), Failover, gwChecker{gw: tc.gw}, r)
+		m.Watch = true
+		m.Refresh()
+		l := m.Links[0]
+		for i := 0; i < 3; i++ {
+			m.probeGateway(context.Background(), l)
+			m.Observe(l, 0, errors.New("no answer"))
+		}
+		st := m.Snapshot()["Fibre"]
+		if st.Up || st.Health != tc.want {
+			t.Fatalf("gateway answers=%v: %+v", tc.gw, st)
+		}
+		if tc.gw && st.GwRTT == 0 {
+			t.Fatal("the next hop's answer time should be recorded")
+		}
+	}
+}
+
+func TestLossIsTheShareOfRecentProbesUnanswered(t *testing.T) {
+	r := &fakeRouter{gws: map[string]string{"eth0": "192.0.2.1"}}
+	m := New(oneLink(), Failover, nil, r)
+	m.Watch = true
+	m.Refresh()
+	l := m.Links[0]
+	for i := 0; i < 8; i++ {
+		m.Observe(l, time.Millisecond, nil)
+	}
+	m.Observe(l, 0, errors.New("x"))
+	m.Observe(l, time.Millisecond, nil)
+	if got := m.Snapshot()["Fibre"].Loss; got != 10 {
+		t.Fatalf("1 of 10 lost should be 10 %%, got %d", got)
 	}
 }

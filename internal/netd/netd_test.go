@@ -4,10 +4,13 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"gatehouse/internal/netcfg"
+	"gatehouse/internal/speedtest"
+	"gatehouse/internal/wanmon"
 )
 
 func newSvc(t *testing.T) *Service {
@@ -88,5 +91,69 @@ func TestUnconfirmedRollsBackOnBoot(t *testing.T) {
 	defer s2.Stop()
 	if m, _ := filepath.Glob(glob); len(m) != 0 {
 		t.Fatal("unconfirmed change survived a restart")
+	}
+}
+
+type okChecker struct{}
+
+func (okChecker) Check(ctx context.Context, l wanmon.Link) (time.Duration, error) {
+	return 7 * time.Millisecond, nil
+}
+
+// touchRouter fails the test if the monitor changes any route.
+type touchRouter struct{ t *testing.T }
+
+func (r touchRouter) Gateway(l wanmon.Link) (string, error) { return "192.0.2.1", nil }
+func (r touchRouter) SetDefault(nh []wanmon.Nexthop) error {
+	r.t.Error("a single connection's route must be left to systemd-networkd")
+	return nil
+}
+func (r touchRouter) EnsureLink(l wanmon.Link, gw string) error {
+	r.t.Error("a single connection must not get its own table")
+	return nil
+}
+func (r touchRouter) RemoveLink(l wanmon.Link) error { return nil }
+
+func TestSingleConnectionIsWatchedButNeverRouted(t *testing.T) {
+	s := newSvc(t)
+	s.NewMon = func(l []wanmon.Link, m wanmon.Mode) *wanmon.Monitor {
+		return wanmon.New(l, m, okChecker{}, touchRouter{t})
+	}
+	if err := s.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	defer s.Stop()
+	tok, _, err := s.Apply(plan(), time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Confirm(tok); err != nil {
+		t.Fatal(err)
+	}
+	var st wanmon.State
+	for i := 0; i < 100; i++ {
+		st = s.Status()["isp"]
+		if st.Checked {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if !st.Checked || st.Health != "working" || st.RTT != 7*time.Millisecond {
+		t.Fatalf("a single connection should be measured: %+v", st)
+	}
+}
+
+func TestSpeedTestRefusesBadOrMissingDevices(t *testing.T) {
+	s := &Service{}
+	for _, dev := range []string{"", "eth0;rm", "this-port-does-not-exist"} {
+		if _, err := s.SpeedTest(context.Background(), speedtest.Params{Dev: dev, Server: "https://127.0.0.1:1"}); err == nil {
+			t.Errorf("%q should be refused", dev)
+		}
+	}
+	// One test at a time.
+	speedMu.Lock()
+	defer speedMu.Unlock()
+	if _, err := s.SpeedTest(context.Background(), speedtest.Params{Dev: "lo", Server: "https://127.0.0.1:1"}); err == nil || !strings.Contains(err.Error(), "another speed test") {
+		t.Fatalf("want busy, got %v", err)
 	}
 }

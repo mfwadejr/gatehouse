@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { del, get, put, useData, useStream } from '../api.js';
+import { del, get, getWatched, put, setFailing, useData, useStream } from '../api.js';
 import { RuleForm } from './FirewallRules.jsx';
 import { COUNTRIES, MAP_H, MAP_W } from '../worldmap.js';
-import { Button, Card, Empty, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, Switch, Tabs, ToggleRow, Trend, useAction, fmt } from '../ui.jsx';
+import { Button, Card, Empty, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, Switch, Tabs, ToggleRow, Trend, useAction, fmt, confirmBox } from '../ui.jsx';
 
 const KINDS = [
   { value: '', label: 'Everything' },
@@ -63,10 +63,21 @@ function Recording({ onClose, state, onSaved }) {
           </div>
         )}
         <p className="small muted">Only the first packet of each connection is recorded, and a flood is capped, so a busy network cannot fill the disk. Names asked for through DNS are always recorded.</p>
-        <Button kind="danger" onClick={() => window.confirm('Delete every log entry?') && run(() => del('/api/logs'), 'Logs cleared.').then(() => { reload(); onSaved(); onClose(); })}>Delete all log entries</Button>
+        <Button kind="danger" onClick={async () => await confirmBox('Delete every log entry?') && run(() => del('/api/logs'), 'Logs cleared.').then(() => { reload(); onSaved(); onClose(); })}>Delete all log entries</Button>
       </div>
     </Modal>
   );
+}
+
+// Other pages (the Overview map) open the log already filtered by leaving the filter here.
+export const PRESET_KEY = 'gh.logs.preset';
+function takePreset() {
+  try {
+    const raw = sessionStorage.getItem(PRESET_KEY);
+    if (!raw) return {};
+    const p = JSON.parse(raw);
+    return p && typeof p === 'object' ? p : {};
+  } catch { return {}; }
 }
 
 // ---------------------------------------------------------------- the map
@@ -109,13 +120,16 @@ function TopList({ title, items, field, onPick, render }) {
 // ---------------------------------------------------------------- the log
 
 export default function Logs() {
+  const preset = useRef(null);
+  if (preset.current === null) preset.current = takePreset();
+  useEffect(() => { try { sessionStorage.removeItem(PRESET_KEY); } catch { /* ignore */ } }, []);
   const [tab, setTab] = useState('log');
   const [q, setQ] = useState('');
   const [kind, setKind] = useState('');
-  const [verdict, setVerdict] = useState('');
-  const [hours, setHours] = useState('1');
+  const [verdict, setVerdict] = useState(preset.current.verdict || '');
+  const [hours, setHours] = useState(preset.current.hours || '1');
   const [custom, setCustom] = useState({ from: dtLocal(Date.now() / 1000 - 86400), to: dtLocal(Date.now() / 1000) });
-  const [flt, setFlt] = useState({});
+  const [flt, setFlt] = useState(preset.current.flt || {});
   const [rows, setRows] = useState([]);
   const [more, setMore] = useState(false);
   const [meta, setMeta] = useState({ record_allowed: true, record_blocked: true });
@@ -132,7 +146,7 @@ export default function Logs() {
   const names = (ov?.matrix_zones || []).map((z) => z.name);
 
   useEffect(() => {
-    get('/api/prefs/logs').then((p) => { if (Array.isArray(p.cols) && p.cols.length) setCols(p.cols); if (p.rows) setPageSize(p.rows); }).catch(() => {});
+    getWatched('logs.prefs', '/api/prefs/logs', (p) => { if (Array.isArray(p.cols) && p.cols.length) setCols(p.cols); if (p.rows) setPageSize(p.rows); });
   }, []);
   const savePrefs = (c, r) => put('/api/prefs/logs', { cols: c, rows: r }).catch(() => {});
 
@@ -156,7 +170,8 @@ export default function Logs() {
       const r = await get(`/api/logs?${params()}`);
       setRows(r.items); setMore(r.more); setMeta({ record_allowed: r.record_allowed, record_blocked: r.record_blocked });
       paged.current = false;
-    } catch { /* keep what is shown */ }
+      setFailing('logs.list', false);
+    } catch { setFailing('logs.list', true); }
     setLoading(false);
   }, [params]);
 
@@ -293,7 +308,7 @@ function Summary({ params, pick }) {
   const [s, setS] = useState(null);
   const p = params(); p.delete('limit'); p.delete('before'); p.delete('kind');
   const qs = p.toString();
-  useEffect(() => { get(`/api/logs/summary?${qs}`).then(setS).catch(() => {}); }, [qs]);
+  useEffect(() => { getWatched('logs.summary', `/api/logs/summary?${qs}`, setS); }, [qs]);
   const { data: geo } = useData('/api/logs/countries');
   if (!s) return <Card><Empty>Loading…</Empty></Card>;
   return (
@@ -328,10 +343,10 @@ function Activity() {
   const [apps, setApps] = useState(null);
   useEffect(() => {
     const go = () => {
-      get(`/api/traffic?range=${range}`).then(setD).catch(() => {});
-      get(`/api/traffic/usage?range=${range}`).then(setUsage).catch(() => {});
-      get(`/api/traffic/domains?range=${range}`).then(setSites).catch(() => {});
-      get(`/api/traffic/apps?range=${range}`).then(setApps).catch(() => {});
+      getWatched('act.series', `/api/traffic?range=${range}`, setD);
+      getWatched('act.usage', `/api/traffic/usage?range=${range}`, setUsage);
+      getWatched('act.sites', `/api/traffic/domains?range=${range}`, setSites);
+      getWatched('act.apps', `/api/traffic/apps?range=${range}`, setApps);
     };
     go();
     const i = setInterval(go, 30000);

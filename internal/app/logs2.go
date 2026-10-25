@@ -573,7 +573,19 @@ func (a *App) topDomains(rng string) map[string]any {
 	return map[string]any{"approximate": true, "domains": out}
 }
 
+// topDomainsAll is the expensive one (it walks the lookups of the whole range), so the answer is
+// kept for a minute and shared by everything that asks, the sites list and the apps list included.
 func (a *App) topDomainsAll(rng string) []domainRow {
+	if _, ok := trafficRanges[rng]; !ok {
+		rng = "1d"
+	}
+	return a.cached("domains:"+rng, time.Minute, func() any { return a.computeDomains(rng) }).([]domainRow)
+}
+
+// maxLookupsScanned keeps a month-long range from reading millions of rows: the newest ones win.
+const maxLookupsScanned = 400000
+
+func (a *App) computeDomains(rng string) []domainRow {
 	r, ok := trafficRanges[rng]
 	if !ok {
 		r = trafficRanges["1d"]
@@ -596,7 +608,7 @@ func (a *App) topDomainsAll(rng string) []domainRow {
 		rows.Close()
 	}
 	seen := map[key]map[string]bool{}
-	q, err := a.Logs.Query(`SELECT ts,client,qname FROM dns_queries WHERE ts>=? AND result<>'blocked' ORDER BY ts`, since-win)
+	q, err := a.Logs.Query(`SELECT ts,client,qname FROM (SELECT ts,client,qname FROM dns_queries WHERE ts>=? AND result<>'blocked' ORDER BY ts DESC LIMIT ?) ORDER BY ts`, since-win, maxLookupsScanned)
 	if err == nil {
 		arp := arpTable()
 		macs := map[string]string{}

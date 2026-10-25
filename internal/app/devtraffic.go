@@ -290,19 +290,37 @@ func (a *App) registerDevTrafficRoutes() {
 		if v := strings.TrimSpace(r.URL.Query().Get("macs")); v != "" {
 			macs = strings.Split(v, ",")
 		}
-		step, from, to, pts, err := a.trafficSeries(r.URL.Query().Get("range"), macs)
-		if err != nil {
+		rng := r.URL.Query().Get("range")
+		build := func() any {
+			step, from, to, pts, err := a.trafficSeries(rng, macs)
+			if err != nil {
+				return err
+			}
+			return map[string]any{"step": step, "from": from, "to": to, "points": pts}
+		}
+		var v any
+		if len(macs) == 0 { // the whole connection: the same for everyone, so it is shared
+			v = a.cached("tser:"+rng, 30*time.Second, build)
+		} else {
+			v = build()
+		}
+		if err, bad := v.(error); bad {
 			fail(w, err)
 			return
 		}
-		api.JSON(w, 200, map[string]any{"step": step, "from": from, "to": to, "points": pts})
+		api.JSON(w, 200, v)
 	})
 	s.Handle("GET /api/traffic/usage", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-		u, err := a.usageByDevice(r.URL.Query().Get("range"))
-		if err != nil {
-			fail(w, err)
+		rng := r.URL.Query().Get("range")
+		type usage struct {
+			rows []usageRow
+			err  error
+		}
+		u := a.cached("usage:"+rng, 30*time.Second, func() any { rows, err := a.usageByDevice(rng); return usage{rows, err} }).(usage)
+		if u.err != nil {
+			fail(w, u.err)
 			return
 		}
-		api.JSON(w, 200, u)
+		api.JSON(w, 200, u.rows)
 	})
 }

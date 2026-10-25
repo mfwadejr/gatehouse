@@ -163,6 +163,7 @@ var reservedPorts = map[int]string{
 func (a *App) event(actor, sev, title, detail string) {
 	if a.Logs != nil {
 		a.Logs.Exec(`INSERT INTO events(ts,area,severity,actor,title,detail) VALUES(?,?,?,?,?,?)`, time.Now().Unix(), "system", sev, actor, title, detail)
+		a.Bus.Publish("events", map[string]int64{"at": time.Now().Unix()})
 	}
 }
 

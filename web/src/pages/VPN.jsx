@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { del, get, post, put, useData } from '../api.js';
-import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, ToggleRow, useAction, fmt, Switch } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, ToggleRow, useAction, fmt, Switch, confirmBox, noticeBox } from '../ui.jsx';
 
 const STATE = {
   up: { tone: 'good', label: 'Working' },
@@ -153,7 +153,7 @@ function AddVPN({ endpoint, onClose, onDone }) {
     const r = await run(() => post(path, body), 'VPN added.');
     if (r && goal === 'in' && (r.device || r.device_error)) {
       onDone(r.id, goal, tech);
-      if (r.device_error) window.alert(`The VPN was created, but the device could not be added: ${r.device_error}`);
+      if (r.device_error) noticeBox(`The VPN was created, but the device could not be added: ${r.device_error}`);
       if (r.device) { setFirst(r.device); return; }
     }
     if (r && goal === 'out' && f.scope === 'all') {
@@ -335,7 +335,7 @@ function Uses({ v, onClose, onSaved }) {
     });
     const r = await run(() => put(`/api/vpn/${v.kind}/${v.id}/uses`, { uses }), 'Saved.');
     if (r) {
-      (r.warnings || []).forEach((w) => window.alert(w));
+      if (r.warnings?.length) noticeBox(r.warnings.join('\n'));
       onSaved(); onClose();
     }
   };
@@ -369,7 +369,7 @@ function Uses({ v, onClose, onSaved }) {
         </Field>
         <Field label="Address or range" hint="For anything else, like 192.168.1.50 or 192.168.20.0/24.">
           <div className="inline">
-            <Input value={range} onChange={setRange} placeholder="192.168.1.50" onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addRange(); } }} />
+            <Input value={range} onChange={setRange} aria-label="Address or range" placeholder="192.168.1.50" onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addRange(); } }} />
             <Button onClick={addRange}>Add</Button>
           </div>
           {extra.map((r) => (
@@ -492,7 +492,7 @@ function Outbound({ v, reload, setModal }) {
           <Button kind="primary" icon="edit" onClick={() => setModal({ t: 'uses', v })}>Choose who uses it</Button>
           <Button onClick={() => run(() => put(`/api/vpn/${v.kind}/${v.id}`, { enabled: !v.enabled }), v.enabled ? 'Turned off.' : 'Turned on.').then(reload)}>{v.enabled ? 'Turn off' : 'Turn on'}</Button>
           <Button onClick={() => setModal({ t: 'settings', v })}>Settings</Button>
-          <Button kind="danger" icon="trash" onClick={() => window.confirm(`Remove ${v.label}? Devices using it go back to your normal connection.`) && run(() => del(`/api/vpn/${v.kind}/${v.id}`), 'Removed.').then(reload)}>Remove</Button>
+          <Button kind="danger" icon="trash" onClick={async () => await confirmBox(`Remove ${v.label}? Devices using it go back to your normal connection.`) && run(() => del(`/api/vpn/${v.kind}/${v.id}`), 'Removed.').then(reload)}>Remove</Button>
         </div>
       </div>
     </Card>
@@ -523,7 +523,7 @@ function Inbound({ v, reload, setModal }) {
                 <div><div className="name">{p.name}</div><div className="meta">{p.address || ''}{p.real ? ` · from ${p.real}` : ''}{p.state === 'connected' ? ` · ↓ ${bytes(p.rx)} ↑ ${bytes(p.tx)}` : p.last_seen ? ` · last seen ${fmt.ago(p.last_seen)}` : ''}</div></div>
                 <div className="inline">{p.paused ? <Pill tone="">Paused</Pill> : <Pill tone={s.tone}>{s.label}</Pill>}
                   {v.kind === 'wireguard' && <Switch checked={!p.paused} label={`${p.name} allowed to connect`} onChange={(on) => run(() => put(`/api/vpn/${v.kind}/${v.id}/peers/${p.id}`, { enabled: on }), on ? 'Allowed again.' : 'Paused.').then(reload)} />}
-                  <Button small kind="danger" icon="trash" onClick={() => window.confirm(`Remove ${p.name}? It will no longer be able to connect.`) && run(() => del(`/api/vpn/${v.kind}/${v.id}/peers/${p.id}`), 'Removed.').then(reload)}>Remove</Button></div>
+                  <Button small kind="danger" icon="trash" onClick={async () => await confirmBox(`Remove ${p.name}? It will no longer be able to connect.`) && run(() => del(`/api/vpn/${v.kind}/${v.id}/peers/${p.id}`), 'Removed.').then(reload)}>Remove</Button></div>
               </div>
             );
           })}
@@ -533,7 +533,7 @@ function Inbound({ v, reload, setModal }) {
           <Button kind="primary" icon="plus" onClick={() => setModal({ t: 'device', v })}>Add a device</Button>
           <Button onClick={() => run(() => put(`/api/vpn/${v.kind}/${v.id}`, { enabled: !v.enabled }), v.enabled ? 'Turned off.' : 'Turned on.').then(reload)}>{v.enabled ? 'Turn off' : 'Turn on'}</Button>
           <Button onClick={() => setModal({ t: 'settings', v })}>Settings</Button>
-          <Button kind="danger" icon="trash" onClick={() => window.confirm(`Remove ${v.label}? Every device on it will be disconnected.`) && run(() => del(`/api/vpn/${v.kind}/${v.id}`), 'Removed.').then(reload)}>Remove</Button>
+          <Button kind="danger" icon="trash" onClick={async () => await confirmBox(`Remove ${v.label}? Every device on it will be disconnected.`) && run(() => del(`/api/vpn/${v.kind}/${v.id}`), 'Removed.').then(reload)}>Remove</Button>
         </div>
       </div>
     </Card>
@@ -561,7 +561,7 @@ function Site({ v, reload, setModal }) {
         <div className="actions">
           <Button onClick={() => run(() => put(`/api/vpn/${v.kind}/${v.id}`, { enabled: !v.enabled }), v.enabled ? 'Turned off.' : 'Turned on.').then(reload)}>{v.enabled ? 'Turn off' : 'Turn on'}</Button>
           <Button onClick={() => setModal({ t: 'settings', v })}>Rename</Button>
-          <Button kind="danger" icon="trash" onClick={() => window.confirm(`Remove the link ${v.label}? The two sites will no longer reach each other.`) && run(() => del(`/api/vpn/${v.kind}/${v.id}`), 'Removed.').then(reload)}>Remove</Button>
+          <Button kind="danger" icon="trash" onClick={async () => await confirmBox(`Remove the link ${v.label}? The two sites will no longer reach each other.`) && run(() => del(`/api/vpn/${v.kind}/${v.id}`), 'Removed.').then(reload)}>Remove</Button>
         </div>
       </div>
     </Card>

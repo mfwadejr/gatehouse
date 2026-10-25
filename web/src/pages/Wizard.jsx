@@ -24,19 +24,25 @@ function Frame({ title, step, of = 3, children }) {
   );
 }
 
-function PortPick({ ports, value, onChange, taken = [], here }) {
+// roles says what a port is already used for, by port name, for example { eth0: 'Internet' }.
+function PortPick({ ports, value, onChange, roles = {}, here }) {
   return (
     <div className="stack">
       {ports.map((p) => {
-        const off = taken.includes(p.name);
+        const role = roles[p.name];
+        const off = !!role;
+        const v4 = (p.addrs || []).filter((a) => !a.includes(':')).map((a) => a.split('/')[0]);
+        const addr = v4.length ? `address ${v4[0]}` : p.link ? 'no address yet' : '';
+        const note = off ? `used as your ${role === 'Internet' ? 'internet connection' : 'network'}` : '';
         return (
           <button type="button" key={p.name} disabled={off} className={`preset ${value === p.name ? 'on' : ''}`} aria-pressed={value === p.name} onClick={() => onChange(p.name)}>
             <span className="t">
               {p.name}{p.usb ? ' (USB adapter)' : ''}{p.wifi ? ' (Wi-Fi)' : ''}{' '}
               {p.link ? <Pill tone="good">cable connected{p.speed && p.speed > 0 ? `, ${p.speed} Mb/s` : ''}</Pill> : <Pill>no cable</Pill>}
-              {here === p.name ? <Pill tone="info">you are connected here</Pill> : null}
+              {role ? <Pill tone="info">{role}</Pill> : null}
+              {here === p.name && !role ? <Pill tone="info">you are connected here</Pill> : null}
             </span>
-            <span className="d mono">{p.mac}{off ? ' · used for something else' : ''}</span>
+            <span className="d mono">{p.mac}{addr ? ` · ${addr}` : ''}{note ? ` · ${note}` : ''}</span>
           </button>
         );
       })}
@@ -170,9 +176,9 @@ export default function Wizard({ data, me, onDone }) {
         ) : (
           <>
             <p className="sec">Which port does the cable from your modem or provider plug into?</p>
-            {data.here && <p className="small muted">You are connected through {data.here} right now, so it is kept for your own network.</p>}
+            {data.here && <p className="small muted">You are using {data.here} right now, so it stays your own network.</p>}
             {cand.length ? (
-              <PortPick ports={cand} value={wan?.port || ''} onChange={pick} />
+              <PortPick ports={cand} value={wan?.port || ''} onChange={pick} roles={lan.port ? { [lan.port]: 'Your network' } : {}} />
             ) : (
               <Note tone="warn" title="This machine has only one wired port">It cannot be both your internet and your network. Add a USB network adapter{wifiCards.length ? ', or choose a Wi-Fi network above' : ''}.</Note>
             )}
@@ -213,11 +219,11 @@ export default function Wizard({ data, me, onDone }) {
       <Frame title="Your network" step={sn} of={order.length}>
         <h2 className="h3">Which port is your LAN?</h2>
         <p className="small muted">The port your computers and switch connect to.{data.here ? ` You are using ${data.here} right now.` : ''}</p>
-        <PortPick ports={wired} value={lan.port} here={data.here} taken={[wan?.port].filter(Boolean)}
+        <PortPick ports={wired} value={lan.port} here={data.here} roles={wan?.port ? { [wan.port]: 'Internet' } : {}}
           onChange={(p) => setNet((m) => ({ ...m, lan: { ...m.lan, port: p }, wan: m.wan?.port === p ? { ...m.wan, port: '' } : m.wan, bridge: m.bridge.filter((b) => b !== p) }))} />
         {router ? (
           <>
-            <Field label="Address of this device on your network" hint="Gatehouse picked a range that does not clash with the network you are on now.">
+            <Field label="Address of this device on your network" hint={data.install?.address && lan.address === data.install.address ? 'Chosen during install. You can change it here.' : 'Gatehouse picked a range that does not clash with the network you are on now.'}>
               <Input className="mono" value={lan.address} onChange={setLan('address')} placeholder="192.168.1.1/24" />
             </Field>
             {wifiCards.some((c) => c.name !== wan?.port) && (
@@ -267,7 +273,7 @@ export default function Wizard({ data, me, onDone }) {
     <Frame title="About this device" step={sn} of={order.length}>
       <Field label="Name of this device" hint="Shown on your network, for example gatehouse"><Input value={host} onChange={setHost} /></Field>
       <Field label="Time zone"><Select value={zone} onChange={setZone} options={data.timezones || ['UTC']} /></Field>
-      <ToggleRow title="Require two-step sign-in" desc="Optional. Asks for a code from an authenticator app each time you sign in. You can change this later in Settings." checked={mfa} onChange={setMfa} />
+      <ToggleRow title="Require two-factor sign-in" desc="Optional. Asks for a code from an authenticator app each time you sign in. You can change this later in Settings." checked={mfa} onChange={setMfa} />
       {router && hereIsLan && !(data.install?.address && lan.address === data.install.address) && <Note tone="warn" title="Your connection will move">Gatehouse becomes your router on this port. After you finish, unplug and replug the cable on this computer so it gets a new address. The next page shows where to go.</Note>}
       {err && <Note tone="bad">{err}</Note>}
       <div className="actions"><Button onClick={() => setStep('network')}>Back</Button><Button kind="primary" disabled={busy || !host} onClick={() => finish(false)}>Finish setup</Button></div>

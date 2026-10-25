@@ -88,8 +88,10 @@ func TestBackupDownload(t *testing.T) {
 	if rc != 200 || !strings.HasPrefix(string(raw), "SQLite format 3") {
 		t.Fatalf("%d %.40q", rc, raw)
 	}
-	if left, _ := filepath.Glob(filepath.Join(data, "backups", "download-*.db")); len(left) != 0 {
-		t.Fatalf("temporary copy left behind: %v", left)
-	}
+	// The copy is removed just after the answer has been sent, so give the handler a moment.
+	waitFor(t, "the temporary copy to be removed", func() bool {
+		left, _ := filepath.Glob(filepath.Join(data, "backups", "download-*.db"))
+		return len(left) == 0
+	})
 	_ = os.Remove
 }

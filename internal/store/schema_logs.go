@@ -71,4 +71,23 @@ CREATE TABLE traffic(
   PRIMARY KEY(ts, mac)
 );
 CREATE INDEX idx_traffic_mac ON traffic(mac, ts);
+`, `
+-- Speed tests, one row per run. A test that could not finish is kept too, with the reason.
+CREATE TABLE speedtests(
+  id INTEGER PRIMARY KEY,
+  ts INTEGER NOT NULL,
+  link TEXT NOT NULL,
+  source TEXT NOT NULL DEFAULT 'manual',
+  quick INTEGER NOT NULL DEFAULT 0,
+  server TEXT NOT NULL DEFAULT '',
+  down_bps REAL NOT NULL DEFAULT 0,
+  up_bps REAL NOT NULL DEFAULT 0,
+  delay_ms REAL NOT NULL DEFAULT 0,
+  jitter_ms REAL NOT NULL DEFAULT 0,
+  loaded_ms REAL NOT NULL DEFAULT 0,
+  grade TEXT NOT NULL DEFAULT '',
+  bytes INTEGER NOT NULL DEFAULT 0,
+  error TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX idx_speed_link ON speedtests(link, ts);
 `}

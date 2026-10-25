@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -233,6 +234,38 @@ func (a *App) registerRoutes() {
 		api.JSON(w, 200, a.DNS.Pool().Status())
 	})
 	s.HandleAdmin("POST /api/dns/upstreams", a.dnsAddUpstream)
+	s.Handle("GET /api/dns/upstream-mode", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		api.JSON(w, 200, map[string]any{"mode": a.setting("dns.upstream_order", "fastest")})
+	})
+	s.HandleAdmin("PUT /api/dns/upstream-mode", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		var in struct {
+			Mode string `json:"mode"`
+		}
+		if !api.Decode(w, r, &in) {
+			return
+		}
+		if in.Mode != "fastest" && in.Mode != "ordered" {
+			fail(w, errors.New("choose fastest first, or in my order"))
+			return
+		}
+		a.Config.SetSetting("dns.upstream_order", in.Mode)
+		a.DNS.Pool().SetOrdered(in.Mode == "ordered")
+		ok(w)
+	})
+	s.HandleAdmin("PUT /api/dns/upstreams/order", a.dnsOrderUpstreams)
+	s.HandleAdmin("POST /api/dns/upstreams/{id}/test", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		id, good := pathID(r)
+		if !good {
+			fail(w, errBadID)
+			return
+		}
+		u := a.DNS.Pool().Get(id)
+		if u == nil {
+			fail(w, errors.New("that server is not in use (it may be switched off)"))
+			return
+		}
+		api.JSON(w, 200, a.DNS.Pool().Test(r.Context(), u))
+	})
 	s.HandleAdmin("DELETE /api/dns/upstreams/{id}", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		id, good := pathID(r)
 		if !good {
@@ -326,6 +359,8 @@ func (a *App) registerRoutes() {
 	a.registerRogueRoutes()
 	a.registerAddNetRoutes()
 	a.registerTrafficRoutes()
+	a.registerOverviewRoutes()
+	a.registerSpeedRoutes()
 	a.registerDevTrafficRoutes()
 	a.registerLogExtraRoutes()
 	a.registerAppRoutes()

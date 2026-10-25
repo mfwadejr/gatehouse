@@ -4,7 +4,7 @@ import ApplyBar from '../ApplyBar.jsx';
 import AddNetwork from '../AddNetwork.jsx';
 import { ScopeForm } from './DHCP.jsx';
 import { usePortWatch } from './Internet.jsx';
-import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Select, ToggleRow, useAction, useToast } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Select, ToggleRow, useAction, useToast, confirmBox } from '../ui.jsx';
 
 // The one place for your own networks: what they are, where they plug in, who is on them, and how
 // they get addresses. Adding one is one form. The internet connection itself is on the Internet page.
@@ -110,7 +110,7 @@ export default function Networks({ me }) {
                 <div className="actions">
                   <Button small onClick={() => setDhcp(n.scope || newScope(n))}>DHCP</Button>
                   <Button small icon="edit" onClick={() => setEdit(n)}>Edit</Button>
-                  <Button small kind="danger" icon="trash" onClick={() => { if (window.confirm(`Remove ${n.title}? Devices on it will lose their connection.`)) run(() => del(`/api/net/interfaces/${n.iface.id}`)).then(all); }}>Remove</Button>
+                  <Button small kind="danger" icon="trash" onClick={async () => { if (await confirmBox(`Remove ${n.title}? Devices on it will lose their connection.`)) run(() => del(`/api/net/interfaces/${n.iface.id}`)).then(all); }}>Remove</Button>
                 </div>
               </div>
             ))}

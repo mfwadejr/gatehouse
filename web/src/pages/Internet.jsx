@@ -2,7 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { del, put, useData } from '../api.js';
 import ApplyBar from '../ApplyBar.jsx';
 import WanGroups, { Traffic } from './WanGroups.jsx';
-import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, ToggleRow, useAction, useToast, fmt } from '../ui.jsx';
+import SpeedTest from './SpeedTest.jsx';
+import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, ToggleRow, useAction, useToast, fmt, confirmBox } from '../ui.jsx';
+import { linkState, linkMeasure } from '../linkstate.js';
 
 const TYPES = [
   { value: 'dhcp', label: 'Automatic' },
@@ -27,7 +29,7 @@ export function usePortWatch(active) {
 
 export function PortPicker({ value, onChange, ports, found, exclude = [] }) {
   const options = ports.filter((p) => !exclude.includes(p.name));
-  if (!options.length) return <Input value={value} onChange={onChange} placeholder="eth0" />;
+  if (!options.length) return <Input value={value} onChange={onChange} aria-label="Port name" placeholder="eth0" />;
   return (
     <Select value={value} onChange={onChange}
       options={[{ value: '', label: 'Choose a port…' }, ...options.map((p) => ({ value: p.name, label: `${p.name} — ${p.wifi ? 'Wi-Fi card' : p.link ? 'cable connected' : 'no cable'}${p.speed && p.speed > 0 ? `, ${p.speed} Mb/s` : ''}${p.usb ? ', USB adapter' : ''}${found === p.name ? ' (just plugged in)' : ''}` }))]} />
@@ -131,7 +133,6 @@ function QuickSetup({ ports, found, onDone }) {
   );
 }
 
-function linkTone(l) { if (!l) return ['', 'Not checked yet']; if (!l.up) return ['bad', 'Down']; return ['good', l.active ? 'Working' : 'Standby']; }
 
 export default function Internet({ me }) {
   const { data: wd, reload: rw } = useData('/api/net/wans', { topics: ['net.status'] });
@@ -159,17 +160,19 @@ export default function Internet({ me }) {
           {wans.length === 0 ? <Empty>No connection yet.</Empty> : (
             <div className="list">
               {wans.map((w) => {
-                const [tone, text] = linkTone(links[w.name]);
+                const ls = linkState(links[w.name]);
+                const measure = linkMeasure(links[w.name]);
                 return (
                   <div className="item" key={w.id}>
                     <div>
                       <div className="name">{w.name} {!w.enabled && <Pill>Off</Pill>}</div>
-                      <div className="meta">{w.iface}{w.vlan ? ` · VLAN ${w.vlan}` : ''} · {TYPES.find((t) => t.value === w.type)?.label}{links[w.name]?.gateway ? ` · gateway ${links[w.name].gateway}` : ''}{links[w.name]?.rtt ? ` · ${fmt.d1(links[w.name].rtt / 1e6)} ms` : ''}</div>
+                      <div className="meta">{w.iface}{w.vlan ? ` · VLAN ${w.vlan}` : ''} · {TYPES.find((t) => t.value === w.type)?.label}{links[w.name]?.gateway ? ` · gateway ${links[w.name].gateway}` : ''}{measure ? ` · ${measure}` : ''}</div>
+                      {ls.detail && ls.tone === 'bad' && <div className="small" style={{ color: 'var(--color-status-serious)' }}>{ls.detail}</div>}
                     </div>
                     <div className="actions">
-                      <Pill tone={tone}>{text}</Pill>
+                      <Pill tone={ls.tone}>{ls.text}</Pill>
                       <Button small icon="edit" onClick={() => setEdit(w)}>Edit</Button>
-                      <Button small kind="danger" icon="trash" onClick={() => { if (window.confirm(`Remove ${w.name}?`)) run(() => del(`/api/net/wans/${w.id}`)).then(all); }}>Remove</Button>
+                      <Button small kind="danger" icon="trash" onClick={async () => { if (await confirmBox(`Remove ${w.name}?`)) run(() => del(`/api/net/wans/${w.id}`)).then(all); }}>Remove</Button>
                     </div>
                   </div>
                 );
@@ -181,6 +184,7 @@ export default function Internet({ me }) {
 
       <WanGroups wans={wans} links={links} onChanged={all} />
       <Traffic wans={wans} links={links} />
+      {wans.some((w) => w.enabled) && <SpeedTest wans={wans} links={links} />}
 
       {edit && <WanForm initial={edit} wans={wans} ports={ports} found={found} onClose={() => setEdit(null)} onSaved={all} />}
       <ApplyBar kind="net" label="your network settings" status={stat} me={me} onChanged={all} />

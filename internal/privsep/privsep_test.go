@@ -1,6 +1,7 @@
 package privsep
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 
 	"gatehouse/internal/fw"
 	"gatehouse/internal/netd"
+	"gatehouse/internal/speedtest"
 	"gatehouse/internal/wanmon"
 )
 
@@ -104,6 +106,7 @@ type fakeNetCtl struct {
 	updatePath    string
 	systemStarted bool
 	power         string
+	speed         speedtest.Params
 }
 
 func (f *fakeNetCtl) Apply(netd.Plan, time.Duration) (string, time.Time, error) {
@@ -162,9 +165,17 @@ func TestEveryClientCallIsRouted(t *testing.T) {
 	if err := c.SetSystem("h", "UTC"); err != nil {
 		t.Fatalf("net.system: %v", err)
 	}
+	r, err := c.SpeedTest(speedtest.Params{Dev: "eth0", Quick: true})
+	if err != nil || r.Server != "t" || nc.speed.Dev != "eth0" || !nc.speed.Quick {
+		t.Fatalf("speed.run: %+v %v %+v", r, err, nc.speed)
+	}
 	if err := c.call("nope.nothing", nil, nil); err == nil {
 		t.Fatal("a made-up method was accepted")
 	}
 }
 
+func (f *fakeNetCtl) SpeedTest(ctx context.Context, p speedtest.Params) (speedtest.Result, error) {
+	f.speed = p
+	return speedtest.Result{DownBps: 1e6, Server: "t"}, nil
+}
 func (f *fakeNetCtl) Power(a string) error { f.power = a; return nil }

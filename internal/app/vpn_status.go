@@ -510,6 +510,7 @@ func (a *App) vpnAlert(v VPNView, from string) {
 		detail += ". The kill switch is holding back internet for the devices that use it."
 	}
 	a.Logs.Exec(`INSERT INTO events(ts,area,severity,actor,title,detail) VALUES(?,?,?,?,?,?)`, time.Now().Unix(), "vpn", sev, "system", title, detail)
+	a.Bus.Publish("events", map[string]int64{"at": time.Now().Unix()})
 }
 
 // vpnMonitor polls the helper and keeps the console and the event log current.

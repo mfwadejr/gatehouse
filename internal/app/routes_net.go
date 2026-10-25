@@ -19,6 +19,7 @@ import (
 	"gatehouse/internal/fw"
 	"gatehouse/internal/netcfg"
 	"gatehouse/internal/netd"
+	"gatehouse/internal/speedtest"
 	"gatehouse/internal/wanmon"
 )
 
@@ -40,6 +41,7 @@ type NetController interface {
 	SystemCheck() (netd.SystemUpdates, error)
 	SystemUpdateStart() error
 	Power(action string) error
+	SpeedTest(p speedtest.Params) (speedtest.Result, error)
 }
 
 // IfaceRow is a LAN-side port or VLAN as the console edits it.

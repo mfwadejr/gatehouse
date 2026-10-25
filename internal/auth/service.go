@@ -213,7 +213,7 @@ func (s *Service) Login(username, password, ip, ua string) (LoginResult, error) 
 		return LoginResult{}, ErrInvalid
 	}
 	if !u.TOTPEnabled {
-		// Two-step sign-in is optional unless the administrator requires it.
+		// Two-factor sign-in is optional unless the administrator requires it.
 		required := s.MFARequired()
 		sess, err := s.newSession(u.ID, ip, ua, !required)
 		if err != nil {
@@ -288,7 +288,7 @@ func (s *Service) checkSecondFactor(u *userRow, code string) (bool, error) {
 	return n == 1, nil
 }
 
-// MFARequired reports whether every account must use two-step sign-in.
+// MFARequired reports whether every account must use two-factor sign-in.
 func (s *Service) MFARequired() bool { return s.db.Setting("auth.mfa_required", "0") == "1" }
 
 // SetMFARequired turns the requirement on or off for all accounts.
@@ -300,10 +300,10 @@ func (s *Service) SetMFARequired(on bool) error {
 	return s.db.SetSetting("auth.mfa_required", v)
 }
 
-// DisableTOTP turns a user's two-step sign-in off. It needs the password and a current code.
+// DisableTOTP turns a user's two-factor sign-in off. It needs the password and a current code.
 func (s *Service) DisableTOTP(userID int64, password, code string) error {
 	if s.MFARequired() {
-		return errors.New("an administrator requires two-step sign-in for every account")
+		return errors.New("an administrator requires two-factor sign-in for every account")
 	}
 	u, err := s.loadByID(userID)
 	if err != nil {

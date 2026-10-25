@@ -15,6 +15,8 @@ type RecoveryEnv struct {
 	ClearTwoStep  func(name string) error
 	ResetFirewall func() error
 	Diagnose      func() string // what is running and the last error lines
+	// Services says whether DHCP and DNS are answering, in plain words.
+	Services func() string
 	// ResetAccess puts the console back on port 443 and removes any limit on who may manage.
 	ResetAccess func() error
 	// ResetToDefault clears the settings to "network" or "factory" level, after saving a copy.
@@ -28,15 +30,16 @@ func RunRecovery(t *Term, env RecoveryEnv) error {
 	for {
 		t.heading("Recovery", "What do you need?")
 		t.p("  1) Choose a new password for an administrator\n")
-		t.p("  2) Turn off two-step sign-in for an administrator\n")
+		t.p("  2) Turn off two-factor sign-in for an administrator\n")
 		t.p("  3) Reset the firewall to the safe starting rules\n")
 		t.p("  4) Check what is running and why the console may be down\n")
-		t.p("  5) Let any management network in, and put the console back on port 443\n")
-		t.p("  6) Reset to default (network settings, or everything)\n")
-		t.p("  7) Leave recovery\n\n")
-		n, err := t.ask("Number", "7", func(s string) error {
-			if s < "1" || s > "7" || len(s) != 1 {
-				return errors.New("enter a number from 1 to 7")
+		t.p("  5) Show whether DHCP and DNS are working\n")
+		t.p("  6) Let any management network in, and put the console back on port 443\n")
+		t.p("  7) Reset to default (network settings, or everything)\n")
+		t.p("  8) Leave recovery\n\n")
+		n, err := t.ask("Number", "8", func(s string) error {
+			if s < "1" || s > "8" || len(s) != 1 {
+				return errors.New("enter a number from 1 to 8")
 			}
 			return nil
 		})
@@ -62,7 +65,7 @@ func RunRecovery(t *Term, env RecoveryEnv) error {
 				if err := env.ClearTwoStep(name); err != nil {
 					t.p("\n  %s%v%s\n", red, err, reset)
 				} else {
-					t.p("\n  %sTwo-step sign-in is off for %s.%s They can turn it on again after signing in.\n", green, name, reset)
+					t.p("\n  %sTwo-factor sign-in is off for %s.%s They can turn it on again after signing in.\n", green, name, reset)
 				}
 				pause(t)
 				continue
@@ -124,6 +127,16 @@ func RunRecovery(t *Term, env RecoveryEnv) error {
 			}
 			pause(t)
 		case "5":
+			t.heading("Recovery", "DHCP and DNS")
+			if env.Services == nil {
+				t.p("  %sNot available on this machine.%s\n", red, reset)
+			} else {
+				for _, l := range strings.Split(env.Services(), "\n") {
+					t.p("  %s\n", trim(l, t.W-6))
+				}
+			}
+			pause(t)
+		case "6":
 			ok, err := t.yesno("Remove the limit on who may manage, and put the console back on port 443? The console restarts", false)
 			if err != nil {
 				if err == errRestart {
@@ -141,7 +154,7 @@ func RunRecovery(t *Term, env RecoveryEnv) error {
 				}
 				pause(t)
 			}
-		case "6":
+		case "7":
 			if env.ResetToDefault == nil {
 				t.p("\n  %sNot available on this machine.%s\n", red, reset)
 				pause(t)
@@ -180,7 +193,7 @@ func RunRecovery(t *Term, env RecoveryEnv) error {
 				t.p("\n  %sDone.%s A copy of the old settings is saved at %s.\n  Gatehouse restarts and the machine goes back to its starting state. Wait about a minute, then open the address shown on this screen.\n", green, reset, saved)
 			}
 			pause(t)
-		case "7":
+		case "8":
 			t.clear()
 			return nil
 		}

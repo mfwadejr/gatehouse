@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useSyncExternalStore } from 'react';
 
 let csrf = '';
 export const setCsrf = (t) => { csrf = t || ''; };
@@ -33,27 +33,55 @@ export const post = (p, b) => api('POST', p, b ?? {});
 export const del = (p) => api('DELETE', p);
 export const patch = (p, b) => api('PATCH', p, b);
 
+// Which things on the screen could not be refreshed just now. A page shows one small note when
+// anything is on this list, so a failed refresh is never silent.
+const failing = new Set();
+const watchers = new Set();
+let failingNow = false;
+export function setFailing(key, bad) {
+  const had = failing.has(key);
+  if (bad === had) return;
+  if (bad) failing.add(key); else failing.delete(key);
+  failingNow = failing.size > 0;
+  watchers.forEach((f) => f());
+}
+export function useFailing() {
+  return useSyncExternalStore((cb) => { watchers.add(cb); return () => watchers.delete(cb); }, () => failingNow);
+}
+// Fetch and hand the answer on; a failure is remembered under `key` instead of being swallowed.
+export function getWatched(key, path, then) {
+  return get(path).then((d) => { setFailing(key, false); then(d); }, () => setFailing(key, true));
+}
+export const refreshAll = () => window.dispatchEvent(new Event('gh-refresh'));
+
 // Load data and keep it fresh. Refetches when `topics` push an event, and on a slow timer.
 export function useData(path, { topics = [], every = 0, enabled = true } = {}) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [updatedAt, setUpdatedAt] = useState(0);
   const alive = useRef(true);
+  const me = useRef(`${Math.random()}`);
   const reload = useCallback(async () => {
     if (!enabled) return;
-    try { const d = await get(path); if (alive.current) { setData(d); setError(null); } }
-    catch (e) { if (alive.current) setError(e); }
+    try { const d = await get(path); if (alive.current) { setData(d); setError(null); setUpdatedAt(Date.now()); setFailing(me.current, false); } }
+    catch (e) { if (alive.current) { setError(e); setFailing(me.current, true); } }
     finally { if (alive.current) setLoading(false); }
   }, [path, enabled]);
-  useEffect(() => { alive.current = true; setLoading(true); reload(); return () => { alive.current = false; }; }, [reload]);
+  useEffect(() => { alive.current = true; setLoading(true); reload(); return () => { alive.current = false; setFailing(me.current, false); }; }, [reload]);
+  useEffect(() => { const f = () => { if (!document.hidden) reload(); }; window.addEventListener('gh-refresh', f); return () => window.removeEventListener('gh-refresh', f); }, [reload]);
+  // Polling stops while the tab is hidden and catches up the moment it is shown again.
   useEffect(() => {
     if (!every || !enabled) return undefined;
-    const t = setInterval(reload, every);
-    return () => clearInterval(t);
+    const tick = () => { if (!document.hidden) reload(); };
+    const t = setInterval(tick, every);
+    const vis = () => { if (!document.hidden) reload(); };
+    document.addEventListener('visibilitychange', vis);
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', vis); };
   }, [every, reload, enabled]);
   const key = topics.join(',');
-  useStream(key ? key.split(',') : [], () => reload());
-  return { data, error, loading, reload, setData };
+  useStream(key ? key.split(',') : [], () => { if (!document.hidden) reload(); });
+  return { data, error, loading, reload, setData, updatedAt };
 }
 
 // Subscribe to server-sent events. The handler receives (topic, payload).

@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
 import { del, get, patch, post, put, useData, useStream } from '../api.js';
-import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Select, Spark, Trend, Tabs, ToggleRow, useAction, fmt, Bar } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, Spark, Trend, Tabs, ToggleRow, useAction, fmt, Bar, confirmBox } from '../ui.jsx';
 
 function Overview() {
   const { data, setData } = useData('/api/dns/summary', { every: 10000 });
   useStream(['dns.stats'], (t, p) => p && setData((d) => (d ? { ...d, stats: p } : d)));
   const { data: ups, reload: ru } = useData('/api/dns/upstreams', { topics: ['dns.upstreams'], every: 10000 });
+  const { data: top } = useData('/api/dns/top?hours=24', { every: 30000 });
   const [run] = useAction();
   const [add, setAdd] = useState(false);
   const st = data?.stats;
+  const total = st?.hour_total || 0;
+  const outcomes = st ? [['Forwarded', st.outcomes?.forwarded], ['Blocked', st.outcomes?.blocked], ['Cached', st.outcomes?.cached], ['Local', st.outcomes?.local]] : [];
   const hist = st?.history || [];
   const peak = Math.max(0, ...hist);
   return (
@@ -23,20 +26,114 @@ function Overview() {
         <div className="card tile"><span className="lbl">Answered from memory</span><div><span className="val">{fmt.d1(st?.cached_pct)}</span><span className="unit">%</span></div><span className="foot">{fmt.n(st?.cache_size)} saved answers</span></div>
         <div className="card tile"><span className="lbl">Response time</span><div><span className="val">{fmt.d1(st?.avg_ms)}</span><span className="unit">ms</span></div><span className="foot">95% under {fmt.d1(st?.p95_ms)} ms</span></div>
       </section>
-      <Card title="Upstream DNS servers" desc="Where Gatehouse asks when it does not already know the answer." actions={<><Button small icon="plus" onClick={() => setAdd(true)}>Add</Button><Button small onClick={() => run(() => post('/api/dns/cache/flush'), 'Memory cleared.')}>Clear saved answers</Button></>}>
-        <div className="list">
-          {(ups || []).map((u) => (
-            <div className="item" key={u.id}>
-              <div><div className="name">{u.name}</div><div className="meta">{u.addr} · {u.proto.toUpperCase()}{u.last_error ? ` · ${u.last_error}` : ''}</div></div>
-              <div className="actions"><span className="muted small">{fmt.d1(u.latency_ms)} ms · {fmt.n(u.queries)} queries</span><Pill tone={u.state === 'healthy' ? 'good' : u.state === 'degraded' ? 'warn' : 'bad'}>{u.state}</Pill>
-                <Button small kind="danger" icon="trash" onClick={() => run(() => del(`/api/dns/upstreams/${u.id}`)).then(ru)}>Remove</Button></div>
-            </div>
-          ))}
-          {!ups?.length && <Empty>No upstream servers.</Empty>}
+      <div className="row">
+        <div className="grow">
+          <Card title="How queries were answered" desc="Last hour">
+            {total === 0 ? <Empty>No queries yet.</Empty> : (
+              <div className="stack">
+                {outcomes.map(([k, v]) => (
+                  <div key={k} className="stack" style={{ gap: 'var(--space-1)' }}>
+                    <div className="spread small"><span>{k}</span><span className="muted">{fmt.n(v || 0)} · {fmt.d1((100 * (v || 0)) / total)}%</span></div>
+                    <Bar pct={(100 * (v || 0)) / total} thin />
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
         </div>
-      </Card>
+        <div className="grow">
+          <Card title="Busiest devices" desc="DNS queries, last 24 hours">
+            {!top?.clients?.length ? <Empty>No activity yet.</Empty> : (
+              <div className="list">
+                {top.clients.slice(0, 6).map((c) => <div className="item" key={c.key}><div><div className="name">{c.label || c.key}</div><div className="meta">{c.key}</div></div><span>{fmt.n(c.n)}</span></div>)}
+              </div>
+            )}
+          </Card>
+        </div>
+        <div className="grow">
+          <Card title="Most blocked" desc="Last 24 hours">
+            {!top?.blocked?.length ? <Empty>Nothing has been blocked yet.</Empty> : (
+              <div className="list">
+                {top.blocked.slice(0, 6).map((c) => <div className="item" key={c.key}><span className="name" style={{ wordBreak: 'break-all' }}>{c.key}</span><span>{fmt.n(c.n)}</span></div>)}
+              </div>
+            )}
+          </Card>
+        </div>
+      </div>
+      <Upstreams ups={ups || []} reload={ru} onAdd={() => setAdd(true)} />
       {add && <AddUpstream onClose={() => setAdd(false)} onSaved={ru} />}
     </>
+  );
+}
+
+// How a server is doing, in words a person can act on. Only every server being down is "No upstream".
+function UpstreamRow({ u, first, last, ordered, onMove, onRemove, reload }) {
+  const [res, setRes] = useState(null);
+  const [run, busy] = useAction();
+  const tone = u.state === 'healthy' ? 'good' : u.state === 'degraded' ? 'warn' : 'bad';
+  const label = { healthy: 'Healthy', degraded: 'Slow', down: 'Down' }[u.state] || u.state;
+  const ago = (t) => (t ? fmt.ago(t) : 'never');
+  const test = async () => {
+    const r = await run(() => post(`/api/dns/upstreams/${u.id}/test`, {}));
+    if (r) { setRes(r); reload(); }
+  };
+  return (
+    <div className="item" style={{ alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', gap: '0.75rem', minWidth: 0 }}>
+        {ordered && <span className="muted" style={{ fontVariantNumeric: 'tabular-nums', minWidth: '1.2rem', paddingTop: '0.1rem' }} aria-label={`Number ${u.position}`}>{u.position}</span>}
+        <div style={{ minWidth: 0 }}>
+          <div className="name">{u.name}</div>
+          <div className="meta">{u.addr} · {u.proto.toUpperCase()}{u.reused ? ' · connection kept open' : ''}</div>
+          {u.state !== 'healthy' && u.reason && <div className="small" style={{ color: u.state === 'down' ? 'var(--color-status-serious)' : 'var(--color-status-warning)', marginTop: '0.25rem' }}>{u.reason}{u.state === 'down' && u.retry_in ? ` Trying again in ${u.retry_in} s.` : ''}</div>}
+          {(u.state !== 'healthy' || res) && <div className="small muted" style={{ marginTop: '0.2rem' }}>Last answered {ago(u.last_ok)}{u.failures ? ` · ${fmt.n(u.failures)} failed so far` : ''}</div>}
+          {res && (
+            <div className="small" style={{ marginTop: '0.35rem' }} role="status">
+              <strong>{res.ok ? 'Test: answered' : 'Test: no answer'}</strong>
+              {res.ok && <> · {res.connect_ms > 0 ? <>connecting {fmt.d1(res.connect_ms)} ms · </> : null}answer {fmt.d1(res.answer_ms)} ms</>}
+              <div className="muted">{res.verdict}</div>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="actions">
+        <span className="muted small">{fmt.d1(u.latency_ms)} ms · {fmt.n(u.queries)} queries</span>
+        <Pill tone={tone}>{label}</Pill>
+        {ordered && <><Button small icon="up" disabled={first} aria-label={`Move ${u.name} up`} onClick={() => onMove(-1)} /><Button small icon="down" disabled={last} aria-label={`Move ${u.name} down`} onClick={() => onMove(1)} /></>}
+        <Button small disabled={busy} onClick={test}>{busy ? 'Testing…' : 'Test'}</Button>
+        <Button small kind="danger" icon="trash" onClick={onRemove}>Remove</Button>
+      </div>
+    </div>
+  );
+}
+
+function Upstreams({ ups, reload, onAdd }) {
+  const { data: mode, reload: rm } = useData('/api/dns/upstream-mode');
+  const [run] = useAction();
+  const ordered = mode?.mode === 'ordered';
+  const sorted = [...ups].sort((a, b) => a.position - b.position);
+  const move = async (i, d) => {
+    const ids = sorted.map((u) => u.id);
+    [ids[i], ids[i + d]] = [ids[i + d], ids[i]];
+    await run(() => put('/api/dns/upstreams/order', { ids }));
+    reload();
+  };
+  const setMode = async (m) => { await run(() => put('/api/dns/upstream-mode', { mode: m })); rm(); };
+  const allDown = ups.length > 0 && ups.every((u) => u.state === 'down');
+  return (
+    <Card title="Upstream DNS servers" desc="Where Gatehouse asks when it does not already know the answer."
+      actions={<><Button small icon="plus" onClick={onAdd}>Add</Button><Button small onClick={() => run(() => post('/api/dns/cache/flush'), 'Memory cleared.')}>Clear saved answers</Button></>}>
+      <Field label="Which server is asked first" hint={ordered ? 'The first server in the list is asked; the next one only if it does not answer. Use the arrows to change the order.' : 'Gatehouse measures how fast each one answers and asks the fastest first. Slower ones are the backup.'}>
+        <Segmented value={ordered ? 'ordered' : 'fastest'} onChange={setMode} options={[{ value: 'fastest', label: 'Fastest first' }, { value: 'ordered', label: 'In my order' }]} />
+      </Field>
+      {allDown && <Note tone="warn" title="No server is answering">Names that are not already saved cannot be looked up until one of these answers again.</Note>}
+      <div className="list">
+        {sorted.map((u, i) => (
+          <UpstreamRow key={u.id} u={u} first={i === 0} last={i === sorted.length - 1} ordered={ordered} onMove={(d) => move(i, d)} reload={reload}
+            onRemove={() => run(() => del(`/api/dns/upstreams/${u.id}`)).then(reload)} />
+        ))}
+        {!ups.length && <Empty>No upstream servers.</Empty>}
+      </div>
+    </Card>
   );
 }
 
@@ -85,7 +182,7 @@ function Lists() {
               </div>
               <div className="actions">
                 {!l.local && <Button small icon="refresh" onClick={() => run(() => post(`/api/dns/lists/${l.id}/refresh`), 'Updated.').then(reload)}>Update</Button>}
-                <Button small kind="danger" icon="trash" onClick={() => window.confirm(`Delete ${l.name}?`) && run(() => del(`/api/dns/lists/${l.id}`)).then(reload)}>Delete</Button>
+                <Button small kind="danger" icon="trash" onClick={async () => await confirmBox(`Delete ${l.name}?`) && run(() => del(`/api/dns/lists/${l.id}`)).then(reload)}>Delete</Button>
                 <button role="switch" aria-checked={l.enabled} aria-label={`Use ${l.name}`} className="switch" onClick={() => run(() => patch(`/api/dns/lists/${l.id}`, { enabled: !l.enabled })).then(reload)} />
               </div>
             </div>
@@ -96,8 +193,8 @@ function Lists() {
 
       <Card enter title="Always allow or always block" desc="Your own exceptions beat every list.">
         <div className="inline">
-          <div style={{ flex: '1 1 14rem' }}><Input value={rule.domain} onChange={(v) => setRule({ ...rule, domain: v })} placeholder="example.com" /></div>
-          <Select value={rule.action} onChange={(v) => setRule({ ...rule, action: v })} options={[{ value: 'block', label: 'Block' }, { value: 'allow', label: 'Allow' }]} />
+          <div style={{ flex: '1 1 14rem' }}><Input value={rule.domain} onChange={(v) => setRule({ ...rule, domain: v })} aria-label="Name to always allow or block" placeholder="example.com" /></div>
+          <Select aria-label="Allow or block" value={rule.action} onChange={(v) => setRule({ ...rule, action: v })} options={[{ value: 'block', label: 'Block' }, { value: 'allow', label: 'Allow' }]} />
           <Button kind="primary" disabled={!rule.domain} onClick={() => run(() => post('/api/dns/rules', rule), 'Saved.').then(() => { setRule({ ...rule, domain: '' }); rr(); })}>Add</Button>
         </div>
         <div className="list">
@@ -107,7 +204,7 @@ function Lists() {
 
       <Card title="Why is this blocked?" desc="Type a name to see which list is responsible.">
         <div className="inline">
-          <div style={{ flex: '1 1 14rem' }}><Input value={q} onChange={setQ} placeholder="ads.example.com" /></div>
+          <div style={{ flex: '1 1 14rem' }}><Input value={q} onChange={setQ} aria-label="Name to check" placeholder="ads.example.com" /></div>
           <Button disabled={!q} onClick={() => run(() => get(`/api/dns/explain?domain=${encodeURIComponent(q)}`)).then(setWhy)}>Check</Button>
         </div>
         {why && (
@@ -159,9 +256,9 @@ function Records() {
   return (
     <Card enter title="Your own names" desc="Make a name point somewhere on your network, like nas.lan → 192.168.1.10. Devices that get an address from Gatehouse already have a name automatically.">
       <div className="inline">
-        <div style={{ flex: '1 1 10rem' }}><Input value={f.name} onChange={(v) => setF({ ...f, name: v })} placeholder="nas.lan" /></div>
-        <Select value={f.type} onChange={(v) => setF({ ...f, type: v })} options={['A', 'AAAA', 'CNAME', 'TXT', 'MX']} />
-        <div style={{ flex: '1 1 10rem' }}><Input value={f.value} onChange={(v) => setF({ ...f, value: v })} placeholder="192.168.1.10" /></div>
+        <div style={{ flex: '1 1 10rem' }}><Input value={f.name} onChange={(v) => setF({ ...f, name: v })} aria-label="Name" placeholder="nas.lan" /></div>
+        <Select aria-label="Record type" value={f.type} onChange={(v) => setF({ ...f, type: v })} options={['A', 'AAAA', 'CNAME', 'TXT', 'MX']} />
+        <div style={{ flex: '1 1 10rem' }}><Input value={f.value} onChange={(v) => setF({ ...f, value: v })} aria-label="Points to" placeholder="192.168.1.10" /></div>
         <Button kind="primary" disabled={!f.name || !f.value} onClick={() => run(() => post('/api/dns/records', f), 'Saved.').then(() => { setF({ ...f, name: '', value: '' }); reload(); })}>Add</Button>
       </div>
       <div className="list">
@@ -183,7 +280,7 @@ function Groups() {
         {(groups || []).map((g) => (
           <div className="item" key={g.id}>
             <div><div className="name">{g.name}</div><div className="meta">{g.filtering ? `${g.lists?.length || 0} lists` : 'No filtering'} · {g.devices} device{g.devices === 1 ? '' : 's'}{g.description ? ` · ${g.description}` : ''}</div></div>
-            <div className="actions"><Button small icon="edit" onClick={() => setEdit(g)}>Edit</Button><Button small kind="danger" icon="trash" onClick={() => window.confirm(`Delete ${g.name}?`) && run(() => del(`/api/dns/groups/${g.id}`)).then(reload)}>Delete</Button></div>
+            <div className="actions"><Button small icon="edit" onClick={() => setEdit(g)}>Edit</Button><Button small kind="danger" icon="trash" onClick={async () => await confirmBox(`Delete ${g.name}?`) && run(() => del(`/api/dns/groups/${g.id}`)).then(reload)}>Delete</Button></div>
           </div>
         ))}
       </div>

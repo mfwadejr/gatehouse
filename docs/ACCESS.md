@@ -7,7 +7,7 @@
 - The firewall lives in the kernel and keeps protecting the network while the program restarts. No hardware watchdog is used.
 
 ## Changeable console port
-Settings, Console address. The new port is opened next to the old one and the firewall allows both. The change is final only when the console is reached on the new port and "Keep this port" is pressed there (120 seconds); otherwise it is undone. Ports used by DNS, DHCP, SSH, NTP, UPnP, a VPN or a port forward are refused, as is any port already in use. The saved port is copied to `console.port` in the data folder for the machine's screens and the starting firewall rules. Recovery option 5 puts it back to 443.
+Settings, Console address. The new port is opened next to the old one and the firewall allows both. The change is final only when the console is reached on the new port and "Keep this port" is pressed there (120 seconds); otherwise it is undone. Ports used by DNS, DHCP, SSH, NTP, UPnP, a VPN or a port forward are refused, as is any port already in use. The saved port is copied to `console.port` in the data folder for the machine's screens and the starting firewall rules. Recovery option 6 puts it back to 443.
 
 ## Lock-out protection
 - A built-in rule lets every management network reach the console; it sits above all editable rules.
@@ -15,4 +15,4 @@ Settings, Console address. The new port is opened next to the old one and the fi
 - Firewall page, "Protected" block: shows these rules in plain words; "Test my access" checks the saved firewall, your own connection, the address limit and that the console answers.
 - Optional limit on who may manage (networks and/or address ranges). Empty means every management network. Saving is refused if it would cut off the address you are using.
 - Applying a firewall change is still refused if it would disconnect you, and still rolls back unless confirmed.
-- Recovery (Alt+F2): option 3 restores the safe starting rules; option 5 also removes the address limit and resets the console port to 443.
+- Recovery (Alt+F2): option 3 restores the safe starting rules; option 5 shows whether DHCP and DNS are working; option 6 also removes the address limit and resets the console port to 443.

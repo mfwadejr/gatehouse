@@ -152,7 +152,7 @@ func (a *App) dnsAddUpstream(w http.ResponseWriter, r *http.Request, c *api.Ctx)
 	if in.Name == "" {
 		in.Name = in.Address
 	}
-	if _, err := a.Config.Exec(`INSERT INTO dns_upstreams(name,address,proto,tls_name) VALUES(?,?,?,?)`, in.Name, in.Address, in.Proto, in.TLSName); err != nil {
+	if _, err := a.Config.Exec(`INSERT INTO dns_upstreams(name,address,proto,tls_name,position) VALUES(?,?,?,?,(SELECT COALESCE(MAX(position),0)+1 FROM dns_upstreams))`, in.Name, in.Address, in.Proto, in.TLSName); err != nil {
 		fail(w, errors.New("that resolver is already in the list"))
 		return
 	}
@@ -210,5 +210,58 @@ func (a *App) dnsSaveSettings(w http.ResponseWriter, r *http.Request, c *api.Ctx
 		fail(w, err)
 		return
 	}
+	ok(w)
+}
+
+// dnsOrderUpstreams saves the order the person arranged the DNS servers in. The list must name
+// every server exactly once, so a stale page cannot drop or duplicate one.
+func (a *App) dnsOrderUpstreams(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+	var in struct {
+		IDs []int64 `json:"ids"`
+	}
+	if !api.Decode(w, r, &in) {
+		return
+	}
+	have := map[int64]bool{}
+	rows, err := a.Config.Query(`SELECT id FROM dns_upstreams`)
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	for rows.Next() {
+		var id int64
+		rows.Scan(&id)
+		have[id] = true
+	}
+	rows.Close()
+	seen := map[int64]bool{}
+	for _, id := range in.IDs {
+		if !have[id] || seen[id] {
+			fail(w, errors.New("the list changed; reload the page and try again"))
+			return
+		}
+		seen[id] = true
+	}
+	if len(seen) != len(have) {
+		fail(w, errors.New("the list changed; reload the page and try again"))
+		return
+	}
+	tx, err := a.Config.Begin()
+	if err != nil {
+		fail(w, err)
+		return
+	}
+	for i, id := range in.IDs {
+		if _, err := tx.Exec(`UPDATE dns_upstreams SET position=? WHERE id=?`, i+1, id); err != nil {
+			tx.Rollback()
+			fail(w, err)
+			return
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		fail(w, err)
+		return
+	}
+	a.loadUpstreams()
 	ok(w)
 }

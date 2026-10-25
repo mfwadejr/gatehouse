@@ -140,9 +140,13 @@ func (s *Service) runLocked(mf *monitorFile) {
 		s.running.Wait()
 		s.cancel, s.mon = nil, nil
 	}
-	if mf == nil || len(mf.Links) == 0 || (len(mf.Links) < 2 && len(mf.Groups) == 0) || s.root == nil {
-		return // one connection needs no monitor; systemd-networkd owns its route
+	if mf == nil || len(mf.Links) == 0 || s.root == nil {
+		return
 	}
+	// One connection has nothing to fail over to, so systemd-networkd keeps its route. It is still
+	// watched, so the console can say whether it works; the monitor only measures and never
+	// changes a route in that mode.
+	watch := len(mf.Links) < 2 && len(mf.Groups) == 0
 	links := make([]wanmon.Link, len(mf.Links))
 	for i, l := range mf.Links {
 		links[i] = l.link()
@@ -152,6 +156,7 @@ func (s *Service) runLocked(mf *monitorFile) {
 		mode = wanmon.Balance
 	}
 	m := s.NewMon(links, mode)
+	m.Watch = watch
 	for _, g := range mf.Groups {
 		m.Groups = append(m.Groups, g.group())
 	}

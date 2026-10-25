@@ -71,6 +71,10 @@ type App struct {
 	vpn          vpnState
 	fwn          fwNames
 	traffic      wanTraffic
+	health       healthSampler
+	hist         histState
+	speed        speedRun
+	ocache       ocache
 	upnp         upnpState
 	setupMu      sync.Mutex
 	con          consoles
@@ -146,7 +150,7 @@ func New(cfg Config) (*App, error) {
 	a.API = api.New(a.Auth, a.Bus)
 	a.API.Static = cfg.Static
 	a.API.Secure = cfg.TLSCert != ""
-	a.API.Topic("dns.stats", "dns.live", "dns.upstreams", "dns.lists", "dhcp.leases", "dhcp.utilisation", "fw.status", "net.status", "vpn.status", "logs.live", "upnp.maps", "dhcp.alerts")
+	a.API.Topic("dns.stats", "dns.live", "dns.upstreams", "dns.lists", "dhcp.leases", "dhcp.utilisation", "fw.status", "net.status", "vpn.status", "logs.live", "upnp.maps", "dhcp.alerts", "speedtest", "events")
 	a.FW = cfg.FW
 	a.Net = cfg.Net
 	a.registerRoutes()
@@ -233,7 +237,7 @@ func (a *App) seedUpstreams() error {
 		{"Cloudflare", "1.1.1.1:853", "cloudflare-dns.com"},
 		{"Quad9", "9.9.9.9:853", "dns.quad9.net"},
 	} {
-		if _, err := a.Config.Exec(`INSERT INTO dns_upstreams(name,address,proto,tls_name) VALUES(?,?,?,?)`, u.name, u.addr, "tls", u.tls); err != nil {
+		if _, err := a.Config.Exec(`INSERT INTO dns_upstreams(name,address,proto,tls_name,position) VALUES(?,?,?,?,(SELECT COALESCE(MAX(position),0)+1 FROM dns_upstreams))`, u.name, u.addr, "tls", u.tls); err != nil {
 			return err
 		}
 	}
@@ -241,7 +245,7 @@ func (a *App) seedUpstreams() error {
 }
 
 func (a *App) loadUpstreams() error {
-	rows, err := a.Config.Query(`SELECT id,name,address,proto,tls_name FROM dns_upstreams WHERE enabled=1 ORDER BY id`)
+	rows, err := a.Config.Query(`SELECT id,name,address,proto,tls_name,position FROM dns_upstreams WHERE enabled=1 ORDER BY position,id`)
 	if err != nil {
 		return err
 	}
@@ -249,11 +253,12 @@ func (a *App) loadUpstreams() error {
 	var list []*dnssrv.Upstream
 	for rows.Next() {
 		u := &dnssrv.Upstream{}
-		if err := rows.Scan(&u.ID, &u.Name, &u.Addr, &u.Proto, &u.TLSName); err != nil {
+		if err := rows.Scan(&u.ID, &u.Name, &u.Addr, &u.Proto, &u.TLSName, &u.Position); err != nil {
 			return err
 		}
 		list = append(list, u)
 	}
+	a.DNS.Pool().SetOrdered(a.setting("dns.upstream_order", "fastest") == "ordered")
 	a.DNS.Pool().Set(list)
 	return rows.Err()
 }
@@ -313,6 +318,8 @@ func (a *App) Run(ctx context.Context) error {
 	run(func() { a.vpnMonitor(ctx) })
 	run(func() { a.collectFW(ctx) })
 	run(func() { a.collectTraffic(ctx) })
+	run(func() { a.collectHistory(ctx) })
+	run(func() { a.speedLoop(ctx) })
 	run(func() { a.runUPnP(ctx) })
 	run(func() { a.updateLoop(ctx) })
 	run(func() { a.dynLoop(ctx) })
@@ -357,6 +364,7 @@ func (a *App) housekeeping(ctx context.Context) {
 			a.QLog.Prune(days)
 			a.pruneFWLog(days)
 			a.pruneTraffic(int(a.settingFloat("logs.retention_days", 30)))
+			a.pruneSpeed()
 			a.Auth.PurgeExpired()
 		}
 	}

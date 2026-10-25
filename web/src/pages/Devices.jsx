@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { del, get, patch, post, put, useData } from '../api.js';
 import DeviceIcon, { ICON_LABELS } from '../DeviceIcon.jsx';
 import { NewDevice } from '../AddrPicker.jsx';
-import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, Select, Spark, ToggleRow, useAction, useToast, fmt } from '../ui.jsx';
+import DeviceMap from './DeviceMap.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, Select, Spark, ToggleRow, useAction, useToast, fmt, confirmBox } from '../ui.jsx';
 
 const POLICIES = [
   { value: 'filtered', label: 'Allowed, ads and trackers filtered' },
@@ -114,7 +115,7 @@ function Details({ d, groups, onClose, onSaved }) {
             {det?.reservation ? (
               <div className="inline"><span className="mono">{det.reservation.ip}</span><Button small kind="danger" onClick={() => keep(false)} disabled={busy}>Stop fixing it</Button></div>
             ) : (
-              <div className="inline"><Input value={fixIP} onChange={setFixIP} placeholder={d.ip || '192.168.1.50'} className="in mono" style={{ maxWidth: '12rem' }} /><Button small onClick={() => keep(true)} disabled={busy || (!fixIP && !d.ip)}>Always use {fixIP || d.ip || 'this address'}</Button></div>
+              <div className="inline"><Input value={fixIP} onChange={setFixIP} aria-label="Fixed address for this device" placeholder={d.ip || '192.168.1.50'} className="in mono" style={{ maxWidth: '12rem' }} /><Button small onClick={() => keep(true)} disabled={busy || (!fixIP && !d.ip)}>Always use {fixIP || d.ip || 'this address'}</Button></div>
             )}
           </Field>
         </>
@@ -163,6 +164,7 @@ export default function Devices() {
   const [rowsPer, setRowsPer] = useState(null);
   const [page, setPage] = useState(0);
   const [pick, setPick] = useState(false);
+  const [view, setView] = useState('list');
 
   const colIds = cols || prefs?.cols || DEFAULT_COLS;
   const per = rowsPer || prefs?.rows || 25;
@@ -187,8 +189,9 @@ export default function Devices() {
 
   return (
     <Page title="Devices & access" sub="Every device that has joined your network. Rename it, give it an icon, filter it, or pause its internet."
-      actions={<Button icon="plus" onClick={() => setAdding(true)}>Add a device</Button>}>
-      <div>
+      actions={<><Segmented value={view} onChange={setView} options={[{ value: 'list', label: 'List' }, { value: 'map', label: 'Map' }]} /><Button icon="plus" onClick={() => setAdding(true)}>Add a device</Button></>}>
+      {view === 'map' && <DeviceMap devices={all} onOpen={setOpen} />}
+      <div style={view === 'map' ? { display: 'none' } : undefined}>
         <Card actions={
           <div className="inline">
             <div style={{ width: '15rem' }}><Input value={q} onChange={setQ} placeholder="Search name, maker, address" aria-label="Search devices" /></div>
@@ -212,7 +215,7 @@ export default function Devices() {
                       {d.source !== 'vpn' && (
                         <div className="actions" style={{ justifyContent: 'flex-end' }}>
                           <Button small onClick={() => run(() => patch(`/api/devices/${d.id}`, { internet: !d.internet }), d.internet ? 'Paused.' : 'Back online.').then(reload)}>{d.internet ? 'Pause' : 'Resume'}</Button>
-                          {!d.online && <Button small kind="danger" icon="trash" onClick={() => window.confirm('Forget this device?') && run(() => del(`/api/devices/${d.id}`), 'Forgotten.').then(reload)}>Forget</Button>}
+                          {!d.online && <Button small kind="danger" icon="trash" onClick={async () => await confirmBox('Forget this device?') && run(() => del(`/api/devices/${d.id}`), 'Forgotten.').then(reload)}>Forget</Button>}
                         </div>
                       )}
                     </td>

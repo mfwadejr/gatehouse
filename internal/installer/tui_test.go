@@ -121,6 +121,7 @@ func TestRecoveryScreen(t *testing.T) {
 		ResetFirewall:  func() error { got = append(got, "fw"); return nil },
 		ResetAccess:    func() error { got = append(got, "access"); return nil },
 		Diagnose:       func() string { return "gatehouse          failed" },
+		Services:       func() string { return "DHCP (hands out addresses)\n  Listening: yes" },
 		ResetToDefault: func(l string) (string, error) { got = append(got, "reset:"+l); return "/backup.db", nil },
 	}
 	script := strings.Join([]string{
@@ -128,10 +129,11 @@ func TestRecoveryScreen(t *testing.T) {
 		"2", "", // two-step off
 		"3", "y", "", // firewall
 		"4", "", // what is running
-		"5", "y", "", // port and management limit
-		"6", "2", "nope", "", // reset: wrong word changes nothing
-		"6", "1", "RESET", "", // network reset
-		"7",
+		"5", "", // DHCP and DNS status
+		"6", "y", "", // port and management limit
+		"7", "2", "nope", "", // reset: wrong word changes nothing
+		"7", "1", "RESET", "", // network reset
+		"8",
 	}, "\r") + "\r"
 	var out bytes.Buffer
 	if err := RunRecovery(NewTerm(strings.NewReader(script), &out), env); err != nil {
@@ -142,6 +144,9 @@ func TestRecoveryScreen(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "gatehouse          failed") {
 		t.Fatal("the diagnostics view shows nothing")
+	}
+	if !strings.Contains(out.String(), "Listening: yes") {
+		t.Fatal("the DHCP and DNS view shows nothing")
 	}
 	if !strings.Contains(out.String(), "Too short: 5 of the 12") || strings.Contains(out.String(), "a long enough pass") {
 		t.Fatal("password feedback wrong or the password was echoed")

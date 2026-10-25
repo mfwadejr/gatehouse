@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useId, useMemo, useState, useCallback, useRef } from 'react';
+import { refreshAll, useFailing } from './api.js';
 
 export const ICONS = {
   overview: 'M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z',
@@ -13,6 +14,8 @@ export const ICONS = {
   logs: 'M5 4h14v16H5zM9 9h6M9 13h6M9 17h3',
   settings: 'M4 7h10M18 7h2M4 17h2M10 17h10M14 5v4M6 15v4',
   check: 'M5 12l5 5 9-10',
+  up: 'M12 19V5M5 12l7-7 7 7',
+  down: 'M12 5v14M5 12l7 7 7-7',
   warn: 'M12 8v5M12 16.5h.01M10.3 3.9L2.4 18a2 2 0 001.7 3h15.8a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z',
   x: 'M6 6l12 12M18 6L6 18',
   plus: 'M12 5v14M5 12h14',
@@ -51,6 +54,7 @@ export function Card({ title, desc, actions, children, className = '', enter = f
 }
 
 export function Page({ title, sub, actions, children }) {
+  const stale = useFailing();
   return (
     <>
       <header className="head">
@@ -60,6 +64,12 @@ export function Page({ title, sub, actions, children }) {
         </div>
         {actions && <div className="actions">{actions}</div>}
       </header>
+      {stale && (
+        <div className="stalenote small" role="status">
+          Some of what is shown here could not be refreshed just now, so it may be out of date. Gatehouse keeps trying.{' '}
+          <button type="button" className="link" onClick={refreshAll}>Try again now</button>
+        </div>
+      )}
       {children}
     </>
   );
@@ -241,6 +251,7 @@ export function ToastHost({ children }) {
   return (
     <ToastCtx.Provider value={push}>
       {children}
+      <DialogHost />
       <div className="toasts" role="status" aria-live="polite">{items.map((i) => <div key={i.id} className={`toast ${i.tone}`}>{i.text}</div>)}</div>
     </ToastCtx.Provider>
   );
@@ -301,6 +312,38 @@ export function Modal({ title, onClose, children, footer }) {
         {footer && <div className="actions" style={{ justifyContent: 'flex-end' }}>{footer}</div>}
       </div>
     </div>
+  );
+}
+
+// ---------- confirm and notice dialogs ----------
+// Used instead of the browser's grey pop-ups. They work from anywhere with `await confirmBox(text)`,
+// which gives true or false, and `await noticeBox(text)`, which waits for OK. The first button is
+// the safe one and has the focus, so a stray Enter never deletes anything.
+let showDialog = null;
+export function confirmBox(message, { title = 'Are you sure?', yes = 'Yes, do it', no = 'Cancel', danger = true } = {}) {
+  if (!showDialog) return Promise.resolve(window.confirm(message));
+  return new Promise((resolve) => showDialog({ kind: 'confirm', message, title, yes, no, danger, resolve }));
+}
+export function noticeBox(message, { title = 'Please note' } = {}) {
+  if (!showDialog) { window.alert(message); return Promise.resolve(); }
+  return new Promise((resolve) => showDialog({ kind: 'notice', message, title, resolve }));
+}
+function DialogHost() {
+  const [d, setD] = useState(null);
+  const queue = useRef([]);
+  useEffect(() => {
+    showDialog = (x) => setD((cur) => { if (cur) { queue.current.push(x); return cur; } return x; });
+    return () => { showDialog = null; };
+  }, []);
+  if (!d) return null;
+  const done = (v) => { d.resolve(v); const next = queue.current.shift(); setD(next || null); };
+  return (
+    <Modal title={d.title} onClose={() => done(false)}
+      footer={d.kind === 'confirm'
+        ? <><Button onClick={() => done(false)}>{d.no}</Button><Button kind={d.danger ? 'danger' : 'primary'} onClick={() => done(true)}>{d.yes}</Button></>
+        : <Button kind="primary" onClick={() => done(true)}>OK</Button>}>
+      {String(d.message).split('\n').map((l, i) => <p key={i}>{l}</p>)}
+    </Modal>
   );
 }
 

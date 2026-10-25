@@ -20,17 +20,44 @@ import (
 // internet connection) or broadcasts a network of its own (and can then be a LAN port, alone or
 // in a bridge). The person setting up the device decides.
 
+// WifiChannel is one channel as the driver reports it under the country in force now.
+type WifiChannel struct {
+	Num      int    `json:"num"`
+	MHz      int    `json:"mhz"`
+	Band     string `json:"band"`     // "2.4", "5" or "6"
+	Disabled bool   `json:"disabled"` // not allowed at all
+	NoIR     bool   `json:"no_ir"`    // may listen but not start a network ("no initiating radiation")
+	Radar    bool   `json:"radar"`    // shared with weather radar: needs radar detection and waiting
+}
+
+// Usable says whether a network can be broadcast on the channel without radar detection.
+func (c WifiChannel) Usable() bool { return !c.Disabled && !c.NoIR && !c.Radar }
+
 // WifiCaps is what a card can do, read from the driver.
 type WifiCaps struct {
 	AP    bool     `json:"ap"`
-	Bands []string `json:"bands"` // "2.4", "5"
-	VHT   bool     `json:"vht"`   // 802.11ac on 5 GHz
+	Bands []string `json:"bands"` // bands the card has any allowed channel in: it can join networks there
+	// ApBands are the bands it can actually broadcast on right now, under the country in force.
+	// A band the card lists but may not start a network on (most 5 GHz channels until a country is
+	// set) is in Bands but not here.
+	ApBands []string `json:"ap_bands"`
+	// Listed are the bands the hardware has at all, whatever the country allows.
+	Listed   []string      `json:"listed"`
+	VHT      bool          `json:"vht"` // 802.11ac on 5 GHz
+	Std      string        `json:"std"` // fastest standard: n, ac, ax or be
+	Channels []WifiChannel `json:"channels"`
 }
 
 // ParseWifiCaps reads `iw phy <name> info`.
 func ParseWifiCaps(info string) WifiCaps {
 	var c WifiCaps
 	inModes := false
+	rank := map[string]int{"": 0, "n": 1, "ac": 2, "ax": 3, "be": 4}
+	std := func(s string) {
+		if rank[s] > rank[c.Std] {
+			c.Std = s
+		}
+	}
 	for _, line := range strings.Split(info, "\n") {
 		l := strings.TrimSpace(line)
 		switch {
@@ -45,30 +72,114 @@ func ParseWifiCaps(info string) WifiCaps {
 		if inModes && l == "* AP" {
 			c.AP = true
 		}
-		if strings.HasPrefix(l, "VHT Capabilities") {
+		switch {
+		case strings.HasPrefix(l, "HT Capabilities"):
+			std("n")
+		case strings.HasPrefix(l, "VHT Capabilities"):
 			c.VHT = true
+			std("ac")
+		case strings.HasPrefix(l, "HE Iftypes"), strings.HasPrefix(l, "HE Capabilities"), strings.HasPrefix(l, "HE MAC Capabilities"):
+			std("ax")
+		case strings.HasPrefix(l, "EHT Iftypes"), strings.HasPrefix(l, "EHT Capabilities"), strings.HasPrefix(l, "EHT MAC Capabilities"):
+			std("be")
 		}
 		// Frequencies tell the bands apart; a band's header does not say which it is.
 		if strings.HasPrefix(l, "* ") && strings.Contains(l, " MHz [") {
 			f := strings.Fields(l)
-			if len(f) > 1 {
-				var mhz int
-				fmt.Sscanf(f[1], "%d", &mhz)
-				band := ""
-				switch {
-				case mhz >= 2400 && mhz < 2500:
-					band = "2.4"
-				case mhz >= 5000 && mhz < 5900:
-					band = "5"
-				}
-				if band != "" && !hasStr(c.Bands, band) {
-					c.Bands = append(c.Bands, band)
-				}
+			if len(f) < 4 {
+				continue
+			}
+			var mhz, num int
+			fmt.Sscanf(f[1], "%d", &mhz)
+			fmt.Sscanf(strings.Trim(f[3], "[]"), "%d", &num)
+			band := ""
+			switch {
+			case mhz >= 2400 && mhz < 2500:
+				band = "2.4"
+			case mhz >= 5000 && mhz < 5900:
+				band = "5"
+			case mhz >= 5925 && mhz <= 7125:
+				band = "6"
+			}
+			if band == "" {
+				continue
+			}
+			ch := WifiChannel{Num: num, MHz: mhz, Band: band}
+			if i := strings.Index(l, "dBm)"); i >= 0 {
+				flags := l[i+4:]
+				ch.Disabled = strings.Contains(flags, "disabled")
+				ch.NoIR = strings.Contains(flags, "no IR")
+				ch.Radar = strings.Contains(flags, "radar detection")
+			} else {
+				ch.Disabled = strings.Contains(l, "disabled")
+			}
+			c.Channels = append(c.Channels, ch)
+			if !hasStr(c.Listed, band) {
+				c.Listed = append(c.Listed, band)
+			}
+			if !ch.Disabled && !hasStr(c.Bands, band) {
+				c.Bands = append(c.Bands, band)
+			}
+			// 6 GHz broadcasting is not offered yet: only 2.4 and 5 GHz networks are generated.
+			if ch.Usable() && band != "6" && !hasStr(c.ApBands, band) {
+				c.ApBands = append(c.ApBands, band)
 			}
 		}
 	}
 	sort.Strings(c.Bands)
+	sort.Strings(c.ApBands)
+	sort.Strings(c.Listed)
+	return c.normal()
+}
+
+// normal makes every list a real list, so the console never meets a null.
+func (c WifiCaps) normal() WifiCaps {
+	if c.Bands == nil {
+		c.Bands = []string{}
+	}
+	if c.ApBands == nil {
+		c.ApBands = []string{}
+	}
+	if c.Listed == nil {
+		c.Listed = []string{}
+	}
+	if c.Channels == nil {
+		c.Channels = []WifiChannel{}
+	}
 	return c
+}
+
+// RegCountry reads the country the system applies to a card, from `iw reg get`. A card that
+// manages its own regulatory rules (some Realtek and Intel cards) has its own entry.
+func RegCountry(out, phy string) string {
+	global, own := "", ""
+	section := ""
+	for _, line := range strings.Split(out, "\n") {
+		l := strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(l, "global"):
+			section = "global"
+		case strings.HasPrefix(l, "phy#"):
+			section = "phy"
+			if n := strings.TrimPrefix(strings.SplitN(l, " ", 2)[0], "phy#"); phy == "phy"+n {
+				section = "own"
+			}
+		case strings.HasPrefix(l, "country "):
+			f := strings.Fields(strings.TrimSuffix(l, ":"))
+			if len(f) >= 2 {
+				cc := strings.TrimSuffix(f[1], ":")
+				if section == "global" && global == "" {
+					global = cc
+				} else if section == "own" && own == "" {
+					own = cc
+				}
+			}
+		}
+	}
+	if own != "" {
+		return own
+	}
+	return global
 }
 
 func hasStr(l []string, s string) bool {
@@ -103,6 +214,45 @@ type WifiLive struct {
 	SSID   string   `json:"ssid"`
 	Signal int      `json:"signal"` // dBm, joined networks only
 	Addrs  []string `json:"addrs"`
+	// Serves is, for a card that broadcasts, the network it carries. The address belongs to that
+	// network (or to the bridge it is part of), never to the card itself.
+	Serves *WifiServes `json:"serves,omitempty"`
+}
+
+// WifiServes says which network a broadcasting card carries.
+type WifiServes struct {
+	Name string `json:"name"`           // the port or bridge that has the address, for example br-lan
+	Zone string `json:"zone,omitempty"` // the firewall network it belongs to, for example Home
+	Addr string `json:"addr,omitempty"` // the router's address on it, for example 192.168.50.1/24
+	Via  string `json:"via,omitempty"`  // set when the card is a member of the bridge Name
+}
+
+// wifiServes finds the network a broadcasting card is attached to: its own network, or the bridge
+// it belongs to. It returns nil when the card has no network, which is a setup that needs fixing.
+func wifiServes(q querier, iface string) *WifiServes {
+	rows, err := q.Query(`SELECT i.name,i.kind,i.members,i.ipv4_cidr,COALESCE(z.name,'') FROM interfaces i LEFT JOIN zones z ON z.id=i.zone_id WHERE i.enabled=1 ORDER BY i.id`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var via *WifiServes
+	for rows.Next() {
+		var name, kind, mem, cidr, zone string
+		if rows.Scan(&name, &kind, &mem, &cidr, &zone) != nil {
+			continue
+		}
+		if name == iface {
+			return &WifiServes{Name: name, Zone: zone, Addr: cidr}
+		}
+		if kind == "bridge" {
+			for _, m := range strings.Split(mem, ",") {
+				if strings.TrimSpace(m) == iface {
+					via = &WifiServes{Name: name, Zone: zone, Addr: cidr, Via: name}
+				}
+			}
+		}
+	}
+	return via
 }
 
 // ParseIwLink reads `iw dev <name> link`.
@@ -156,14 +306,17 @@ func liveWifi(name, mode string) WifiLive {
 }
 
 type wifiCard struct {
-	Live    *WifiLive `json:"live,omitempty"`
-	Iface   string    `json:"iface"`
-	MAC     string    `json:"mac"`
-	Driver  string    `json:"driver"`
-	USB     bool      `json:"usb"`
-	Caps    WifiCaps  `json:"caps"`
-	Saved   *WifiRow  `json:"saved"`
-	Present bool      `json:"present"`
+	Live   *WifiLive `json:"live,omitempty"`
+	Iface  string    `json:"iface"`
+	MAC    string    `json:"mac"`
+	Driver string    `json:"driver"`
+	USB    bool      `json:"usb"`
+	Caps   WifiCaps  `json:"caps"`
+	// Reg is the country the system applies to this card right now. The channel list is for that
+	// country, and is read again after a different one is applied.
+	Reg     string   `json:"reg"`
+	Saved   *WifiRow `json:"saved"`
+	Present bool     `json:"present"`
 }
 
 // WifiRow is a card's saved setup. The password is write-only.
@@ -240,7 +393,7 @@ func (a *App) wifiCards() []wifiCard {
 			continue
 		}
 		real, _ := filepath.EvalSymlinks(base)
-		c := wifiCard{Iface: n, Present: true, USB: strings.Contains(real, "/usb")}
+		c := wifiCard{Iface: n, Present: true, USB: strings.Contains(real, "/usb"), Caps: WifiCaps{}.normal()}
 		if m, err := os.ReadFile(base + "/address"); err == nil {
 			c.MAC = strings.TrimSpace(string(m))
 		}
@@ -249,6 +402,9 @@ func (a *App) wifiCards() []wifiCard {
 		}
 		if b, err := exec.Command("iw", "phy", strings.TrimSpace(string(phy)), "info").Output(); err == nil {
 			c.Caps = ParseWifiCaps(string(b))
+		}
+		if b, err := exec.Command("iw", "reg", "get").Output(); err == nil {
+			c.Reg = RegCountry(string(b), strings.TrimSpace(string(phy)))
 		}
 		for i := range saved {
 			if saved[i].Iface == n {
@@ -260,6 +416,9 @@ func (a *App) wifiCards() []wifiCard {
 			mode = c.Saved.Mode
 		}
 		lv := liveWifi(n, mode)
+		if mode == "ap" && c.Saved != nil && c.Saved.Enabled {
+			lv.Serves = wifiServes(a.Config, n)
+		}
 		c.Live = &lv
 		out = append(out, c)
 	}
@@ -294,9 +453,27 @@ func (a *App) registerWifiRoutes() {
 				fail(w, fmt.Errorf("this card cannot broadcast a network; use it to join one instead"))
 				return
 			}
-			if in.Mode == "ap" && len(card.Caps.Bands) > 0 && !hasStr(card.Caps.Bands, in.Band) {
+			if in.Mode == "ap" && len(card.Caps.Listed) > 0 && !hasStr(card.Caps.Listed, in.Band) {
 				fail(w, fmt.Errorf("this card does not support %s GHz", in.Band))
 				return
+			}
+			// The channel list is for the country in force now. Only when the chosen country is that
+			// same country can it be trusted; a new country is checked again once it is applied.
+			if in.Mode == "ap" && card.Reg != "" && in.Country == card.Reg && len(card.Caps.Channels) > 0 && !hasStr(card.Caps.ApBands, in.Band) {
+				fail(w, fmt.Errorf("this card may not broadcast on %s GHz in %s. Choose %s, or another band", in.Band, in.Country, otherBand(card.Caps.ApBands, in.Band)))
+				return
+			}
+			if in.Mode == "ap" && in.Channel != 0 && card.Reg != "" && in.Country == card.Reg {
+				ok := false
+				for _, ch := range card.Caps.Channels {
+					if ch.Num == in.Channel && ch.Band == in.Band && ch.Usable() {
+						ok = true
+					}
+				}
+				if !ok {
+					fail(w, fmt.Errorf("channel %d is not available for broadcasting in %s; use Automatic or pick another channel", in.Channel, in.Country))
+					return
+				}
 			}
 			in.Fast = card.Caps.VHT && in.Band == "5"
 		}
@@ -343,4 +520,14 @@ func (a *App) registerWifiRoutes() {
 		}
 		api.JSON(w, 200, nets)
 	})
+}
+
+// otherBand names the band to suggest when the asked one is not allowed.
+func otherBand(ap []string, asked string) string {
+	for _, b := range ap {
+		if b != asked {
+			return b + " GHz"
+		}
+	}
+	return "another card"
 }

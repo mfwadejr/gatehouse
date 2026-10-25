@@ -5,6 +5,7 @@ package privsep
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,6 +19,7 @@ import (
 	"gatehouse/internal/fw"
 	"gatehouse/internal/netcfg"
 	"gatehouse/internal/netd"
+	"gatehouse/internal/speedtest"
 	"gatehouse/internal/wanmon"
 )
 
@@ -39,6 +41,7 @@ type NetController interface {
 	SystemCheck() (netd.SystemUpdates, error)
 	SystemUpdateStart() error
 	Power(action string) error
+	SpeedTest(ctx context.Context, p speedtest.Params) (speedtest.Result, error)
 }
 
 const maxRequest = 16 << 20
@@ -300,6 +303,14 @@ func (s *Server) dispatchNet(r request) (any, error) {
 		return s.Net.SystemCheck()
 	case "system.start":
 		return nil, s.Net.SystemUpdateStart()
+	case "speed.run":
+		var p speedtest.Params
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+		defer cancel()
+		return s.Net.SpeedTest(ctx, p)
 	case "system.power":
 		var p struct {
 			Action string `json:"action"`
@@ -478,6 +489,13 @@ func (c *Client) SystemCheck() (netd.SystemUpdates, error) {
 // "restart-gatehouse").
 func (c *Client) Power(action string) error {
 	return c.call("system.power", map[string]string{"action": action}, nil)
+}
+
+// SpeedTest measures one connection through its own device. It takes about twenty seconds.
+func (c *Client) SpeedTest(p speedtest.Params) (speedtest.Result, error) {
+	var out speedtest.Result
+	err := c.callWithin(2*time.Minute, "speed.run", p, &out)
+	return out, err
 }
 
 // SystemUpdateStart installs only the operating system's updates.

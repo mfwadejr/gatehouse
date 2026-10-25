@@ -56,7 +56,7 @@ function TwoStep({ me, data, reload, boot }) {
   const required = !!data?.mfa_required;
   if (turningOn) return <Enrol onDone={() => { setTurningOn(false); reload(); boot?.(); }} />;
   return (
-    <Card title="Two-step sign-in" desc="A code from an authenticator app on your phone, asked for each time you sign in. Optional, and you can turn it off again.">
+    <Card title="Two-factor sign-in" desc="A code from an authenticator app on your phone, asked for each time you sign in. Optional, and you can turn it off again.">
       <div className="inline"><Pill tone={on ? 'good' : 'warn'}>{on ? 'On' : 'Off'}</Pill>
         {on && <span className="sec small">{data ? `${data.recovery_left} recovery code${data.recovery_left === 1 ? '' : 's'} left` : ''}</span>}</div>
       {on && data && data.recovery_left <= 2 && <Note tone="warn">You are running low on recovery codes.</Note>}
@@ -65,15 +65,15 @@ function TwoStep({ me, data, reload, boot }) {
         {on && <Button onClick={() => setTurningOn(true)}>Set up a new phone</Button>}
         {on && <Button kind="danger" disabled={required} onClick={() => setTurningOff(true)}>Turn off</Button>}
       </div>
-      {on && required && <Note>Two-step sign-in is required for every account, so it cannot be turned off. An administrator can change that below.</Note>}
+      {on && required && <Note>Two-factor sign-in is required for every account, so it cannot be turned off. An administrator can change that below.</Note>}
       {me.user.role === 'admin' && (
-        <ToggleRow title="Require two-step sign-in for every account" desc={on ? 'Everyone will be asked to set it up the next time they sign in.' : 'Turn it on for your own account first.'}
+        <ToggleRow title="Require two-factor sign-in for every account" desc={on ? 'Everyone will be asked to set it up the next time they sign in.' : 'Turn it on for your own account first.'}
           checked={required} disabled={!on && !required} onChange={(v) => run(() => put('/api/auth/policy', { require_mfa: v })).then(reload)} />
       )}
       {turningOff && (
-        <Modal title="Turn off two-step sign-in" onClose={() => setTurningOff(false)}
+        <Modal title="Turn off two-factor sign-in" onClose={() => setTurningOff(false)}
           footer={<><Button onClick={() => setTurningOff(false)}>Cancel</Button><Button kind="danger" disabled={busy || !f.password || !f.code}
-            onClick={async () => { if (await run(() => post('/api/auth/mfa/disable', { password: f.password, code: f.code.trim() }), 'Two-step sign-in is off.')) { setTurningOff(false); setF({ password: '', code: '' }); reload(); boot?.(); } }}>Turn off</Button></>}>
+            onClick={async () => { if (await run(() => post('/api/auth/mfa/disable', { password: f.password, code: f.code.trim() }), 'Two-factor sign-in is off.')) { setTurningOff(false); setF({ password: '', code: '' }); reload(); boot?.(); } }}>Turn off</Button></>}>
           <p className="sec">Confirm it is you. Enter your password and a current code from your phone (or a recovery code).</p>
           <Field label="Password"><Input type="password" value={f.password} onChange={(v) => setF({ ...f, password: v })} autoComplete="current-password" /></Field>
           <Field label="Code"><Input className="codebox" value={f.code} onChange={(v) => setF({ ...f, code: v })} inputMode="numeric" autoComplete="one-time-code" /></Field>
@@ -123,7 +123,7 @@ function ConsolePort() {
       ) : (
         <div className="stack">
           <Field label="New port" hint="A number from 1 to 65535, like 8443. The old port keeps working until you confirm the new one. Ports used by DNS, DHCP, a VPN or a port forward are refused.">
-            <div className="inline"><Input value={port} onChange={setPort} placeholder="8443" inputMode="numeric" style={{ maxWidth: '8rem' }} /><Button kind="primary" disabled={busy || !port} onClick={start}>Try this port</Button></div>
+            <div className="inline"><Input value={port} onChange={setPort} aria-label="New console port" placeholder="8443" inputMode="numeric" style={{ maxWidth: '8rem' }} /><Button kind="primary" disabled={busy || !port} onClick={start}>Try this port</Button></div>
           </Field>
           <p className="small muted">Forgot the port? The machine's own screen always shows the address, and the recovery screen (Alt+F2) can put it back to 443.</p>
         </div>
