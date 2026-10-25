@@ -90,7 +90,7 @@ func RunTextInstaller() error {
 	if hasUART(sdev) {
 		if f, err := os.OpenFile("/dev/"+sdev, os.O_RDWR|0x100 /* O_NOCTTY */, 0); err == nil {
 			rawTTY("/dev/"+sdev, baud)
-			outs = append(outs, f)
+			outs = append(outs, plainSerial(f))
 			pump(f)
 			serial = fmt.Sprintf("%s, %d baud, 8 data bits, no parity, 1 stop bit (8N1), no flow control", sdev, baud)
 		}

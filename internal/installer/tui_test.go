@@ -265,3 +265,26 @@ func TestScreensResetCharset(t *testing.T) {
 		t.Fatalf("clear must select ASCII, got %q", b.String())
 	}
 }
+
+func TestSerialIsPlainASCII(t *testing.T) {
+	scr := RenderScreen([]Port{{Name: "eth0", Link: true}}, []string{"https://192.168.1.1"}, "ABC-123", 80, 24)
+	var b bytes.Buffer
+	n, err := plainSerial(&b).Write([]byte(scr))
+	if err != nil || n != len(scr) {
+		t.Fatalf("write: %d %v", n, err)
+	}
+	for i, c := range b.Bytes() {
+		if c >= 0x80 {
+			t.Fatalf("byte %d is not ASCII: %q", i, b.String()[max(0, i-20):i+5])
+		}
+		if c == 0x0e || c == 0x8e || c == 0x8f {
+			t.Fatalf("shift code at %d", i)
+		}
+	}
+	if !strings.Contains(b.String(), "+-") {
+		t.Fatalf("expected a drawn box: %q", b.String()[:200])
+	}
+	if got := ASCII("Getting a network address…"); got != "Getting a network address..." {
+		t.Fatal(got)
+	}
+}
