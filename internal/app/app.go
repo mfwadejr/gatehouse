@@ -151,6 +151,7 @@ func New(cfg Config) (*App, error) {
 	a.Net = cfg.Net
 	a.registerRoutes()
 	a.registerSetupRoutes()
+	a.registerChecklistRoutes()
 	a.registerUPnPRoutes()
 	a.prepareSetup()
 

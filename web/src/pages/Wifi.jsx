@@ -10,6 +10,13 @@ const COUNTRIES = {
   MX: 'Mexico', ZA: 'South Africa', AE: 'United Arab Emirates', IL: 'Israel',
 };
 
+// Who uses a Wi-Fi network decides its firewall network: what it may reach and whether it gets the internet.
+const WHO = {
+  own: { name: 'Wi-Fi', kind: 'trusted', internet: true, intra: true },
+  guest: { name: 'Guest Wi-Fi', kind: 'guest', internet: true, intra: false },
+  iot: { name: 'Smart-home Wi-Fi', kind: 'isolated', internet: false, intra: true },
+};
+
 const MODES = [
   { value: 'client', label: 'Join a Wi-Fi network' },
   { value: 'ap', label: 'Broadcast a Wi-Fi network' },
@@ -101,9 +108,10 @@ function Setup({ card, country, wans, ifs, onClose, onSaved }) {
         const [ip, bits] = cidr.split('/');
         const o = ip.split('.').map(Number);
         const net = `${o[0]}.${o[1]}.${o[2]}.0/${bits}`;
+        const z = WHO[where] || WHO.own;
         await put('/api/net/interfaces', { name: card.iface, kind: 'phys', ipv4: cidr, enabled: true });
-        await put('/api/fw/zones', { name: 'Wi-Fi', kind: 'trusted', ifaces: [card.iface], internet: true, management: false, gateway: true, intra_allow: true });
-        await put('/api/dhcp/scopes', { name: 'Wi-Fi', iface: card.iface, mode: 'serve', subnet: net, range_start: `${o[0]}.${o[1]}.${o[2]}.100`, range_end: `${o[0]}.${o[1]}.${o[2]}.200`, router: ip, dns: ip, domain: 'lan', ntp: '', lease_seconds: 43200, relay_addr: '', enabled: true });
+        await put('/api/fw/zones', { name: z.name, kind: z.kind, ifaces: [card.iface], internet: z.internet, management: false, gateway: true, intra_allow: z.intra });
+        await put('/api/dhcp/scopes', { name: z.name, iface: card.iface, mode: 'serve', subnet: net, range_start: `${o[0]}.${o[1]}.${o[2]}.100`, range_end: `${o[0]}.${o[1]}.${o[2]}.200`, router: ip, dns: ip, domain: 'lan', ntp: '', lease_seconds: z.kind === 'guest' ? 3600 * 4 : 43200, relay_addr: '', enabled: true });
       }
       await put('/api/net/wifi', f);
       return true;
@@ -164,10 +172,10 @@ function Setup({ card, country, wans, ifs, onClose, onSaved }) {
           <Field label="Speed band" hint="5 GHz is faster and less crowded; 2.4 GHz reaches farther.">
             <Segmented value={f.band} onChange={set('band')} options={[{ value: '5', label: '5 GHz' }, { value: '2.4', label: '2.4 GHz' }].filter((o) => !card.caps.bands.length || card.caps.bands.includes(o.value))} />
           </Field>
-          <Field label="Where do the devices on this Wi-Fi connect?">
-            <Segmented value={where} onChange={setWhere} options={[{ value: 'own', label: 'Its own network' }, ...(bridges.length ? [{ value: 'bridge', label: 'Join an existing network' }] : [])]} />
+          <Field label="Who will use this Wi-Fi?" hint={where === 'bridge' ? 'Devices join the same network as your wired ones.' : where === 'guest' ? 'Visitors: internet only, they cannot reach your other networks.' : where === 'iot' ? 'Cameras and smart-home gadgets: no internet and no other networks.' : 'Your own phones and laptops: their own address range, able to reach your other networks.'}>
+            <Segmented value={where} onChange={setWhere} options={[{ value: 'own', label: 'My own devices' }, ...(bridges.length ? [{ value: 'bridge', label: 'Same network as wired' }] : []), { value: 'guest', label: 'Guests' }, { value: 'iot', label: 'Smart-home gadgets' }]} />
           </Field>
-          {where === 'own' ? (
+          {where !== 'bridge' ? (
             <Field label="Address of this device on the Wi-Fi network" hint="Gatehouse will also hand out addresses and protect it with the firewall."><Input value={cidr} onChange={setCidr} /></Field>
           ) : (
             <Field label="Network"><Select value={bridge} onChange={setBridge} options={bridges.map((b) => ({ value: b.name, label: `${b.name} (${(b.members || []).join(', ')})` }))} /></Field>

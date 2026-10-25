@@ -365,6 +365,11 @@ func (a *App) registerAddNetRoutes() {
 		}
 		used := a.usedNets(a.Config)
 		out := map[string]any{"ports": pl}
+		// The first network on a machine that has none able to manage it also becomes the one
+		// that manages it; the form says so.
+		if m, err := fw.Load(a.Config); err == nil {
+			out["first"] = !hasManagementNetwork(m)
+		}
 		if p, ok := suggestPrefix(used); ok {
 			rt := routerOf(p)
 			out["address"] = rt.String()

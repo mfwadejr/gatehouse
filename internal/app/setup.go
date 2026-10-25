@@ -238,6 +238,7 @@ func (a *App) registerSetupRoutes() {
 			a.Auth.SetMFARequired(true)
 		}
 		a.Config.SetSetting(wizardSetting, "done")
+		a.Config.SetSetting(setupModeKey, in.Network.LAN.Mode)
 		a.writeSetupState()
 		// The change moves this very connection when Gatehouse becomes the router, so it is
 		// applied a moment after the answer has gone out.

@@ -31,6 +31,9 @@ export default function AddNetwork({ onClose, onCreated }) {
     return () => clearTimeout(timer.current);
   }, [f.address]);
 
+  // What the network is for sets the two switches below it; changing a switch by hand leaves none selected.
+  const purposes = { own: { internet: true, isolate: false }, guest: { internet: true, isolate: true }, iot: { internet: false, isolate: true } };
+  const purpose = Object.keys(purposes).find((k) => purposes[k].internet === f.internet && purposes[k].isolate === f.isolate) || '';
   const port = sug?.ports?.find((p) => p.name === f.port);
   const shared = !!port?.use; // the port already has something on it, so this network rides on a VLAN
   useEffect(() => {
@@ -53,8 +56,12 @@ export default function AddNetwork({ onClose, onCreated }) {
     <Modal title="Add a network" onClose={onClose}
       footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" onClick={save} disabled={busy || !f.name.trim() || !f.port || chk?.ok === false}>Add network</Button></>}>
       <div className="stack">
-        <Field label="Name" hint="For example Cameras, Guests or Office.">
+        {sug?.first && <Note tone="good" title="This is your first network">It will also be allowed to manage this device, so you can always reach this console from it. You can change that later under Firewall.</Note>}
+        <Field label="Name" hint="For example Home, Cameras, Guests or Office.">
           <Input value={f.name} onChange={set('name')} maxLength={40} autoComplete="off" />
+        </Field>
+        <Field label="What is this network for?" hint={purpose === 'own' ? 'Your own computers and phones. They can reach the internet and your other networks.' : purpose === 'guest' ? 'Visitors. Internet only; they cannot reach your other networks.' : purpose === 'iot' ? 'Cameras and smart-home gadgets. No internet and no other networks.' : 'Custom: set by the two switches further down.'}>
+          <Segmented value={purpose} onChange={(k) => setF((x) => ({ ...x, ...purposes[k] }))} options={[{ value: 'own', label: 'My own devices' }, { value: 'guest', label: 'Guests' }, { value: 'iot', label: 'Cameras and smart-home' }]} />
         </Field>
         <Field label="Port" hint={shared ? 'This port already has a network, so the new one shares it using a VLAN. Your switch must pass that VLAN number.' : 'Plug the switch or devices for this network into this port.'}>
           <Select value={f.port} onChange={set('port')} options={portOptions.length ? portOptions : [{ value: '', label: 'No ports found' }]} />

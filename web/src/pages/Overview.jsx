@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useData, useStream } from '../api.js';
+import { useData, useStream, put } from '../api.js';
 import { Card, Empty, Icon, Page, Pill, Spark, Trend, Tile, Bar, fmt, Note } from '../ui.jsx';
 import { go } from '../App.jsx';
 
@@ -10,6 +10,35 @@ function Status({ title, tone, state, big, small, to }) {
       <div className="val" style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 600 }}>{big}</div>
       <div className="small muted">{small}</div>
       <button className="link small" style={{ textAlign: 'left' }} onClick={() => go(to)}>Open →</button>
+    </Card>
+  );
+}
+
+// The "Finish setting up" list. It is worked out from what the machine has, so it is right in any
+// order, and it goes away by itself when everything is done.
+function SetupChecklist() {
+  const { data, reload } = useData('/api/setup/checklist', { topics: ['net.status', 'fw.status'], every: 15000 });
+  if (!data || !data.items?.length) return null;
+  const hide = async (hidden) => { try { await put('/api/setup/checklist', { hidden }); } catch { /* ignore */ } reload(); };
+  if (data.left === 0) return null;
+  if (data.hidden) {
+    return <p className="small muted"><button type="button" className="link" onClick={() => hide(false)}>Show the setup checklist ({data.left} left)</button></p>;
+  }
+  const done = data.items.length - data.left;
+  return (
+    <Card title="Finish setting up" desc={`${done} of ${data.items.length} done. You can do these in any order, and change any of them later.`}
+      actions={<button type="button" className="link small" onClick={() => hide(true)}>Hide for now</button>}>
+      <ul className="stack" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        {data.items.map((i) => (
+          <li key={i.id} className="spread" style={{ gap: 'var(--space-3)', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ fontWeight: 600 }}>{i.done ? '✓ ' : ''}{i.text}</div>
+              <div className="small muted">{i.why}</div>
+            </div>
+            {i.done ? <Pill tone="good">Done</Pill> : <button type="button" className="btn small primary" onClick={() => go(i.to)}>Set up</button>}
+          </li>
+        ))}
+      </ul>
     </Card>
   );
 }
@@ -63,6 +92,7 @@ export default function Overview() {
 
   return (
     <Page title="Overview" sub={`${leases?.length ?? 0} devices have an address · ${attention.length ? `${attention.length} item${attention.length > 1 ? 's' : ''} need attention` : 'all good'}`}>
+      <SetupChecklist />
       <section className="grid" aria-label="Status">
         <Status title="Internet" tone={wanTone} state={!wanList.length ? 'Not set up' : wanTone === 'good' ? 'Healthy' : wanTone === 'warn' ? 'Degraded' : 'Down'}
           big={active || '–'} small={wanList.length > 1 ? 'Primary active · others on standby' : wanList.length ? 'Single connection' : 'Add a connection'} to="internet" />

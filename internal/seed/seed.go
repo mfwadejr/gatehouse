@@ -23,6 +23,9 @@ type LAN struct {
 
 	// Router mode.
 	Address string `json:"address"` // this device on the LAN, for example 192.168.1.1/24
+	// NoDHCP leaves address handing-out off on the LAN (router mode only), for networks where
+	// devices are set by hand or another server on the LAN does it.
+	NoDHCP bool `json:"no_dhcp,omitempty"`
 
 	// Behind mode. Addressing is "dhcp" or "static".
 	Addressing string `json:"addressing"`
@@ -232,8 +235,12 @@ func Apply(db *store.DB, box *crypt.Box, n *Network) error {
 	if l.Mode == "router" {
 		p := netip.MustParsePrefix(l.Address)
 		s, e := Range(p)
+		mode, on := "serve", 1
+		if l.NoDHCP {
+			mode, on = "off", 0
+		}
 		if _, err := tx.Exec(`INSERT INTO dhcp_scopes(name,iface,mode,subnet,range_start,range_end,router,dns,domain,lease_seconds,enabled)
-			VALUES('Home',?,'serve',?,?,?,?,?,'lan',86400,1)`, lanName, p.Masked().String(), s.String(), e.String(), p.Addr().String(), p.Addr().String()); err != nil {
+			VALUES('Home',?,?,?,?,?,?,?,'lan',86400,?)`, lanName, mode, p.Masked().String(), s.String(), e.String(), p.Addr().String(), p.Addr().String(), on); err != nil {
 			return err
 		}
 	}
