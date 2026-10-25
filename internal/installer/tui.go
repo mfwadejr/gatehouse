@@ -38,7 +38,7 @@ func (t *Term) p(f string, a ...any) {
 	fmt.Fprintf(t.w, strings.ReplaceAll(f, "\n", "\r\n"+t.M), a...)
 }
 
-func (t *Term) clear() { io.WriteString(t.w, "\x1b[0m\x1b[2J\x1b[H") }
+func (t *Term) clear() { io.WriteString(t.w, asciiReset+"\x1b[0m\x1b[2J\x1b[H") }
 
 // readLine reads until Enter. Backspace edits, Ctrl-U clears, Ctrl-C starts over, and arrow
 // keys and other escape sequences are ignored. With echo off each character shows as a star.

@@ -252,3 +252,16 @@ type safeBuf struct {
 
 func (s *safeBuf) Write(p []byte) (int, error) { s.mu.Lock(); defer s.mu.Unlock(); return s.b.Write(p) }
 func (s *safeBuf) String() string              { s.mu.Lock(); defer s.mu.Unlock(); return s.b.String() }
+
+func TestScreensResetCharset(t *testing.T) {
+	s := NewScreen(80, 24)
+	s.header("Installer")
+	if out := s.String(); !strings.HasPrefix(out, asciiReset) {
+		t.Fatalf("screen must start by selecting ASCII, got %q", out[:12])
+	}
+	var b bytes.Buffer
+	NewTerm(strings.NewReader(""), &b).clear()
+	if !strings.HasPrefix(b.String(), asciiReset) {
+		t.Fatalf("clear must select ASCII, got %q", b.String())
+	}
+}

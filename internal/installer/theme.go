@@ -14,6 +14,11 @@ import (
 // Layouts are designed for 80x24, the smallest screen the large console font gives on a
 // laptop display, and centre themselves on anything bigger.
 
+// asciiReset puts a terminal back on plain ASCII: shift-in, then ASCII for both character
+// sets. A serial terminal can be left in line-drawing mode by earlier boot output, which turns
+// every lowercase letter into a box glyph.
+const asciiReset = "\x0f\x1b(B\x1b)B"
+
 // Colours come from the design tokens. Only the sixteen console colours exist, so each
 // meaning gets one slot, and "bold" is never used for colour (the console would swap in a
 // default colour for it).
@@ -158,7 +163,7 @@ func (s *Screen) String() string {
 	}
 	room := s.H - 1
 	var b strings.Builder
-	b.WriteString("\x1b[?25l\x1b[0m\x1b[2J\x1b[H")
+	b.WriteString(asciiReset + "\x1b[?25l\x1b[0m\x1b[2J\x1b[H")
 	used := 0
 	for i := 0; i < top; i++ {
 		b.WriteString("\r\n")
