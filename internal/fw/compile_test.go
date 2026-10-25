@@ -232,3 +232,35 @@ func TestStartingRulesFollowPort(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+// Before setup is finished, a computer plugged into the management port must be able to ask for
+// an address and a name; nothing else new is opened.
+func TestFirstBootBaselineLetsTheSetupPortGetAnAddress(t *testing.T) {
+	dir := t.TempDir()
+	InstallNetPath = filepath.Join(dir, "install-net")
+	defer func() { InstallNetPath = "/var/lib/gatehouse/install-net" }()
+	got := FirstBootBaselineFor(443)
+	if !strings.Contains(got, "udp sport 68 udp dport 67 accept") {
+		t.Fatal("DHCP requests from a computer on the setup port would be dropped")
+	}
+	if strings.Contains(got, "dport 53") {
+		t.Fatal("DNS must not be open when no setup network was chosen")
+	}
+	os.WriteFile(InstallNetPath, []byte("wan enp1s0 aa:bb\nmgmt 192.168.51.1/24\n"), 0o644)
+	got = FirstBootBaselineFor(8443)
+	for _, want := range []string{"ip saddr 192.168.51.0/24 udp dport 53 accept", "ip saddr 192.168.51.0/24 tcp dport 53 accept", "tcp dport 8443 ct state new"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("missing %q in:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "policy accept") {
+		t.Fatal("the baseline must still drop by default")
+	}
+	if p, err := exec.LookPath("nft"); err == nil {
+		f := filepath.Join(dir, "b.nft")
+		os.WriteFile(f, []byte(got), 0o644)
+		if out, err := exec.Command(p, "-c", "-f", f).CombinedOutput(); err != nil && !strings.Contains(string(out), "Operation not permitted") {
+			t.Fatalf("nft rejects the baseline: %v\n%s", err, out)
+		}
+	}
+}

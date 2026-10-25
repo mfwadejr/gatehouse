@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/netip"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -354,7 +355,35 @@ func (a *Applier) baseline() string {
 
 // FirstBootBaselineFor is the starting rules with the console on the given port.
 func FirstBootBaselineFor(port int) string {
-	return strings.Replace(FirstBootBaseline, "tcp dport 443 ct state new", fmt.Sprintf("tcp dport %d ct state new", port), 1)
+	b := strings.Replace(FirstBootBaseline, "tcp dport 443 ct state new", fmt.Sprintf("tcp dport %d ct state new", port), 1)
+	// A computer plugged into the management port asks this machine for an address (a request
+	// to DHCP port 67) and for names (port 53) before anything else is set up. Without these two
+	// rules the baseline would drop both and the computer would never get an address.
+	extra := "\t\tudp sport 68 udp dport 67 accept\n"
+	if n := setupNetwork(); n != "" {
+		extra += fmt.Sprintf("\t\tip saddr %s udp dport 53 accept\n\t\tip saddr %s tcp dport 53 accept\n", n, n)
+	}
+	return strings.Replace(b, "\t\tudp sport 547 udp dport 546 accept\n", "\t\tudp sport 547 udp dport 546 accept\n"+extra, 1)
+}
+
+// InstallNetPath is where the installer left the network it chose.
+var InstallNetPath = "/var/lib/gatehouse/install-net"
+
+// setupNetwork is the management network the installer chose, like 192.168.51.0/24, or "".
+func setupNetwork() string {
+	b, err := os.ReadFile(InstallNetPath)
+	if err != nil {
+		return ""
+	}
+	for _, l := range strings.Split(string(b), "\n") {
+		f := strings.Fields(l)
+		if len(f) == 2 && f[0] == "mgmt" {
+			if p, err := netip.ParsePrefix(f[1]); err == nil && p.Addr().Is4() {
+				return p.Masked().String()
+			}
+		}
+	}
+	return ""
 }
 
 // Boot is called before the console starts listening: it loads the last known good ruleset,
