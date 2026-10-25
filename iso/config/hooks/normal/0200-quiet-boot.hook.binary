@@ -116,7 +116,7 @@ if serial --unit=0 --speed=115200 --word=8 --parity=no --stop=1; then
 fi
 set theme=/boot/grub/theme/theme.txt
 
-menuentry "Install Gatehouse" {
+menuentry "Install Gatehouse  (press Enter to start)" {
   linux $L $EXTRA gatehouse.text
   initrd $I
 }

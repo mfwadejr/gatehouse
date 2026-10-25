@@ -105,7 +105,7 @@ func TestChosenAddressIsServedAtOnceAndKept(t *testing.T) {
 	// Even when a router has already given the port an address, the chosen one is used.
 	f.update("account", ports, func(string) bool { return true })
 	b, err := os.ReadFile(FallbackFile)
-	if err != nil || !strings.Contains(string(b), "Name=enp2s0") || !strings.Contains(string(b), "Address=192.168.50.1/24") || !strings.Contains(string(b), "DHCPServer=yes") {
+	if err != nil || !strings.Contains(string(b), "Name=enp2s0") || !strings.Contains(string(b), "Address=192.168.50.1/24") || strings.Contains(string(b), "DHCPServer") {
 		t.Fatalf("chosen address not served: %v %q", err, b)
 	}
 	if strings.Contains(string(b), "enp1s0") {

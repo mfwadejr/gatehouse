@@ -63,7 +63,13 @@ func FallbackConfig(port string) string { return FallbackConfigFor(port, Fallbac
 
 // FallbackConfigFor is the same with the address the person chose during the install (with its
 // size). The address pool for devices that connect sits in the upper half of the network.
-func FallbackConfigFor(port, addr string) string {
+func FallbackConfigFor(port, addr string) string { return fallbackConfig(port, addr, true) }
+
+// ChosenConfig is the file for an address the person chose during the install. It only gives the
+// port its address: Gatehouse's own DHCP service hands out addresses to whatever is plugged in.
+func ChosenConfig(port, addr string) string { return fallbackConfig(port, addr, false) }
+
+func fallbackConfig(port, addr string, server bool) string {
 	p, err := netip.ParsePrefix(addr)
 	if err != nil {
 		p = netip.MustParsePrefix(FallbackAddr + "/24")
@@ -73,19 +79,23 @@ func FallbackConfigFor(port, addr string) string {
 	if hosts < 254 {
 		offset, size = hosts/2, max(hosts/2-1, 1)
 	}
-	return fmt.Sprintf(`# Written by Gatehouse while setup is not finished: the management port's own address.
+	body := fmt.Sprintf(`# Written by Gatehouse while setup is not finished: the management port's own address.
 [Match]
 Name=%s
 
 [Network]
 Address=%s
-DHCPServer=yes
+`, port, p.String())
+	if !server {
+		return body
+	}
+	return body + fmt.Sprintf(`DHCPServer=yes
 
 [DHCPServer]
 PoolOffset=%d
 PoolSize=%d
 EmitDNS=no
-`, port, p.String(), offset, size)
+`, offset, size)
 }
 
 // fallbackPort says which port should carry the fallback address right now, or "". It wants one
@@ -194,7 +204,11 @@ func (f *fallback) update(setup string, ports []Port, hasAddr func(string) bool)
 	switch {
 	case want != "" && want != f.active:
 		os.MkdirAll(filepath.Dir(FallbackFile), 0o755)
-		if os.WriteFile(FallbackFile, []byte(FallbackConfigFor(want, f.addrOrDefault())), 0o644) == nil {
+		cfg := FallbackConfig(want)
+		if f.addr != nil && f.addr() != "" {
+			cfg = ChosenConfig(want, f.addr())
+		}
+		if os.WriteFile(FallbackFile, []byte(cfg), 0o644) == nil {
 			old := f.active
 			f.active = want
 			f.reload(want)
@@ -208,13 +222,4 @@ func (f *fallback) update(setup string, ports []Port, hasAddr func(string) bool)
 		f.active = ""
 		f.reload(old)
 	}
-}
-
-func (f *fallback) addrOrDefault() string {
-	if f.addr != nil {
-		if a := f.addr(); a != "" {
-			return a
-		}
-	}
-	return FallbackAddr + "/24"
 }

@@ -70,6 +70,9 @@ var reCountry = regexp.MustCompile(`^[A-Z]{2}$`)
 
 var rePort = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,14}$`)
 
+// SetupScope names the temporary address pool the management port serves until setup is done.
+const SetupScope = "Setup"
+
 // BridgeName is the name of the LAN bridge when extra ports join it.
 const BridgeName = "br-lan"
 
@@ -237,6 +240,9 @@ func Apply(db *store.DB, box *crypt.Box, n *Network) error {
 	}
 	defer tx.Rollback()
 
+	if _, err := tx.Exec(`DELETE FROM dhcp_scopes WHERE name=?`, SetupScope); err != nil {
+		return err
+	}
 	l := n.LAN
 	zone := fw.Zone{Name: "Home", Kind: fw.KindTrusted}
 	fw.ApplyPreset(&zone)

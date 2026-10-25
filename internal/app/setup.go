@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"log"
 	"net"
 	"net/http"
 	"net/netip"
@@ -55,7 +56,34 @@ func (a *App) writeSetupState() {
 	os.WriteFile(a.setupStatePath(), []byte(a.setupState()+"\n"), 0o644)
 }
 
-func (a *App) prepareSetup() { a.writeSetupState() }
+func (a *App) prepareSetup() {
+	a.ensureSetupScope()
+	a.writeSetupState()
+}
+
+// ensureSetupScope hands out addresses on the management port until the wizard is finished, so a
+// computer plugged into it can open the setup page. The installer chose the port and its address;
+// Gatehouse's own DHCP service does the handing out (the system's DHCP server cannot, because
+// this service already holds the DHCP port). The wizard replaces this with the real network.
+func (a *App) ensureSetupScope() {
+	a.Config.Exec(`DELETE FROM dhcp_scopes WHERE name=?`, seed.SetupScope)
+	if !a.wizardPending() {
+		return
+	}
+	n, port := installer.ReadInstallNet(), installer.MgmtPort()
+	if n.MgmtAddr == "" || port == "" {
+		return
+	}
+	p, err := netip.ParsePrefix(n.MgmtAddr)
+	if err != nil {
+		return
+	}
+	start, end := seed.Range(p)
+	if _, err := a.Config.Exec(`INSERT INTO dhcp_scopes(name,iface,mode,subnet,range_start,range_end,router,dns,domain,lease_seconds,enabled)
+		VALUES(?,?,'serve',?,?,?,'',?,'',3600,1)`, seed.SetupScope, port, p.Masked().String(), start.String(), end.String(), p.Addr().String()); err != nil {
+		log.Printf("setup: could not prepare addresses for the management port: %v", err)
+	}
+}
 
 func privateIP(ip net.IP) bool {
 	x, ok := netip.AddrFromSlice(ip)
@@ -208,6 +236,8 @@ func (a *App) registerSetupRoutes() {
 			return
 		}
 		if in.Skip {
+			a.Config.Exec(`DELETE FROM dhcp_scopes WHERE name=?`, seed.SetupScope)
+			a.DHCP.Reload()
 			a.Config.SetSetting(wizardSetting, "done")
 			a.writeSetupState()
 			api.JSON(w, 200, map[string]any{"status": "skipped"})
