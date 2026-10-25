@@ -23,6 +23,19 @@ lb clean --purge >/dev/null 2>&1 || true
 lb config
 lb build
 
+# Size report: what the image costs, biggest installed packages first. Kept beside the image.
+mkdir -p "$OUT"
+{
+  echo "Gatehouse $VERSION image size report"
+  echo
+  echo "Largest installed packages (KiB):"
+  chroot "$WORK/chroot" dpkg-query -W -f='${Installed-Size}\t${Package}\n' 2>/dev/null | sort -rn | head -25
+  echo
+  echo "Image parts:"
+  ls -l "$WORK"/binary/live/*.squashfs 2>/dev/null | awk '{printf "%d MiB  %s\n", $5/1048576, $9}'
+  ls -l "$WORK"/*.iso | awk '{printf "%d MiB  %s\n", $5/1048576, $9}'
+} > "$OUT/size-report.txt"
+
 ISO=$(ls "$WORK"/*.iso | head -n1)
 # Put the Gatehouse boot menus on the finished image and fail the build if anything else shows.
 sh "$SRC/brand-iso.sh" "$ISO" "$SRC/config/includes.binary/gatehouse-boot"

@@ -66,6 +66,10 @@ jobs:
           '
         env:
           VERSION: ${{ needs.binary.outputs.version }}
+      - name: Show the image size
+        run: |
+          cat out/size-report.txt >> "$GITHUB_STEP_SUMMARY"
+          ls -l out/*.iso
       - uses: actions/upload-artifact@v4
         with:
           name: gatehouse-iso
