@@ -36,7 +36,6 @@ if [ -f "$D"/isolinux/live.cfg ]; then
 		SAFE=$(echo "$A" | sed 's/ splash//')
 		cat > "$D"/isolinux/isolinux.cfg <<CFG
 path
-serial 0 115200
 prompt 0
 noescape 1
 timeout 40
@@ -80,8 +79,9 @@ label basic
 label serial
   menu label Install with serial console (115200 8N1)
   text help
-  For machines with no screen. Connect to the first serial port (COM1)
-  at 115200 baud, 8 data bits, no parity, 1 stop bit, no flow control.
+  For machines with no screen. The installer shows on the first serial port (COM1)
+  by itself on every choice; this one also sends the start-up messages there.
+  115200 baud, 8 data bits, no parity, 1 stop bit, no flow control.
   endtext
   linux $K
   initrd $I

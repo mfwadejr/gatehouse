@@ -210,13 +210,8 @@ func pause(t *Term) { t.p("\n  Press Enter to continue. "); t.readLine(true) }
 // RunRecoveryConsole runs the recovery screen on this process's own terminal.
 func RunRecoveryConsole(env RecoveryEnv) error {
 	rawTTY("/dev/tty", 0)
-	var out io.Writer = os.Stdout
-	if isSerialStdout() {
-		out = plainSerial(os.Stdout) // no colour-palette codes and no UTF-8 on a serial terminal
-	} else {
-		io.WriteString(os.Stdout, palette)
-	}
-	t := NewTerm(os.Stdin, out)
+	io.WriteString(os.Stdout, palette)
+	t := NewTerm(os.Stdin, os.Stdout)
 	t.W, t.H = consoleSize()
 	if t.W < 40 {
 		t.W, t.H = 80, 24
