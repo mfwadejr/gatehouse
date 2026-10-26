@@ -96,8 +96,12 @@ func TestSpeedRoutesSaveSettingsAndStartATest(t *testing.T) {
 	if err := c.app.Config.QueryRow(`SELECT name FROM wan_links WHERE enabled=1 ORDER BY priority LIMIT 1`).Scan(&wan); err != nil {
 		t.Fatal(err)
 	}
-	if rc, _, raw := c.call("PUT", "/api/speedtest", map[string]any{"server": "http://insecure", "hour": 3}); rc == 200 {
-		t.Fatalf("plain http server accepted: %s", raw)
+	// The server list has its own calls; a stray server in the schedule save is ignored, not an error.
+	if rc, _, raw := c.call("PUT", "/api/speedtest", map[string]any{"server": "http://insecure", "hour": 3}); rc != 200 {
+		t.Fatalf("saving with a stray server field failed: %s", raw)
+	}
+	if got := c.app.speedConfig().Server; got == "http://insecure" {
+		t.Fatal("the stray server field changed the default server")
 	}
 	if rc, _, raw := c.call("PUT", "/api/speedtest", map[string]any{"hour": 30}); rc == 200 {
 		t.Fatalf("bad hour accepted: %s", raw)

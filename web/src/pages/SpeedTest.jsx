@@ -120,7 +120,7 @@ export default function SpeedTest({ wans, links }) {
 
   const rows = st?.links || [];
   const last = useMemo(() => { const m = {}; (recent || []).forEach((r) => { if (!m[r.link]) m[r.link] = r; }); return m; }, [recent]);
-  const form = edit || (st && { server: st.server === st.default_server ? '' : st.server, schedule: st.schedule, hour: st.hour, links: Object.fromEntries(rows.map((l) => [l.name, { down_mbps: l.down_mbps || 0, up_mbps: l.up_mbps || 0, metered: l.metered }])) });
+  const form = edit || (st && { schedule: st.schedule, hour: st.hour, links: Object.fromEntries(rows.map((l) => [l.name, { down_mbps: l.down_mbps || 0, up_mbps: l.up_mbps || 0, metered: l.metered }])) });
   const setF = (patch) => setEdit({ ...form, ...patch });
   const setL = (n, patch) => setF({ links: { ...form.links, [n]: { ...form.links[n], ...patch } } });
   const dirty = !!edit;

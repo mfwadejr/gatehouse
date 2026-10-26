@@ -291,8 +291,9 @@ func (a *App) registerSpeedRoutes() {
 	})
 	s.HandleAdmin("PUT /api/speedtest", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		var in struct {
-			Schedule bool `json:"schedule"`
-			Hour     int  `json:"hour"`
+			Server   string `json:"server"` // older screens still send it; the default is changed by its own call
+			Schedule bool   `json:"schedule"`
+			Hour     int    `json:"hour"`
 			Links    map[string]struct {
 				DownMbps float64 `json:"down_mbps"`
 				UpMbps   float64 `json:"up_mbps"`
