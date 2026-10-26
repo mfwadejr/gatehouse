@@ -75,6 +75,7 @@ type App struct {
 	hist         histState
 	speed        speedRun
 	ocache       ocache
+	probeKick    chan struct{}
 	upnp         upnpState
 	setupMu      sync.Mutex
 	con          consoles
@@ -107,7 +108,7 @@ func New(cfg Config) (*App, error) {
 	if err := os.MkdirAll(cfg.DataDir, 0o750); err != nil {
 		return nil, err
 	}
-	a := &App{Cfg: cfg, Bus: events.NewBus(), dyn: newFWDyn(), rogue: rogueState{alerts: map[int64]rogueAlert{}, kick: make(chan struct{}, 1)}}
+	a := &App{Cfg: cfg, Bus: events.NewBus(), dyn: newFWDyn(), probeKick: make(chan struct{}, 1), rogue: rogueState{alerts: map[int64]rogueAlert{}, kick: make(chan struct{}, 1)}}
 	var err error
 	if a.Config, err = store.OpenConfig(filepath.Join(cfg.DataDir, "config.db")); err != nil {
 		return nil, fmt.Errorf("config database: %w", err)
@@ -260,6 +261,10 @@ func (a *App) loadUpstreams() error {
 	}
 	a.DNS.Pool().SetOrdered(a.setting("dns.upstream_order", "fastest") == "ordered")
 	a.DNS.Pool().Set(list)
+	select {
+	case a.probeKick <- struct{}{}:
+	default:
+	}
 	return rows.Err()
 }
 
@@ -320,6 +325,7 @@ func (a *App) Run(ctx context.Context) error {
 	run(func() { a.collectTraffic(ctx) })
 	run(func() { a.collectHistory(ctx) })
 	run(func() { a.speedLoop(ctx) })
+	run(func() { a.upstreamProbeLoop(ctx) })
 	run(func() { a.runUPnP(ctx) })
 	run(func() { a.updateLoop(ctx) })
 	run(func() { a.dynLoop(ctx) })
