@@ -72,8 +72,8 @@ function CardCheck({ c, onDone }) {
   const go = async () => { if (await run(() => post(`/api/net/wifi/${c.iface}/check`, {}), 'Card checked.')) onDone(); };
   return (
     <div className="stack">
-      <table className="tbl small">
-        <thead><tr><th>Band</th><th>Reported by the card</th><th>Tested</th></tr></thead>
+      <table className="table small" style={{ tableLayout: 'fixed' }}>
+        <thead><tr><th style={{ width: '20%' }}>Band</th><th style={{ width: '38%' }}>What the card says it can do</th><th>Listening test</th></tr></thead>
         <tbody>
           {listed.map((b) => {
             const heard = ck?.bands?.[b]?.heard;
@@ -81,7 +81,7 @@ function CardCheck({ c, onDone }) {
               <tr key={b}>
                 <td>{b} GHz</td>
                 <td>{c.caps.ap_bands?.includes(b) ? 'Join and broadcast' : 'Join'}</td>
-                <td>{!ck ? <span className="muted">Not tested yet</span> : heard > 0 ? <Pill tone="good">Heard {heard} network{heard === 1 ? '' : 's'}</Pill> : <Pill tone="warn">Heard nothing</Pill>}</td>
+                <td>{!ck ? <span className="muted">Not tested yet</span> : heard > 0 ? <Pill tone="good">Can hear networks ({heard} found)</Pill> : <Pill tone="warn">Heard nothing</Pill>}</td>
               </tr>
             );
           })}
