@@ -537,6 +537,7 @@ func (a *App) registerOverviewRoutes() {
 		if hours == 0 {
 			hours = 24
 		}
+		a.geoEnsure()
 		key := "map:" + dir + ":" + strconv.Itoa(hours)
 		api.JSON(w, 200, a.cached(key, 60*time.Second, func() any { return a.worldMap(dir, hours) }))
 	})

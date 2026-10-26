@@ -529,6 +529,7 @@ func (a *App) registerLogExtraRoutes() {
 	s.Handle("GET /api/logs/countries", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		f := logParams(r)
 		where, args := f.where(a)
+		a.geoEnsure()
 		_, have := a.geoAge()
 		api.JSON(w, 200, map[string]any{"ready": have, "countries": a.countryCounts(f, where, args)})
 	})

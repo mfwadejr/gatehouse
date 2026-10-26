@@ -192,6 +192,45 @@ func (a *App) geoMaybeRefresh(ctx context.Context, needed bool) {
 	a.fwSyncAll()
 }
 
+// geoEnsure starts the download when there is no country data at all (the map and the logs need it
+// even when no firewall rule does). A failed try is not repeated for five minutes.
+func (a *App) geoEnsure() {
+	if _, have := a.geoAge(); have || a.dyn.geoBusy.Load() {
+		return
+	}
+	now := time.Now().Unix()
+	if last := a.dyn.geoTried.Load(); last != 0 && now-last < 300 {
+		return
+	}
+	a.dyn.geoTried.Store(now)
+	go a.geoMaybeRefresh(context.Background(), true)
+}
+
+// geoNow downloads the lists right away, whatever their age (the Download now button).
+func (a *App) geoNow() {
+	if a.dyn.geoBusy.Load() {
+		return
+	}
+	a.dyn.geoTried.Store(time.Now().Unix())
+	go a.geoRefreshNow(context.Background())
+}
+
+func (a *App) geoRefreshNow(ctx context.Context) {
+	if !a.dyn.geoBusy.CompareAndSwap(false, true) {
+		return
+	}
+	defer a.dyn.geoBusy.Store(false)
+	if err := a.geoRefresh(ctx); err != nil {
+		log.Printf("geo: %v", err)
+		a.dyn.geoErr.Store(err.Error())
+		return
+	}
+	a.dyn.geoErr.Store("")
+	a.Config.SetSetting("geo.updated", strconv.FormatInt(time.Now().Unix(), 10))
+	a.event("system", "info", "Country address lists updated", "Downloaded from the regional internet registries.")
+	a.fwSyncAll()
+}
+
 // geoIndex answers "which country is this address in" from the same registry lists the country
 // rules use. It reads the list once and again whenever the file is replaced.
 type geoIndex struct {

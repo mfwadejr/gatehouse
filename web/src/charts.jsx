@@ -84,6 +84,19 @@ export function Chart({ series, from, to, kind = 'count', unit = '', height = 20
   return (
     <figure className={`ch2 ${compact ? 'compact' : ''}`} style={{ margin: 0 }}>
       {!compact && <div className="ch2-unit small muted">{u}</div>}
+      {!compact && series.some((x) => x.name) && (
+        <div className="ch2-legend small" aria-live="off">
+          {series.filter((x) => x.name).map((x) => {
+            const h = hits.find((q) => q.s.key === x.key);
+            const p = hover != null ? h?.p : x.pts[x.pts.length - 1];
+            return (
+              <span key={x.key} className="ch2-lg"><i className="sw" style={{ background: x.color }} />{x.name}
+                <b>{p ? showVal(p[1]) : '–'}</b></span>
+            );
+          })}
+          <span className="muted ch2-lgwhen">{hover != null && hits[0] ? when(hits[0].p) : 'latest'}</span>
+        </div>
+      )}
       <div className="ch2-body">
         {!compact && (
           <div className="ch2-y small muted" aria-hidden="true" style={{ height }}>
@@ -92,7 +105,7 @@ export function Chart({ series, from, to, kind = 'count', unit = '', height = 20
         )}
         <div className="ch2-plot" style={{ height }} onMouseMove={move} onMouseLeave={() => setHover(null)} role="img" aria-label={label || `Chart in ${u}`}>
           <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-            {[0, 25, 50, 75, 100].map((y) => <line key={y} x1="0" x2={W} y1={y} y2={y} className="gl" vectorEffect="non-scaling-stroke" />)}
+            {[0, 25, 50, 75, 100].filter((y) => !compact || y === 100).map((y) => <line key={y} x1="0" x2={W} y1={y} y2={y} className="gl" vectorEffect="non-scaling-stroke" />)}
             {paths.map(({ s, segs }) => segs.map((d, i) => (
               <g key={`${s.key}${i}`} style={{ '--c': s.color }}>
                 {filled && series.length <= 2 && <path d={`${d}L${d.split('L').pop().split(',')[0]},${H}L${d.slice(1).split(',')[0]},${H}Z`} className="fill" />}
@@ -105,7 +118,7 @@ export function Chart({ series, from, to, kind = 'count', unit = '', height = 20
             <i key={`${s.key}${p[0]}`} className="ch2-dot" style={{ left: `${(X(p[0]) / W) * 100}%`, top: `${(Y(p[1]) / H) * 100}%`, background: s.color }} />
           )))}
           {marks.filter((m) => m.t >= from && m.t <= to).map((m, i) => <span key={i} className="ch2-mark small" style={{ right: `${100 - (X(m.t) / W) * 100}%` }}>{m.label}</span>)}
-          {!has && <span className="ch2-empty small muted">{empty}</span>}
+          {!has && <span className="ch2-empty small muted">{compact ? 'No data yet' : empty}</span>}
           {hover != null && hits.length > 0 && (
             <>
               <div className="ch2-cur" style={{ left: `${hover * 100}%` }} />

@@ -288,6 +288,7 @@ func (a *App) registerFWObjectRoutes() {
 
 	// Whether the country lists are ready.
 	s.Handle("GET /api/fw/geo", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		a.geoEnsure()
 		age, have := a.geoAge()
 		res := map[string]any{"ready": have, "busy": a.dyn.geoBusy.Load()}
 		if have {
@@ -297,5 +298,9 @@ func (a *App) registerFWObjectRoutes() {
 			res["error"] = e
 		}
 		api.JSON(w, 200, res)
+	})
+	s.Handle("POST /api/fw/geo/refresh", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		a.geoNow()
+		ok(w)
 	})
 }

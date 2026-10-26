@@ -20,14 +20,15 @@ import (
 // a new address from DHCP is covered within a couple of seconds and no rule has to be applied.
 
 type fwDyn struct {
-	mu      sync.Mutex
-	dom     map[string]map[string]time.Time // domain -> address -> when it is forgotten
-	pushQ   map[string]map[string]time.Time // set name -> address -> expiry, waiting to be sent
-	watch   []string                        // domains named by enabled rules
-	counts  map[string]fw.Counter
-	kick    chan struct{}
-	geoBusy atomic.Bool
-	geoErr  atomic.Value // string
+	mu       sync.Mutex
+	dom      map[string]map[string]time.Time // domain -> address -> when it is forgotten
+	pushQ    map[string]map[string]time.Time // set name -> address -> expiry, waiting to be sent
+	watch    []string                        // domains named by enabled rules
+	counts   map[string]fw.Counter
+	kick     chan struct{}
+	geoBusy  atomic.Bool
+	geoTried atomic.Int64
+	geoErr   atomic.Value // string
 }
 
 func newFWDyn() *fwDyn {

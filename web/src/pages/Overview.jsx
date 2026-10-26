@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useData, useStream, put } from '../api.js';
-import { Card, Empty, Icon, Page, Pill, Segmented, fmt, Bar } from '../ui.jsx';
+import { useData, useStream, put, post } from '../api.js';
+import { Button, Card, Empty, Icon, Note, Page, Pill, Segmented, fmt, Bar, useAction } from '../ui.jsx';
 import { go } from '../App.jsx';
 import { COUNTRIES, MAP_H, MAP_W } from '../worldmap.js';
 import { Chart, fmtBits, fmtBytes } from '../charts.jsx';
@@ -258,6 +258,8 @@ function WorldCard() {
   const [dir, setDir] = useState('out');
   const [range, setRange] = useState('24h');
   const { data } = useData(`/api/overview/map?dir=${dir}&range=${range}`, { every: 60000 });
+  const { data: geo, reload: reloadGeo } = useData('/api/fw/geo', { every: 5000 });
+  const [dl, dlBusy] = useAction();
   const [hover, setHover] = useState(null);
   const by = useMemo(() => Object.fromEntries((data?.countries || []).map((c) => [c.country, c])), [data]);
   const top = data?.top || 0;
@@ -273,6 +275,12 @@ function WorldCard() {
       <Card title="Where connections go"
         desc={dir === 'out' ? 'Where your devices are connecting' : 'Where connection attempts from the internet come from'}
         actions={<div className="inline"><Segmented value={dir} onChange={setDir} options={[{ value: 'out', label: 'Outgoing' }, { value: 'in', label: 'Incoming' }]} /><Segmented value={range} onChange={setRange} options={[{ value: '1h', label: '1 h' }, { value: '24h', label: '24 h' }, { value: '7d', label: '7 d' }, { value: '30d', label: '30 d' }]} /></div>}>
+        {geo && !geo.ready && (
+          <Note tone={geo.error ? 'warn' : ''} title="Country data not downloaded yet">
+            {geo.busy ? 'Downloading the country address lists now. The map fills in once they arrive.' : geo.error ? `The last try failed: ${geo.error}` : 'Gatehouse needs the country address lists to place connections on the map.'}
+            {' '}<Button small disabled={geo.busy || dlBusy} onClick={() => dl(async () => { await post('/api/fw/geo/refresh', {}); reloadGeo(); })}>{geo.busy ? 'Downloading…' : 'Download now'}</Button>
+          </Note>
+        )}
         <div className="ov-map" onMouseLeave={() => setHover(null)}>
           <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} role="img" aria-label={`${dir === 'out' ? 'Outgoing connections' : 'Incoming attempts'} by country`}>
             {Object.entries(COUNTRIES).filter(([cc]) => cc !== 'AQ').map(([cc, c]) => {
