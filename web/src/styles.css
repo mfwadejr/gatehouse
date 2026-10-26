@@ -366,7 +366,7 @@ details.more > summary { cursor: pointer; color: var(--color-text-secondary); ma
 .ov-cr .num, .ov-bd .num { text-align: right; font-variant-numeric: tabular-nums; color: var(--color-text-secondary); }
 .ov-bd { display: grid; grid-template-columns: 1fr auto; gap: var(--space-3); align-items: center; }
 .ov-nets { display: flex; flex-direction: column; }
-.ov-net { padding: var(--space-2-5) 0; border-top: var(--border-width-thin) solid var(--color-border-subtle); }
+.ov-net { padding: var(--space-3) 0; }
 .ov-net:first-child { border-top: 0; padding-top: 0; }
 .ov-gauges { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3) var(--space-4); }
 .ov-h3 { font-size: var(--font-size-base); font-weight: var(--font-weight-semibold); margin-top: var(--space-2); }

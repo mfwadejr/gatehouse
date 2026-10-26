@@ -105,7 +105,7 @@ export function Chart({ series, from, to, kind = 'count', unit = '', height = 20
         )}
         <div className="ch2-plot" style={{ height }} onMouseMove={move} onMouseLeave={() => setHover(null)} role="img" aria-label={label || `Chart in ${u}`}>
           <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-            {[0, 25, 50, 75, 100].filter((y) => !compact || y === 100).map((y) => <line key={y} x1="0" x2={W} y1={y} y2={y} className="gl" vectorEffect="non-scaling-stroke" />)}
+            {[0, 25, 50, 75, 100].filter(() => !compact).map((y) => <line key={y} x1="0" x2={W} y1={y} y2={y} className="gl" vectorEffect="non-scaling-stroke" />)}
             {paths.map(({ s, segs }) => segs.map((d, i) => (
               <g key={`${s.key}${i}`} style={{ '--c': s.color }}>
                 {filled && series.length <= 2 && <path d={`${d}L${d.split('L').pop().split(',')[0]},${H}L${d.slice(1).split(',')[0]},${H}Z`} className="fill" />}
