@@ -31,7 +31,7 @@ systemctl enable nftables.service 2>/dev/null || true
 systemctl disable nftables.service 2>/dev/null || true # Gatehouse loads its own table
 
 # SSH is off unless the administrator turns it on.
-systemctl disable ssh.service 2>/dev/null || true
+systemctl disable ssh.service ssh.socket 2>/dev/null || true
 
 # Quiet, fast boot. Nothing in the image needs these.
 systemctl disable apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
