@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { del, post, put, useData } from '../api.js';
+import { go } from '../App.jsx';
 import { AddrPicker, Chip, NewDevice, ScheduleEditor, ServicePicker, tokens } from '../AddrPicker.jsx';
 import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Pill, Segmented, Select, ToggleRow, useAction, fmt, confirmBox } from '../ui.jsx';
 
@@ -47,7 +48,7 @@ export function RuleForm({ initial, zoneNames, pickers, reloadPickers, onClose, 
         </Note>
       )}
       {tokens(r.dst).some((t) => t.startsWith('dom:')) && <p className="small muted">Websites are matched by the addresses devices were given when they looked them up through Gatehouse, so this works for devices that use Gatehouse for DNS.</p>}
-      <Field label="What for"><ServicePicker value={r.service} onChange={set('service')} pickers={pickers} /></Field>
+      <Field label="What for"><ServicePicker value={r.service} onChange={set('service')} pickers={pickers} reload={reloadPickers} /></Field>
       <Field label="Then"><Select value={r.action} onChange={set('action')} options={ACTIONS} /></Field>
       <Field label="When"><ScheduleEditor value={r.sched} onChange={set('sched')} /></Field>
       <Field label="Note" hint="Optional. Why the rule exists, for whoever looks at it next."><Input value={r.descr} onChange={set('descr')} maxLength={300} /></Field>
@@ -280,25 +281,8 @@ function GroupForm({ initial, pickers, reloadPickers, onClose, onSaved }) {
   );
 }
 
-function PortListForm({ initial, onClose, onSaved }) {
-  const [p, setP] = useState({ name: '', ports: [], ...initial });
-  const [text, setText] = useState((initial?.ports || []).join('\n'));
-  const [run, busy] = useAction();
-  const body = { ...p, ports: text.split(/[\s,]+/).filter(Boolean) };
-  return (
-    <Modal title={p.id ? `Edit ${initial.name}` : 'New list of ports'} onClose={onClose}
-      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy || !p.name || !body.ports.length} onClick={async () => { if (await run(() => put('/api/fw/portlists', body), 'Saved.')) { onSaved(); onClose(); } }}>Save</Button></>}>
-      <Field label="Name"><Input value={p.name} onChange={(v) => setP({ ...p, name: v })} placeholder="Game consoles" /></Field>
-      <Field label="Ports" hint="One per line. A service name like https, or tcp/8080, or udp/27000-27050.">
-        <textarea className="in mono" rows={6} value={text} onChange={(e) => setText(e.target.value)} spellCheck={false} placeholder={'tcp/3074\nudp/3074\nudp/27000-27050'} />
-      </Field>
-    </Modal>
-  );
-}
-
 export function GroupsAndLists({ pickers, reloadPickers, reload }) {
   const [eg, setEg] = useState(null);
-  const [ep, setEp] = useState(null);
   const [run] = useAction();
   const deviceName = (mac) => pickers?.devices?.find((d) => d.mac === mac)?.name || mac;
   const refresh = () => { reloadPickers(); reload(); };
@@ -317,20 +301,10 @@ export function GroupsAndLists({ pickers, reloadPickers, reload }) {
           {!pickers?.groups?.length && <Empty>No groups yet.</Empty>}
         </div>
       </Card>
-      <Card title="Lists of ports" desc="A named set of ports you can reuse, like everything a game console needs." actions={<Button small icon="plus" onClick={() => setEp({})}>New list</Button>}>
-        <div className="list">
-          {(pickers?.port_lists || []).map((l) => (
-            <div className="item" key={l.id}>
-              <div><div className="name">{l.name}</div><div className="meta mono">{l.ports.join(', ')}</div></div>
-              <div className="actions"><Button small icon="edit" onClick={() => setEp(l)}>Edit</Button>
-                <Button small kind="danger" icon="trash" onClick={async () => await confirmBox(`Delete the list "${l.name}"?`) && run(() => del(`/api/fw/portlists/${l.id}`)).then(refresh)}>Delete</Button></div>
-            </div>
-          ))}
-          {!pickers?.port_lists?.length && <Empty>No lists yet.</Empty>}
-        </div>
+      <Card title="Services and ports" desc="Your own services, like Plex or a game console's ports, now live on the Services page. Everything you saved here is already there.">
+        <button type="button" className="link small" style={{ textAlign: 'left' }} onClick={() => go('services')}>Open Services →</button>
       </Card>
       {eg && <GroupForm initial={eg} pickers={pickers} reloadPickers={reloadPickers} onClose={() => setEg(null)} onSaved={refresh} />}
-      {ep && <PortListForm initial={ep} onClose={() => setEp(null)} onSaved={refresh} />}
     </>
   );
 }

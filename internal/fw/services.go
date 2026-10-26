@@ -2,6 +2,7 @@ package fw
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -133,4 +134,32 @@ func ParseServices(s string, lists map[string][]string) ([]PortSpec, error) {
 		return nil, nil
 	}
 	return out, nil
+}
+
+// String renders a spec the way people type it: tcp/443, udp/67-68, icmp.
+func (p PortSpec) String() string {
+	if p.Proto == "icmp" {
+		return "icmp"
+	}
+	return p.Proto + "/" + p.portExpr()
+}
+
+// BuiltinService is a service Gatehouse knows by name.
+type BuiltinService struct {
+	Name  string   `json:"name"`
+	Ports []string `json:"ports"`
+}
+
+// BuiltinServices lists the named services with their ports, sorted by name.
+func BuiltinServices() []BuiltinService {
+	out := make([]BuiltinService, 0, len(services))
+	for name, specs := range services {
+		b := BuiltinService{Name: name}
+		for _, sp := range specs {
+			b.Ports = append(b.Ports, sp.String())
+		}
+		out = append(out, b)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
 }

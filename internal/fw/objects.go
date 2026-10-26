@@ -321,3 +321,25 @@ func DeletePortList(tx *sql.Tx, id int64) error {
 	_, err := tx.Exec(`DELETE FROM fw_objects WHERE id=?`, id)
 	return err
 }
+
+// RulesUsingService names the rules whose "what for" field includes the saved list. Lists may have
+// spaces in their names, so only commas separate entries here.
+func RulesUsingService(db Queryer, list string) []string {
+	rows, err := db.Query(`SELECT name,service FROM fw_rules ORDER BY position,id`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var name, svc string
+		rows.Scan(&name, &svc)
+		for _, x := range strings.Split(svc, ",") {
+			if strings.EqualFold(strings.TrimSpace(x), "list:"+list) {
+				out = append(out, name)
+				break
+			}
+		}
+	}
+	return out
+}

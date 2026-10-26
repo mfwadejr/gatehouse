@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { post } from './api.js';
+import { post, put } from './api.js';
 import { Button, Field, Input, Modal, Select, useAction } from './ui.jsx';
 
 // Pieces used by the firewall rule form: choosing who or what a rule covers, which ports, and when.
@@ -134,33 +134,78 @@ export function AddrPicker({ value, onChange, side, pickers, local = true, reloa
   );
 }
 
-// ServicePicker chooses what kind of traffic: named services, saved lists of ports, or ports typed by hand.
-export function ServicePicker({ value, onChange, pickers }) {
+// ServicePicker chooses what kind of traffic with one search box: built-in services, your own
+// services, or ports typed by hand (which can be saved as a named service on the spot).
+const rePort = /^(tcp|udp)\/\d{1,5}(-\d{1,5})?$/;
+
+export function ServicePicker({ value, onChange, pickers, reload }) {
   const toks = tokens(value);
-  const [custom, setCustom] = useState('');
-  const add = (t) => { if (t && !toks.includes(t)) onChange([...toks, t].join(',')); };
+  const [q, setQ] = useState('');
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(null);
+  const has = (t) => toks.some((x) => x.toLowerCase() === t.toLowerCase());
+  const add = (t) => { if (t && !has(t)) onChange([...toks, t].join(',')); setQ(''); };
   const remove = (t) => onChange(toks.filter((x) => x !== t).join(','));
-  const label = (t) => (t.startsWith('list:') ? `List: ${t.slice(5)}` : t);
-  const services = [...(pickers?.services || [])].sort();
+  const label = (t) => (t.startsWith('list:') ? t.slice(5) : t);
+  const needle = q.trim().toLowerCase();
+  const typed = needle.replace(/\s+/g, '');
+  const isPort = rePort.test(typed);
+  const customs = (pickers?.port_lists || []).map((l) => ({ tok: `list:${l.name}`, name: l.name, ports: l.ports, custom: true }));
+  const builtins = (pickers?.catalog || (pickers?.services || []).map((n) => ({ name: n, ports: [] }))).map((b) => ({ tok: b.name, name: b.name, ports: b.ports }));
+  const match = (x) => !has(x.tok) && (!needle || x.name.toLowerCase().includes(needle) || x.ports.some((p) => p.includes(needle) || p.split('/')[1]?.includes(needle)));
+  const mine = customs.filter(match).slice(0, 8);
+  const known = builtins.filter(match).slice(0, 10);
+  const showList = open || needle;
+  const row = (x) => (
+    <button type="button" role="option" key={x.tok} onMouseDown={(e) => e.preventDefault()} onClick={() => add(x.tok)}>
+      <span className="name">{x.name}</span>{x.custom && <span className="muted small">your service</span>}
+      <span className="muted small mono">{x.ports.join(', ')}</span>
+    </button>
+  );
   return (
     <div className="stack" style={{ gap: 'var(--space-2)' }}>
       <div className="chips">
         {toks.length === 0 && <span className="chip any">Everything</span>}
         {toks.map((t) => <span className="chip" key={t}>{label(t)}<button type="button" className="chipx" aria-label={`Remove ${label(t)}`} onClick={() => remove(t)}>×</button></span>)}
       </div>
-      <div className="formgrid">
-        <Select value="" onChange={add} aria-label="Add a service" options={[
-          { value: '', label: 'Add a service…' },
-          ...(pickers?.port_lists || []).map((l) => ({ value: `list:${l.name}`, label: `List: ${l.name}` })),
-          ...services.map((s) => ({ value: s, label: s })),
-        ]} />
-        <div className="inline">
-          <Input value={custom} onChange={setCustom} placeholder="tcp/8080 or udp/1000-2000" aria-label="Type a port"
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); add(custom.trim().toLowerCase()); setCustom(''); } }} />
-          <Button onClick={() => { add(custom.trim().toLowerCase()); setCustom(''); }} disabled={!custom.trim()}>Add</Button>
-        </div>
+      <div className="pick">
+        <Input value={q} onChange={setQ} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)}
+          placeholder="Search a service or port, or type tcp/8080 or udp/1000-2000" aria-label="Find a service"
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); if (isPort) add(typed); else if (mine.length + known.length === 1) add((mine[0] || known[0]).tok); } }} />
+        {showList && (
+          <div className="pickmenu" role="listbox">
+            {isPort && !has(typed) && <button type="button" role="option" onMouseDown={(e) => e.preventDefault()} onClick={() => add(typed)}>Use the port <span className="mono">{typed}</span></button>}
+            {isPort && <button type="button" role="option" onMouseDown={(e) => e.preventDefault()} onClick={() => setSaving(typed)}>Save <span className="mono">{typed}</span> as a named service…</button>}
+            {mine.map(row)}
+            {known.map(row)}
+            {!isPort && !mine.length && !known.length && <div className="muted small pad">{needle ? 'No service with that name or port. Type a port like tcp/8080 to use it or save it as a service.' : 'Nothing left to add.'}</div>}
+            {!needle && <button type="button" role="option" onMouseDown={(e) => e.preventDefault()} onClick={() => setSaving('')}>+ New service…</button>}
+          </div>
+        )}
       </div>
+      {saving !== null && <NewService initialPorts={saving} onClose={() => setSaving(null)} onCreated={(name) => { reload?.(); add(`list:${name}`); }} />}
     </div>
+  );
+}
+
+// NewService saves a named set of ports. It is the same thing as a custom service on the Services page.
+export function NewService({ initialPorts = '', onClose, onCreated }) {
+  const [name, setName] = useState('');
+  const [ports, setPorts] = useState(initialPorts);
+  const [run, busy] = useAction();
+  const list = ports.split(/[\s,]+/).filter(Boolean).map((x) => x.toLowerCase());
+  const save = async () => {
+    const ok = await run(() => put('/api/fw/portlists', { name: name.trim(), ports: list }), 'Service saved.');
+    if (ok) { onCreated(name.trim()); onClose(); }
+  };
+  return (
+    <Modal title="New service" onClose={onClose}
+      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy || !name.trim() || !list.length} onClick={save}>Save</Button></>}>
+      <Field label="Name"><Input value={name} onChange={setName} placeholder="Plex" /></Field>
+      <Field label="Ports" hint="One per line, like tcp/32400 or udp/1000-2000. A built-in name such as https also works.">
+        <textarea className="in mono" rows={4} value={ports} onChange={(e) => setPorts(e.target.value)} spellCheck={false} placeholder={'tcp/32400\nudp/1900'} />
+      </Field>
+    </Modal>
   );
 }
 

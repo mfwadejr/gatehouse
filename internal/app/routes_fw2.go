@@ -189,7 +189,7 @@ func (a *App) registerFWObjectRoutes() {
 		}
 		sort.Slice(out, func(i, j int) bool { return strings.ToLower(out[i].Name) < strings.ToLower(out[j].Name) })
 		lists, _ := fw.PortLists(a.Config)
-		api.JSON(w, 200, map[string]any{"devices": out, "groups": groups, "port_lists": lists, "services": fw.ServiceNames()})
+		api.JSON(w, 200, map[string]any{"devices": out, "groups": groups, "port_lists": lists, "services": fw.ServiceNames(), "catalog": fw.BuiltinServices()})
 	})
 
 	s.HandleAdmin("PUT /api/fw/groups", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
@@ -226,6 +226,27 @@ func (a *App) registerFWObjectRoutes() {
 			return
 		}
 		api.JSON(w, 200, g)
+	})
+	// The services page: what Gatehouse knows by name, and the person's own, with where each is used.
+	s.Handle("GET /api/fw/services", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		lists, err := fw.PortLists(a.Config)
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		type custom struct {
+			fw.PortListRow
+			UsedBy []string `json:"used_by"`
+		}
+		out := make([]custom, 0, len(lists))
+		for _, l := range lists {
+			used := fw.RulesUsingService(a.Config, l.Name)
+			if used == nil {
+				used = []string{}
+			}
+			out = append(out, custom{l, used})
+		}
+		api.JSON(w, 200, map[string]any{"builtin": fw.BuiltinServices(), "custom": out})
 	})
 	s.Handle("GET /api/fw/portlists", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		l, err := fw.PortLists(a.Config)

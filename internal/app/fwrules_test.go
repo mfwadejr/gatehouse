@@ -41,6 +41,27 @@ func TestDeviceRulesFollowAddresses(t *testing.T) {
 	if rc, _, raw := c.call("PUT", "/api/fw/rules", rule); rc != 200 {
 		t.Fatalf("rule: %d %s", rc, raw)
 	}
+	// The services page lists built-in and custom services and where the custom ones are used.
+	if rc, sv, raw := c.call("GET", "/api/fw/services", nil); rc != 200 {
+		t.Fatalf("services: %d %s", rc, raw)
+	} else {
+		found := false
+		for _, b := range sv["builtin"].([]any) {
+			if b.(map[string]any)["name"] == "https" && len(b.(map[string]any)["ports"].([]any)) > 0 {
+				found = true
+			}
+		}
+		if !found {
+			t.Error("built-in https missing from the services list")
+		}
+		cs, _ := sv["custom"].([]any)
+		if len(cs) != 1 || cs[0].(map[string]any)["name"] != "Games" {
+			t.Fatalf("custom services: %s", raw)
+		}
+		if used, _ := cs[0].(map[string]any)["used_by"].([]any); len(used) != 1 || used[0] != "Kids no games" {
+			t.Errorf("used_by = %v", used)
+		}
+	}
 	// Things that cannot be saved.
 	for name, mut := range map[string]map[string]any{
 		"unknown group":      {"name": "X1", "src": "grp:Nobody"},
