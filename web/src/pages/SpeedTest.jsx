@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { put, post, useData, useStream } from '../api.js';
+import { del, put, post, useData, useStream } from '../api.js';
 import { Button, Card, Empty, Field, Input, Note, NumberInput, Pill, Segmented, Select, ToggleRow, useAction, useToast, fmt, confirmBox } from '../ui.jsx';
 import { Chart, fmtBits, fmtBytes } from '../charts.jsx';
 import { linkState } from '../linkstate.js';
@@ -67,6 +67,42 @@ function History({ links }) {
   );
 }
 
+// The servers a test can run against. The default is used by the daily test.
+function Servers({ st, reload }) {
+  const [run, busy] = useAction();
+  const [name, setName] = useState('');
+  const [url, setUrl] = useState('');
+  if (!st) return null;
+  const list = st.servers || [];
+  const add = async () => { if (await run(() => post('/api/speedtest/servers', { name, url }), 'Added.')) { setName(''); setUrl(''); reload(); } };
+  return (
+    <Card title="Test servers" desc="Where the speed test sends its data. The default is used by the daily test; when you run a test by hand you can pick another from the list.">
+      <div className="list">
+        {list.map((v) => (
+          <div className="item" key={v.url}>
+            <div>
+              <div className="name">{v.name} {v.url === st.server && <Pill tone="good">Default</Pill>}</div>
+              <div className="small muted mono">{v.url}</div>
+            </div>
+            <div className="actions">
+              {v.url !== st.server && <Button small disabled={busy} onClick={async () => { if (await run(() => put('/api/speedtest/default', { url: v.url }), 'Default changed.')) reload(); }}>Make default</Button>}
+              {v.url !== st.default_server && <Button small kind="danger" disabled={busy} onClick={async () => { if (await run(() => del(`/api/speedtest/servers?url=${encodeURIComponent(v.url)}`), 'Removed.')) reload(); }}>Remove</Button>}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="inline" style={{ alignItems: 'flex-end', marginTop: 'var(--space-3)' }}>
+        <Field label="Name"><Input value={name} onChange={setName} placeholder="My server" /></Field>
+        <Field label="Address" hint="https:// and the same kind of server as Cloudflare's (it answers /__down and /__up).">
+          <Input value={url} onChange={setUrl} className="in mono" placeholder="https://speed.example.com" />
+        </Field>
+        <Button disabled={busy || !url} onClick={add}>Add server</Button>
+      </div>
+      <p className="small muted">Cloudflare's test is public and needs no account. Its terms for automated daily use are not confirmed, so check them or add your own server if that matters to you. Gatehouse checks that a new server answers before keeping it.</p>
+    </Card>
+  );
+}
+
 export default function SpeedTest({ wans, links }) {
   const { data: st, reload } = useData('/api/speedtest', { topics: ['speedtest'], every: 5000 });
   const { data: recent, reload: rr } = useData('/api/speedtest/history?days=365', { topics: ['speedtest'] });
@@ -89,7 +125,7 @@ export default function SpeedTest({ wans, links }) {
   const setL = (n, patch) => setF({ links: { ...form.links, [n]: { ...form.links[n], ...patch } } });
   const dirty = !!edit;
   const save = async () => { if (await run(() => put('/api/speedtest', { ...form, hour: Number(form.hour) }), 'Saved.')) { setEdit(null); reload(); } };
-  const go = async (name, full) => { if (await run(() => post('/api/speedtest/run', { link: name, full }))) { toast(`Testing ${name}…`); reload(); } };
+  const go = async (name, full, server) => { if (await run(() => post('/api/speedtest/run', { link: name, full, server }))) { toast(`Testing ${name}…`); reload(); } };
   if (!wans?.length) return null;
 
   return (
@@ -109,6 +145,9 @@ export default function SpeedTest({ wans, links }) {
                 </div>
                 <div className="actions">
                   <Button small disabled={busy || running} onClick={() => go(l.name, false)}>{l.metered ? 'Run short test' : 'Run test'}</Button>
+                  {(st?.servers || []).length > 1 && (
+                    <Select value="" onChange={(v) => v && go(l.name, false, v)} options={[{ value: '', label: 'Test using…' }, ...st.servers.map((v) => ({ value: v.url, label: v.name }))]} />
+                  )}
                   {l.metered && <Button small disabled={busy || running} onClick={async () => { if (await confirmBox(`The full test may use several hundred MB of ${l.name}'s data allowance. Run it anyway?`)) go(l.name, true); }}>Run full test</Button>}
                 </div>
               </div>
@@ -129,13 +168,11 @@ export default function SpeedTest({ wans, links }) {
             ))}
             <ToggleRow title="Test every day" desc="Runs one connection after another at the hour you choose, so you can see how the line behaves over weeks. Connections with a data limit are never tested this way." checked={form.schedule} onChange={(v) => setF({ schedule: v })} />
             {form.schedule && <Field label="Start at"><Select value={String(form.hour)} onChange={(v) => setF({ hour: Number(v) })} options={HOURS} /></Field>}
-            <Field label="Test server" hint={`Leave empty to use ${st?.default_server}. It is a public server that needs no account. Only the test data is sent to it.`}>
-              <Input value={form.server} onChange={(v) => setF({ server: v })} placeholder={st?.default_server} />
-            </Field>
             {dirty && <div className="inline"><Button kind="primary" disabled={busy} onClick={save}>Save</Button><Button onClick={() => setEdit(null)}>Cancel</Button></div>}
           </div>
         )}
       </Card>
+      <Servers st={st} reload={reload} />
       <History links={rows} />
     </>
   );

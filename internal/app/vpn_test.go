@@ -3,7 +3,9 @@ package app
 import (
 	"bytes"
 	"context"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"net/http"
 	"net/http/cookiejar"
 	"strconv"
@@ -234,3 +236,67 @@ func TestVPNFlow(t *testing.T) {
 }
 
 func itoa(n int64) string { return strconv.FormatInt(n, 10) }
+
+func TestOpenVPNDeviceCanBePaused(t *testing.T) {
+	c, fn, _ := siteBox(t, "192.168.1.1/24")
+	rc, m, raw := c.call("POST", "/api/vpn/openvpn/server", map[string]any{"label": "Laptops", "endpoint": "home.example.com"})
+	if rc != 200 {
+		t.Fatalf("server: %d %s", rc, raw)
+	}
+	sID := int64(m["id"].(float64))
+	if rc, _, raw := c.call("POST", "/api/vpn/openvpn/"+itoa(sID)+"/peers", map[string]string{"name": "Work laptop"}); rc != 200 {
+		t.Fatalf("device: %d %s", rc, raw)
+	}
+	held := func() int {
+		fn.mu.Lock()
+		defer fn.mu.Unlock()
+		for _, o := range fn.vpn.OpenVPN {
+			if crl := o.Files["crl.pem"]; crl != "" {
+				blk, _ := pem.Decode([]byte(crl))
+				if blk == nil {
+					t.Fatal("no CRL sent to the helper")
+				}
+				l, err := x509.ParseRevocationList(blk.Bytes)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return len(l.RevokedCertificateEntries)
+			}
+		}
+		t.Fatal("no OpenVPN server in the plan")
+		return -1
+	}
+	peer := func() map[string]any {
+		_, m, _ := c.call("GET", "/api/vpn", nil)
+		for _, v := range m["vpns"].([]any) {
+			vm := v.(map[string]any)
+			if vm["kind"] == "openvpn" && vm["role"] == "server" {
+				return vm["peers"].([]any)[0].(map[string]any)
+			}
+		}
+		t.Fatal("no OpenVPN server listed")
+		return nil
+	}
+	if n := held(); n != 0 {
+		t.Fatalf("a fresh server holds %d devices out", n)
+	}
+	pid := int64(peer()["id"].(float64))
+	if rc, _, raw := c.call("PUT", "/api/vpn/openvpn/"+itoa(sID)+"/peers/"+itoa(pid), map[string]any{"enabled": false}); rc != 200 {
+		t.Fatalf("pause: %d %s", rc, raw)
+	}
+	if n := held(); n != 1 {
+		t.Fatalf("the paused device is held out %d times, want once", n)
+	}
+	if p := peer(); p["paused"] != true {
+		t.Fatalf("the device does not show as paused: %v", p)
+	}
+	if rc, _, raw := c.call("PUT", "/api/vpn/openvpn/"+itoa(sID)+"/peers/"+itoa(pid), map[string]any{"enabled": true}); rc != 200 {
+		t.Fatalf("allow again: %d %s", rc, raw)
+	}
+	if n := held(); n != 0 {
+		t.Fatalf("an allowed device is still held out (%d)", n)
+	}
+	if p := peer(); p["paused"] == true {
+		t.Fatal("the device still shows as paused")
+	}
+}

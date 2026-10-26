@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -28,8 +30,15 @@ type speedLink struct {
 	Metered  *bool   `json:"metered,omitempty"` // has a data limit; unset means "guess from the kind of port"
 }
 
+// speedServer is a test server the person can choose. Cloudflare's is built in and cannot be removed.
+type speedServer struct {
+	Name string `json:"name"`
+	URL  string `json:"url"`
+}
+
 type speedConfig struct {
-	Server   string               `json:"server"`
+	Server   string               `json:"server"`  // the default server's address; empty means Cloudflare
+	Servers  []speedServer        `json:"servers"` // ones the person added
 	Schedule bool                 `json:"schedule"`
 	Hour     int                  `json:"hour"` // hour of the day the scheduled test starts
 	Links    map[string]speedLink `json:"links"`
@@ -50,6 +59,16 @@ func (a *App) speedConfig() speedConfig {
 	}
 	if c.Links == nil {
 		c.Links = map[string]speedLink{}
+	}
+	// A server typed in by an older version becomes an entry in the list.
+	if c.Server != "" && c.Server != speedtest.DefaultServer {
+		found := false
+		for _, v := range c.Servers {
+			found = found || v.URL == c.Server
+		}
+		if !found {
+			c.Servers = append(c.Servers, speedServer{Name: strings.TrimPrefix(c.Server, "https://"), URL: c.Server})
+		}
 	}
 	if c.Hour < 0 || c.Hour > 23 {
 		c.Hour = 3
@@ -120,6 +139,11 @@ var errSpeedBusy = errors.New("another speed test is running. Wait for it to fin
 
 // runSpeed measures one connection and saves the result. It blocks for about twenty seconds.
 func (a *App) runSpeed(link, source string, full bool) (speedRow, error) {
+	return a.runSpeedOn(link, source, full, "")
+}
+
+// runSpeedOn is runSpeed against a chosen server; empty means the default one.
+func (a *App) runSpeedOn(link, source string, full bool, server string) (speedRow, error) {
 	if a.Net == nil {
 		return speedRow{}, errors.New("speed tests are not available on this machine")
 	}
@@ -152,7 +176,10 @@ func (a *App) runSpeed(link, source string, full bool) (speedRow, error) {
 		a.speed.mu.Unlock()
 		a.Bus.Publish("speedtest", map[string]any{"running": false})
 	}()
-	res, err := a.Net.SpeedTest(speedtest.Params{Dev: dev, Server: cfg.Server, Quick: quick})
+	if server == "" {
+		server = cfg.Server
+	}
+	res, err := a.Net.SpeedTest(speedtest.Params{Dev: dev, Server: server, Quick: quick})
 	row := speedRow{TS: time.Now().Unix(), Link: link, Source: source, Quick: quick, Server: res.Server,
 		DownBps: res.DownBps, UpBps: res.UpBps, DelayMS: res.DelayMS, JitterMS: res.JitterMS, LoadedMS: res.LoadedMS, Grade: res.Grade, Bytes: res.BytesUsed}
 	if err != nil {
@@ -253,7 +280,7 @@ func (a *App) registerSpeedRoutes() {
 		if server == "" {
 			server = speedtest.DefaultServer
 		}
-		api.JSON(w, 200, map[string]any{"server": server, "default_server": speedtest.DefaultServer, "schedule": cfg.Schedule, "hour": cfg.Hour, "links": links, "run": run})
+		api.JSON(w, 200, map[string]any{"server": server, "default_server": speedtest.DefaultServer, "servers": append([]speedServer{{Name: "Cloudflare", URL: speedtest.DefaultServer}}, cfg.Servers...), "schedule": cfg.Schedule, "hour": cfg.Hour, "links": links, "run": run})
 	})
 	s.Handle("GET /api/speedtest/history", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		days, _ := strconv.Atoi(r.URL.Query().Get("days"))
@@ -264,9 +291,8 @@ func (a *App) registerSpeedRoutes() {
 	})
 	s.HandleAdmin("PUT /api/speedtest", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		var in struct {
-			Server   string `json:"server"`
-			Schedule bool   `json:"schedule"`
-			Hour     int    `json:"hour"`
+			Schedule bool `json:"schedule"`
+			Hour     int  `json:"hour"`
 			Links    map[string]struct {
 				DownMbps float64 `json:"down_mbps"`
 				UpMbps   float64 `json:"up_mbps"`
@@ -276,16 +302,12 @@ func (a *App) registerSpeedRoutes() {
 		if !api.Decode(w, r, &in) {
 			return
 		}
-		in.Server = strings.TrimSpace(in.Server)
-		if in.Server != "" && !strings.HasPrefix(in.Server, "https://") {
-			fail(w, errors.New("the test server address must start with https://"))
-			return
-		}
 		if in.Hour < 0 || in.Hour > 23 {
 			fail(w, errors.New("choose an hour from 0 to 23"))
 			return
 		}
-		cfg := speedConfig{Server: in.Server, Schedule: in.Schedule, Hour: in.Hour, Links: map[string]speedLink{}}
+		old := a.speedConfig()
+		cfg := speedConfig{Server: old.Server, Servers: old.Servers, Schedule: in.Schedule, Hour: in.Hour, Links: map[string]speedLink{}}
 		for n, l := range in.Links {
 			if l.DownMbps < 0 || l.UpMbps < 0 || l.DownMbps > 100000 || l.UpMbps > 100000 {
 				fail(w, errors.New("the plan speed must be between 0 and 100000 Mbps"))
@@ -301,10 +323,96 @@ func (a *App) registerSpeedRoutes() {
 		}
 		ok(w)
 	})
+	// The list of test servers: add one, remove one, choose the default.
+	s.HandleAdmin("POST /api/speedtest/servers", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		var in speedServer
+		if !api.Decode(w, r, &in) {
+			return
+		}
+		u, err := cleanSpeedServer(in.URL)
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		in.URL = u
+		in.Name = strings.TrimSpace(in.Name)
+		if in.Name == "" {
+			in.Name = strings.TrimPrefix(u, "https://")
+		}
+		if len(in.Name) > 40 {
+			fail(w, errors.New("the name can be up to 40 characters"))
+			return
+		}
+		cfg := a.speedConfig()
+		if len(cfg.Servers) >= 10 {
+			fail(w, errors.New("you can keep up to 10 test servers; remove one first"))
+			return
+		}
+		if u == speedtest.DefaultServer {
+			fail(w, errors.New("Cloudflare is already in the list"))
+			return
+		}
+		for _, v := range cfg.Servers {
+			if v.URL == u {
+				fail(w, errors.New("that server is already in the list"))
+				return
+			}
+		}
+		// Make sure it answers the way a test server must before it is kept.
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		if err := speedtest.Check(ctx, u); err != nil {
+			fail(w, fmt.Errorf("%s did not answer as a test server: %v", u, err))
+			return
+		}
+		cfg.Servers = append(cfg.Servers, in)
+		a.saveSpeedConfig(cfg)
+		ok(w)
+	})
+	s.HandleAdmin("DELETE /api/speedtest/servers", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		u := r.URL.Query().Get("url")
+		cfg := a.speedConfig()
+		keep := cfg.Servers[:0]
+		for _, v := range cfg.Servers {
+			if v.URL != u {
+				keep = append(keep, v)
+			}
+		}
+		cfg.Servers = keep
+		if cfg.Server == u {
+			cfg.Server = "" // the default falls back to Cloudflare
+		}
+		a.saveSpeedConfig(cfg)
+		ok(w)
+	})
+	s.HandleAdmin("PUT /api/speedtest/default", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		var in struct {
+			URL string `json:"url"`
+		}
+		if !api.Decode(w, r, &in) {
+			return
+		}
+		cfg := a.speedConfig()
+		known := in.URL == speedtest.DefaultServer || in.URL == ""
+		for _, v := range cfg.Servers {
+			known = known || v.URL == in.URL
+		}
+		if !known {
+			fail(w, errors.New("that test server is not in your list"))
+			return
+		}
+		cfg.Server = in.URL
+		if cfg.Server == speedtest.DefaultServer {
+			cfg.Server = ""
+		}
+		a.saveSpeedConfig(cfg)
+		ok(w)
+	})
 	s.HandleAdmin("POST /api/speedtest/run", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		var in struct {
-			Link string `json:"link"`
-			Full bool   `json:"full"`
+			Link   string `json:"link"`
+			Full   bool   `json:"full"`
+			Server string `json:"server"`
 		}
 		if !api.Decode(w, r, &in) {
 			return
@@ -320,7 +428,32 @@ func (a *App) registerSpeedRoutes() {
 			fail(w, errors.New("that internet connection is not switched on"))
 			return
 		}
-		go a.runSpeed(in.Link, "manual", in.Full)
+		if in.Server != "" {
+			known := in.Server == speedtest.DefaultServer
+			for _, v := range a.speedConfig().Servers {
+				known = known || v.URL == in.Server
+			}
+			if !known {
+				fail(w, errors.New("that test server is not in your list"))
+				return
+			}
+		}
+		go a.runSpeedOn(in.Link, "manual", in.Full, in.Server)
 		api.JSON(w, 202, map[string]string{"status": "started"})
 	})
+}
+
+func (a *App) saveSpeedConfig(cfg speedConfig) {
+	b, _ := json.Marshal(cfg)
+	a.Config.SetSetting("speedtest.config", string(b))
+}
+
+// cleanSpeedServer accepts an https address and returns its base form.
+func cleanSpeedServer(raw string) (string, error) {
+	raw = strings.TrimRight(strings.TrimSpace(raw), "/")
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+		return "", errors.New("the test server address must look like https://speed.example.com")
+	}
+	return "https://" + u.Host + strings.TrimRight(u.Path, "/"), nil
 }

@@ -57,10 +57,10 @@ func (a *App) dnsTop(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		hours = h
 	}
 	since := time.Now().Add(-time.Duration(hours) * time.Hour).Unix()
-	clients, _ := a.QLog.TopClients(since, 10)
+	clients, _ := a.QLog.TopClients(since, 10, r.URL.Query().Get("self") == "1")
 	blocked, _ := a.QLog.TopBlocked(since, 10)
 	domains, _ := a.QLog.TopDomains(since, 10)
-	api.JSON(w, 200, map[string]any{"clients": nz(clients), "blocked": nz(blocked), "domains": nz(domains)})
+	api.JSON(w, 200, map[string]any{"clients": nz(clients), "blocked": nz(blocked), "domains": nz(domains), "total": a.QLog.Count(since), "hours": hours})
 }
 
 func nz(t []dnssrv.Top) []dnssrv.Top {

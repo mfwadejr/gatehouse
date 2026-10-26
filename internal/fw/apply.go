@@ -141,6 +141,16 @@ func (a *Applier) Counters() (map[string]Counter, error) {
 	}
 	res := map[string]Counter{}
 	for _, it := range doc.Nftables {
+		if it.Set != nil && (it.Set.Name == AcctTo || it.Set.Name == AcctFrom) {
+			dir := "to:"
+			if it.Set.Name == AcctFrom {
+				dir = "from:"
+			}
+			for ip, c := range acctElems(it.Set.Elem) {
+				res[RemotePrefix+dir+ip] = c
+			}
+			continue
+		}
 		if it.Set != nil && (it.Set.Name == AcctUp || it.Set.Name == AcctDown) {
 			dir := "up:"
 			if it.Set.Name == AcctDown {

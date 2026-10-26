@@ -360,8 +360,8 @@ func (a *App) computeVPN(st netd.VPNStatus) ([]VPNView, error) {
 				if u.RevokedAt > 0 {
 					continue
 				}
-				pv := PeerView{ID: u.ID, Name: u.Name, State: "never", Created: u.CreatedAt}
-				if c, ok := byName[u.Name]; ok {
+				pv := PeerView{ID: u.ID, Name: u.Name, State: "never", Created: u.CreatedAt, Paused: u.Paused}
+				if c, ok := byName[u.Name]; ok && !u.Paused {
 					pv.State, pv.Address, pv.Real, pv.Rx, pv.Tx, pv.LastSeen = "connected", c.Virtual, c.Real, c.Rx, c.Tx, c.Since
 					v.Connected++
 				}

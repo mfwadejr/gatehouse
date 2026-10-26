@@ -8,10 +8,32 @@ import (
 	"encoding/base64"
 	"errors"
 	"os"
+	"sync"
 )
 
 // Box encrypts and decrypts strings with AES-256-GCM.
-type Box struct{ aead cipher.AEAD }
+type Box struct {
+	mu   sync.RWMutex
+	aead cipher.AEAD
+}
+
+func (b *Box) get() cipher.AEAD {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return b.aead
+}
+
+// SetKey switches the box to another key, for restoring a backup made with it.
+func (b *Box) SetKey(key []byte) error {
+	n, err := New(key)
+	if err != nil {
+		return err
+	}
+	b.mu.Lock()
+	b.aead = n.aead
+	b.mu.Unlock()
+	return nil
+}
 
 // LoadOrCreate reads the key file, creating it (mode 0600) on first use.
 func LoadOrCreate(path string) (*Box, error) {
@@ -43,16 +65,19 @@ func New(key []byte) (*Box, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Box{aead: a}, nil
+	b := &Box{}
+	b.aead = a
+	return b, nil
 }
 
 // Seal returns base64(nonce||ciphertext).
 func (b *Box) Seal(plain string) string {
-	nonce := make([]byte, b.aead.NonceSize())
+	aead := b.get()
+	nonce := make([]byte, aead.NonceSize())
 	if _, err := rand.Read(nonce); err != nil {
 		panic(err)
 	}
-	return base64.RawStdEncoding.EncodeToString(b.aead.Seal(nonce, nonce, []byte(plain), nil))
+	return base64.RawStdEncoding.EncodeToString(aead.Seal(nonce, nonce, []byte(plain), nil))
 }
 
 // Open reverses Seal.
@@ -61,11 +86,12 @@ func (b *Box) Open(s string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	n := b.aead.NonceSize()
+	aead := b.get()
+	n := aead.NonceSize()
 	if len(raw) < n {
 		return "", errors.New("crypt: short ciphertext")
 	}
-	pt, err := b.aead.Open(nil, raw[:n], raw[n:], nil)
+	pt, err := aead.Open(nil, raw[:n], raw[n:], nil)
 	if err != nil {
 		return "", err
 	}

@@ -522,7 +522,7 @@ function Inbound({ v, reload, setModal }) {
               <div className="item" key={p.id}>
                 <div><div className="name">{p.name}</div><div className="meta">{p.address || ''}{p.real ? ` · from ${p.real}` : ''}{p.state === 'connected' ? ` · ↓ ${bytes(p.rx)} ↑ ${bytes(p.tx)}` : p.last_seen ? ` · last seen ${fmt.ago(p.last_seen)}` : ''}</div></div>
                 <div className="inline">{p.paused ? <Pill tone="">Paused</Pill> : <Pill tone={s.tone}>{s.label}</Pill>}
-                  {v.kind === 'wireguard' && <Switch checked={!p.paused} label={`${p.name} allowed to connect`} onChange={(on) => run(() => put(`/api/vpn/${v.kind}/${v.id}/peers/${p.id}`, { enabled: on }), on ? 'Allowed again.' : 'Paused.').then(reload)} />}
+                  <Switch checked={!p.paused} label={`${p.name} allowed to connect`} onChange={(on) => run(() => put(`/api/vpn/${v.kind}/${v.id}/peers/${p.id}`, { enabled: on }), on ? 'Allowed again.' : 'Paused.').then(reload)} />
                   <Button small kind="danger" icon="trash" onClick={async () => await confirmBox(`Remove ${p.name}? It will no longer be able to connect.`) && run(() => del(`/api/vpn/${v.kind}/${v.id}/peers/${p.id}`), 'Removed.').then(reload)}>Remove</Button></div>
               </div>
             );

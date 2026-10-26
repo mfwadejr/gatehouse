@@ -2,6 +2,7 @@ package app
 
 import (
 	"database/sql"
+	"errors"
 	"net/http"
 	"sort"
 	"strings"
@@ -204,7 +205,11 @@ func (a *App) registerFWObjectRoutes() {
 		}
 		a.fwSync()
 		a.markDirty()
-		api.JSON(w, 200, map[string]int64{"id": id})
+		out := map[string]any{"id": id}
+		if warn := a.vpnFollowGroup(in.Name, c.User.Username); warn != "" {
+			out["vpn_warning"] = warn
+		}
+		api.JSON(w, 200, out)
 	})
 	s.HandleAdmin("DELETE /api/fw/groups/{id}", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		id, good := pathID(r)
@@ -226,6 +231,104 @@ func (a *App) registerFWObjectRoutes() {
 			return
 		}
 		api.JSON(w, 200, g)
+	})
+	// Forced DNS: the router-wide switch, each network's treatment, and the device and group exceptions.
+	s.Handle("GET /api/fw/dnsforce", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		zones, err := fw.Zones(a.Config)
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		targets := fw.ZoneDNSTargets(a.Config)
+		type net struct {
+			ID       int64  `json:"id"`
+			Name     string `json:"name"`
+			Internet bool   `json:"internet"`
+			Mode     string `json:"mode"` // force, server or off
+			Target   string `json:"target"`
+		}
+		nets := []net{}
+		for _, z := range zones {
+			n := net{ID: z.ID, Name: z.Name, Internet: z.Internet, Mode: "off"}
+			if z.DNSForce {
+				n.Mode = "force"
+				if t := targets[z.ID]; t != "" {
+					n.Mode, n.Target = "server", t
+				}
+			}
+			nets = append(nets, n)
+		}
+		ex := fw.DNSExceptions(a.Config)
+		if ex == nil {
+			ex = []fw.DNSException{}
+		}
+		var redirected, exempt int64
+		for k, h := range a.hitTable() {
+			switch {
+			case strings.HasPrefix(k, "rule:dns:force:"):
+				redirected += h.Hits
+			case k == "rule:dns:exempt":
+				exempt += h.Hits
+			}
+		}
+		api.JSON(w, 200, map[string]any{
+			"master": a.Config.Setting("fw.dns_redirect", "1") == "1", "target": strings.TrimSpace(a.Config.Setting("fw.dns_target", "")),
+			"block_dot": a.Config.Setting("fw.block_dot", "1") == "1",
+			"networks":  nets, "exceptions": ex, "redirected": redirected, "exempt": exempt,
+		})
+	})
+	s.HandleAdmin("PUT /api/fw/dnsforce/network", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		var in struct {
+			ID     int64  `json:"id"`
+			Mode   string `json:"mode"`
+			Target string `json:"target"`
+		}
+		if !api.Decode(w, r, &in) {
+			return
+		}
+		if in.Mode != "force" && in.Mode != "server" && in.Mode != "off" {
+			fail(w, errors.New("choose force, another server, or leave alone"))
+			return
+		}
+		if in.Mode == "server" && strings.TrimSpace(in.Target) == "" {
+			fail(w, errors.New("enter the address of the DNS server for this network"))
+			return
+		}
+		if in.Mode == "force" {
+			in.Target = ""
+		}
+		if err := fw.Mutate(a.Config, func(tx *sql.Tx) error { return fw.SetZoneDNS(tx, in.ID, in.Mode != "off", in.Target) }); err != nil {
+			fail(w, err)
+			return
+		}
+		a.markDirty()
+		ok(w)
+	})
+	s.HandleAdmin("PUT /api/fw/dnsforce/exception", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		var in fw.DNSException
+		if !api.Decode(w, r, &in) {
+			return
+		}
+		var id int64
+		if err := fw.Mutate(a.Config, func(tx *sql.Tx) (e error) { id, e = fw.SaveDNSException(tx, in); return }); err != nil {
+			fail(w, err)
+			return
+		}
+		a.markDirty()
+		api.JSON(w, 200, map[string]int64{"id": id})
+	})
+	s.HandleAdmin("DELETE /api/fw/dnsforce/exception/{id}", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		id, good := pathID(r)
+		if !good {
+			fail(w, errBadID)
+			return
+		}
+		if err := fw.Mutate(a.Config, func(tx *sql.Tx) error { return fw.DeleteDNSException(tx, id) }); err != nil {
+			fail(w, err)
+			return
+		}
+		a.markDirty()
+		ok(w)
 	})
 	// The services page: what Gatehouse knows by name, and the person's own, with where each is used.
 	s.Handle("GET /api/fw/services", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {

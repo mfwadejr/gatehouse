@@ -2,14 +2,18 @@ package app
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
+	"time"
 
 	"gatehouse/internal/api"
 	"gatehouse/internal/netcfg"
@@ -210,10 +214,14 @@ func countryFromZone(zone string) string {
 
 // WifiLive is what a card is doing right now, as opposed to what it was set up to do.
 type WifiLive struct {
-	Linked bool     `json:"linked"` // joined a network, or broadcasting one
-	SSID   string   `json:"ssid"`
-	Signal int      `json:"signal"` // dBm, joined networks only
-	Addrs  []string `json:"addrs"`
+	Linked bool   `json:"linked"` // joined a network, or broadcasting one
+	SSID   string `json:"ssid"`
+	Signal int    `json:"signal"` // dBm, joined networks only
+	// What the card is really using, read back from the driver rather than from the setup.
+	Channel int      `json:"channel,omitempty"`
+	MHz     int      `json:"mhz,omitempty"`
+	Band    string   `json:"band,omitempty"`
+	Addrs   []string `json:"addrs"`
 	// Serves is, for a card that broadcasts, the network it carries. The address belongs to that
 	// network (or to the bridge it is part of), never to the card itself.
 	Serves *WifiServes `json:"serves,omitempty"`
@@ -253,6 +261,32 @@ func wifiServes(q querier, iface string) *WifiServes {
 		}
 	}
 	return via
+}
+
+var reIwChan = regexp.MustCompile(`channel (\d+) \((\d+) MHz\)`)
+
+// BandOfMHz names the band a frequency is in.
+func BandOfMHz(mhz int) string {
+	switch {
+	case mhz >= 2400 && mhz < 2500:
+		return "2.4"
+	case mhz >= 5150 && mhz < 5900:
+		return "5"
+	case mhz >= 5925 && mhz <= 7125:
+		return "6"
+	}
+	return ""
+}
+
+// ParseIwChannel reads the channel a card is on from `iw dev <name> info`.
+func ParseIwChannel(out string) (ch, mhz int, band string) {
+	m := reIwChan.FindStringSubmatch(out)
+	if m == nil {
+		return 0, 0, ""
+	}
+	ch, _ = strconv.Atoi(m[1])
+	mhz, _ = strconv.Atoi(m[2])
+	return ch, mhz, BandOfMHz(mhz)
 }
 
 // ParseIwLink reads `iw dev <name> link`.
@@ -296,6 +330,7 @@ func liveWifi(name, mode string) WifiLive {
 	case "ap":
 		if b, err := exec.Command("iw", "dev", name, "info").Output(); err == nil {
 			l.Linked = strings.Contains(string(b), "type AP")
+			l.Channel, l.MHz, l.Band = ParseIwChannel(string(b))
 		}
 	default:
 		if b, err := exec.Command("iw", "dev", name, "link").Output(); err == nil {
@@ -317,6 +352,53 @@ type wifiCard struct {
 	Reg     string   `json:"reg"`
 	Saved   *WifiRow `json:"saved"`
 	Present bool     `json:"present"`
+	// Check is the last "Check this card" result, so the page can show what was reported next to
+	// what was found.
+	Check *WifiCheck `json:"check,omitempty"`
+}
+
+// WifiCheck is what testing a card found: for each band the card reports, whether it heard
+// networks there. Only a test can say a card really works on a band.
+type WifiCheck struct {
+	At     int64                 `json:"at"`
+	Driver string                `json:"driver"`
+	Bands  map[string]WifiBandCk `json:"bands"`
+}
+
+// WifiBandCk is the result for one band.
+type WifiBandCk struct {
+	Heard int `json:"heard"` // networks seen on this band
+}
+
+// wifiCheckKey is where a card's last check is kept.
+func wifiCheckKey(iface string) string { return "wifi.check." + iface }
+
+func (a *App) wifiLastCheck(iface string) *WifiCheck {
+	raw := a.Config.Setting(wifiCheckKey(iface), "")
+	if raw == "" {
+		return nil
+	}
+	var c WifiCheck
+	if json.Unmarshal([]byte(raw), &c) != nil {
+		return nil
+	}
+	return &c
+}
+
+// checkFromScan turns a scan into a per-band result for the bands the card reports.
+func checkFromScan(listed []string, nets []netd.WifiNetwork, driver string, now time.Time) WifiCheck {
+	c := WifiCheck{At: now.Unix(), Driver: driver, Bands: map[string]WifiBandCk{}}
+	for _, b := range listed {
+		c.Bands[b] = WifiBandCk{}
+	}
+	for _, n := range nets {
+		b := BandOfMHz(n.Freq)
+		if bc, ok := c.Bands[b]; ok {
+			bc.Heard++
+			c.Bands[b] = bc
+		}
+	}
+	return c
 }
 
 // WifiRow is a card's saved setup. The password is write-only.
@@ -420,6 +502,7 @@ func (a *App) wifiCards() []wifiCard {
 			lv.Serves = wifiServes(a.Config, n)
 		}
 		c.Live = &lv
+		c.Check = a.wifiLastCheck(n)
 		out = append(out, c)
 	}
 	return out
@@ -507,6 +590,42 @@ func (a *App) registerWifiRoutes() {
 		}
 		a.publishNet()
 		ok(w)
+	})
+	// "Check this card": listen on every band the card reports and keep what it heard.
+	s.HandleAdmin("POST /api/net/wifi/{iface}/check", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		if a.Net == nil {
+			fail(w, fmt.Errorf("the network helper is not running"))
+			return
+		}
+		var card *wifiCard
+		for _, x := range a.wifiCards() {
+			if x.Iface == r.PathValue("iface") {
+				x := x
+				card = &x
+			}
+		}
+		if card == nil {
+			fail(w, fmt.Errorf("that card was not found"))
+			return
+		}
+		if card.Saved != nil && card.Saved.Mode == "ap" && card.Saved.Enabled {
+			fail(w, fmt.Errorf("this card is broadcasting your network, so it cannot listen at the same time. Switch its network off, apply, check the card, then switch it back on"))
+			return
+		}
+		nets, err := a.Net.WifiScan(card.Iface)
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		listed := card.Caps.Listed
+		if len(listed) == 0 {
+			listed = card.Caps.Bands
+		}
+		res := checkFromScan(listed, nets, card.Driver, time.Now())
+		b, _ := json.Marshal(res)
+		a.Config.SetSetting(wifiCheckKey(card.Iface), string(b))
+		a.publishNet()
+		api.JSON(w, 200, res)
 	})
 	s.HandleAdmin("GET /api/net/wifi/{iface}/scan", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		if a.Net == nil {

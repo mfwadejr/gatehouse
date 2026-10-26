@@ -142,6 +142,14 @@ const (
 	AcctDown = "acct_down4" // from the internet to a device
 )
 
+// The firewall also counts what is sent to and received from each address on the internet, so the
+// console can show how much data went to each country.
+const (
+	AcctTo       = "acct_to4"   // sent out to an internet address
+	AcctFrom     = "acct_from4" // received from an internet address
+	RemotePrefix = "remote:"
+)
+
 // AcctKey is how a device's counter is named in what Counters reports.
 const AcctPrefix = "acct:"
 

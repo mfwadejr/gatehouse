@@ -31,6 +31,7 @@ type Zone struct {
 	Gateway     bool   // this box is the gateway and NATs for it; false when another router is
 	SSH         bool   // allow SSH to the router from this zone
 	DNSForce    bool   // devices here cannot use any DNS server except the enforced one
+	DNSTarget   string // this network's own enforced server; empty to use the router-wide choice
 	Description string // shown in the console
 }
 
@@ -113,6 +114,8 @@ type Model struct {
 	// DNSTarget is where forced DNS goes: empty for this router's own resolver, otherwise the
 	// address of the server the administrator chose.
 	DNSTarget string
+	// DNSExceptions say how single devices or groups are treated, whatever their network says.
+	DNSExceptions []DNSException
 	// BlockDoT drops DNS-over-TLS (port 853) toward the internet so clients cannot bypass filtering.
 	BlockDoT bool
 	// LogDrops writes dropped packets to the event log (rate limited).
@@ -167,3 +170,12 @@ func (m *Model) WanIfaces() []string {
 
 // DefaultConsolePorts is the console's usual port.
 var DefaultConsolePorts = []int{443}
+
+// DNSException is one device or group with its own forced-DNS treatment. Who is dev:<mac> or
+// grp:<name>. Mode is "off" (leave alone), "gatehouse" (force to this router) or "server" (force to Target).
+type DNSException struct {
+	ID     int64  `json:"id"`
+	Who    string `json:"who"`
+	Mode   string `json:"mode"`
+	Target string `json:"target"`
+}

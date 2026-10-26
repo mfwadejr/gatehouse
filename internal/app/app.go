@@ -145,7 +145,7 @@ func New(cfg Config) (*App, error) {
 			a.event("dhcp", "warn", "Address already in use", ip.String()+" on "+scope+" already answers, so it was not handed out. Another device may be set to this address by hand.")
 		}
 	}
-	a.DHCP.InUse = dhcp.PingInUse
+	a.DHCP.InUse = func(iface string, ip net.IP) bool { return dhcp.ARPInUse(iface, ip) || dhcp.PingInUse(iface, ip) }
 	a.Lists.OnChange = func() { a.Bus.Publish("dns.lists", map[string]int64{"at": time.Now().Unix()}) }
 
 	a.API = api.New(a.Auth, a.Bus)
@@ -371,7 +371,9 @@ func (a *App) housekeeping(ctx context.Context) {
 			a.pruneFWLog(days)
 			a.pruneTraffic(int(a.settingFloat("logs.retention_days", 30)))
 			a.pruneSpeed()
+			a.Config.SetSetting("logs.last_prune", strconv.FormatInt(time.Now().Unix(), 10))
 			a.Auth.PurgeExpired()
+			a.backupTick(time.Now())
 		}
 	}
 }

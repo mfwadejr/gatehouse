@@ -128,3 +128,20 @@ func TestSpeedRoutesSaveSettingsAndStartATest(t *testing.T) {
 		t.Fatalf("calls %d", n)
 	}
 }
+
+func TestSpeedServerListRules(t *testing.T) {
+	c, _, _ := siteBox(t, "192.168.1.1/24")
+	if rc, _, _ := c.call("POST", "/api/speedtest/servers", map[string]any{"name": "x", "url": "http://insecure.example"}); rc != 400 {
+		t.Fatalf("http must be refused, got %d", rc)
+	}
+	if rc, _, _ := c.call("PUT", "/api/speedtest/default", map[string]any{"url": "https://not-in-list.example"}); rc != 400 {
+		t.Fatalf("a default outside the list must be refused, got %d", rc)
+	}
+	if rc, _, _ := c.call("PUT", "/api/speedtest/default", map[string]any{"url": ""}); rc != 200 {
+		t.Fatalf("resetting to Cloudflare failed: %d", rc)
+	}
+	_, m, raw := c.call("GET", "/api/speedtest", nil)
+	if l, _ := m["servers"].([]any); len(l) != 1 {
+		t.Fatalf("Cloudflare must always be listed: %s", raw)
+	}
+}

@@ -292,7 +292,7 @@ function WorldCard() {
           {tip && (
             <div className="ov-maptip small">
               <b>{regionName(hover)}</b><br />
-              {fmt.n(tip.n)} {word}
+              {fmt.n(tip.n)} {word}{tip.up + tip.down > 0 ? <><br />{fmtBytes(tip.up)} sent · {fmtBytes(tip.down)} received</> : null}
               {dir === 'in' && <><br />{fmt.n(tip.blocked)} blocked · {fmt.n(tip.allowed)} allowed</>}
               <br /><span className="muted">Click to see them</span>
             </div>
@@ -304,14 +304,14 @@ function WorldCard() {
           <span>The country is approximate for CDN, cloud and VPN traffic.</span>
         </div>
       </Card>
-      <Card title={dir === 'out' ? 'Top countries (outgoing)' : 'Top countries (incoming)'} desc={dir === 'out' ? 'By connections · your devices talking out' : 'Attempts from the internet'}>
+      <Card title={dir === 'out' ? 'Top countries (outgoing)' : 'Top countries (incoming)'} desc={dir === 'out' ? 'By connections, with the data sent and received · your devices talking out' : 'Attempts from the internet'}>
         {!rows.length ? <Empty>{data ? 'Nothing recorded in this time.' : 'Loading…'}</Empty> : (
           <div className="stack" style={{ gap: 'var(--space-2)' }}>
             {rows.map((c) => (
               <button type="button" className="ov-cr" key={c.country} onClick={() => open(c.country)}>
                 <span className="muted small">{c.country}</span>
                 <span><span className="name">{regionName(c.country)}</span><Bar pct={(100 * c.n) / (rows[0].n || 1)} thin /></span>
-                <span className="num">{fmt.n(c.n)}</span>
+                <span className="num">{fmt.n(c.n)}{c.up + c.down > 0 && <span className="small muted"> · {fmtBytes(c.up + c.down)}</span>}</span>
               </button>
             ))}
           </div>
@@ -405,7 +405,7 @@ export default function Overview() {
   useStream(['dns.stats'], (t, p) => p && setDns((d) => (d ? { ...d, stats: p } : d)));
   const { data: net, updatedAt: netAt } = useData('/api/net/status', { topics: ['net.status'], every: 5000 });
   const { data: wans } = useData('/api/net/wans', { topics: ['net.status'] });
-  const { data: thr, updatedAt: thrAt } = useData('/api/net/throughput', { every: 2000 });
+  const { data: thr, updatedAt: thrAt } = useData('/api/net/throughput', { every: 1000 });
   const { data: util } = useData('/api/dhcp/utilisation', { topics: ['dhcp.utilisation', 'dhcp.leases'], every: 10000 });
   const { data: devs } = useData('/api/overview/devices', { topics: ['dhcp.leases'], every: 10000 });
   const { data: fw } = useData('/api/fw/overview', { topics: ['fw.status'] });

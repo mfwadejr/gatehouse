@@ -88,6 +88,18 @@ func Load(db Queryer) (*Model, error) {
 		m.Zones = append(m.Zones, z)
 	}
 	rows.Close()
+	if trows, err := db.Query(`SELECT zone_id,target FROM dns_zone_targets`); err == nil {
+		for trows.Next() {
+			var id int64
+			var t string
+			trows.Scan(&id, &t)
+			if i, ok := byID[id]; ok {
+				m.Zones[i].DNSTarget = t
+			}
+		}
+		trows.Close()
+	}
+	m.DNSExceptions = DNSExceptions(db)
 
 	irows, err := db.Query(`SELECT name,zone_id FROM interfaces WHERE enabled=1 AND zone_id IS NOT NULL ORDER BY id`)
 	if err != nil {

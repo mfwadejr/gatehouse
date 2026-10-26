@@ -341,8 +341,9 @@ func (a *App) sampleHits() {
 	}
 	now := time.Now().Unix()
 	a.sampleDevices(cur, time.Now())
+	a.sampleRemotes(cur, time.Now())
 	for tag, c := range cur {
-		if strings.HasPrefix(tag, fw.AcctPrefix) {
+		if strings.HasPrefix(tag, fw.AcctPrefix) || strings.HasPrefix(tag, fw.RemotePrefix) {
 			continue
 		}
 		prev := a.dyn.counts[tag]

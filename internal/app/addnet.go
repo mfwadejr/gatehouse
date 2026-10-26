@@ -391,6 +391,27 @@ func (a *App) registerAddNetRoutes() {
 		out["vlan"] = v
 		api.JSON(w, 200, out)
 	})
+	s.HandleAdmin("POST /api/networks/move", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		var in struct {
+			ID   int64  `json:"id"`
+			Port string `json:"port"`
+			VLAN int    `json:"vlan"`
+		}
+		if !api.Decode(w, r, &in) {
+			return
+		}
+		if err := a.moveNetwork(in.ID, in.Port, in.VLAN); err != nil {
+			fail(w, err)
+			return
+		}
+		if a.DHCP != nil {
+			a.DHCP.Reload()
+		}
+		a.event(c.User.Username, "info", "Moved a network to another port or VLAN", "")
+		a.publishNet()
+		a.publishFW()
+		api.JSON(w, 200, map[string]bool{"ok": true})
+	})
 	// A live summary while the address is being typed.
 	s.Handle("GET /api/networks/check", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		p, err := netip.ParsePrefix(strings.TrimSpace(r.URL.Query().Get("address")))
@@ -434,6 +455,65 @@ func (a *App) registerAddNetRoutes() {
 }
 
 var _ = sql.ErrNoRows
+
+// moveNetwork changes the port or VLAN number a network lives on. Everything that refers to the
+// network (its firewall network, DHCP scope and rescue setting) follows, in one step.
+func (a *App) moveNetwork(id int64, port string, vlan int) error {
+	port = strings.TrimSpace(port)
+	if !reAddNetPort.MatchString(port) {
+		return errors.New("choose the port this network is on")
+	}
+	if vlan < 0 || vlan > 4094 {
+		return errors.New("a VLAN number must be between 1 and 4094")
+	}
+	return a.mutateNet(func(tx *sql.Tx) error {
+		var old, kind string
+		if err := tx.QueryRow(`SELECT name,kind FROM interfaces WHERE id=?`, id).Scan(&old, &kind); err != nil {
+			return errors.New("that network was not found")
+		}
+		if kind == "bridge" {
+			return errors.New("a bridge is changed by editing its ports")
+		}
+		name, nk, parent := port, "phys", ""
+		if vlan > 0 {
+			name, nk, parent = port+"."+strconv.Itoa(vlan), "vlan", port
+			if len(name) > 15 {
+				return errors.New("the port name is too long to add a VLAN to")
+			}
+		}
+		if name == old {
+			return nil
+		}
+		// A bare row for the port itself (left behind by VLANs on it) is not a network.
+		tx.Exec(`DELETE FROM interfaces WHERE name=? AND id<>? AND kind='phys' AND zone_id IS NULL AND ipv4_cidr='' AND members=''`, name, id)
+		var n int
+		tx.QueryRow(`SELECT COUNT(*) FROM interfaces WHERE name=? AND id<>?`, name, id).Scan(&n)
+		if n > 0 {
+			return errors.New("that port or VLAN number already has a network")
+		}
+		if vlan == 0 {
+			if u := a.portUse(tx)[port]; u != "" {
+				if u == "internet" {
+					return errors.New("that port is used for the internet; pick another port")
+				}
+				if u == "bridge" {
+					return errors.New("that port is part of a bridge; pick another port")
+				}
+				return errors.New("that port already has a network; pick another port, or give this one a VLAN number")
+			}
+		}
+		if _, err := tx.Exec(`UPDATE interfaces SET name=?,kind=?,parent=?,vlan_id=? WHERE id=?`, name, nk, parent, vlan, id); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`UPDATE dhcp_scopes SET iface=? WHERE iface=?`, name, old); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`UPDATE settings SET value=? WHERE key='mgmt.rescue_iface' AND value=?`, name, old); err != nil {
+			return err
+		}
+		return nil
+	})
+}
 
 // hasManagementNetwork says whether any local network with a port may manage this device.
 func hasManagementNetwork(m *fw.Model) bool {

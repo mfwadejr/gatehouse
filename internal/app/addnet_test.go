@@ -149,3 +149,36 @@ func TestFirstNetworkOnAMachineWithNoManagementNetworkCanManage(t *testing.T) {
 	}
 	t.Fatalf("the new network should manage the device: %s", raw)
 }
+
+func TestMoveNetworkFollowsEverywhere(t *testing.T) {
+	c, _, _ := siteBox(t, "192.168.1.1/24")
+	rc, _, raw := c.call("POST", "/api/networks/add", map[string]any{"name": "Cams", "port": "eth1", "vlan": 20, "address": "192.168.50.1/24", "dhcp": "server"})
+	if rc != 200 {
+		t.Fatalf("add: %d %s", rc, raw)
+	}
+	_, _, lraw := c.call("GET", "/api/net/interfaces", nil)
+	var list []map[string]any
+	json.Unmarshal(lraw, &list)
+	var id float64
+	for _, r := range list {
+		if r["name"] == "eth1.20" {
+			id = r["id"].(float64)
+		}
+	}
+	if id == 0 {
+		t.Fatalf("network not found: %s", lraw)
+	}
+	if rc, _, raw := c.call("POST", "/api/networks/move", map[string]any{"id": id, "port": "eth1", "vlan": 30}); rc != 200 {
+		t.Fatalf("move: %d %s", rc, raw)
+	}
+	_, _, sc := c.call("GET", "/api/dhcp/scopes", nil)
+	if !strings.Contains(string(sc), "eth1.30") {
+		t.Fatalf("scope did not follow: %s", sc)
+	}
+	if rc, _, _ := c.call("POST", "/api/networks/move", map[string]any{"id": id, "port": "eth1", "vlan": 0}); rc != 400 {
+		t.Fatalf("moving onto a port that has a network must be refused, got %d", rc)
+	}
+	if rc, _, raw := c.call("POST", "/api/networks/move", map[string]any{"id": id, "port": "eth2", "vlan": 0}); rc != 200 {
+		t.Fatalf("to another whole port: %d %s", rc, raw)
+	}
+}

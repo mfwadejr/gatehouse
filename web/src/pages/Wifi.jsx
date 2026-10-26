@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { del, get, put, useData } from '../api.js';
+import { del, get, post, put, useData } from '../api.js';
 import ApplyBar from '../ApplyBar.jsx';
 import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, Select, ToggleRow, useAction } from '../ui.jsx';
 
@@ -63,6 +63,39 @@ function Serves({ lv, enabled }) {
   );
 }
 
+// What the card says it can do next to what a test found. Only a test can say a band really works.
+function CardCheck({ c, onDone }) {
+  const [run, busy] = useAction();
+  const listed = c.caps.listed?.length ? c.caps.listed : c.caps.bands;
+  if (!listed.length) return null;
+  const ck = c.check;
+  const go = async () => { if (await run(() => post(`/api/net/wifi/${c.iface}/check`, {}), 'Card checked.')) onDone(); };
+  return (
+    <div className="stack">
+      <table className="tbl small">
+        <thead><tr><th>Band</th><th>Reported by the card</th><th>Tested</th></tr></thead>
+        <tbody>
+          {listed.map((b) => {
+            const heard = ck?.bands?.[b]?.heard;
+            return (
+              <tr key={b}>
+                <td>{b} GHz</td>
+                <td>{c.caps.ap_bands?.includes(b) ? 'Join and broadcast' : 'Join'}</td>
+                <td>{!ck ? <span className="muted">Not tested yet</span> : heard > 0 ? <Pill tone="good">Heard {heard} network{heard === 1 ? '' : 's'}</Pill> : <Pill tone="warn">Heard nothing</Pill>}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {ck && listed.some((b) => !ck.bands?.[b]?.heard) && <p className="small muted">"Heard nothing" can mean there is simply nothing on that band nearby, or that the card does not really work there. Run the check again somewhere with more networks in range, or in a different place.</p>}
+      <div className="inline">
+        <Button small disabled={busy} onClick={go}>{ck ? 'Check again' : 'Check this card'}</Button>
+        <span className="small muted">{ck ? `Last checked ${new Date(ck.at * 1000).toLocaleString()}.` : 'Listens on every band the card reports, for a few seconds.'} A card that is broadcasting cannot listen at the same time. Broadcasting itself is not tested here.</span>
+      </div>
+    </div>
+  );
+}
+
 // What the card is doing right now, kept apart from what it was set up to do.
 function Live({ c }) {
   const sv = c.saved, lv = c.live || {};
@@ -86,6 +119,12 @@ function Live({ c }) {
           {!ap && lv.linked && lv.signal ? ` · signal ${bars(lv.signal).toLowerCase()}` : ''}
         </span>
       </div>
+      {ap && lv.linked && lv.channel > 0 && (
+        <div className="small">
+          Actually using channel <b>{lv.channel}</b> on {lv.band} GHz{lv.band !== sv.band ? <> <Pill tone="warn">not the {sv.band} GHz you asked for</Pill></> : null}
+          {sv.channel > 0 && lv.channel !== sv.channel ? <> <Pill tone="warn">you chose channel {sv.channel}</Pill></> : null}
+        </div>
+      )}
       {ap ? <Serves lv={lv} enabled={sv.enabled} /> : (
         <div className="small">{addrs ? <>Address <span className="mono">{addrs}</span></> : <span className="muted">{lv.linked ? 'Waiting for an address…' : 'No address yet.'}</span>}</div>
       )}
@@ -279,6 +318,7 @@ export default function Wifi({ me }) {
               : <Button icon="trash" small onClick={() => setForget(c)}>Forget network</Button>)}
           </>}>
           {!c.saved ? <p className="sec">Not set up. Nothing is broadcast and nothing is joined until you choose.</p> : <Live c={c} />}
+          <CardCheck c={c} onDone={all} />
           {!c.caps.ap && c.caps.bands.length > 0 && <p className="small muted">This card can join networks but cannot broadcast one.</p>}
         </Card>
       ))}

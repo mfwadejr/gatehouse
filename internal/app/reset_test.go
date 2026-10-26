@@ -3,7 +3,6 @@ package app
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -34,7 +33,7 @@ func TestNetworkResetClearsNetworksAndKeepsTheAccount(t *testing.T) {
 		t.Fatal("no DNS servers after the reset")
 	}
 	// A copy of the settings from before is kept.
-	files, _ := filepath.Glob(filepath.Join(data, "backups", "before-reset-*.db"))
+	files, _ := filepath.Glob(filepath.Join(data, "backups", "before-reset-*.ghbk"))
 	if len(files) != 1 {
 		t.Fatalf("backups: %v", files)
 	}
@@ -85,13 +84,13 @@ func TestResetRefusesUnknownLevel(t *testing.T) {
 func TestBackupDownload(t *testing.T) {
 	c, _, data := updBox(t, "http://127.0.0.1:1/none", true)
 	rc, _, raw := c.call("GET", "/api/system/backup", nil)
-	if rc != 200 || !strings.HasPrefix(string(raw), "SQLite format 3") {
+	if rc != 200 || len(raw) < 2 || raw[0] != 0x1f || raw[1] != 0x8b {
 		t.Fatalf("%d %.40q", rc, raw)
 	}
-	// The copy is removed just after the answer has been sent, so give the handler a moment.
-	waitFor(t, "the temporary copy to be removed", func() bool {
-		left, _ := filepath.Glob(filepath.Join(data, "backups", "download-*.db"))
-		return len(left) == 0
-	})
+	// The download is a real backup that is kept in the list.
+	left, _ := filepath.Glob(filepath.Join(data, "backups", "manual-*.ghbk"))
+	if len(left) != 1 {
+		t.Fatalf("expected the backup to be kept, found %d", len(left))
+	}
 	_ = os.Remove
 }

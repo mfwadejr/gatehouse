@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { del, post, put, useData } from '../api.js';
 import { go } from '../App.jsx';
 import { AddrPicker, Chip, NewDevice, ScheduleEditor, ServicePicker, tokens } from '../AddrPicker.jsx';
-import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Pill, Segmented, Select, ToggleRow, useAction, fmt, confirmBox } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Pill, Segmented, Select, ToggleRow, useAction, fmt, confirmBox, noticeBox } from '../ui.jsx';
 
 const ACTIONS = [{ value: 'accept', label: 'Allow' }, { value: 'drop', label: 'Block silently' }, { value: 'reject', label: 'Block and tell the sender' }];
 // Only the fields the server stores; it refuses anything else.
@@ -263,7 +263,7 @@ function GroupForm({ initial, pickers, reloadPickers, onClose, onSaved }) {
   const tog = (mac) => setG((x) => ({ ...x, members: x.members.includes(mac) ? x.members.filter((m) => m !== mac) : [...x.members, mac] }));
   return (
     <Modal title={g.id ? `Edit ${initial.name}` : 'New device group'} onClose={onClose}
-      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy || !g.name} onClick={async () => { if (await run(() => put('/api/fw/groups', g), 'Saved.')) { onSaved(); onClose(); } }}>Save</Button></>}>
+      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy || !g.name} onClick={async () => { const r = await run(() => put('/api/fw/groups', g), 'Saved.'); if (r) { if (r.vpn_warning) await noticeBox(r.vpn_warning); onSaved(); onClose(); } }}>Save</Button></>}>
       <Field label="Name"><Input value={g.name} onChange={(v) => setG({ ...g, name: v })} placeholder="Kids' devices" /></Field>
       <ToggleRow title="Reserved addresses only" desc="A device counts only at the address you reserved for it on the DHCP page. Devices without a reservation are left out, so a stranger who borrows a free address is not covered." checked={g.reserved_only} onChange={(v) => setG({ ...g, reserved_only: v })} />
       <Field label={`Devices (${g.members.length})`}>

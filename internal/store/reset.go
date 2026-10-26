@@ -14,7 +14,7 @@ const (
 // Rows are removed child tables first. Most children also cascade, but listing them keeps the
 // result the same whether or not foreign keys are on.
 var networkTables = []string{
-	"fw_hits", "fw_rules", "fw_objects", "nat_forwards", "upnp_allow",
+	"fw_hits", "dns_exceptions", "dns_zone_targets", "fw_rules", "fw_objects", "nat_forwards", "upnp_allow",
 	"vpn_routes", "vpn_ovpn_users", "vpn_ovpn", "vpn_wg_peers", "vpn_wg",
 	"wan_group_routes", "wan_group_members", "wan_groups", "wan_links", "wifi_radios",
 	"dhcp_leases", "dhcp_reservations", "dhcp_scopes", "interfaces", "zones",

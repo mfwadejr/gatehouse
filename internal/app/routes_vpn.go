@@ -867,10 +867,6 @@ func (a *App) vpnPausePeer(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		fail(w, errBadID)
 		return
 	}
-	if kind != "wireguard" {
-		fail(w, errors.New("OpenVPN devices cannot be paused. Remove the device to cut its access; you can add it again afterwards"))
-		return
-	}
 	var in struct {
 		Enabled bool `json:"enabled"`
 	}
@@ -878,6 +874,18 @@ func (a *App) vpnPausePeer(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		return
 	}
 	err = a.mutateVPN(c.User.Username, func(tx *sql.Tx) error {
+		if kind != "wireguard" {
+			// OpenVPN holds a paused device out through the server's revocation list, which is rebuilt
+			// from what is stored, so letting it back in is just leaving it off the list.
+			res, err := tx.Exec(`UPDATE vpn_ovpn_users SET paused=? WHERE id=? AND ovpn_id=? AND revoked_at=0`, b2i(!in.Enabled), pid, id)
+			if err != nil {
+				return err
+			}
+			if n, _ := res.RowsAffected(); n == 0 {
+				return errors.New("that device no longer exists")
+			}
+			return a.rebuildCRL(tx, id)
+		}
 		res, err := tx.Exec(`UPDATE vpn_wg_peers SET enabled=? WHERE id=? AND wg_id=?`, b2i(in.Enabled), pid, id)
 		if err != nil {
 			return err
@@ -917,6 +925,8 @@ func (a *App) rebuildCRL(tx *sql.Tx, id int64) error {
 	for _, u := range users {
 		if u.RevokedAt > 0 {
 			rev = append(rev, vpn.Revoked{Serial: u.Serial, At: time.Unix(u.RevokedAt, 0)})
+		} else if u.Paused {
+			rev = append(rev, vpn.Revoked{Serial: u.Serial, At: time.Unix(u.CreatedAt, 0)})
 		}
 	}
 	ca := &vpn.CA{CertPEM: srv.CACert, KeyPEM: srv.CAKey}

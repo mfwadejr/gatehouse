@@ -92,6 +92,7 @@ type ovpnUserRow struct {
 	Cert      string
 	CreatedAt int64
 	RevokedAt int64
+	Paused    bool
 }
 
 func (a *App) openSealed(s string) (string, error) {
@@ -192,7 +193,7 @@ func (a *App) listOVPN(q querier) ([]ovpnRow, error) {
 }
 
 func (a *App) listOVPNUsers(q querier, id int64) ([]ovpnUserRow, error) {
-	rows, err := q.Query(`SELECT id,ovpn_id,name,serial,cert,created_at,revoked_at FROM vpn_ovpn_users WHERE ovpn_id=? ORDER BY id`, id)
+	rows, err := q.Query(`SELECT id,ovpn_id,name,serial,cert,created_at,revoked_at,paused FROM vpn_ovpn_users WHERE ovpn_id=? ORDER BY id`, id)
 	if err != nil {
 		return nil, err
 	}
@@ -200,9 +201,11 @@ func (a *App) listOVPNUsers(q querier, id int64) ([]ovpnUserRow, error) {
 	var out []ovpnUserRow
 	for rows.Next() {
 		var r ovpnUserRow
-		if err := rows.Scan(&r.ID, &r.OVPNID, &r.Name, &r.Serial, &r.Cert, &r.CreatedAt, &r.RevokedAt); err != nil {
+		var paused int
+		if err := rows.Scan(&r.ID, &r.OVPNID, &r.Name, &r.Serial, &r.Cert, &r.CreatedAt, &r.RevokedAt, &paused); err != nil {
 			return nil, err
 		}
+		r.Paused = paused == 1
 		out = append(out, r)
 	}
 	return out, rows.Err()

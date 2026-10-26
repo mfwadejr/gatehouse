@@ -90,4 +90,13 @@ CREATE TABLE speedtests(
   error TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX idx_speed_link ON speedtests(link, ts);
+`, `
+-- Data sent to and received from each country, in five-minute buckets.
+CREATE TABLE country_traffic(
+  ts INTEGER NOT NULL,
+  cc TEXT NOT NULL,
+  up INTEGER NOT NULL DEFAULT 0,
+  down INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY(ts, cc)
+);
 `}

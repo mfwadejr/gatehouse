@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { del, put, useData } from '../api.js';
+import { del, post, put, useData } from '../api.js';
 import ApplyBar from '../ApplyBar.jsx';
 import AddNetwork from '../AddNetwork.jsx';
 import { ScopeForm } from './DHCP.jsx';
@@ -13,8 +13,17 @@ function EditNetwork({ n, zones, onClose, onSaved }) {
   const [f, setF] = useState({ ...n.iface });
   const [run, busy] = useAction();
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
+  const { data: sug } = useData('/api/networks/suggest');
+  const [port, setPort] = useState(n.iface.kind === 'vlan' ? n.iface.parent : n.iface.name);
+  const [vlan, setVlan] = useState(String(n.iface.vlan || ''));
+  const movable = n.iface.kind !== 'bridge';
+  const moved = movable && (port !== (n.iface.kind === 'vlan' ? n.iface.parent : n.iface.name) || Number(vlan || 0) !== (n.iface.vlan || 0));
   const save = async () => {
-    if (await run(() => put('/api/net/interfaces', f), 'Saved. Apply it to start using it.')) { onSaved(); onClose(); }
+    const ok = await run(async () => {
+      await put('/api/net/interfaces', f);
+      if (moved) await post('/api/networks/move', { id: n.iface.id, port, vlan: Number(vlan || 0) });
+    }, 'Saved. Apply it to start using it.');
+    if (ok) { onSaved(); onClose(); }
   };
   return (
     <Modal title={`Edit ${n.title}`} onClose={onClose}
@@ -30,6 +39,17 @@ function EditNetwork({ n, zones, onClose, onSaved }) {
         <details className="more">
           <summary>More options</summary>
           <div className="stack">
+            {movable && (
+              <>
+                <Field label="Port" hint="The physical port this network is plugged into.">
+                  <Select value={port} onChange={setPort} options={[...new Set([port, ...((sug && sug.ports) || []).map((p) => p.name)])].map((x) => ({ value: x, label: x }))} />
+                </Field>
+                <Field label="VLAN number" hint="Leave empty to use the whole port. Your switch must pass the number you choose.">
+                  <Input value={vlan} onChange={(v) => setVlan(v.replace(/\D/g, ''))} className="in mono" />
+                </Field>
+                {moved && <Note tone="warn">Moving a network to another port or VLAN cuts devices off until they are on the new one. If you manage Gatehouse from this network, keep another way in until you have applied and checked it.</Note>}
+              </>
+            )}
             <p className="small muted">
               {f.kind === 'vlan' ? <>This network is a VLAN: number {f.vlan} on port {f.parent}. Your switch must pass that number.</> : <>This network uses the whole port {f.name}. To add another network to the same port, add a network and choose this port: Gatehouse then uses a VLAN number for it.</>}
             </p>

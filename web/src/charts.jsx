@@ -70,6 +70,15 @@ export function Chart({ series, from, to, kind = 'count', unit = '', height = 20
     return Math.max(med * 2.6, 6);
   }, [series]);
   const paths = series.map((s) => ({ s, segs: segments(s.pts, X, Y, gap) }));
+  // Stretches with no samples, drawn as a faint dotted line at the bottom of the small charts so a
+  // gap reads as "not recorded" and not as a broken chart.
+  const holes = [];
+  if (compact && all.length) {
+    const ts = series.flatMap((x) => x.pts.map((p) => p[0])).sort((a, b) => a - b);
+    let prev = from;
+    ts.forEach((t) => { if (t - prev > gap) holes.push([prev, t]); prev = t; });
+    if (to - prev > gap) holes.push([prev, to]);
+  }
   const has = rawMax > 0 || all.length > 0;
   const span = to - from;
   const xl = [0, 1, 2, 3, 4].map((k) => (k === 4 ? 'now' : k === 0 ? `${agoText(span)} ago` : agoText(span * (1 - k / 4))));
@@ -106,6 +115,7 @@ export function Chart({ series, from, to, kind = 'count', unit = '', height = 20
         <div className="ch2-plot" style={{ height }} onMouseMove={move} onMouseLeave={() => setHover(null)} role="img" aria-label={label || `Chart in ${u}`}>
           <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
             {[0, 25, 50, 75, 100].filter(() => !compact).map((y) => <line key={y} x1="0" x2={W} y1={y} y2={y} className="gl" vectorEffect="non-scaling-stroke" />)}
+            {holes.map(([a, b], i) => <line key={`h${i}`} x1={X(a)} x2={X(b)} y1="100" y2="100" className="hole" vectorEffect="non-scaling-stroke"><title>Not recorded</title></line>)}
             {paths.map(({ s, segs }) => segs.map((d, i) => (
               <g key={`${s.key}${i}`} style={{ '--c': s.color }}>
                 {filled && series.length <= 2 && <path d={`${d}L${d.split('L').pop().split(',')[0]},${H}L${d.slice(1).split(',')[0]},${H}Z`} className="fill" />}

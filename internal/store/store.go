@@ -112,3 +112,33 @@ func OpenLogs(path string) (*DB, error) {
 	}
 	return db, nil
 }
+
+// ConfigSchemaVersion is the newest settings layout this program knows.
+func ConfigSchemaVersion() int { return len(configMigrations) }
+
+// SchemaVersionOf reads the layout version recorded in a settings database; 0 when unknown.
+func SchemaVersionOf(db *DB) int {
+	var v int
+	db.QueryRow(`SELECT version FROM schema_version WHERE id=1`).Scan(&v)
+	return v
+}
+
+// OpenBackupCopy opens a copy of a settings database taken from a backup and brings it up to this
+// program's layout. It refuses one made by a newer version, which this program could misread.
+// from is the layout version the copy had.
+func OpenBackupCopy(path string) (db *DB, from int, err error) {
+	db, err = open(path, 1)
+	if err != nil {
+		return nil, 0, err
+	}
+	from = SchemaVersionOf(db)
+	if from > len(configMigrations) {
+		db.Close()
+		return nil, from, fmt.Errorf("this backup was made by a newer version of Gatehouse (settings layout %d; this one understands %d). Update first, then restore it", from, len(configMigrations))
+	}
+	if err := migrate(db, "config", configMigrations); err != nil {
+		db.Close()
+		return nil, from, fmt.Errorf("this is not a Gatehouse settings backup, or it is damaged: %w", err)
+	}
+	return db, from, nil
+}

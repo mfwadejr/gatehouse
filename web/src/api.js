@@ -27,6 +27,35 @@ export async function api(method, path, body) {
   return data;
 }
 
+// Fetch a file the server builds on request and hand it to the browser as a download.
+export async function saveFile(method, path, body, filename) {
+  const opts = { method, credentials: 'same-origin', headers: {} };
+  if (csrf) opts.headers['X-CSRF-Token'] = csrf;
+  if (body !== undefined) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  const res = await fetch(path, opts);
+  if (!res.ok) {
+    let msg = `Something went wrong (${res.status}).`;
+    try { msg = (await res.json()).error || msg; } catch { /* keep the default */ }
+    throw new ApiError(msg, res.status);
+  }
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+// Send a file as the body of a request.
+export async function sendFile(path, file, headers = {}) {
+  const h = { 'Content-Type': 'application/octet-stream', ...headers };
+  if (csrf) h['X-CSRF-Token'] = csrf;
+  const res = await fetch(path, { method: 'POST', credentials: 'same-origin', headers: h, body: file });
+  const text = await res.text();
+  let data = null;
+  try { data = JSON.parse(text); } catch { data = null; }
+  if (!res.ok) throw new ApiError((data && data.error) || `Something went wrong (${res.status}).`, res.status);
+  return data;
+}
+
 export const get = (p) => api('GET', p);
 export const put = (p, b) => api('PUT', p, b);
 export const post = (p, b) => api('POST', p, b ?? {});

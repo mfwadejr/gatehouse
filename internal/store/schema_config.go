@@ -411,4 +411,21 @@ CREATE TABLE device_icons(
 -- The order the person wants DNS servers asked in (1 is first).
 ALTER TABLE dns_upstreams ADD COLUMN position INTEGER NOT NULL DEFAULT 0;
 UPDATE dns_upstreams SET position = id;
+`, `
+-- Forced DNS, finer than on or off. A network can send its lookups to its own server instead of
+-- the router-wide one; a device or group can be left alone, forced to this router, or sent to a server.
+CREATE TABLE dns_zone_targets(
+  zone_id INTEGER PRIMARY KEY REFERENCES zones(id) ON DELETE CASCADE,
+  target TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE dns_exceptions(
+  id INTEGER PRIMARY KEY,
+  who TEXT NOT NULL UNIQUE,            -- dev:aa:bb:cc:dd:ee:ff or grp:Name
+  mode TEXT NOT NULL,                  -- off, gatehouse or server
+  target TEXT NOT NULL DEFAULT ''
+);
+`, `
+-- An OpenVPN device can be switched off without being deleted: the server's revocation list holds it
+-- out while it is paused, and lets it back in when it is not.
+ALTER TABLE vpn_ovpn_users ADD COLUMN paused INTEGER NOT NULL DEFAULT 0;
 `}

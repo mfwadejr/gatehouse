@@ -4,7 +4,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"gatehouse/internal/netd"
 	"gatehouse/internal/store"
 )
 
@@ -176,5 +178,17 @@ func TestRegCountry(t *testing.T) {
 	}
 	if RegCountry("", "phy0") != "" {
 		t.Fatal("nothing known")
+	}
+}
+
+func TestWifiCheckCountsNetworksPerBand(t *testing.T) {
+	nets := []netd.WifiNetwork{{Freq: 2412}, {Freq: 2437}, {Freq: 5180}, {Freq: 5955}}
+	c := checkFromScan([]string{"2.4", "5", "6"}, nets, "iwlwifi", time.Unix(100, 0))
+	if c.Bands["2.4"].Heard != 2 || c.Bands["5"].Heard != 1 || c.Bands["6"].Heard != 1 {
+		t.Fatalf("%+v", c)
+	}
+	ch, mhz, band := ParseIwChannel("\ttype AP\n\tchannel 36 (5180 MHz), width: 80 MHz")
+	if ch != 36 || mhz != 5180 || band != "5" {
+		t.Fatalf("%d %d %s", ch, mhz, band)
 	}
 }

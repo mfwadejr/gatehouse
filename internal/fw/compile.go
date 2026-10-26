@@ -81,27 +81,37 @@ func (c *compiler) clientIfaces() []string {
 	return out
 }
 
-// dnsEnforced splits the networks that must use the enforced DNS server. Networks without
-// internet access always use this router's resolver, since the chosen server may be out of reach.
-func (c *compiler) dnsEnforced() (local, remote []string, target net.IP) {
+// dnsEnforced works out which networks are forced and where their lookups go. Networks without
+// internet access always use this router's resolver, since a chosen server may be out of reach.
+// A network's own server wins over the router-wide one.
+func (c *compiler) dnsEnforced() dnsPlan {
+	p := dnsPlan{remote: map[string][]string{}}
 	if !c.m.DNSRedirect {
-		return
+		return p
 	}
-	target = net.ParseIP(c.m.DNSTarget)
-	if target != nil && target.To4() == nil {
-		target = nil // only IPv4 servers can be targeted; see Validate
+	global := ""
+	if ip := net.ParseIP(c.m.DNSTarget); ip != nil && ip.To4() != nil { // only IPv4 servers can be targeted; see Validate
+		global = ip.To4().String()
 	}
 	for _, z := range c.m.Zones {
 		if z.Kind == KindWan || !z.DNSForce {
 			continue
 		}
-		if target != nil && z.Internet {
-			remote = append(remote, z.Ifaces...)
+		t := global
+		if ip := net.ParseIP(z.DNSTarget); ip != nil && ip.To4() != nil {
+			t = ip.To4().String()
+		}
+		if t != "" && z.Internet {
+			p.remote[t] = append(p.remote[t], z.Ifaces...)
 		} else {
-			local = append(local, z.Ifaces...)
+			p.local = append(p.local, z.Ifaces...)
 		}
 	}
-	return
+	for k := range p.remote {
+		p.servers = append(p.servers, k)
+	}
+	sort.Strings(p.servers)
+	return p
 }
 
 func portList(ports []int) string {
@@ -147,6 +157,9 @@ func (c *compiler) build() string {
 	// sets the kernel fills as packets pass. An address that goes quiet drops out after an hour.
 	for _, n := range []string{AcctUp, AcctDown} {
 		c.line(1, "set %s { type ipv4_addr; flags dynamic, timeout; timeout 1h; size 8192; counter; }", n)
+	}
+	for _, n := range []string{AcctTo, AcctFrom} {
+		c.line(1, "set %s { type ipv4_addr; flags dynamic, timeout; timeout 10m; size 65535; counter; }", n)
 	}
 	c.input()
 	c.forward()
@@ -296,16 +309,39 @@ func (c *compiler) forward() {
 		c.line(2, "oifname %s add @%s { ip saddr }", ifSet(toNet), AcctUp)
 		c.line(2, "iifname %s add @%s { ip daddr }", ifSet(toNet), AcctDown)
 	}
+	if len(wan) > 0 {
+		c.line(2, "oifname %s add @%s { ip daddr }", ifSet(wan), AcctTo)
+		c.line(2, "iifname %s add @%s { ip saddr }", ifSet(wan), AcctFrom)
+	}
 	c.line(2, "ct state { established, related } accept")
+	plan := c.dnsEnforced()
+	offMACs, gateMACs, srvMACs, srvKeys := m.exceptionMACs()
 	if m.BlockDoT && len(wan) > 0 {
-		lo, re, _ := c.dnsEnforced()
-		if forced := append(append([]string(nil), lo...), re...); len(forced) > 0 {
-			c.line(2, "iifname %s oifname %s tcp dport 853 counter drop comment \"block dns-over-tls bypass\"", ifSet(forced), ifSet(wan))
-			c.line(2, "iifname %s oifname %s udp dport 853 counter drop comment \"block dns-over-quic bypass\"", ifSet(forced), ifSet(wan))
+		// Encrypted DNS to other servers is blocked for the same devices that are forced; a device left
+		// alone is left alone here too.
+		keep := ""
+		if len(offMACs) > 0 {
+			keep = " ether saddr != " + setLit(offMACs)
+		}
+		if forced := plan.forced(); len(forced) > 0 {
+			c.line(2, "iifname %s oifname %s%s tcp dport 853 counter drop comment \"block dns-over-tls bypass\"", ifSet(forced), ifSet(wan), keep)
+			c.line(2, "iifname %s oifname %s%s udp dport 853 counter drop comment \"block dns-over-quic bypass\"", ifSet(forced), ifSet(wan), keep)
+		}
+		forcedMACs := append([]string(nil), gateMACs...)
+		for _, k := range srvKeys {
+			forcedMACs = append(forcedMACs, srvMACs[k]...)
+		}
+		sort.Strings(forcedMACs)
+		if forcedMACs = uniq(forcedMACs); len(forcedMACs) > 0 {
+			c.line(2, "oifname %s ether saddr %s tcp dport 853 counter drop comment \"block dns-over-tls bypass (device)\"", ifSet(wan), setLit(forcedMACs))
+			c.line(2, "oifname %s ether saddr %s udp dport 853 counter drop comment \"block dns-over-quic bypass (device)\"", ifSet(wan), setLit(forcedMACs))
 		}
 	}
-	if _, re, t := c.dnsEnforced(); len(re) > 0 {
-		c.line(2, "iifname %s ip daddr %s meta l4proto { tcp, udp } th dport 53 ct status dnat accept comment \"enforced dns server\"", ifSet(re), t.To4())
+	for _, srv := range plan.servers {
+		c.line(2, "iifname %s ip daddr %s meta l4proto { tcp, udp } th dport 53 ct status dnat accept comment \"enforced dns server\"", ifSet(plan.remote[srv]), srv)
+	}
+	for _, srv := range srvKeys {
+		c.line(2, "ether saddr %s ip daddr %s meta l4proto { tcp, udp } th dport 53 ct status dnat accept comment \"enforced dns server (device)\"", setLit(srvMACs[srv]), srv)
 	}
 	if len(m.Forwards) > 0 || m.UPnP {
 		c.decide(2, "ct status dnat", "accept", "forward")
@@ -514,24 +550,36 @@ func setLit(v []string) string {
 func (c *compiler) nat() {
 	m := c.m
 	wan := m.WanIfaces()
-	dlocal, dremote, dtarget := c.dnsEnforced()
-	redirect := len(dlocal)+len(dremote) > 0
+	plan := c.dnsEnforced()
+	offMACs, gateMACs, srvMACs, srvKeys := m.exceptionMACs()
+	redirect := len(plan.local)+len(plan.servers) > 0 || len(offMACs)+len(gateMACs)+len(srvKeys) > 0
 	if !redirect && len(m.Forwards) == 0 && len(wan) == 0 && len(m.Tunnels) == 0 {
 		return
 	}
 	c.line(1, "chain prerouting {")
 	c.line(2, "type nat hook prerouting priority dstnat; policy accept;")
-	if redirect {
-		if len(dlocal) > 0 {
-			c.line(2, "iifname %s meta l4proto { tcp, udp } th dport 53 redirect to :53 comment \"dns enforcement\"", ifSet(dlocal))
-		}
-		if len(dremote) > 0 {
-			// The chosen server itself is left alone so it can still ask the internet.
-			c.line(2, "iifname %s meta nfproto ipv4 ip saddr != %s ip daddr != %s meta l4proto { tcp, udp } th dport 53 counter dnat ip to %s:53 comment \"dns enforcement\"",
-				ifSet(dremote), dtarget.To4(), dtarget.To4(), dtarget.To4())
-			// A server that only speaks IPv4 cannot take IPv6 questions, so those go to this router.
-			c.line(2, "iifname %s meta nfproto ipv6 meta l4proto { tcp, udp } th dport 53 redirect to :53 comment \"dns enforcement (ipv6)\"", ifSet(dremote))
-		}
+	// Devices and groups with their own treatment come first, so they win over their network.
+	const dns = "meta l4proto { tcp, udp } th dport 53"
+	if len(offMACs) > 0 {
+		c.line(2, "ether saddr %s %s counter accept comment \"rule:dns:exempt\"", setLit(offMACs), dns)
+	}
+	if len(gateMACs) > 0 {
+		c.line(2, "ether saddr %s %s counter redirect to :53 comment \"rule:dns:force:devices\"", setLit(gateMACs), dns)
+	}
+	for _, srv := range srvKeys {
+		c.line(2, "ether saddr %s meta nfproto ipv4 ip saddr != %s ip daddr != %s %s counter dnat ip to %s:53 comment %s",
+			setLit(srvMACs[srv]), srv, srv, dns, srv, q("rule:dns:force:device:"+srv))
+		c.line(2, "ether saddr %s meta nfproto ipv6 %s redirect to :53 comment \"dns enforcement (ipv6)\"", setLit(srvMACs[srv]), dns)
+	}
+	if len(plan.local) > 0 {
+		c.line(2, "iifname %s %s counter redirect to :53 comment \"rule:dns:force:local\"", ifSet(plan.local), dns)
+	}
+	for _, srv := range plan.servers {
+		// The chosen server itself is left alone so it can still ask the internet.
+		c.line(2, "iifname %s meta nfproto ipv4 ip saddr != %s ip daddr != %s %s counter dnat ip to %s:53 comment %s",
+			ifSet(plan.remote[srv]), srv, srv, dns, srv, q("rule:dns:force:"+srv))
+		// A server that only speaks IPv4 cannot take IPv6 questions, so those go to this router.
+		c.line(2, "iifname %s meta nfproto ipv6 %s redirect to :53 comment \"dns enforcement (ipv6)\"", ifSet(plan.remote[srv]), dns)
 	}
 	for _, f := range m.Forwards {
 		if !f.Enabled {

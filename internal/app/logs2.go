@@ -455,6 +455,7 @@ func (a *App) logUsage() map[string]any {
 	var oldest int64
 	a.Logs.QueryRow(`SELECT COALESCE(MIN(ts),0) FROM fw_events`).Scan(&oldest)
 	return map[string]any{"used_bytes": (pages - free) * size, "file_bytes": pages * size, "connections": fwN, "lookups": dnsN, "events": evN, "oldest": oldest,
+		"last_prune": int64(a.settingFloat("logs.last_prune", 0)), "last_removed": int64(a.settingFloat("logs.last_removed", 0)),
 		"days": int(a.settingFloat("logs.retention_days", 30)), "max_mb": int(a.settingFloat("logs.max_mb", 200))}
 }
 
@@ -499,6 +500,29 @@ func (a *App) registerLogExtraRoutes() {
 		cw.Flush()
 	})
 	s.Handle("GET /api/logs/usage", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		api.JSON(w, 200, a.logUsage())
+	})
+	// Clean up now: apply the limits straight away and say how much was removed.
+	s.HandleAdmin("POST /api/logs/prune", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		count := func() int64 {
+			var n, m, e int64
+			a.Logs.QueryRow(`SELECT COUNT(*) FROM fw_events`).Scan(&n)
+			a.Logs.QueryRow(`SELECT COUNT(*) FROM dns_queries`).Scan(&m)
+			a.Logs.QueryRow(`SELECT COUNT(*) FROM events`).Scan(&e)
+			return n + m + e
+		}
+		before := count()
+		days := int(a.settingFloat("logs.retention_days", 30))
+		a.QLog.Prune(days)
+		a.pruneFWLog(days)
+		a.pruneTraffic(days)
+		a.enforceLogCap()
+		removed := before - count()
+		if removed < 0 {
+			removed = 0
+		}
+		a.Config.SetSetting("logs.last_prune", strconv.FormatInt(time.Now().Unix(), 10))
+		a.Config.SetSetting("logs.last_removed", strconv.FormatInt(removed, 10))
 		api.JSON(w, 200, a.logUsage())
 	})
 	s.HandleAdmin("PUT /api/logs/retention", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {

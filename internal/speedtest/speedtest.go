@@ -128,6 +128,12 @@ func probe(ctx context.Context, c *http.Client, server string) (time.Duration, s
 	return first, resp.Header.Get("cf-meta-colo"), nil
 }
 
+// Check says whether a server answers the way a test server must, without binding to a device.
+func Check(ctx context.Context, server string) error {
+	_, _, err := probe(ctx, client("", 1), server)
+	return err
+}
+
 func median(d []float64) float64 {
 	if len(d) == 0 {
 		return 0

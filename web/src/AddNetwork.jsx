@@ -9,6 +9,8 @@ export default function AddNetwork({ onClose, onCreated }) {
   const [sug, setSug] = useState(null);
   const [f, setF] = useState({ name: '', port: '', vlan: 0, address: '', dhcp: 'server', relay: '', internet: true, isolate: true, lease: '1d', ipv6: 'off' });
   const [chk, setChk] = useState(null);
+  const [chkFailed, setChkFailed] = useState(false);
+  const [sugFailed, setSugFailed] = useState(false);
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
   const timer = useRef(null);
 
@@ -18,7 +20,7 @@ export default function AddNetwork({ onClose, onCreated }) {
       const free = s.ports.find((p) => !p.use);
       setF((x) => ({ ...x, address: s.address || '', port: (free || s.ports[0])?.name || '', vlan: free ? 0 : s.vlan }));
       setChk({ ok: true, router: s.address, summary: s.summary });
-    }).catch(() => setSug({ ports: [] }));
+    }).catch(() => { setSug({ ports: [] }); setSugFailed(true); });
   }, []);
 
   // A live summary of what the address means, as it is typed.
@@ -26,7 +28,7 @@ export default function AddNetwork({ onClose, onCreated }) {
     if (!f.address) return undefined;
     clearTimeout(timer.current);
     timer.current = setTimeout(() => {
-      get(`/api/networks/check?address=${encodeURIComponent(f.address)}`).then(setChk).catch(() => {});
+      get(`/api/networks/check?address=${encodeURIComponent(f.address)}`).then((c) => { setChk(c); setChkFailed(false); }).catch(() => { setChk(null); setChkFailed(true); });
     }, 250);
     return () => clearTimeout(timer.current);
   }, [f.address]);
@@ -56,6 +58,7 @@ export default function AddNetwork({ onClose, onCreated }) {
     <Modal title="Add a network" onClose={onClose}
       footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" onClick={save} disabled={busy || !f.name.trim() || !f.port || chk?.ok === false}>Add network</Button></>}>
       <div className="stack">
+        {sugFailed && <Note tone="warn" title="Couldn't load suggestions">Enter the port and address by hand, or close this window and try again.</Note>}
         {sug?.first && <Note tone="good" title="This is your first network">It will also be allowed to manage this device, so you can always reach this console from it. You can change that later under Firewall.</Note>}
         <Field label="Name" hint="For example Home, Cameras, Guests or Office.">
           <Input value={f.name} onChange={set('name')} maxLength={40} autoComplete="off" />
@@ -75,6 +78,7 @@ export default function AddNetwork({ onClose, onCreated }) {
           <Input value={f.address} onChange={set('address')} className="in mono" placeholder="192.168.10.1/24" />
         </Field>
         {chk?.ok === false && <Note tone="warn">{chk.problem}</Note>}
+        {chkFailed && <Note tone="warn" title="Couldn't check this address just now">Gatehouse checks it again when you add the network, and tells you then if there is a problem.</Note>}
 
         <Field label="Give devices addresses (DHCP)">
           <Segmented value={f.dhcp} onChange={set('dhcp')} options={[{ value: 'server', label: 'Gatehouse does' }, { value: 'off', label: 'Off' }, { value: 'relay', label: 'Pass on to another server' }]} />

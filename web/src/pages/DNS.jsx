@@ -1,66 +1,93 @@
 import React, { useState } from 'react';
 import { del, get, patch, post, put, useData, useStream } from '../api.js';
+import { go } from '../App.jsx';
+import { Chart } from '../charts.jsx';
 import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, Spark, Trend, Tabs, ToggleRow, useAction, fmt, Bar, confirmBox } from '../ui.jsx';
 
 function Overview() {
   const { data, setData } = useData('/api/dns/summary', { every: 10000 });
   useStream(['dns.stats'], (t, p) => p && setData((d) => (d ? { ...d, stats: p } : d)));
   const { data: ups, reload: ru } = useData('/api/dns/upstreams', { topics: ['dns.upstreams'], every: 10000 });
-  const { data: top } = useData('/api/dns/top?hours=24', { every: 30000 });
-  const [run] = useAction();
+  const [self, setSelf] = useState(false);
+  const { data: top } = useData(`/api/dns/top?hours=24${self ? '&self=1' : ''}`, { every: 30000 });
+  const { data: force } = useData('/api/fw/dnsforce', { every: 60000 });
+  const [range, setRange] = useState('live');
+  const { data: h } = useData(`/api/overview/history?range=${range}`, { every: 30000, enabled: range !== 'live' });
   const [add, setAdd] = useState(false);
   const st = data?.stats;
   const total = st?.hour_total || 0;
   const outcomes = st ? [['Forwarded', st.outcomes?.forwarded], ['Blocked', st.outcomes?.blocked], ['Cached', st.outcomes?.cached], ['Local', st.outcomes?.local]] : [];
   const hist = st?.history || [];
   const peak = Math.max(0, ...hist);
+  const list = ups || [];
+  const working = list.filter((u) => u.state !== 'down').length;
+  const slow = list.filter((u) => u.state === 'degraded').length;
+  const upTone = !list.length ? '' : working === 0 ? 'bad' : working < list.length || slow ? 'warn' : 'good';
+  const forcedOn = (force?.networks || []).filter((n) => n.mode !== 'off').map((n) => n.name);
+  const series = [{ key: 'dns.qps', name: 'Queries per second', color: 'var(--color-chart-series-1)', pts: h?.series?.['dns.qps'] || [] }];
   return (
     <>
-      <section className="grid">
-        <div className="card tile trend">
-          <span className="lbl">Queries per second</span>
-          <div className="line"><span className="val">{fmt.d1(st?.qps)}</span><span className="small muted">{peak > 0 ? `peak ${fmt.d1(peak)} a second` : ''}</span></div>
-          <Trend values={hist} unit="/s" series="Queries per second" height={72} empty="No queries in the last minute" />
-        </div>
+      <section className="dns-tiles">
+        <div className="card tile"><span className="lbl">Lookups, 24 hours</span><div><span className="val">{top ? fmt.n(top.total) : '–'}</span></div><span className="foot">{fmt.d1(st?.qps)} a second right now</span></div>
         <div className="card tile"><span className="lbl">Blocked</span><div><span className="val">{fmt.d1(st?.blocked_pct)}</span><span className="unit">%</span></div><span className="foot">{fmt.n(data?.blocked_entries)} names on your lists</span></div>
         <div className="card tile"><span className="lbl">Answered from memory</span><div><span className="val">{fmt.d1(st?.cached_pct)}</span><span className="unit">%</span></div><span className="foot">{fmt.n(st?.cache_size)} saved answers</span></div>
         <div className="card tile"><span className="lbl">Response time</span><div><span className="val">{fmt.d1(st?.avg_ms)}</span><span className="unit">ms</span></div><span className="foot">95% under {fmt.d1(st?.p95_ms)} ms</span></div>
+        <div className="card tile"><span className="lbl">Upstream servers</span><div><span className="val">{working}</span><span className="unit">of {list.length} working</span></div><span className="foot">{slow ? `${slow} slow` : upTone === 'bad' ? 'None answering' : 'All answering normally'}</span></div>
       </section>
-      <div className="row">
-        <div className="grow">
-          <Card title="How queries were answered" desc="Last hour">
-            {total === 0 ? <Empty>No queries yet.</Empty> : (
-              <div className="stack">
-                {outcomes.map(([k, v]) => (
-                  <div key={k} className="stack" style={{ gap: 'var(--space-1)' }}>
-                    <div className="spread small"><span>{k}</span><span className="muted">{fmt.n(v || 0)} · {fmt.d1((100 * (v || 0)) / total)}%</span></div>
-                    <Bar pct={(100 * (v || 0)) / total} thin />
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-        </div>
-        <div className="grow">
-          <Card title="Busiest devices" desc="DNS queries, last 24 hours">
-            {!top?.clients?.length ? <Empty>No activity yet.</Empty> : (
-              <div className="list">
-                {top.clients.slice(0, 6).map((c) => <div className="item" key={c.key}><div><div className="name">{c.label || c.key}</div><div className="meta">{c.key}</div></div><span>{fmt.n(c.n)}</span></div>)}
-              </div>
-            )}
-          </Card>
-        </div>
-        <div className="grow">
-          <Card title="Most blocked" desc="Last 24 hours">
-            {!top?.blocked?.length ? <Empty>Nothing has been blocked yet.</Empty> : (
-              <div className="list">
-                {top.blocked.slice(0, 6).map((c) => <div className="item" key={c.key}><span className="name" style={{ wordBreak: 'break-all' }}>{c.key}</span><span>{fmt.n(c.n)}</span></div>)}
-              </div>
-            )}
-          </Card>
-        </div>
+      <Card title="Lookups over time" desc={range === 'live' ? 'Queries per second, last minute' : 'Queries per second, averaged over each period'}
+        actions={<Segmented value={range} onChange={setRange} options={[{ value: 'live', label: 'Live' }, { value: '1h', label: '1 h' }, { value: '24h', label: '24 h' }, { value: '7d', label: '7 d' }]} />}>
+        {range === 'live' ? (
+          <>
+            <div className="small muted" style={{ textAlign: 'right' }}>{peak > 0 ? `peak ${fmt.d1(peak)} a second` : ''}</div>
+            <Trend values={hist} unit="/s" series="Queries per second" height={96} empty="No queries in the last minute" />
+          </>
+        ) : (
+          <Chart series={series} from={h?.from || 0} to={h?.to || 1} unit="queries/s" height={160} label={`DNS queries per second, ${range}`} />
+        )}
+      </Card>
+      <div className="dns-cards">
+        <Card title="How queries were answered" desc="Last hour">
+          {total === 0 ? <Empty>No queries yet.</Empty> : (
+            <div className="stack">
+              {outcomes.map(([k, v]) => (
+                <div key={k} className="stack" style={{ gap: 'var(--space-1)' }}>
+                  <div className="spread small"><span>{k}</span><span className="muted">{fmt.n(v || 0)} · {fmt.d1((100 * (v || 0)) / total)}%</span></div>
+                  <Bar pct={(100 * (v || 0)) / total} thin />
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+        <Card title="Busiest devices" desc="DNS queries, last 24 hours"
+          actions={<button type="button" className="link small" onClick={() => setSelf((x) => !x)}>{self ? 'Hide this router' : 'Show this router'}</button>}>
+          {!top?.clients?.length ? <Empty>No activity yet.</Empty> : (
+            <div className="list">
+              {top.clients.slice(0, 6).map((c) => <div className="item" key={c.key}><div><div className="name">{c.label || c.key}</div><div className="meta">{c.key === '127.0.0.1' || c.key === '::1' ? 'This router, asking for itself' : c.key}</div></div><span>{fmt.n(c.n)}</span></div>)}
+            </div>
+          )}
+        </Card>
+        <Card title="Most blocked" desc="Last 24 hours">
+          {!top?.blocked?.length ? <Empty>Nothing has been blocked yet.</Empty> : (
+            <div className="list">
+              {top.blocked.slice(0, 6).map((c) => <div className="item" key={c.key}><span className="name" style={{ wordBreak: 'break-all' }}>{c.key}</span><span>{fmt.n(c.n)}</span></div>)}
+            </div>
+          )}
+        </Card>
+        <Card title="Most asked" desc="Names devices looked up most, last 24 hours">
+          {!top?.domains?.length ? <Empty>No lookups yet.</Empty> : (
+            <div className="list">
+              {top.domains.slice(0, 6).map((c) => <div className="item" key={c.key}><span className="name" style={{ wordBreak: 'break-all' }}>{c.key}</span><span>{fmt.n(c.n)}</span></div>)}
+            </div>
+          )}
+        </Card>
       </div>
-      <Upstreams ups={ups || []} reload={ru} onAdd={() => setAdd(true)} />
+      <Card title="Forced DNS" desc="Devices that use a DNS server of their own are sent to the one you chose.">
+        <div className="spread">
+          <span>{!force ? 'Loading…' : !force.master ? 'Off. Devices may use any DNS server.' : forcedOn.length ? `On for ${forcedOn.join(', ')}.${force.redirected ? ` ${fmt.n(force.redirected)} lookups redirected so far.` : ''}` : 'On, but no network is forced.'}</span>
+          <button type="button" className="link small" onClick={() => go('firewall')}>Change →</button>
+        </div>
+      </Card>
+      <Upstreams ups={list} reload={ru} onAdd={() => setAdd(true)} />
       {add && <AddUpstream onClose={() => setAdd(false)} onSaved={ru} />}
     </>
   );

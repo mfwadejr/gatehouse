@@ -17,8 +17,8 @@ import (
 // Throughput of each internet connection, sampled from the kernel's interface counters.
 
 const (
-	trafficEvery   = 2 * time.Second
-	trafficSamples = 300 // ten minutes
+	trafficEvery   = time.Second
+	trafficSamples = 600 // ten minutes
 )
 
 type trafficSeries struct {

@@ -237,6 +237,24 @@ func (m *Model) Validate() error {
 			add("%s cannot be used as the DNS server", m.DNSTarget)
 		}
 	}
+	for _, z := range m.Zones {
+		if z.DNSTarget != "" {
+			if err := CheckDNSServer(z.DNSTarget); err != nil {
+				add("network %q: %v", z.Name, err)
+			}
+		}
+	}
+	for _, e := range m.DNSExceptions {
+		switch e.Mode {
+		case DNSOff, DNSGatehouse:
+		case DNSServer:
+			if err := CheckDNSServer(e.Target); err != nil {
+				add("forced DNS exception %q: %v", e.Who, err)
+			}
+		default:
+			add("forced DNS exception %q has an unknown treatment", e.Who)
+		}
+	}
 	tseen := map[string]bool{}
 	for _, t := range m.Tunnels {
 		if !reIface.MatchString(t.Iface) {

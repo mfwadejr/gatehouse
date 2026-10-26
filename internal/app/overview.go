@@ -357,6 +357,7 @@ var histRanges = map[string]struct {
 }{
 	"1h":  {"a", 3600, int64(histEvery / time.Second)},
 	"24h": {"b", 24 * 3600, tierB},
+	"7d":  {"c", 7 * 24 * 3600, tierC},
 	"30d": {"c", 30 * 24 * 3600, tierC},
 }
 
@@ -392,6 +393,8 @@ type mapCountry struct {
 	N       int    `json:"n"`
 	Blocked int    `json:"blocked,omitempty"`
 	Allowed int    `json:"allowed,omitempty"`
+	Up      int64  `json:"up,omitempty"`   // bytes sent to the country
+	Down    int64  `json:"down,omitempty"` // bytes received from it
 }
 
 // worldMap adds up connections by the country on the far side. Going out is the connections the
@@ -437,6 +440,24 @@ func (a *App) worldMap(dir string, hours int) map[string]any {
 			} else {
 				m.Allowed += n
 			}
+		}
+		rows.Close()
+	}
+	// Data volume per country, counted by the firewall.
+	if rows, err := a.Logs.Query(`SELECT cc, SUM(up), SUM(down) FROM country_traffic WHERE ts>=? GROUP BY cc`, since); err == nil {
+		for rows.Next() {
+			var cc string
+			var up, down int64
+			rows.Scan(&cc, &up, &down)
+			m := by[cc]
+			if m == nil && incoming {
+				continue
+			}
+			if m == nil {
+				m = &mapCountry{Country: cc}
+				by[cc] = m
+			}
+			m.Up, m.Down = up, down
 		}
 		rows.Close()
 	}

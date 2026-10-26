@@ -276,10 +276,74 @@ func (a *App) todayBytes() map[string][2]int64 {
 }
 
 // pruneTraffic removes buckets older than the retention.
+// remoteLast remembers each internet address's counter from the last look.
+var remoteLast = struct {
+	sync.Mutex
+	m     map[string]uint64
+	first bool
+}{m: map[string]uint64{}, first: true}
+
+// sampleRemotes turns the firewall's per-address counters into data per country.
+func (a *App) sampleRemotes(cur map[string]fw.Counter, now time.Time) {
+	remoteLast.Lock()
+	defer remoteLast.Unlock()
+	type ud struct{ up, down int64 }
+	by := map[string]*ud{}
+	seen := map[string]bool{}
+	for key, c := range cur {
+		if !strings.HasPrefix(key, fw.RemotePrefix) {
+			continue
+		}
+		rest := key[len(fw.RemotePrefix):]
+		dir, ip, ok := strings.Cut(rest, ":")
+		if !ok {
+			continue
+		}
+		seen[rest] = true
+		prev, had := remoteLast.m[rest]
+		d := c.Bytes - prev
+		if !had || c.Bytes < prev {
+			d = c.Bytes
+			if !had && remoteLast.first {
+				d = 0
+			}
+		}
+		remoteLast.m[rest] = c.Bytes
+		if d == 0 {
+			continue
+		}
+		cc := a.country(ip)
+		if cc == "" {
+			continue
+		}
+		x := by[cc]
+		if x == nil {
+			x = &ud{}
+			by[cc] = x
+		}
+		if dir == "to" {
+			x.up += int64(d)
+		} else {
+			x.down += int64(d)
+		}
+	}
+	for k := range remoteLast.m {
+		if !seen[k] {
+			delete(remoteLast.m, k)
+		}
+	}
+	remoteLast.first = false
+	ts := now.Unix() / deviceBucket * deviceBucket
+	for cc, x := range by {
+		a.Logs.Exec(`INSERT INTO country_traffic(ts,cc,up,down) VALUES(?,?,?,?) ON CONFLICT(ts,cc) DO UPDATE SET up=up+excluded.up, down=down+excluded.down`, ts, cc, x.up, x.down)
+	}
+}
+
 func (a *App) pruneTraffic(days int) {
 	if days < 1 {
 		days = 30
 	}
+	a.Logs.Exec(`DELETE FROM country_traffic WHERE ts<?`, time.Now().Add(-time.Duration(days)*24*time.Hour).Unix())
 	a.Logs.Exec(`DELETE FROM traffic WHERE ts<?`, time.Now().Add(-time.Duration(days)*24*time.Hour).Unix())
 }
 

@@ -198,8 +198,20 @@ type Top struct {
 }
 
 // TopClients ranks clients by query count since the cutoff.
-func (q *QueryLog) TopClients(since int64, n int) ([]Top, error) {
-	return q.top(`SELECT client, MAX(client_name), COUNT(*) c FROM dns_queries WHERE ts>=? GROUP BY client ORDER BY c DESC LIMIT ?`, since, n)
+// The router's own lookups (127.0.0.1 and ::1) are left out unless includeSelf is set.
+func (q *QueryLog) TopClients(since int64, n int, includeSelf bool) ([]Top, error) {
+	skip := ` AND client NOT IN ('127.0.0.1','::1')`
+	if includeSelf {
+		skip = ""
+	}
+	return q.top(`SELECT client, MAX(client_name), COUNT(*) c FROM dns_queries WHERE ts>=?`+skip+` GROUP BY client ORDER BY c DESC LIMIT ?`, since, n)
+}
+
+// Count is the number of lookups since the cutoff.
+func (q *QueryLog) Count(since int64) int64 {
+	var n int64
+	q.db.QueryRow(`SELECT COUNT(*) FROM dns_queries WHERE ts>=?`, since).Scan(&n)
+	return n
 }
 
 // TopBlocked ranks blocked domains.

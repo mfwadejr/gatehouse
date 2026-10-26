@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { del, get, getWatched, put, setFailing, useData, useStream } from '../api.js';
+import { del, get, getWatched, post, put, setFailing, useData, useStream } from '../api.js';
 import { RuleForm } from './FirewallRules.jsx';
 import { COUNTRIES, MAP_H, MAP_W } from '../worldmap.js';
 import { Button, Card, Empty, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, Switch, Tabs, ToggleRow, Trend, useAction, fmt, confirmBox } from '../ui.jsx';
@@ -60,6 +60,7 @@ function Recording({ onClose, state, onSaved }) {
               <label className="field"><span className="label">Never use more than (MB)</span><NumberInput value={keep.max_mb} min={10} max={20000} onChange={(v) => setKeep({ ...keep, max_mb: v })} /></label>
             </div>
             {u && <p className="small muted">Using {bytes(u.used_bytes)} now: {fmt.n(u.connections)} connections, {fmt.n(u.lookups)} name lookups, {fmt.n(u.events)} events{u.oldest ? `, going back to ${fmt.dt(u.oldest)}` : ''}. The oldest entries are removed first when either limit is reached.</p>}
+            {u && <div className="inline"><span className="small muted">{u.last_prune ? `Last cleaned up ${fmt.dt(u.last_prune)}, ${fmt.n(u.last_removed)} entries removed.` : 'Cleaned up automatically once an hour.'}</span><Button small disabled={busy} onClick={async () => { if (await run(() => post('/api/logs/prune', {}), 'Cleaned up.')) { reload(); onSaved(); } }}>Clean up now</Button></div>}
           </div>
         )}
         <p className="small muted">Only the first packet of each connection is recorded, and a flood is capped, so a busy network cannot fill the disk. Names asked for through DNS are always recorded.</p>
