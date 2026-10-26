@@ -294,6 +294,12 @@ export default function Wifi({ me }) {
   const cards = data?.cards || [];
   const all = () => { reload(); rw(); ri(); rs(); };
 
+  // Switching a card off keeps all its settings; it only stops it from broadcasting or joining.
+  const toggle = async (c) => {
+    await run(() => put('/api/net/wifi', { ...c.saved, psk: '', enabled: !c.saved.enabled }), c.saved.enabled ? 'Switched off. Apply it to take effect.' : 'Switched on. Apply it to take effect.');
+    all();
+  };
+
   const remove = async (c) => {
     await run(async () => {
       await del(`/api/net/wifi/${c.iface}`);
@@ -313,6 +319,7 @@ export default function Wifi({ me }) {
         <Card key={c.iface} title={c.iface} desc={`${c.usb ? 'USB adapter' : 'Built-in card'}${c.driver ? ` · ${c.driver}` : ''}${c.caps.bands.length ? ` · ${bandsText(c)}` : ''}`}
           actions={<>
             <Button icon="edit" small onClick={() => setEdit(c)}>{c.saved ? 'Edit' : 'Set up'}</Button>
+            {c.saved && <Button small onClick={() => toggle(c)}>{c.saved.enabled ? 'Switch off' : 'Switch on'}</Button>}
             {c.saved && (c.saved.mode === 'ap'
               ? <Button icon="trash" small onClick={() => remove(c)}>Remove</Button>
               : <Button icon="trash" small onClick={() => setForget(c)}>Forget network</Button>)}

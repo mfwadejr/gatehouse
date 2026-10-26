@@ -609,7 +609,7 @@ func (a *App) registerWifiRoutes() {
 			return
 		}
 		if card.Saved != nil && card.Saved.Mode == "ap" && card.Saved.Enabled {
-			fail(w, fmt.Errorf("this card is broadcasting your network, so it cannot listen at the same time. Switch its network off, apply, check the card, then switch it back on"))
+			fail(w, fmt.Errorf("this card is broadcasting your network, so it cannot listen at the same time. Press Switch off on this card, apply, check the card, then Switch on and apply again"))
 			return
 		}
 		nets, err := a.Net.WifiScan(card.Iface)
