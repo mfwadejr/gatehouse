@@ -90,15 +90,13 @@ func probeWifi(iface string) (ok bool, reason string, stations int) {
 	if out, err := wifiRun(5*time.Second, "iw", "dev", iface, "info"); err != nil || !strings.Contains(out, "type AP") {
 		return false, "the card is not in access point mode", 0
 	}
-	out, err := wifiRun(6*time.Second, "hostapd_cli", "-i", iface, "status")
-	if err != nil {
-		return false, "the access point service does not answer", 0
-	}
-	if st := lineValue(out, "state"); st != "ENABLED" {
-		if st == "" {
-			st = "unknown"
+	// hostapd_cli is only believed when it answers with a state. If it cannot be run or cannot reach
+	// the access point's control socket, that says nothing about the card, so it is not a failure
+	// (an earlier version treated it as one and restarted a working card).
+	if out, err := wifiRun(3*time.Second, "hostapd_cli", "-i", iface, "status"); err == nil {
+		if st := lineValue(out, "state"); st != "" && st != "ENABLED" {
+			return false, "the access point is " + strings.ToLower(st) + ", not enabled", 0
 		}
-		return false, "the access point is " + strings.ToLower(st) + ", not enabled", 0
 	}
 	// A hung driver stops answering questions about the radio.
 	if _, err := wifiRun(6*time.Second, "iw", "dev", iface, "survey", "dump"); err != nil {

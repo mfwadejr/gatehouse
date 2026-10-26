@@ -523,7 +523,7 @@ func (a *App) registerWifiRoutes() {
 				zone = strings.TrimSpace(string(b))
 			}
 		}
-		api.JSON(w, 200, map[string]any{"cards": cards, "country": countryFromZone(zone), "keep_awake": a.wifiKeepAwake()})
+		api.JSON(w, 200, map[string]any{"cards": cards, "country": countryFromZone(zone), "keep_awake": a.wifiKeepAwake(), "watchdog": a.wifiWatchdogOn()})
 	})
 	s.HandleAdmin("PUT /api/net/wifi", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		var in WifiRow

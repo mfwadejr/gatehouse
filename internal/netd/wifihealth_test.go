@@ -120,3 +120,24 @@ func TestPowerSaveOptionsOnlyForOptionsTheDriverHas(t *testing.T) {
 		t.Fatal("the options were not removed when switched off")
 	}
 }
+
+func TestAHostapdCliThatTimesOutDoesNotCountAsAFailedCard(t *testing.T) {
+	recordRun(t, func(name string, args []string) (string, error) {
+		switch name {
+		case "systemctl":
+			return "active\n", nil
+		case "iw":
+			if len(args) > 2 && args[2] == "info" {
+				return "type AP\n", nil
+			}
+			return "", nil
+		case "hostapd_cli":
+			return "", os.ErrDeadlineExceeded // timed out, as seen on the real machine
+		}
+		return "", nil
+	})
+	ok, reason, _ := probeWifi("wlp3s0")
+	if !ok {
+		t.Fatalf("a working card was judged failed: %s", reason)
+	}
+}

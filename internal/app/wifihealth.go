@@ -21,6 +21,8 @@ type wifiWatch struct {
 	bad    map[string]bool // cards last reported as not serving
 }
 
+func (a *App) wifiWatchdogOn() bool { return a.Config.Setting("wifi.watchdog", "1") == "1" }
+
 func (a *App) wifiKeepAwake() bool { return a.Config.Setting("wifi.keep_awake", "1") == "1" }
 
 // broadcastingCards lists the cards set up to broadcast and switched on.
@@ -50,6 +52,12 @@ func (a *App) wifiState(iface string) (netd.WifiState, bool) {
 func (a *App) wifiCheckOnce() {
 	cards := a.broadcastingCards()
 	if len(cards) == 0 || a.Net == nil {
+		return
+	}
+	if !a.wifiWatchdogOn() {
+		a.wifiw.mu.Lock()
+		a.wifiw.states, a.wifiw.bad = nil, nil
+		a.wifiw.mu.Unlock()
 		return
 	}
 	res, err := a.Net.WifiHealth(cards, a.wifiKeepAwake())
@@ -109,6 +117,18 @@ func (a *App) wifiLoop(ctx context.Context) {
 
 func (a *App) registerWifiHealthRoutes() {
 	s := a.API
+	s.HandleAdmin("PUT /api/net/wifi/watchdog", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		var in struct {
+			On bool `json:"on"`
+		}
+		if !api.Decode(w, r, &in) {
+			return
+		}
+		a.Config.SetSetting("wifi.watchdog", map[bool]string{true: "1", false: "0"}[in.On])
+		a.event("wifi", "info", "Automatic Wi-Fi recovery switched "+map[bool]string{true: "on", false: "off"}[in.On], "")
+		a.publishNet()
+		ok(w)
+	})
 	s.HandleAdmin("PUT /api/net/wifi/keepawake", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		var in struct {
 			On bool `json:"on"`

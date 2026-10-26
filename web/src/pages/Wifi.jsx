@@ -314,6 +314,7 @@ export default function Wifi({ me }) {
     const r = await run(() => get(`/api/net/wifi/${c.iface}/report`));
     if (r) setRep({ iface: c.iface, text: r.report });
   };
+  const watchdog = async (on) => { await run(() => put('/api/net/wifi/watchdog', { on }), on ? 'Automatic recovery is on.' : 'Automatic recovery is off.'); reload(); };
   const keepAwake = async (on) => { await run(() => put('/api/net/wifi/keepawake', { on }), on ? 'The card is kept awake.' : 'Power saving is back to the default.'); reload(); };
 
   const remove = async (c) => {
@@ -349,6 +350,7 @@ export default function Wifi({ me }) {
       {cards.some((c) => c.saved?.mode === 'ap') && (
         <Card title="Keep the card awake" desc="Some cards, Realtek ones in particular, can stop answering after a while when they save power. This turns power saving off for broadcasting cards. If something looks wrong with Wi-Fi after changing it, turn it off again.">
           <ToggleRow title="Turn off power saving" checked={!!data?.keep_awake} onChange={keepAwake} />
+          <ToggleRow title="Restart the card automatically if it stops working" desc="Off: Gatehouse never restarts the Wi-Fi by itself." checked={data?.watchdog !== false} onChange={watchdog} />
           <p className="small muted">Gatehouse also checks every 20 seconds that a broadcasting card is really serving. If it stops for a minute, Gatehouse restarts the Wi-Fi service, then reloads the card's driver, and writes each step to the Logs.</p>
         </Card>
       )}
