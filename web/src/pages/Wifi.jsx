@@ -107,6 +107,8 @@ function Live({ c }) {
   const addrs = v4.join(', ');
   let tone = '', label;
   if (!sv.enabled) label = 'Switched off';
+  else if (ap && lv.linked && c.health && !c.health.ok && !c.health.reason?.includes('coming back')) { tone = 'bad'; label = 'Not responding'; }
+  else if (ap && lv.linked && c.health && !c.health.ok) { tone = 'warn'; label = 'Restarting…'; }
   else if (lv.linked) { tone = 'good'; label = ap ? 'Broadcasting' : 'Connected'; }
   else label = ap ? 'Starting the network…' : 'Not connected yet';
   return (
@@ -119,6 +121,13 @@ function Live({ c }) {
           {!ap && lv.linked && lv.signal ? ` · signal ${bars(lv.signal).toLowerCase()}` : ''}
         </span>
       </div>
+      {ap && sv.enabled && c.health && !c.health.ok && (
+        <p className="small" style={{ color: 'var(--color-status-serious)' }}>
+          The card says it is broadcasting, but {c.health.reason || 'it is not answering'}.
+          {c.health.action ? ` Gatehouse ${c.health.action}.` : ' Gatehouse restarts it by itself if this lasts a minute.'}
+        </p>
+      )}
+      {ap && sv.enabled && c.health?.ok && <div className="small muted">{c.health.stations} device{c.health.stations === 1 ? '' : 's'} connected{c.health.recoveries ? ` · restarted ${c.health.recoveries} time${c.health.recoveries === 1 ? '' : 's'} in the last hour` : ''}</div>}
       {ap && lv.linked && lv.channel > 0 && (
         <div className="small">
           Actually using channel <b>{lv.channel}</b> on {lv.band} GHz{lv.band !== sv.band ? <> <Pill tone="warn">not the {sv.band} GHz you asked for</Pill></> : null}
@@ -300,6 +309,13 @@ export default function Wifi({ me }) {
     all();
   };
 
+  const [rep, setRep] = useState(null);
+  const report = async (c) => {
+    const r = await run(() => get(`/api/net/wifi/${c.iface}/report`));
+    if (r) setRep({ iface: c.iface, text: r.report });
+  };
+  const keepAwake = async (on) => { await run(() => put('/api/net/wifi/keepawake', { on }), on ? 'The card is kept awake.' : 'Power saving is back to the default.'); reload(); };
+
   const remove = async (c) => {
     await run(async () => {
       await del(`/api/net/wifi/${c.iface}`);
@@ -319,6 +335,7 @@ export default function Wifi({ me }) {
         <Card key={c.iface} title={c.iface} desc={`${c.usb ? 'USB adapter' : 'Built-in card'}${c.driver ? ` · ${c.driver}` : ''}${c.caps.bands.length ? ` · ${bandsText(c)}` : ''}`}
           actions={<>
             <Button icon="edit" small onClick={() => setEdit(c)}>{c.saved ? 'Edit' : 'Set up'}</Button>
+            {c.saved && c.saved.mode === 'ap' && <Button small onClick={() => report(c)}>Wi-Fi report</Button>}
             {c.saved && <Button small onClick={() => toggle(c)}>{c.saved.enabled ? 'Switch off' : 'Switch on'}</Button>}
             {c.saved && (c.saved.mode === 'ap'
               ? <Button icon="trash" small onClick={() => remove(c)}>Remove</Button>
@@ -329,6 +346,19 @@ export default function Wifi({ me }) {
           {!c.caps.ap && c.caps.bands.length > 0 && <p className="small muted">This card can join networks but cannot broadcast one.</p>}
         </Card>
       ))}
+      {cards.some((c) => c.saved?.mode === 'ap') && (
+        <Card title="Keep the card awake" desc="Some cards, Realtek ones in particular, can stop answering after a while when they save power. This turns power saving off for broadcasting cards. If something looks wrong with Wi-Fi after changing it, turn it off again.">
+          <ToggleRow title="Turn off power saving" checked={!!data?.keep_awake} onChange={keepAwake} />
+          <p className="small muted">Gatehouse also checks every 20 seconds that a broadcasting card is really serving. If it stops for a minute, Gatehouse restarts the Wi-Fi service, then reloads the card's driver, and writes each step to the Logs.</p>
+        </Card>
+      )}
+      {rep && (
+        <Modal title={`Wi-Fi report: ${rep.iface}`} onClose={() => setRep(null)}
+          footer={<><Button onClick={() => navigator.clipboard?.writeText(rep.text)}>Copy</Button><Button kind="primary" onClick={() => setRep(null)}>Close</Button></>}>
+          <p className="small muted">What the card, the access point and the kernel have said recently. Copy it if you need to ask for help.</p>
+          <pre className="mono small" style={{ maxHeight: '55vh', overflow: 'auto', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{rep.text}</pre>
+        </Modal>
+      )}
       {forget && (
         <Modal title={`Forget ${forget.saved.ssid}?`} onClose={() => setForget(null)}
           footer={<><Button onClick={() => setForget(null)}>Keep it</Button><Button kind="primary" onClick={async () => { const c = forget; setForget(null); await remove(c); }}>Forget network</Button></>}>

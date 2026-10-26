@@ -229,6 +229,34 @@ func (s *Service) Login(username, password, ip, ua string) (LoginResult, error) 
 	return LoginResult{MFATicket: t}, nil
 }
 
+// CheckPassword checks an administrator's password for a login that is not the console, such as
+// SSH. It starts no session and does not ask for the second factor. The same limits apply: an
+// address that keeps failing is slowed down, and an account locks after repeated failures.
+func (s *Service) CheckPassword(username, password, ip string) error {
+	if _, blocked := s.ipLim.Blocked("ip:" + ip); blocked {
+		return ErrRateLimited
+	}
+	u, err := s.loadByName(strings.TrimSpace(username))
+	if err != nil {
+		VerifyPassword(password, s.dummy)
+		s.ipLim.Fail("ip:" + ip)
+		return ErrInvalid
+	}
+	if s.now().Unix() < u.lockedTill {
+		VerifyPassword(password, s.dummy)
+		return ErrRateLimited
+	}
+	if !VerifyPassword(password, u.hash) {
+		s.accountFail(u)
+		s.ipLim.Fail("ip:" + ip)
+		return ErrInvalid
+	}
+	if u.Role != "admin" {
+		return ErrInvalid
+	}
+	return nil
+}
+
 // VerifyMFA completes a login with a TOTP code or an unused recovery code.
 func (s *Service) VerifyMFA(tkt, code, ip, ua string) (*Session, error) {
 	if _, blocked := s.ipLim.Blocked("ip:" + ip); blocked {

@@ -42,6 +42,11 @@ type NetController interface {
 	SystemUpdateStart() error
 	Power(action string) error
 	SpeedTest(ctx context.Context, p speedtest.Params) (speedtest.Result, error)
+	WifiHealth(ifaces []string, keepAwake bool) ([]netd.WifiState, error)
+	WifiPowerSave(iface string, keepAwake bool) error
+	WifiReport(iface string) (string, error)
+	SSHApply(p netd.SSHPlan) error
+	SSHLog(since int64) ([]string, error)
 }
 
 const maxRequest = 16 << 20
@@ -283,6 +288,46 @@ func (s *Server) dispatchNet(r request) (any, error) {
 			return nil, errors.New("bad parameters")
 		}
 		return s.Net.WifiScan(p.Iface)
+	case "wifi.health":
+		var p struct {
+			Ifaces    []string `json:"ifaces"`
+			KeepAwake bool     `json:"keep_awake"`
+		}
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return s.Net.WifiHealth(p.Ifaces, p.KeepAwake)
+	case "wifi.powersave":
+		var p struct {
+			Iface     string `json:"iface"`
+			KeepAwake bool   `json:"keep_awake"`
+		}
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return nil, s.Net.WifiPowerSave(p.Iface, p.KeepAwake)
+	case "wifi.report":
+		var p struct {
+			Iface string `json:"iface"`
+		}
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return s.Net.WifiReport(p.Iface)
+	case "ssh.apply":
+		var p netd.SSHPlan
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return nil, s.Net.SSHApply(p)
+	case "ssh.log":
+		var p struct {
+			Since int64 `json:"since"`
+		}
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return s.Net.SSHLog(p.Since)
 	case "net.upnp":
 		var p struct {
 			Maps []netd.UPnPMapping `json:"maps"`
@@ -465,6 +510,37 @@ func (c *Client) SetSystem(hostname, zone string) error {
 func (c *Client) WifiScan(iface string) ([]netd.WifiNetwork, error) {
 	var out []netd.WifiNetwork
 	err := c.call("net.wifiscan", map[string]string{"iface": iface}, &out)
+	return out, err
+}
+
+// WifiHealth checks the broadcasting cards and takes a recovery step for one that has stalled.
+func (c *Client) WifiHealth(ifaces []string, keepAwake bool) ([]netd.WifiState, error) {
+	var out []netd.WifiState
+	err := c.callWithin(3*time.Minute, "wifi.health", map[string]any{"ifaces": ifaces, "keep_awake": keepAwake}, &out)
+	return out, err
+}
+
+// WifiPowerSave keeps a card from sleeping.
+func (c *Client) WifiPowerSave(iface string, keepAwake bool) error {
+	return c.call("wifi.powersave", map[string]any{"iface": iface, "keep_awake": keepAwake}, nil)
+}
+
+// WifiReport reads what is known about a card, for the console.
+func (c *Client) WifiReport(iface string) (string, error) {
+	var out string
+	err := c.callWithin(time.Minute, "wifi.report", map[string]string{"iface": iface}, &out)
+	return out, err
+}
+
+// SSHApply puts remote login in the state asked for.
+func (c *Client) SSHApply(p netd.SSHPlan) error {
+	return c.callWithin(2*time.Minute, "ssh.apply", p, nil)
+}
+
+// SSHLog returns recent remote sign-in lines.
+func (c *Client) SSHLog(since int64) ([]string, error) {
+	var out []string
+	err := c.call("ssh.log", map[string]int64{"since": since}, &out)
 	return out, err
 }
 

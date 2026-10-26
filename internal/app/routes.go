@@ -41,6 +41,8 @@ func (a *App) registerRoutes() {
 	a.registerPowerRoutes()
 	a.registerResetRoutes()
 	a.registerBackupRoutes()
+	a.registerSSHRoutes()
+	a.registerWifiHealthRoutes()
 	s.Handle("GET /api/logs", a.logSearch)
 	s.HandleAdmin("DELETE /api/logs", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		a.QLog.Clear()

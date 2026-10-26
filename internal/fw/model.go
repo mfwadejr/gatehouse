@@ -102,6 +102,9 @@ type Model struct {
 	// RescueIface is the network port the device was first set up from. It keeps reaching the
 	// console even if every network is edited wrongly. Empty when not known.
 	RescueIface string
+	// SSHEnabled is the master switch for remote login. Off, nothing listens for SSH from any
+	// network, whatever each network's own SSH switch says.
+	SSHEnabled bool
 	// MgmtAllow, when not empty, limits management (console and SSH) to these address ranges.
 	// Empty means every management network may manage. The setup port is never limited by it.
 	MgmtAllow []string

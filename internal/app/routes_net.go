@@ -42,6 +42,11 @@ type NetController interface {
 	SystemUpdateStart() error
 	Power(action string) error
 	SpeedTest(p speedtest.Params) (speedtest.Result, error)
+	WifiHealth(ifaces []string, keepAwake bool) ([]netd.WifiState, error)
+	WifiPowerSave(iface string, keepAwake bool) error
+	WifiReport(iface string) (string, error)
+	SSHApply(p netd.SSHPlan) error
+	SSHLog(since int64) ([]string, error)
 }
 
 // IfaceRow is a LAN-side port or VLAN as the console edits it.

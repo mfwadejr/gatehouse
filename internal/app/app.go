@@ -86,6 +86,7 @@ type App struct {
 	names        nameCache
 	geoIdx       geoIndex
 	stationCache stationCache
+	wifiw        wifiWatch
 
 	netApplyState struct {
 		mu     sync.Mutex
@@ -330,6 +331,8 @@ func (a *App) Run(ctx context.Context) error {
 	run(func() { a.updateLoop(ctx) })
 	run(func() { a.dynLoop(ctx) })
 	run(func() { a.rogueLoop(ctx) })
+	run(func() { a.wifiLoop(ctx) })
+	run(func() { a.sshLoop(ctx) })
 
 	a.con.begin(ctx)
 	cs, err := a.startConsole(ctx, a.consoleAddr())

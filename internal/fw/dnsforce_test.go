@@ -137,3 +137,40 @@ func TestForcedDNSNftAcceptsRuleset(t *testing.T) {
 		t.Fatalf("nft rejected the ruleset: %v\n%s\n%s", err, b, out)
 	}
 }
+
+func TestSSHIsClosedUntilTheMasterSwitchIsOnAndIsRateLimited(t *testing.T) {
+	m := dnsModel()
+	for i := range m.Zones {
+		if m.Zones[i].Management {
+			m.Zones[i].SSH = true
+		}
+	}
+	out, err := Compile(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "protected: management ssh") {
+		t.Fatalf("SSH was open with the master switch off:\n%s", out)
+	}
+	m.SSHEnabled = true
+	out, err = Compile(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"set ssh_rate4", "@ssh_rate4 { ip saddr limit rate over 8/minute", `tcp dport 22 accept comment "protected: management ssh"`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	if i, j := strings.Index(out, "ssh limit"), strings.Index(out, "protected: management ssh\""); i < 0 || i > j {
+		t.Error("the rate limit must come before the accept")
+	}
+	if _, err := exec.LookPath("nft"); err != nil {
+		t.Skip("nft not installed")
+	}
+	f := filepath.Join(t.TempDir(), "r.nft")
+	os.WriteFile(f, []byte(out), 0o600)
+	if b, err := exec.Command("nft", "-c", "-f", f).CombinedOutput(); err != nil {
+		t.Fatalf("nft rejected the rules: %v\n%s", err, b)
+	}
+}

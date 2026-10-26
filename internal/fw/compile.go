@@ -158,6 +158,11 @@ func (c *compiler) build() string {
 	for _, n := range []string{AcctUp, AcctDown} {
 		c.line(1, "set %s { type ipv4_addr; flags dynamic, timeout; timeout 1h; size 8192; counter; }", n)
 	}
+	// Remote login is slowed down: one address may start only a few SSH connections a minute.
+	if m.SSHEnabled {
+		c.line(1, "set ssh_rate4 { type ipv4_addr; flags dynamic, timeout; timeout 5m; size 4096; }")
+		c.line(1, "set ssh_rate6 { type ipv6_addr; flags dynamic, timeout; timeout 5m; size 4096; }")
+	}
 	for _, n := range []string{AcctTo, AcctFrom} {
 		c.line(1, "set %s { type ipv4_addr; flags dynamic, timeout; timeout 10m; size 65535; counter; }", n)
 	}
@@ -257,7 +262,9 @@ func (c *compiler) input() {
 	}
 	for _, lim := range limits {
 		c.line(2, "iifname %s%s tcp dport %s accept comment \"protected: management console\"", ifSet(mgmt), lim, portList(m.ConsolePorts))
-		if len(ssh) > 0 {
+		if len(ssh) > 0 && m.SSHEnabled {
+			c.line(2, "iifname %s%s tcp dport 22 ct state new add @ssh_rate4 { ip saddr limit rate over 8/minute burst 5 packets } drop comment \"protected: management ssh limit\"", ifSet(ssh), lim)
+			c.line(2, "iifname %s%s tcp dport 22 ct state new add @ssh_rate6 { ip6 saddr limit rate over 8/minute burst 5 packets } drop comment \"protected: management ssh limit\"", ifSet(ssh), lim)
 			c.line(2, "iifname %s%s tcp dport 22 accept comment \"protected: management ssh\"", ifSet(ssh), lim)
 		}
 	}

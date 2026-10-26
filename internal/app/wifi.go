@@ -355,6 +355,8 @@ type wifiCard struct {
 	// Check is the last "Check this card" result, so the page can show what was reported next to
 	// what was found.
 	Check *WifiCheck `json:"check,omitempty"`
+	// Health is whether a broadcasting card is really serving, as the watcher last saw it.
+	Health *netd.WifiState `json:"health,omitempty"`
 }
 
 // WifiCheck is what testing a card found: for each band the card reports, whether it heard
@@ -503,6 +505,9 @@ func (a *App) wifiCards() []wifiCard {
 		}
 		c.Live = &lv
 		c.Check = a.wifiLastCheck(n)
+		if st, ok := a.wifiState(n); ok && mode == "ap" {
+			c.Health = &st
+		}
 		out = append(out, c)
 	}
 	return out
@@ -518,7 +523,7 @@ func (a *App) registerWifiRoutes() {
 				zone = strings.TrimSpace(string(b))
 			}
 		}
-		api.JSON(w, 200, map[string]any{"cards": cards, "country": countryFromZone(zone)})
+		api.JSON(w, 200, map[string]any{"cards": cards, "country": countryFromZone(zone), "keep_awake": a.wifiKeepAwake()})
 	})
 	s.HandleAdmin("PUT /api/net/wifi", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		var in WifiRow

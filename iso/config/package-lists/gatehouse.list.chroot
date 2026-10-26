@@ -71,6 +71,9 @@ firmware-intel-misc
 intel-microcode
 amd64-microcode
 
+# Remote login: installed but switched off until the administrator turns it on in the console
+openssh-server
+
 # Convenience on the local console
 nano
 less

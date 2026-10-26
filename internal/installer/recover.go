@@ -34,7 +34,7 @@ func RunRecovery(t *Term, env RecoveryEnv) error {
 		t.p("  3) Reset the firewall to the safe starting rules\n")
 		t.p("  4) Check what is running and why the console may be down\n")
 		t.p("  5) Show whether DHCP and DNS are working\n")
-		t.p("  6) Let any management network in, and put the console back on port 443\n")
+		t.p("  6) Let any management network in, put the console back on port 443, and turn off remote login (SSH)\n")
 		t.p("  7) Reset to default (network settings, or everything)\n")
 		t.p("  8) Leave recovery\n\n")
 		n, err := t.ask("Number", "8", func(s string) error {
@@ -137,7 +137,7 @@ func RunRecovery(t *Term, env RecoveryEnv) error {
 			}
 			pause(t)
 		case "6":
-			ok, err := t.yesno("Remove the limit on who may manage, and put the console back on port 443? The console restarts", false)
+			ok, err := t.yesno("Remove the limit on who may manage, and put the console back on port 443, and turn off remote login (SSH)? The console restarts", false)
 			if err != nil {
 				if err == errRestart {
 					continue

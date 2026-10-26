@@ -3,8 +3,10 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -70,6 +72,8 @@ func main() {
 		if err := installer.RunTextInstaller(); err != nil {
 			log.Fatalf("textinstaller: %v", err)
 		}
+	case "ssh-auth":
+		sshAuth()
 	case "screen":
 		installer.RunStatus("443")
 	case "update-apply":
@@ -477,7 +481,7 @@ func recoverCmd(args []string) {
 				return err
 			}
 			defer fixOwner()
-			for _, k := range []string{"console.port", "console.port.pending", "mgmt.allow"} {
+			for _, k := range []string{"console.port", "console.port.pending", "mgmt.allow", "ssh.enabled"} {
 				db.Exec(`DELETE FROM settings WHERE key=?`, k)
 			}
 			os.WriteFile(filepath.Join(*data, "console.port"), []byte("443\n"), 0o644)
@@ -488,6 +492,7 @@ func recoverCmd(args []string) {
 			if err := ap.Rollback(); err != nil {
 				return err
 			}
+			exec.Command("systemctl", "disable", "--now", "ssh.service").Run() // remote login goes back to off
 			exec.Command("systemctl", "restart", "gatehouse").Run()
 			return nil
 		},
@@ -550,4 +555,37 @@ func diagnose() string {
 	out, _ := exec.Command("journalctl", "-u", "gatehouse", "-u", "gatehouse-netd", "-n", "10", "--no-pager", "-o", "cat").CombinedOutput()
 	b.WriteString(strings.TrimSpace(string(out)))
 	return b.String()
+}
+
+// sshAuth is run by sshd (through PAM) to check an administrator's password. The user name and the
+// address come from the environment, the password from standard input. It asks the console on this
+// machine, so the same limits and the same accounts apply as for signing in there. Exit 0 means yes.
+func sshAuth() {
+	user, from := os.Getenv("PAM_USER"), os.Getenv("PAM_RHOST")
+	pw, _ := bufio.NewReader(os.Stdin).ReadString(0)
+	pw = strings.TrimRight(pw, "\x00\n")
+	if user == "" || pw == "" {
+		os.Exit(1)
+	}
+	port := "443"
+	if b, err := os.ReadFile("/var/lib/gatehouse/console.port"); err == nil {
+		if n, err := strconv.Atoi(strings.TrimSpace(string(b))); err == nil && n > 0 && n < 65536 {
+			port = strconv.Itoa(n)
+		}
+	}
+	body, _ := json.Marshal(map[string]string{"user": user, "password": pw, "from": from})
+	hc := &http.Client{Timeout: 10 * time.Second, Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}} // the machine itself, on its own loopback address
+	for _, scheme := range []string{"https", "http"} {
+		resp, err := hc.Post(scheme+"://127.0.0.1:"+port+"/api/auth/ssh-verify", "application/json", bytes.NewReader(body))
+		if err != nil {
+			continue
+		}
+		resp.Body.Close()
+		if resp.StatusCode == http.StatusOK {
+			os.Exit(0)
+		}
+		break
+	}
+	time.Sleep(time.Second) // slows down guessing
+	os.Exit(1)
 }

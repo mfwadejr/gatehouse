@@ -39,6 +39,44 @@ type fakeNet struct {
 	resets     int
 	speedCalls []speedtest.Params
 	speedErr   error
+
+	wifiStates []netd.WifiState
+	wifiCalls  int
+	powerSave  map[string]bool
+	sshPlans   []netd.SSHPlan
+	sshLines   []string
+}
+
+func (f *fakeNet) WifiHealth(ifaces []string, keepAwake bool) ([]netd.WifiState, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.wifiCalls++
+	return f.wifiStates, nil
+}
+
+func (f *fakeNet) WifiPowerSave(iface string, keepAwake bool) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.powerSave == nil {
+		f.powerSave = map[string]bool{}
+	}
+	f.powerSave[iface] = keepAwake
+	return nil
+}
+
+func (f *fakeNet) WifiReport(iface string) (string, error) { return "== Card ==\nsample " + iface, nil }
+
+func (f *fakeNet) SSHApply(p netd.SSHPlan) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.sshPlans = append(f.sshPlans, p)
+	return nil
+}
+
+func (f *fakeNet) SSHLog(since int64) ([]string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.sshLines, nil
 }
 
 func (f *fakeNet) NetApply(p netd.Plan, w time.Duration) (string, time.Time, error) {

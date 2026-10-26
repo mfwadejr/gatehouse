@@ -179,3 +179,11 @@ func (f *fakeNetCtl) SpeedTest(ctx context.Context, p speedtest.Params) (speedte
 	return speedtest.Result{DownBps: 1e6, Server: "t"}, nil
 }
 func (f *fakeNetCtl) Power(a string) error { f.power = a; return nil }
+
+func (f *fakeNetCtl) WifiHealth(ifaces []string, keepAwake bool) ([]netd.WifiState, error) {
+	return []netd.WifiState{{Iface: "wlan0", OK: true}}, nil
+}
+func (f *fakeNetCtl) WifiPowerSave(iface string, keepAwake bool) error { return nil }
+func (f *fakeNetCtl) WifiReport(iface string) (string, error)          { return "report " + iface, nil }
+func (f *fakeNetCtl) SSHApply(p netd.SSHPlan) error                    { return nil }
+func (f *fakeNetCtl) SSHLog(since int64) ([]string, error)             { return nil, nil }

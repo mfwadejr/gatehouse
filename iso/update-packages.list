@@ -4,3 +4,4 @@
 # ordinary update with no reinstall. Names must be exact Debian 13 package names.
 # Leave a package out of this list until a release actually needs it.
 ieee-data
+openssh-server

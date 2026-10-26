@@ -3,6 +3,7 @@ import { del, get, post, put, useData } from '../api.js';
 import { Button, Card, Empty, Field, Form, Input, Modal, Note, Page, Pill, Segmented, Select, ToggleRow, useAction, fmt } from '../ui.jsx';
 import { Enrol } from './Auth.jsx';
 import Backups from './Backups.jsx';
+import RemoteLogin from './RemoteLogin.jsx';
 
 function Password() {
   const [f, setF] = useState({ current: '', next: '', again: '' });
@@ -387,6 +388,7 @@ export default function Settings({ me, reloadMe }) {
       {me?.user?.role === 'admin' && <Updates me={me} />}
       {me?.user?.role === 'admin' && <PowerCard me={me} />}
       {me?.user?.role === 'admin' && <ConsolePort />}
+      {me?.user?.role === 'admin' && <RemoteLogin me={me} />}
       {me?.user?.role === 'admin' && <Backups me={me} />}
       {me?.user?.role === 'admin' && <ResetCard me={me} />}
       <Password />

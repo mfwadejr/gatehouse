@@ -100,6 +100,7 @@ func Load(db Queryer) (*Model, error) {
 		trows.Close()
 	}
 	m.DNSExceptions = DNSExceptions(db)
+	m.SSHEnabled = settingOn(db, "ssh.enabled")
 
 	irows, err := db.Query(`SELECT name,zone_id FROM interfaces WHERE enabled=1 AND zone_id IS NOT NULL ORDER BY id`)
 	if err != nil {
@@ -423,4 +424,18 @@ func rescueDevice(db Queryer, port string) string {
 		}
 	}
 	return port
+}
+
+// settingOn says whether a setting is switched on ("1").
+func settingOn(db Queryer, key string) bool {
+	rows, err := db.Query(`SELECT value FROM settings WHERE key=?`, key)
+	if err != nil {
+		return false
+	}
+	defer rows.Close()
+	var v string
+	if rows.Next() {
+		rows.Scan(&v)
+	}
+	return v == "1"
 }

@@ -207,9 +207,17 @@ func SystemUpgrade(required []string) (update.SystemResult, error) {
 		return res, nil
 	}
 	if len(required) > 0 {
+		// A remote login server that arrives with an update must not start by itself: it stays
+		// off until the administrator turns it on in the console.
+		_, errSSH := aptRun(time.Minute, "dpkg-query", "-W", "-f=${Status}", "openssh-server")
+		hadSSH := errSSH == nil
 		b, err := aptRun(30*time.Minute, "apt-get", aptArgs(append([]string{"install", "--no-install-recommends"}, required...)...)...)
 		if err != nil {
 			return res, fmt.Errorf("could not install %s: %s", strings.Join(required, ", "), lastLine(b, err))
+		}
+		if !hadSSH {
+			aptRun(time.Minute, "systemctl", "disable", "--now", "ssh.socket")
+			aptRun(time.Minute, "systemctl", "disable", "--now", "ssh.service")
 		}
 		res.Packages += len(reSetup.FindAllSubmatch(b, -1))
 	}
