@@ -1,6 +1,13 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.22',
+    title: 'Clearer Who can reach whom',
+    items: [
+      'Who can reach whom is easier to read: Open is green, Blocked is red and Replies only is amber, each with a symbol and its word, in both the dark and light looks. The explanation under the table is now a short colour key.',
+    ],
+  },
+  {
     version: '0.8.21',
     title: 'Fail back when you choose',
     items: [

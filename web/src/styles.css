@@ -169,6 +169,16 @@ textarea.in { height: auto; padding: var(--space-2-5) var(--component-input-padd
 .matrix .cell { padding: var(--space-2) var(--space-2-5); border-radius: var(--radius-sm); font-size: var(--font-size-sm); background: var(--color-matrix-deny); border: var(--border-width-thin) solid var(--color-matrix-deny-border); color: var(--color-text-muted); text-align: center; }
 .matrix .cell.allow { background: var(--color-matrix-allow); color: var(--color-text-primary); border-color: transparent; }
 .matrix .cell.lim { background: var(--color-matrix-limited); border-color: var(--color-matrix-limited-border); color: var(--color-text-primary); }
+.matrix .cell.pair { display: flex; align-items: center; justify-content: center; gap: var(--space-1-5); min-height: 2.6rem; transition: transform .12s, filter .12s; }
+.matrix .cell.pair:hover { transform: translateY(-1px); filter: brightness(1.12); }
+.matrix .cell.st-open { background: var(--color-matrix-open-bg); border-color: var(--color-matrix-open-border); color: var(--color-matrix-open-text); font-weight: var(--font-weight-semibold); }
+.matrix .cell.st-blocked { background: var(--color-matrix-block-bg); border-color: var(--color-matrix-block-border); color: var(--color-matrix-block-text); }
+.matrix .cell.st-replies { background: var(--color-matrix-replies-bg); border-color: var(--color-matrix-replies-border); color: var(--color-matrix-replies-text); font-weight: var(--font-weight-semibold); }
+.matrix .cell .mk { width: 1.1em; height: 1.1em; flex: none; }
+.matrix .cell.self { display: flex; align-items: center; justify-content: center; gap: var(--space-1-5); }
+.mxkey { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+.mxkey .chip { display: inline-flex; align-items: center; gap: var(--space-1-5); font-size: var(--font-size-sm); color: var(--color-text-secondary); border: var(--border-width-thin) solid var(--color-border-default, var(--color-matrix-deny-border)); border-radius: 999px; padding: 2px var(--space-2) 2px var(--space-1-5); }
+.mxkey .chip i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 .matrix .cell.hd { background: transparent; border-color: transparent; color: var(--color-text-secondary); font-weight: var(--font-weight-medium); }
 .spark { display: block; flex: none; }
 .spark.fluid { width: 100%; height: 90px; max-width: 100%; }

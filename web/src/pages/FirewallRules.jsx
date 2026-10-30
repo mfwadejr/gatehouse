@@ -88,6 +88,12 @@ function pairState(a, b, ov, rules) {
 
 const STATE_TEXT = { open: 'Open', blocked: 'Blocked', replies: 'Replies only' };
 
+// A small symbol for each state, so the meaning never depends on colour alone.
+function Mark({ kind }) {
+  const d = { open: 'M4 10.5l4 4 8-9', blocked: 'M5 5l10 10M15 5L5 15', replies: 'M8 4L4 8l4 4M4 8h8a4 4 0 010 8h-2' }[kind];
+  return <svg className="mk" viewBox="0 0 20 20" aria-hidden="true"><path d={d} fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+}
+
 export function Matrix({ ov, rules, onPick }) {
   const zones = ov?.matrix_zones || [];
   if (zones.length < 2) return null;
@@ -103,14 +109,14 @@ export function Matrix({ ov, rules, onPick }) {
               {zones.map((b) => {
                 if (a.name === b.name) {
                   const open = !!ov?.pair_open?.[`${a.name}|${b.name}`];
-                  return <div key={b.name} className={`cell self ${open ? 'allow' : ''}`} role="gridcell">{a.kind === 'wan' ? '–' : open ? 'Open' : 'Blocked'}</div>;
+                  return <div key={b.name} className="cell self" role="gridcell">{a.kind === 'wan' ? '–' : <><Mark kind={open ? 'open' : 'blocked'} />{open ? 'Open' : 'Blocked'}</>}</div>;
                 }
                 const p = pairState(a.name, b.name, ov, rules);
                 const n = p.exceptions.length;
                 return (
-                  <button type="button" key={b.name} role="gridcell" className={`cell pair ${p.state === 'open' ? 'allow' : p.state === 'replies' ? 'lim' : ''} ${p.changed ? 'changed' : ''}`}
+                  <button type="button" key={b.name} role="gridcell" className={`cell pair st-${p.state} ${p.changed ? 'changed' : ''}`}
                     onClick={() => onPick(a.name, b.name, p)} aria-label={`${a.name} to ${b.name}: ${STATE_TEXT[p.state]}${n ? `, ${n} exceptions` : ''}${p.changed ? ', set from here' : ''}`}>
-                    {STATE_TEXT[p.state]}{n > 0 && <span className="cnt"> ({n})</span>}{p.changed && <span className="dotmark" aria-hidden="true" title="Set from this matrix" />}
+                    <Mark kind={p.state} />{STATE_TEXT[p.state]}{n > 0 && <span className="cnt"> ({n})</span>}{p.changed && <span className="dotmark" aria-hidden="true" title="Set from this matrix" />}
                   </button>
                 );
               })}
@@ -118,7 +124,12 @@ export function Matrix({ ov, rules, onPick }) {
           ))}
         </div>
       </div>
-      <p className="small muted" style={{ marginTop: 'var(--space-2)' }}>Open: new connections are allowed. Blocked: they are not. Replies only: this side cannot start a connection, but can answer one the other side started. A number in brackets counts the rules for that pair.</p>
+      <div className="mxkey">
+        <span className="chip"><i style={{ background: 'var(--color-matrix-open-dot)' }} />Open: new connections are allowed</span>
+        <span className="chip"><i style={{ background: 'var(--color-matrix-block-dot)' }} />Blocked: they are not</span>
+        <span className="chip"><i style={{ background: 'var(--color-matrix-replies-dot)' }} />Replies only: this side cannot start a connection, but can answer one the other side started</span>
+      </div>
+      <p className="small muted" style={{ marginTop: 'var(--space-2)' }}>A number in brackets counts the rules for that pair.</p>
     </Card>
   );
 }
