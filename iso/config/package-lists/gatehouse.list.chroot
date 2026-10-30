@@ -40,6 +40,10 @@ openvpn
 dnsutils
 traceroute
 
+# High availability for a pair of units (inert until the console sets it up)
+keepalived
+conntrackd
+
 # Disk and boot loader tools (installer and the installed system)
 grub2-common
 grub-common

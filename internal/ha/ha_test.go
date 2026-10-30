@@ -104,3 +104,30 @@ func TestStandbyGuard(t *testing.T) {
 		}
 	}
 }
+
+func TestConntrackd(t *testing.T) {
+	p := pair(t)
+	a, err := ConntrackdConf(p, Primary, "br0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := ConntrackdConf(p, Standby, "br0")
+	for _, want := range []string{"Mode FTFW", "IPv4_address 192.168.1.2\n        IPv4_Destination_Address 192.168.1.3", "Interface br0", "Port 3780"} {
+		if !strings.Contains(a, want) {
+			t.Errorf("primary missing %q", want)
+		}
+	}
+	if !strings.Contains(b, "IPv4_address 192.168.1.3\n        IPv4_Destination_Address 192.168.1.2") {
+		t.Fatal("standby must send the other way round")
+	}
+	if _, err := ConntrackdConf(p, Primary, ""); err == nil {
+		t.Fatal("needs a port")
+	}
+	if _, err := ConntrackdConf(p, Role("x"), "br0"); err == nil {
+		t.Fatal("unknown role")
+	}
+	k, _ := KeepalivedConf(p, Primary, "")
+	if !strings.Contains(k, "notify "+NotifyPath) {
+		t.Fatal("keepalived must call the notify script")
+	}
+}

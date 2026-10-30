@@ -283,3 +283,15 @@ func TestAddressInUseIsSkipped(t *testing.T) {
 		t.Fatalf("got %s", ack.YIAddr)
 	}
 }
+
+func TestSilentStandbyNeverAnswers(t *testing.T) {
+	e := newEngine(t)
+	e.Silent.Store(true)
+	if resp, err := e.Handle(pkt(Discover, "02:00:00:00:00:09", nil), lan); resp != nil || err != nil {
+		t.Fatalf("a silent unit must not answer: %v %v", resp, err)
+	}
+	e.Silent.Store(false)
+	if resp, _ := e.Handle(pkt(Discover, "02:00:00:00:00:09", nil), lan); resp == nil {
+		t.Fatal("answering must come back when the unit becomes active")
+	}
+}

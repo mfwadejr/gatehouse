@@ -6,14 +6,16 @@ import { Button, Card, Pill } from '../ui.jsx';
 // is fixed. Things that are fine are folded away.
 const tone = { bad: 'bad', warn: 'warn', ok: 'good' };
 
-export default function Security() {
+export default function Security({ bare }) {
   const { data, reload } = useData('/api/security/check', { topics: ['fw.status'], every: 60000 });
   const [all, setAll] = useState(false);
   if (!data) return null;
   const risks = data.items.filter((i) => i.level !== 'ok');
   const fine = data.items.filter((i) => i.level === 'ok');
+  const Wrap = bare ? ({ children }) => <div>{children}</div> : (p) => <Card {...p} />;
   return (
-    <Card title="Security check" desc={data.summary} actions={<Button small onClick={reload}>Check again</Button>}>
+    <Wrap title="Security check" desc={data.summary} actions={<Button small onClick={reload}>Check again</Button>}>
+      {bare && <p className="small muted">{data.summary} <button type="button" className="link" onClick={reload}>Check again</button></p>}
       <div className="list">
         {risks.map((i) => (
           <div className="item" key={i.id}>
@@ -29,6 +31,6 @@ export default function Security() {
         </p>
       )}
       {all && <div className="list">{fine.map((i) => <div className="item" key={i.id}><div><div className="name">{i.title}</div><div className="meta">{i.text}</div></div><Pill tone="good">Fine</Pill></div>)}</div>}
-    </Card>
+    </Wrap>
   );
 }

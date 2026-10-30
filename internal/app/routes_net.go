@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"gatehouse/internal/bridgemode"
 	"net"
 	"net/http"
 	"os"
@@ -48,6 +49,9 @@ type NetController interface {
 	Diag(kind, target string) (string, error)
 	SSHApply(p netd.SSHPlan) error
 	SSHLog(since int64) ([]string, error)
+	HAApply(p netd.HAPlan) error
+	NDPIApply(p netd.NDPIPlan) error
+	NDPIInstalled() bool
 }
 
 // IfaceRow is a LAN-side port or VLAN as the console edits it.
@@ -153,6 +157,11 @@ func (a *App) listWans(q querier) ([]WanRow, error) {
 // Connection i (enabled, ordered by priority then id) uses routing table 100+i and mark MarkBase+i,
 // matching the firewall's view of the internet-side interfaces.
 func (a *App) buildPlan(q querier) (*netd.Plan, error) {
+	return a.buildPlanFrom(q, fw.BridgeFrom(q))
+}
+
+// buildPlanFrom builds the plan from the saved networks; a live bridge setup replaces them.
+func (a *App) buildPlanFrom(q querier, bridge *bridgemode.Config) (*netd.Plan, error) {
 	ifs, err := a.listIfaces(q)
 	if err != nil {
 		return nil, err
@@ -201,6 +210,7 @@ func (a *App) buildPlan(q querier) (*netd.Plan, error) {
 	if err := a.addWifiToPlan(q, p); err != nil {
 		return nil, err
 	}
+	applyBridgeToPlan(p, bridge)
 	return p, nil
 }
 

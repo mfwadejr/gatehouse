@@ -27,10 +27,11 @@ const RECIPES = [
   },
 ];
 
-export default function Recipes() {
+export default function Recipes({ bare }) {
   const [open, setOpen] = useState('');
+  const Wrap = bare ? ({ children }) => <div>{children}</div> : (p) => <Card {...p} />;
   return (
-    <Card title="Common setups" desc="Pick what you want to do. Each one lists the steps in order and takes you to the first.">
+    <Wrap title="Common setups" desc="Pick what you want to do. Each one lists the steps in order and takes you to the first.">
       <div className="list">
         {RECIPES.map((r) => (
           <div className="item" key={r.id} style={{ display: 'block' }}>
@@ -47,6 +48,6 @@ export default function Recipes() {
           </div>
         ))}
       </div>
-    </Card>
+    </Wrap>
   );
 }

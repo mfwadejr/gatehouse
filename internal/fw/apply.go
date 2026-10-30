@@ -286,7 +286,7 @@ func (a *Applier) Apply(script string, window time.Duration, author string) (tok
 			return "", time.Time{}, fmt.Errorf("could not start the safety timer: %w", err)
 		}
 	}
-	if err := a.run(script, false); err != nil {
+	if err := a.run(a.withBridgeCleanup(script), false); err != nil {
 		os.Remove(a.path("pending.json"))
 		return "", time.Time{}, err
 	}
@@ -331,7 +331,7 @@ func (a *Applier) rollbackLocked() error {
 	if err != nil {
 		script = []byte(a.baseline())
 	}
-	if err := a.run(string(script), false); err != nil {
+	if err := a.run(a.withBridgeCleanup(string(script)), false); err != nil {
 		return err
 	}
 	os.Remove(a.path("pending.json"))
@@ -496,3 +496,16 @@ type Controller interface {
 }
 
 var _ Controller = (*Applier)(nil)
+
+// withBridgeCleanup makes sure leaving bridge mode (by a change or by a rollback) also removes the
+// bridge filter table: a script that does not describe that table would otherwise leave it behind,
+// still dropping traffic. It only looks when the script does not mention the table itself.
+func (a *Applier) withBridgeCleanup(script string) string {
+	if strings.Contains(script, "table bridge "+bridgeTable) {
+		return script
+	}
+	if a.nftCmd("list", "table", "bridge", bridgeTable).Run() != nil {
+		return script
+	}
+	return "delete table bridge " + bridgeTable + "\n" + script
+}

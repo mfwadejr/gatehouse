@@ -187,4 +187,7 @@ func (f *fakeNetCtl) WifiPowerSave(iface string, keepAwake bool) error { return 
 func (f *fakeNetCtl) Diag(kind, target string) (string, error)         { return kind + " " + target, nil }
 func (f *fakeNetCtl) WifiReport(iface string) (string, error)          { return "report " + iface, nil }
 func (f *fakeNetCtl) SSHApply(p netd.SSHPlan) error                    { return nil }
+func (f *fakeNetCtl) HAApply(p netd.HAPlan) error                      { return nil }
+func (f *fakeNetCtl) NDPIApply(p netd.NDPIPlan) error                  { return nil }
+func (f *fakeNetCtl) NDPIInstalled() bool                              { return true }
 func (f *fakeNetCtl) SSHLog(since int64) ([]string, error)             { return nil, nil }

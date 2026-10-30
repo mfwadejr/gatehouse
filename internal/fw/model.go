@@ -6,7 +6,11 @@
 // typed into the console can never change the structure of the ruleset.
 package fw
 
-import "time"
+import (
+	"time"
+
+	"gatehouse/internal/bridgemode"
+)
 
 // Zone kinds. Wan is the internet side; Vpn zones behave like Private unless changed.
 const (
@@ -156,6 +160,11 @@ type Model struct {
 	Routes []RouteSpec
 	// LogAllowed records new connections that were allowed, with the reason, in the event log.
 	LogAllowed bool
+	// Bridge, when set and enabled, replaces the routing ruleset with the transparent bridge one.
+	Bridge *bridgemode.Config
+	// HAPeer is the partner unit's own address when this unit is half of a high-availability pair. It
+	// may reach the link port, the shared-address protocol and the connection-table copy, nothing else.
+	HAPeer string
 }
 
 // ZoneByName returns a zone.

@@ -5,3 +5,5 @@
 # Leave a package out of this list until a release actually needs it.
 ieee-data
 openssh-server
+keepalived
+conntrackd

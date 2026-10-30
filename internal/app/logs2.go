@@ -237,6 +237,13 @@ func (a *App) searchFWf(f fwFilter) []LogItem {
 			if ap, found := appid.Lookup(dn); found {
 				it.App, it.Category = ap.Name, ap.Category
 			}
+			// A label read from the packets is more exact than one guessed from the name.
+			if nm, cat, found := a.ndpiLabel(proto, fa, sport, ta, dport); found {
+				it.App = nm
+				if cat != "" {
+					it.Category = cat
+				}
+			}
 		}
 		dest := ta
 		if dn != "" {

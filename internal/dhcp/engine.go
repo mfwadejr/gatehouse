@@ -52,6 +52,8 @@ type Engine struct {
 
 	mu     sync.Mutex // serialises allocation
 	scopes atomic.Pointer[[]*Scope]
+	// Silent stops every answer: set on the standby unit of a high-availability pair.
+	Silent atomic.Bool
 	snap   atomic.Pointer[Snapshot]
 
 	// OnChange is called after the lease table changes (for live widgets).
@@ -342,6 +344,9 @@ func (e *Engine) event(kind, mac string, ip net.IP, scope string) {
 
 // Handle answers one request. A nil reply means stay silent.
 func (e *Engine) Handle(req *Packet, in Ingress) (*Packet, error) {
+	if e.Silent.Load() {
+		return nil, nil // the standby unit of a pair never answers
+	}
 	if req.Op != 1 || req.HType != 1 || len(req.CHAddr) != 6 {
 		return nil, nil
 	}

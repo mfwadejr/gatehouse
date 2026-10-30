@@ -45,6 +45,9 @@ type fakeNet struct {
 	powerSave  map[string]bool
 	sshPlans   []netd.SSHPlan
 	sshLines   []string
+	haPlans    []netd.HAPlan
+	ndpiPlans  []netd.NDPIPlan
+	ndpiHave   bool
 }
 
 func (f *fakeNet) WifiHealth(ifaces []string, keepAwake bool) ([]netd.WifiState, error) {
@@ -74,6 +77,23 @@ func (f *fakeNet) SSHApply(p netd.SSHPlan) error {
 	return nil
 }
 
+func (f *fakeNet) HAApply(p netd.HAPlan) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.haPlans = append(f.haPlans, p)
+	return nil
+}
+func (f *fakeNet) NDPIApply(p netd.NDPIPlan) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.ndpiPlans = append(f.ndpiPlans, p)
+	return nil
+}
+func (f *fakeNet) NDPIInstalled() bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.ndpiHave
+}
 func (f *fakeNet) SSHLog(since int64) ([]string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

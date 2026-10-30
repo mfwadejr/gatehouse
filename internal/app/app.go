@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"gatehouse/internal/api"
@@ -23,6 +24,7 @@ import (
 	"gatehouse/internal/events"
 	"gatehouse/internal/fw"
 	"gatehouse/internal/mdns"
+	"gatehouse/internal/ndpi"
 	"gatehouse/internal/store"
 )
 
@@ -55,6 +57,13 @@ func DefaultConfig() Config {
 type App struct {
 	sysout       syslogOut
 	ddns         ddnsState
+	haActiveFn   func() bool // tests replace the check for holding the shared addresses
+	haOwnsFn     func(addr string) bool
+	haListen     string // the link's listen address; empty means the usual port
+	haBound      atomic.Value
+	NDPI         *ndpi.Table
+	ndpiOnce     sync.Once
+	haApplyMu    sync.Mutex
 	Cfg          Config
 	Config       *store.DB
 	Logs         *store.DB
@@ -172,6 +181,9 @@ func New(cfg Config) (*App, error) {
 	a.registerWhyRoutes()
 	a.registerSecurityRoutes()
 	a.registerChangeRoutes()
+	a.registerBridgeRoutes()
+	a.registerHARoutes()
+	a.registerNDPIRoutes()
 	a.registerWifiCardRoutes()
 	a.registerSummaryRoutes()
 	a.registerISPRoutes()
@@ -363,6 +375,9 @@ func (a *App) Run(ctx context.Context) error {
 	run(func() { a.mdnsLoop(ctx) })
 	run(func() { a.alertLoop(ctx) })
 	run(func() { a.ddnsLoop(ctx) })
+	run(func() { a.haServe(ctx) })
+	run(func() { a.ndpiLoop(ctx) })
+	run(func() { a.haSyncLoop(ctx) })
 	run(func() { a.updateLoop(ctx) })
 	run(func() { a.dynLoop(ctx) })
 	run(func() { a.rogueLoop(ctx) })

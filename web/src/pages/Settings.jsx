@@ -5,6 +5,9 @@ import { Enrol } from './Auth.jsx';
 import Backups from './Backups.jsx';
 import Changes from './Changes.jsx';
 import Syslog from './Syslog.jsx';
+import BridgeMode from './BridgeMode.jsx';
+import HighAvailability from './HighAvailability.jsx';
+import TrafficLabels from './TrafficLabels.jsx';
 import RemoteLogin from './RemoteLogin.jsx';
 import Alerts from './Alerts.jsx';
 
@@ -399,7 +402,7 @@ export default function Settings({ me, reloadMe }) {
         </Card>
       )}
       {me?.user?.role === 'admin' && <Changes me={me} />}
-      {me?.user?.role === 'admin' && <details className="more"><summary>Advanced</summary><Syslog /></details>}
+      {me?.user?.role === 'admin' && <details className="more"><summary>Advanced</summary><HighAvailability me={me} /><BridgeMode /><TrafficLabels /><Syslog /></details>}
       {me?.user?.role === 'admin' && <Backups me={me} />}
       {me?.user?.role === 'admin' && <ResetCard me={me} />}
       <Password />

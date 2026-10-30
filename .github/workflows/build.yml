@@ -69,6 +69,8 @@ jobs:
           docker run --rm --privileged -v "$PWD":/src -w /src debian:trixie sh -ec '
             apt-get update
             apt-get install -y --no-install-recommends live-build debootstrap squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin mtools dosfstools syslinux syslinux-common isolinux ca-certificates
+            # Optional traffic-labelling program. A failure here only means the image has no gh-ndpi.
+            (apt-get install -y --no-install-recommends gcc libc6-dev libndpi-dev libpcap-dev pkg-config >/dev/null 2>&1 && sh iso/ndpi/build.sh /src/iso/config/includes.chroot/usr/lib/gatehouse) || echo "gh-ndpi: skipped"
             OUT=/src/out iso/build.sh /src/bin/gatehouse "${VERSION}"
           '
         env:

@@ -322,6 +322,10 @@ func ifaceOf(clientIP string) string {
 // checked is false when the client's interface cannot be determined or is the local loopback.
 func sessionSafe(m *fw.Model, clientIP string) (checked, safe bool, iface string) {
 	iface = ifaceOf(clientIP)
+	if m.BridgeOn() {
+		// In bridge mode the console is reached through the bridge; the bridge setup checks its own safety.
+		return false, true, iface
+	}
 	if iface == "" || iface == "lo" {
 		return false, true, iface
 	}

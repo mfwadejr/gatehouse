@@ -10,6 +10,11 @@ getent group gatehouse >/dev/null || groupadd --system gatehouse
 id gatehouse >/dev/null 2>&1 || useradd --system --gid gatehouse --home-dir /var/lib/gatehouse --no-create-home --shell /usr/sbin/nologin gatehouse
 install -d -o gatehouse -g gatehouse -m 750 /var/lib/gatehouse
 install -d -m 755 /run/gatehouse
+# Home for the optional traffic-labelling program (see gatehouse-ndpi.service); recreated at boot by tmpfiles.d.
+systemd-sysusers 2>/dev/null || true
+
+# High availability programs stay off until the console pairs two units.
+for u in keepalived.service conntrackd.service; do systemctl disable "$u" 2>/dev/null || true; done
 
 # Use systemd-networkd for the network; we serve DNS and DHCP ourselves.
 systemctl enable systemd-networkd.service || true

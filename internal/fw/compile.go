@@ -15,6 +15,9 @@ const tableName = "gatehouse"
 // Compile validates the model and returns an nftables script that replaces the whole
 // gatehouse table in one atomic step. It never touches any other table.
 func Compile(m *Model) (string, error) {
+	if m.BridgeOn() {
+		return compileBridge(m)
+	}
 	if err := m.Validate(); err != nil {
 		return "", err
 	}
@@ -273,6 +276,13 @@ func (c *compiler) input() {
 	// the networks look like. Never on an internet-facing port or one already covered above.
 	if r := m.RescueIface; r != "" && !contains(m.WanIfaces(), r) && !contains(mgmt, r) {
 		c.line(2, "iifname %s tcp dport %s accept comment \"protected: setup port\"", ifSet([]string{r}), portList(m.ConsolePorts))
+	}
+
+	// The partner unit of a high-availability pair, by its own address only.
+	if m.HAPeer != "" {
+		c.line(2, "ip saddr %s tcp dport 8444 accept comment \"protected: partner unit link\"", m.HAPeer)
+		c.line(2, "ip saddr %s ip protocol vrrp accept comment \"protected: partner unit heartbeat\"", m.HAPeer)
+		c.line(2, "ip saddr %s udp dport 3780 accept comment \"protected: partner unit connection copy\"", m.HAPeer)
 	}
 
 	// Basic protocol health.

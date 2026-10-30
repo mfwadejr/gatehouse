@@ -29,18 +29,15 @@ function LiveDot({ stamp }) {
 
 // The "Finish setting up" list. It is worked out from what the machine has, so it is right in any
 // order, and it goes away by itself when everything is done.
-function SetupChecklist() {
-  const { data, reload } = useData('/api/setup/checklist', { topics: ['net.status', 'fw.status'], every: 15000 });
+function SetupChecklist({ bare }) {
+  const { data } = useData('/api/setup/checklist', { topics: ['net.status', 'fw.status'], every: 15000 });
   if (!data || !data.items?.length) return null;
-  const hide = async (hidden) => { try { await put('/api/setup/checklist', { hidden }); } catch { /* ignore */ } reload(); };
   if (data.left === 0) return null;
-  if (data.hidden) {
-    return <p className="small muted"><button type="button" className="link" onClick={() => hide(false)}>Show the setup checklist ({data.left} left)</button></p>;
-  }
   const done = data.items.length - data.left;
+  const Wrap = bare ? ({ children }) => <div>{children}</div> : (p) => <Card {...p} />;
   return (
-    <Card title="Finish setting up" desc={`${done} of ${data.items.length} done. You can do these in any order, and change any of them later.`}
-      actions={<button type="button" className="link small" onClick={() => hide(true)}>Hide for now</button>}>
+    <Wrap title="Finish setting up" desc={`${done} of ${data.items.length} done. You can do these in any order, and change any of them later.`}>
+      {bare && <p className="small muted">You can do these in any order, and change any of them later.</p>}
       <ul className="stack" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
         {data.items.map((i) => (
           <li key={i.id} className="spread" style={{ gap: 'var(--space-3)', alignItems: 'flex-start' }}>
@@ -52,6 +49,36 @@ function SetupChecklist() {
           </li>
         ))}
       </ul>
+    </Wrap>
+  );
+}
+
+// One quiet panel instead of three stacked cards: each part is a single line until opened.
+function ToDoPanel() {
+  const cl = useData('/api/setup/checklist', { topics: ['net.status', 'fw.status'], every: 15000 }).data;
+  const sec = useData('/api/security/check', { topics: ['fw.status'], every: 60000 }).data;
+  const [open, setOpen] = useState('');
+  const left = cl?.items?.length ? cl.left : 0;
+  const bad = (sec?.items || []).filter((i) => i.level === 'bad').length;
+  const warn = (sec?.items || []).filter((i) => i.level === 'warn').length;
+  const rows = [];
+  if (left > 0) rows.push({ id: 'setup', title: 'Finish setting up', note: `${cl.items.length - left} of ${cl.items.length} done`, body: <SetupChecklist bare /> });
+  if (sec) rows.push({ id: 'sec', title: 'Security check', note: bad ? `${bad} to fix now${warn ? `, ${warn} worth fixing` : ''}` : warn ? `${warn} worth fixing` : 'all fine', tone: bad ? 'bad' : warn ? 'warn' : 'good', body: <Security bare /> });
+  rows.push({ id: 'recipes', title: 'Common setups', note: 'step-by-step guides', body: <Recipes bare /> });
+  return (
+    <Card title="Suggestions">
+      <div className="list">
+        {rows.map((r) => (
+          <div className="item" key={r.id} style={{ display: 'block' }}>
+            <button type="button" className="row" style={{ width: '100%', justifyContent: 'space-between', background: 'none', border: 0, color: 'inherit', padding: 0, cursor: 'pointer', textAlign: 'left' }}
+              aria-expanded={open === r.id} onClick={() => setOpen(open === r.id ? '' : r.id)}>
+              <span className="name">{r.title} {r.tone ? <Pill tone={r.tone}>{r.note}</Pill> : <span className="small muted">· {r.note}</span>}</span>
+              <span className="small muted">{open === r.id ? 'Hide' : 'Show'}</span>
+            </button>
+            {open === r.id && <div style={{ marginTop: 'var(--space-3)' }}>{r.body}</div>}
+          </div>
+        ))}
+      </div>
     </Card>
   );
 }
@@ -475,9 +502,6 @@ export default function Overview() {
         </Card>
       )}
       <WhatsNewCard current={upd?.current} />
-      <SetupChecklist />
-      <Security />
-      <Recipes />
       <Hero wanList={wanList} links={links} thr={thr} />
       <section className="ov-g4" aria-label="Status">
         <DevicesTile d={devs} />
@@ -485,6 +509,7 @@ export default function Overview() {
         <DhcpTile util={util} />
         <SecurityTile sec={sec} fw={fw} h={h1} />
       </section>
+      <ToDoPanel />
       <WorldCard />
       <section className="ov-g3">
         <NetworksCard fw={fw} wanList={wanList} links={links} devs={devs} h24={h1} />

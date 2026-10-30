@@ -57,6 +57,7 @@ function Shell({ me, onSignOut, reloadMe }) {
   const Page = page.el;
   const { data: fw } = useData('/api/fw/overview', { topics: ['fw.status'] });
   const { data: net } = useData('/api/net/status', { topics: ['net.status'] });
+  const { data: ha } = useData('/api/ha', { every: 15000 });
   const pending = (fw?.status?.pending || net?.status?.pending) ? true : false;
   const dirty = !!(fw?.status?.dirty || net?.status?.dirty);
   const [finding, setFinding] = useState(false);
@@ -89,6 +90,7 @@ function Shell({ me, onSignOut, reloadMe }) {
         </div>
       </aside>
       <main className="main" id="main">
+        {ha?.standby && <div className="note warn" role="status" style={{ margin: 'var(--space-3)' }}><div><strong>This is the standby unit.</strong> Settings are read-only here; make changes on the active unit{ha.peer_addr ? ` (${ha.peer_addr})` : ''}. <a href="#/settings">High availability</a></div></div>}
         <Page me={me} reloadMe={reloadMe} />
       </main>
       {finding && <SearchBox onClose={() => setFinding(false)} go={go} />}

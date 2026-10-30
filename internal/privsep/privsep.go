@@ -48,6 +48,9 @@ type NetController interface {
 	Diag(kind, target string) (string, error)
 	SSHApply(p netd.SSHPlan) error
 	SSHLog(since int64) ([]string, error)
+	HAApply(p netd.HAPlan) error
+	NDPIApply(p netd.NDPIPlan) error
+	NDPIInstalled() bool
 }
 
 const maxRequest = 16 << 20
@@ -330,6 +333,20 @@ func (s *Server) dispatchNet(r request) (any, error) {
 			return nil, errors.New("bad parameters")
 		}
 		return nil, s.Net.SSHApply(p)
+	case "ha.apply":
+		var p netd.HAPlan
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return nil, s.Net.HAApply(p)
+	case "ndpi.apply":
+		var p netd.NDPIPlan
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return nil, s.Net.NDPIApply(p)
+	case "ndpi.installed":
+		return s.Net.NDPIInstalled(), nil
 	case "ssh.log":
 		var p struct {
 			Since int64 `json:"since"`
@@ -552,6 +569,22 @@ func (c *Client) Diag(kind, target string) (string, error) {
 // SSHApply puts remote login in the state asked for.
 func (c *Client) SSHApply(p netd.SSHPlan) error {
 	return c.callWithin(2*time.Minute, "ssh.apply", p, nil)
+}
+
+// HAApply installs or removes the high-availability services.
+func (c *Client) HAApply(p netd.HAPlan) error {
+	return c.callWithin(2*time.Minute, "ha.apply", p, nil)
+}
+
+// NDPIApply starts or stops the traffic-labelling program.
+func (c *Client) NDPIApply(p netd.NDPIPlan) error {
+	return c.callWithin(2*time.Minute, "ndpi.apply", p, nil)
+}
+
+// NDPIInstalled reports whether the program is present on this system.
+func (c *Client) NDPIInstalled() bool {
+	var ok bool
+	return c.call("ndpi.installed", nil, &ok) == nil && ok
 }
 
 // SSHLog returns recent remote sign-in lines.

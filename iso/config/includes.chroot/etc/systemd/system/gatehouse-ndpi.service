@@ -1,0 +1,33 @@
+[Unit]
+Description=Gatehouse traffic labels (names the application behind each connection)
+ConditionKernelCommandLine=!boot=live
+ConditionPathExists=/usr/lib/gatehouse/gh-ndpi
+ConditionPathExists=/etc/gatehouse/ndpi.conf
+After=gatehouse.service
+
+[Service]
+Type=simple
+User=gatehouse-ndpi
+Group=gatehouse-ndpi
+EnvironmentFile=/etc/gatehouse/ndpi.conf
+ExecStart=/usr/lib/gatehouse/gh-ndpi -s /run/gatehouse/ndpi/ndpi.sock $IFACES
+Restart=on-failure
+RestartSec=5
+# It only looks at copies of packets. It can open a capture socket and talk to Gatehouse, nothing else.
+AmbientCapabilities=CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_RAW
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_PACKET AF_UNIX
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+MemoryMax=256M
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

@@ -17,6 +17,9 @@ import (
 
 const codePrefix = "GATEHOUSE-PAIR-1:"
 
+// NotifyPath is the script keepalived runs when a unit becomes active or standby.
+const NotifyPath = "/usr/lib/gatehouse/ha-notify"
+
 // VIP is a shared address held by whichever unit is active, on one network.
 type VIP struct {
 	Iface string `json:"iface"` // the interface on the unit, such as br0
@@ -31,6 +34,10 @@ type Pairing struct {
 	Primary string `json:"primary"` // the primary's own management address
 	Standby string `json:"standby"` // the standby's own management address
 	VIPs    []VIP  `json:"vips"`
+	// FP is the primary's link certificate fingerprint; the standby pins it.
+	FP string `json:"fp,omitempty"`
+	// Port is the primary's link port; zero means LinkPort.
+	Port int `json:"port,omitempty"`
 }
 
 // NewSecret makes a random secret for a new pair.
@@ -147,7 +154,7 @@ func KeepalivedConf(p Pairing, role Role, ownAddr string) (string, error) {
 		fmt.Fprintf(&b, "  state BACKUP\n  interface %s\n  virtual_router_id %d\n  priority %d\n  nopreempt\n  advert_int 0.1\n", v.Iface, routerID(p.ID, i), prio)
 		fmt.Fprintf(&b, "  unicast_src_ip %s\n  unicast_peer {\n    %s\n  }\n", own, peer)
 		fmt.Fprintf(&b, "  authentication {\n    auth_type PASS\n    auth_pass %s\n  }\n", passFor(p.Secret))
-		fmt.Fprintf(&b, "  virtual_ipaddress {\n    %s dev %s\n  }\n}\n\n", v.CIDR, v.Iface)
+		fmt.Fprintf(&b, "  virtual_ipaddress {\n    %s dev %s\n  }\n  notify %s\n}\n\n", v.CIDR, v.Iface, NotifyPath)
 	}
 	return b.String(), nil
 }

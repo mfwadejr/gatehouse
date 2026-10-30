@@ -68,6 +68,10 @@ func Load(db Queryer) (*Model, error) {
 	m.DNSTarget = strings.TrimSpace(setting(db, "fw.dns_target", ""))
 	m.LogDrops = setting(db, "fw.log_drops", "1") == "1"
 	m.LogAllowed = setting(db, "fw.log_allowed", "1") == "1"
+	m.Bridge = BridgeFrom(db)
+	if a, err := netip.ParseAddr(strings.TrimSpace(setting(db, "ha.peer", ""))); err == nil && a.Is4() {
+		m.HAPeer = a.String()
+	}
 
 	rows, err := db.Query(`SELECT id,name,kind,gateway_mode,intra_allow,management,upnp,internet,ssh,dns_force,description FROM zones ORDER BY id`)
 	if err != nil {

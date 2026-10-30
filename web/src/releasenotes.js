@@ -1,6 +1,16 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.18',
+    title: 'Pairs, bridge mode and traffic labels',
+    items: [
+      'High availability: pair two Gatehouse units so the second takes over by itself when the first fails. Settings are copied across, the spare is read-only and stays quiet, and connections carry over. Settings, Advanced. Needs a second unit with at least as many ports.',
+      'Bridge mode: put Gatehouse between another router and your network and filter without routing. The console stays reachable on its own address, setup has a 60-second undo, and Reset to default always brings routing back. Settings, Advanced.',
+      'Traffic labels: an optional small program names the application behind each connection by looking at the first packets (YouTube, Zoom, BitTorrent), and flags cautions such as self-signed certificates. Off by default. It is on fresh install images only.',
+      'The top of Overview is tidier: suggestions, the security check and common setups now sit together in one collapsed card.',
+    ],
+  },
+  {
     version: '0.8.17',
     title: 'Cards, reports and remote access',
     items: [
