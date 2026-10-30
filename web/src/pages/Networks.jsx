@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { del, post, put, useData } from '../api.js';
+import { confirmRemoval } from '../removal.js';
 import ApplyBar from '../ApplyBar.jsx';
 import AddNetwork from '../AddNetwork.jsx';
 import { ScopeForm } from './DHCP.jsx';
@@ -130,7 +131,7 @@ export default function Networks({ me }) {
                 <div className="actions">
                   <Button small onClick={() => setDhcp(n.scope || newScope(n))}>DHCP</Button>
                   <Button small icon="edit" onClick={() => setEdit(n)}>Edit</Button>
-                  <Button small kind="danger" icon="trash" onClick={async () => { if (await confirmBox(`Remove ${n.title}? Devices on it will lose their connection.`)) run(() => del(`/api/net/interfaces/${n.iface.id}`)).then(all); }}>Remove</Button>
+                  <Button small kind="danger" icon="trash" onClick={async () => { if (await confirmRemoval(`/api/net/interfaces/${n.iface.id}/removal`, `Remove ${n.title}? Devices on it will lose their connection.`)) run(() => del(`/api/net/interfaces/${n.iface.id}`)).then(all); }}>Remove</Button>
                 </div>
               </div>
             ))}

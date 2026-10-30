@@ -317,6 +317,16 @@ func (a *App) Run(ctx context.Context) error {
 	stopLog := make(chan struct{})
 	run(func() { a.QLog.Run(stopLog) })
 	run(func() { a.DNS.Run(ctx, func(s dnssrv.Snapshot) { a.Bus.Publish("dns.stats", s) }) })
+	// A blocklist that failed because the internet was not there yet is tried again as soon as
+	// a DNS server answers.
+	a.Lists.Online = func() bool {
+		for _, u := range a.DNS.Pool().Status() {
+			if u.State == "healthy" {
+				return true
+			}
+		}
+		return false
+	}
 	run(func() { a.Lists.Run(ctx) })
 	run(func() { a.DHCPSrv.Run(ctx) })
 	run(func() { a.housekeeping(ctx) })

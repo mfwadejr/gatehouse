@@ -27,9 +27,12 @@ function Overview() {
   const series = [{ key: 'dns.qps', name: 'Queries per second', color: 'var(--color-chart-series-1)', pts: h?.series?.['dns.qps'] || [] }];
   return (
     <>
+      {data && data.lists_enabled > 0 && !data.blocking_active && (
+        <Note tone="warn" title="Blocking is not active yet">Your blocklists have not downloaded yet, so nothing is being blocked. Gatehouse keeps trying and starts blocking as soon as one arrives. The Blocklists tab shows how it is going.</Note>
+      )}
       <section className="dns-tiles">
         <div className="card tile"><span className="lbl">Lookups, 24 hours</span><div><span className="val">{top ? fmt.n(top.total) : '–'}</span></div><span className="foot">{fmt.d1(st?.qps)} a second right now</span></div>
-        <div className="card tile"><span className="lbl">Blocked</span><div><span className="val">{fmt.d1(st?.blocked_pct)}</span><span className="unit">%</span></div><span className="foot">{fmt.n(data?.blocked_entries)} names on your lists</span></div>
+        <div className="card tile"><span className="lbl">Blocked</span><div><span className="val">{fmt.d1(st?.blocked_pct)}</span><span className="unit">%</span></div><span className="foot">{fmt.n(data?.unique_blocked ?? data?.blocked_entries)} different names on your lists</span></div>
         <div className="card tile"><span className="lbl">Answered from memory</span><div><span className="val">{fmt.d1(st?.cached_pct)}</span><span className="unit">%</span></div><span className="foot">{fmt.n(st?.cache_size)} saved answers</span></div>
         <div className="card tile"><span className="lbl">Response time</span><div><span className="val">{fmt.d1(st?.avg_ms)}</span><span className="unit">ms</span></div><span className="foot">95% under {fmt.d1(st?.p95_ms)} ms</span></div>
         <div className="card tile"><span className="lbl">Upstream servers</span><div><span className="val">{working}</span><span className="unit">of {list.length} working</span></div><span className="foot">{slow ? `${slow} slow` : upTone === 'bad' ? 'None answering' : 'All answering normally'}</span></div>
@@ -189,8 +192,30 @@ function AddUpstream({ onClose, onSaved }) {
   );
 }
 
+function ListMeta({ l }) {
+  const [details, setDetails] = useState(false);
+  const hhmm = (t) => new Date(t * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const counts = `${fmt.n(l.entries)} blocked${l.allowed ? ` · ${fmt.n(l.allowed)} allowed` : ''}${l.skipped ? ` · ${fmt.n(l.skipped)} not used` : ''}`;
+  const total = `${fmt.n(l.entries + l.allowed)} in all${l.skipped ? `, ${fmt.n(l.skipped)} lines Gatehouse cannot use` : ''}`;
+  if (l.status === 'downloading') return <div className="meta">Downloading…</div>;
+  if (l.status === 'new') return <div className="meta">{l.enabled ? 'Waiting to download. Gatehouse does this by itself.' : 'Switched off'}</div>;
+  if (l.status === 'error') {
+    return (
+      <div className="meta">
+        <span style={{ color: 'var(--color-status-serious)' }}>{l.plain || "Couldn't download this list."}</span>
+        {l.retry_at ? ` Gatehouse will try again at ${hhmm(l.retry_at)}.` : ''}
+        {l.last_ok ? <> Using the copy from {fmt.ago(l.last_ok)} ({counts}).</> : ' Nothing is blocked from this list yet.'}
+        {' '}<button className="linkbtn" onClick={() => setDetails(!details)}>{details ? 'Hide details' : 'Details'}</button>
+        {details && <div className="small mono muted">{l.error}</div>}
+      </div>
+    );
+  }
+  return <div className="meta" title={total}>{counts} · {l.status === 'stale' ? <span style={{ color: 'var(--color-status-warning)' }}>not updated for a while ({fmt.ago(l.last_ok)})</span> : `updated ${fmt.ago(l.last_ok)}`}</div>;
+}
+
 function Lists() {
   const { data: lists, reload } = useData('/api/dns/lists', { topics: ['dns.lists'], every: 15000 });
+  const { data: sum } = useData('/api/dns/summary', { every: 30000 });
   const { data: rules, reload: rr } = useData('/api/dns/rules', { topics: ['dns.lists'] });
   const [add, setAdd] = useState(false);
   const [run] = useAction();
@@ -200,12 +225,13 @@ function Lists() {
   return (
     <>
       <Card title="Blocklists" desc="Lists of ad, tracker and malware names. Blocked names get no answer." actions={<Button small icon="plus" onClick={() => setAdd(true)}>Add list</Button>}>
+        {sum?.unique_blocked > 0 && <p className="small muted">Different names blocked across all lists: <b>{fmt.n(sum.unique_blocked)}</b>. A name that is on two lists counts once.</p>}
         <div className="list">
           {(lists || []).map((l) => (
             <div className="item" key={l.id}>
               <div>
                 <div className="name">{l.name} {l.local && <Pill>Yours</Pill>}</div>
-                <div className="meta">{fmt.n(l.entries)} names · {l.status === 'ok' ? `updated ${fmt.ago(l.last_ok)}` : l.status === 'new' ? 'waiting for first download' : <span style={{ color: 'var(--color-status-serious)' }}>{l.status}: {l.error}</span>}</div>
+                <ListMeta l={l} />
               </div>
               <div className="actions">
                 {!l.local && <Button small icon="refresh" onClick={() => run(() => post(`/api/dns/lists/${l.id}/refresh`), 'Updated.').then(reload)}>Update</Button>}
@@ -280,25 +306,45 @@ function Records() {
   const { data, reload } = useData('/api/dns/records');
   const { data: dset } = useData('/api/dns/settings');
   const [f, setF] = useState({ name: '', type: 'A', value: '', ttl: 300 });
-  const [run] = useAction();
-  // "Name this firewall": firewall.<home domain> pointing at the address this page was opened on.
+  const [label, setLabel] = useState('firewall');
+  const [changing, setChanging] = useState(false);
+  const [run, busy] = useAction();
+  // "Name this firewall": <name>.<home domain> pointing at the address this page was opened on.
   const host = typeof window !== 'undefined' ? window.location.hostname : '';
   const isV4 = /^\d{1,3}(\.\d{1,3}){3}$/.test(host);
-  const fwName = `firewall.${dset?.local_domain || 'lan'}`;
-  const hasFw = (data || []).some((r) => r.name === fwName && r.type === 'A' && !r.problem);
+  const domain = dset?.local_domain || 'lan';
+  const clean = (v) => v.toLowerCase().replace(new RegExp(`\\.${domain}$`), '').replace(/[^a-z0-9-]/g, '').replace(/^-+|-+$/g, '');
+  const mine = (data || []).find((r) => r.type === 'A' && r.value === host && !r.problem);
+  const full = `${clean(label) || 'firewall'}.${domain}`;
+  const saveName = async () => {
+    if (!(await run(() => post('/api/dns/records', { name: full, type: 'A', value: host, ttl: 300 }), 'Saved.'))) return;
+    if (mine && mine.name !== full) await run(() => del(`/api/dns/records/${mine.id}`));
+    setChanging(false);
+    reload();
+  };
+  const nameBox = (
+    <div className="stack" style={{ gap: 'var(--space-2)' }}>
+      <div className="namerow">
+        <Input value={label} onChange={setLabel} aria-label="Name for this firewall" placeholder="firewall" />
+        <span className="muted mono">.{domain}</span>
+        <Button small kind="primary" disabled={busy || !clean(label) || (mine && mine.name === full)} onClick={saveName}>{mine ? 'Save name' : `Add ${full}`}</Button>
+        {mine && <Button small onClick={() => setChanging(false)}>Cancel</Button>}
+      </div>
+      <span className="small muted">Then you can open the console at <b>https://{full}</b> instead of remembering {host}.</span>
+    </div>
+  );
   return (
     <Card enter title="Your own names" desc="Make a name point somewhere on your network, like nas.lan → 192.168.1.10. Devices that get an address from Gatehouse already have a name automatically.">
-      {data && dset && isV4 && !hasFw && (
-        <Note title="Give this firewall a name">
-          Then you can open the console at <b>https://{fwName}</b> instead of remembering {host}.{' '}
-          <Button small onClick={() => run(() => post('/api/dns/records', { name: fwName, type: 'A', value: host, ttl: 300 }), 'Saved.').then(reload)}>Add {fwName}</Button>
-        </Note>
+      {data && dset && isV4 && !mine && <Note title="Give this firewall a name">{nameBox}</Note>}
+      {data && dset && isV4 && mine && !changing && (
+        <p className="small muted">Open the console at <a href={`https://${mine.name}`}>https://{mine.name}</a>. Type the https:// part, or the browser will search the web instead.{' '}
+          <Button small onClick={() => { setLabel(clean(mine.name)); setChanging(true); }}>Change</Button></p>
       )}
-      {hasFw && <p className="small muted">Open the console at <a href={`https://${fwName}`}>https://{fwName}</a>. Type the https:// part, or the browser will search the web instead.</p>}
-      <div className="inline">
-        <div style={{ flex: '1 1 10rem' }}><Input value={f.name} onChange={(v) => setF({ ...f, name: v })} aria-label="Name" placeholder="nas.lan" /></div>
+      {data && dset && isV4 && mine && changing && <Note title="Change this firewall's name">{nameBox}</Note>}
+      <div className="ownrow">
+        <Input value={f.name} onChange={(v) => setF({ ...f, name: v })} aria-label="Name" placeholder="nas.lan" />
         <Select aria-label="Record type" value={f.type} onChange={(v) => setF({ ...f, type: v })} options={['A', 'AAAA', 'CNAME', 'TXT', 'MX']} />
-        <div style={{ flex: '1 1 10rem' }}><Input value={f.value} onChange={(v) => setF({ ...f, value: v })} aria-label="Points to" placeholder="192.168.1.10" /></div>
+        <Input value={f.value} onChange={(v) => setF({ ...f, value: v })} aria-label="Points to" placeholder="192.168.1.10" />
         <Button kind="primary" disabled={!f.name || !f.value} onClick={() => run(() => post('/api/dns/records', f), 'Saved.').then(() => { setF({ ...f, name: '', value: '' }); reload(); })}>Add</Button>
       </div>
       <div className="list">
@@ -330,7 +376,7 @@ function Groups() {
           <Field label="Note"><Input value={edit.description} onChange={(v) => setEdit({ ...edit, description: v })} /></Field>
           <ToggleRow title="Filter ads and trackers" checked={edit.filtering} onChange={(v) => setEdit({ ...edit, filtering: v })} />
           {edit.filtering && (lists || []).map((l) => (
-            <ToggleRow key={l.id} title={l.name} desc={`${fmt.n(l.entries)} names`} checked={(edit.lists || []).includes(l.id)}
+            <ToggleRow key={l.id} title={l.name} desc={`${fmt.n(l.entries)} blocked`} checked={(edit.lists || []).includes(l.id)}
               onChange={(v) => setEdit({ ...edit, lists: v ? [...(edit.lists || []), l.id] : edit.lists.filter((x) => x !== l.id) })} />
           ))}
         </Modal>

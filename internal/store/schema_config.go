@@ -428,4 +428,12 @@ CREATE TABLE dns_exceptions(
 -- An OpenVPN device can be switched off without being deleted: the server's revocation list holds it
 -- out while it is paused, and lets it back in when it is not.
 ALTER TABLE vpn_ovpn_users ADD COLUMN paused INTEGER NOT NULL DEFAULT 0;
+`, `
+-- Blocklists: how many names a list blocks, how many exceptions ("allowed") it carries and how many
+-- lines Gatehouse could not use; and when to try a failed download again. A failed download no
+-- longer counts as a finished one.
+ALTER TABLE blocklists ADD COLUMN allowed INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE blocklists ADD COLUMN skipped INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE blocklists ADD COLUMN failures INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE blocklists ADD COLUMN retry_at INTEGER NOT NULL DEFAULT 0;
 `}

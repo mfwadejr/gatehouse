@@ -21,14 +21,21 @@ func (a *App) dnsSummary(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 	snap := a.DNS.Stats().Snapshot()
 	snap.CacheSize = a.DNS.Cache().Len()
 	lists, _ := a.Lists.Lists()
-	entries := 0
+	entries, enabled, loaded := 0, 0, 0
 	for _, l := range lists {
 		if l.Enabled {
+			enabled++
 			entries += l.Entries
+			if l.Entries+l.Allowed > 0 {
+				loaded++
+			}
 		}
 	}
 	api.JSON(w, 200, map[string]any{
 		"stats": snap, "upstreams": a.DNS.Pool().Status(), "list_count": len(lists), "blocked_entries": entries,
+		"unique_blocked": a.Lists.UniqueBlocked(),
+		// Blocking only works once at least one switched-on list has been downloaded.
+		"lists_enabled": enabled, "lists_loaded": loaded, "blocking_active": enabled == 0 || loaded > 0,
 		"log_dropped": a.QLog.Dropped(),
 	})
 }

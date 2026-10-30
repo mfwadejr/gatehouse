@@ -27,9 +27,13 @@ type ListInfo struct {
 	Interval  int    `json:"interval_hours"`
 	LastFetch int64  `json:"last_fetch"`
 	LastOK    int64  `json:"last_ok"`
-	Entries   int    `json:"entries"`
-	Status    string `json:"status"` // new, ok, error, stale
+	Entries   int    `json:"entries"` // names the list blocks
+	Allowed   int    `json:"allowed"` // exceptions ("do not block this") the list carries
+	Skipped   int    `json:"skipped"` // lines in a syntax Gatehouse does not use
+	Status    string `json:"status"`  // new, downloading, ok, error, stale
 	Error     string `json:"error,omitempty"`
+	Plain     string `json:"plain,omitempty"` // the error in plain words
+	RetryAt   int64  `json:"retry_at,omitempty"`
 	Local     bool   `json:"local"`
 }
 
@@ -44,14 +48,20 @@ type Manager struct {
 	http     *http.Client
 	now      func() time.Time
 	mu       sync.Mutex // serialises reloads and refreshes
+	mu2      sync.Mutex // guards fetching and unique
 	OnChange func()
+	// Online, when set, says whether the internet answers; a list that failed is tried again at
+	// once when this goes from false to true, instead of waiting out its backoff.
+	Online   func() bool
+	fetching map[int64]bool // lists being downloaded right now
+	unique   int            // distinct names blocked across all enabled lists
 	// AllowFetch lets tests permit loopback URLs; production blocks private addresses.
 	AllowPrivate bool
 }
 
 func NewManager(db *store.DB, dir string, eng *engineHolder) *Manager {
 	os.MkdirAll(dir, 0o750)
-	return &Manager{db: db, dir: dir, eng: eng, now: time.Now,
+	return &Manager{db: db, dir: dir, eng: eng, now: time.Now, fetching: map[int64]bool{},
 		http: &http.Client{Timeout: 90 * time.Second}}
 }
 
@@ -96,7 +106,7 @@ func (m *Manager) SeedDefaults() error {
 
 // Lists returns every blocklist.
 func (m *Manager) Lists() ([]ListInfo, error) {
-	rows, err := m.db.Query(`SELECT id,name,url,format,enabled,interval_hours,last_fetch,last_ok,entries,status,error,local FROM blocklists ORDER BY name`)
+	rows, err := m.db.Query(`SELECT id,name,url,format,enabled,interval_hours,last_fetch,last_ok,entries,allowed,skipped,status,error,retry_at,local FROM blocklists ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -105,16 +115,83 @@ func (m *Manager) Lists() ([]ListInfo, error) {
 	for rows.Next() {
 		var l ListInfo
 		var en, loc int
-		if err := rows.Scan(&l.ID, &l.Name, &l.URL, &l.Format, &en, &l.Interval, &l.LastFetch, &l.LastOK, &l.Entries, &l.Status, &l.Error, &loc); err != nil {
+		if err := rows.Scan(&l.ID, &l.Name, &l.URL, &l.Format, &en, &l.Interval, &l.LastFetch, &l.LastOK, &l.Entries, &l.Allowed, &l.Skipped, &l.Status, &l.Error, &l.RetryAt, &loc); err != nil {
 			return nil, err
 		}
 		l.Enabled, l.Local = en == 1, loc == 1
+		if m.isFetching(l.ID) {
+			l.Status = "downloading"
+		}
+		if l.Status == "error" {
+			l.Plain = PlainListError(l.Error)
+		}
 		if l.Status == "ok" && l.Interval > 0 && l.LastOK > 0 && m.now().Unix()-l.LastOK > int64(l.Interval)*3600*3 {
 			l.Status = "stale"
 		}
 		out = append(out, l)
 	}
 	return out, rows.Err()
+}
+
+func (m *Manager) isFetching(id int64) bool {
+	m.mu2.Lock()
+	defer m.mu2.Unlock()
+	return m.fetching[id]
+}
+
+func (m *Manager) setFetching(id int64, on bool) {
+	m.mu2.Lock()
+	defer m.mu2.Unlock()
+	if on {
+		m.fetching[id] = true
+	} else {
+		delete(m.fetching, id)
+	}
+}
+
+// UniqueBlocked is how many different names the enabled lists block, counting a name once
+// even when several lists carry it.
+func (m *Manager) UniqueBlocked() int {
+	m.mu2.Lock()
+	defer m.mu2.Unlock()
+	return m.unique
+}
+
+// PlainListError turns the technical text of a failed download into a sentence a person can use.
+func PlainListError(e string) string {
+	l := strings.ToLower(e)
+	switch {
+	case e == "":
+		return ""
+	case strings.Contains(l, "no usable entries"):
+		return "The file did not look like a blocklist."
+	case strings.Contains(l, "larger than"):
+		return "The list is too large to use."
+	case strings.Contains(l, "server answered"):
+		return "The list's website answered with an error."
+	case strings.Contains(l, "lookup") || strings.Contains(l, "dial tcp") || strings.Contains(l, "no such host") || strings.Contains(l, "timeout") ||
+		strings.Contains(l, "connection refused") || strings.Contains(l, "unreachable") || strings.Contains(l, "deadline exceeded") || strings.Contains(l, "eof"):
+		return "Couldn't reach the list's website."
+	}
+	return "Couldn't download this list."
+}
+
+// retryDelay is how long to wait after the n-th failed download in a row: a minute, 2, 5, 15, 30,
+// then an hour, until it works.
+func retryDelay(n int) time.Duration {
+	steps := []time.Duration{time.Minute, 2 * time.Minute, 5 * time.Minute, 15 * time.Minute, 30 * time.Minute, time.Hour}
+	if n < 0 {
+		n = 0
+	}
+	if n >= len(steps) {
+		n = len(steps) - 1
+	}
+	return steps[n]
+}
+
+// Nudge lets lists that failed try again at once, for example when the internet comes back.
+func (m *Manager) Nudge() {
+	m.db.Exec(`UPDATE blocklists SET retry_at=0 WHERE status='error'`)
 }
 
 func validListURL(raw string, allowPrivate bool) error {
@@ -205,21 +282,27 @@ func (m *Manager) store(id int64, r io.Reader, format string) error {
 		return fmt.Errorf("list is larger than %d MB", maxListBytes>>20)
 	}
 	tmp.Seek(0, io.SeekStart)
-	count := 0
-	stats, err := Parse(tmp, format, func(Rule) { count++ })
+	count, allowed := 0, 0
+	stats, err := Parse(tmp, format, func(r Rule) {
+		if r.Allow {
+			allowed++
+		} else {
+			count++
+		}
+	})
 	tmp.Close()
 	if err != nil {
 		return err
 	}
-	if count == 0 {
+	if count+allowed == 0 {
 		return fmt.Errorf("no usable entries found (%d lines skipped)", stats.Skipped)
 	}
 	if err := os.Rename(tmp.Name(), m.file(id)); err != nil {
 		return err
 	}
 	now := m.now().Unix()
-	_, err = m.db.Exec(`UPDATE blocklists SET entries=?, format=CASE WHEN format='auto' THEN ? ELSE format END, last_fetch=?, last_ok=?, status='ok', error='' WHERE id=?`,
-		count, stats.Format, now, now, id)
+	_, err = m.db.Exec(`UPDATE blocklists SET entries=?, allowed=?, skipped=?, format=CASE WHEN format='auto' THEN ? ELSE format END, last_fetch=?, last_ok=?, status='ok', error='', failures=0, retry_at=0 WHERE id=?`,
+		count, allowed, stats.Skipped, stats.Format, now, now, id)
 	return err
 }
 
@@ -233,8 +316,15 @@ func (m *Manager) Refresh(ctx context.Context, id int64) error {
 	if local == 1 || raw == "" {
 		return nil
 	}
+	m.setFetching(id, true)
+	defer m.setFetching(id, false)
+	// A failed try is not a finished one: the list is tried again soon (1, 2, 5, 15 minutes, then
+	// hourly), not after a whole refresh interval.
 	fail := func(err error) error {
-		m.db.Exec(`UPDATE blocklists SET last_fetch=?, status='error', error=? WHERE id=?`, m.now().Unix(), err.Error(), id)
+		var n int
+		m.db.QueryRow(`SELECT failures FROM blocklists WHERE id=?`, id).Scan(&n)
+		m.db.Exec(`UPDATE blocklists SET last_fetch=?, status='error', error=?, failures=?, retry_at=? WHERE id=?`,
+			m.now().Unix(), err.Error(), n+1, m.now().Add(retryDelay(n)).Unix(), id)
 		return err
 	}
 	if err := validListURL(raw, m.AllowPrivate); err != nil {
@@ -261,8 +351,8 @@ func (m *Manager) Refresh(ctx context.Context, id int64) error {
 
 // Due returns lists whose refresh interval has passed.
 func (m *Manager) due() []int64 {
-	rows, err := m.db.Query(`SELECT id FROM blocklists WHERE enabled=1 AND local=0 AND url<>'' AND
-		(last_fetch=0 OR ?-last_fetch >= interval_hours*3600)`, m.now().Unix())
+	rows, err := m.db.Query(`SELECT id FROM blocklists WHERE enabled=1 AND local=0 AND url<>'' AND ?>=retry_at AND
+		(last_ok=0 OR ?-last_ok >= interval_hours*3600)`, m.now().Unix(), m.now().Unix())
 	if err != nil {
 		return nil
 	}
@@ -280,7 +370,15 @@ func (m *Manager) due() []int64 {
 func (m *Manager) Run(ctx context.Context) {
 	t := time.NewTicker(time.Minute)
 	defer t.Stop()
+	wasOnline := false
 	for {
+		if m.Online != nil {
+			on := m.Online()
+			if on && !wasOnline {
+				m.Nudge()
+			}
+			wasOnline = on
+		}
 		for _, id := range m.due() {
 			rctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 			m.Refresh(rctx, id)
@@ -299,18 +397,19 @@ func (m *Manager) Reload() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	type lst struct {
-		id     int64
-		name   string
-		format string
+		id                        int64
+		name                      string
+		format                    string
+		entries, allowed, skipped int // as saved; corrected below from the file itself
 	}
-	rows, err := m.db.Query(`SELECT id,name,format FROM blocklists WHERE enabled=1 ORDER BY id`)
+	rows, err := m.db.Query(`SELECT id,name,format,entries,allowed,skipped FROM blocklists WHERE enabled=1 ORDER BY id`)
 	if err != nil {
 		return err
 	}
 	var lists []lst
 	for rows.Next() {
 		var l lst
-		rows.Scan(&l.id, &l.name, &l.format)
+		rows.Scan(&l.id, &l.name, &l.format, &l.entries, &l.allowed, &l.skipped)
 		lists = append(lists, l)
 	}
 	rows.Close()
@@ -328,8 +427,20 @@ func (m *Manager) Reload() error {
 		}
 		i := i
 		l := l
-		Parse(f, l.format, func(r Rule) { b.add(i, l.name, r) })
+		blocked, allowed := 0, 0
+		stats, _ := Parse(f, l.format, func(r Rule) {
+			b.add(i, l.name, r)
+			if r.Allow {
+				allowed++
+			} else {
+				blocked++
+			}
+		})
 		f.Close()
+		// Lists saved by an older version only knew one number; fill in the three from the file.
+		if blocked != l.entries || allowed != l.allowed || stats.Skipped != l.skipped {
+			m.db.Exec(`UPDATE blocklists SET entries=?, allowed=?, skipped=? WHERE id=?`, blocked, allowed, stats.Skipped, l.id)
+		}
 	}
 	custom := newCustom()
 	crow, err := m.db.Query(`SELECT domain,action FROM custom_rules`)
@@ -371,6 +482,9 @@ func (m *Manager) Reload() error {
 		}
 		gb.Close()
 	}
+	m.mu2.Lock()
+	m.unique = len(b.ix.block)
+	m.mu2.Unlock()
 	m.eng.p.Store(&engine{ix: b.ix, custom: custom, masks: masks, nofilter: nofilter})
 	if m.OnChange != nil {
 		m.OnChange()

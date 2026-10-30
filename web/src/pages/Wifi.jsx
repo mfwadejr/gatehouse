@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { del, get, post, put, useData } from '../api.js';
 import ApplyBar from '../ApplyBar.jsx';
+import { confirmRemoval } from '../removal.js';
 import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, Select, ToggleRow, useAction } from '../ui.jsx';
 
 export const COUNTRIES = {
@@ -317,7 +318,10 @@ export default function Wifi({ me }) {
   const watchdog = async (on) => { await run(() => put('/api/net/wifi/watchdog', { on }), on ? 'Automatic recovery is on.' : 'Automatic recovery is off.'); reload(); };
   const keepAwake = async (on) => { await run(() => put('/api/net/wifi/keepawake', { on }), on ? 'The card is kept awake.' : 'Power saving is back to the default.'); reload(); };
 
-  const remove = async (c) => {
+  const remove = async (c, asked = false) => {
+    // Removing a broadcast network also removes its network and address range, so say so first.
+    const mine = (ifs || []).find((x) => x.name === c.iface);
+    if (!asked && c.saved?.mode === 'ap' && mine && !(await confirmRemoval(`/api/net/interfaces/${mine.id}/removal`, `Remove the Wi-Fi network ${c.saved?.ssid || ''}?`.replace('  ', ' ')))) return;
     await run(async () => {
       await del(`/api/net/wifi/${c.iface}`);
       for (const w of (wd?.wans || []).filter((x) => x.iface === c.iface)) await del(`/api/net/wans/${w.id}`);
@@ -363,7 +367,7 @@ export default function Wifi({ me }) {
       )}
       {forget && (
         <Modal title={`Forget ${forget.saved.ssid}?`} onClose={() => setForget(null)}
-          footer={<><Button onClick={() => setForget(null)}>Keep it</Button><Button kind="primary" onClick={async () => { const c = forget; setForget(null); await remove(c); }}>Forget network</Button></>}>
+          footer={<><Button onClick={() => setForget(null)}>Keep it</Button><Button kind="primary" onClick={async () => { const c = forget; setForget(null); await remove(c, true); }}>Forget network</Button></>}>
           <p>This card will stop using <b>{forget.saved.ssid}</b>. The saved password is deleted, and so is the internet connection that used this network. The card itself stays, ready to join a different network with Set up.</p>
           <p className="small muted">Nothing changes until you apply it.</p>
         </Modal>

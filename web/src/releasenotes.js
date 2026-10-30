@@ -1,0 +1,24 @@
+// Plain-language release notes, newest first. Add an entry for every release.
+export const RELEASES = [
+  {
+    version: '0.8.13',
+    title: 'Tidy-ups and small features',
+    items: [
+      'Search: press / or Ctrl+K (⌘K on a Mac) to jump to any page, setting, device or network.',
+      'Blocklists now download on a fresh install, retry sooner when the internet is not ready yet, and say in plain words what went wrong. Each list shows how many names it blocks and how many it allows.',
+      'Removing a network now removes everything that belonged to it: its address pool, its rules and its firewall network. You see what will go before you confirm.',
+      'The "This machine" card shows real amounts for memory, disk and processor, and what is using the disk.',
+      'A clear warning when a network is nearly out of addresses.',
+      'You can choose the name of this firewall on the Your names page.',
+    ],
+  },
+  {
+    version: '0.8.12',
+    title: 'Friendlier imports and names',
+    items: [
+      'More VPN provider files (such as ExpressVPN) import without changes, and if one cannot, every reason is listed at once.',
+      'Your own names are checked when you save them, so a pasted web address cannot break a name.',
+      'Messages appear top right and go away when clicked.',
+    ],
+  },
+];

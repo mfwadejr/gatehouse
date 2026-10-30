@@ -3,6 +3,7 @@ package app
 import (
 	"encoding/json"
 	"net/netip"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -182,3 +183,99 @@ func TestMoveNetworkFollowsEverywhere(t *testing.T) {
 		t.Fatalf("to another whole port: %d %s", rc, raw)
 	}
 }
+
+func idOf(t *testing.T, raw []byte, key, val string) float64 {
+	t.Helper()
+	var list []map[string]any
+	json.Unmarshal(raw, &list)
+	for _, r := range list {
+		if r[key] == val {
+			return r["id"].(float64)
+		}
+	}
+	t.Fatalf("no row with %s=%q in %s", key, val, raw)
+	return 0
+}
+
+// Removing a network takes its DHCP range and (when it was the last port) its firewall network
+// with it, and tells the person what goes before they confirm.
+func TestRemovingANetworkTakesItsLeftoversWithIt(t *testing.T) {
+	c, _, _ := siteBox(t, "192.168.1.1/24")
+	if rc, _, raw := c.call("POST", "/api/networks/add", map[string]any{"name": "Cameras", "port": "eth2", "internet": true, "isolate": true}); rc != 200 {
+		t.Fatalf("add: %d %s", rc, raw)
+	}
+	_, _, raw := c.call("GET", "/api/net/interfaces", nil)
+	id := idOf(t, raw, "name", "eth2")
+	rc, m, raw := c.call("GET", "/api/net/interfaces/"+fmtID(id)+"/removal", nil)
+	if rc != 200 || m["remove_zone"] != true || m["zone"] != "Cameras" || len(m["scopes"].([]any)) != 1 {
+		t.Fatalf("impact: %d %s", rc, raw)
+	}
+	if rc, _, raw := c.call("DELETE", "/api/net/interfaces/"+fmtID(id), nil); rc != 200 {
+		t.Fatalf("remove: %d %s", rc, raw)
+	}
+	for path, what := range map[string]string{"/api/dhcp/scopes": "Cameras", "/api/fw/zones": "Cameras", "/api/net/interfaces": "eth2"} {
+		_, _, raw := c.call("GET", path, nil)
+		if strings.Contains(string(raw), `"`+what+`"`) {
+			t.Errorf("%s still lists %s after removing the network: %s", path, what, raw)
+		}
+	}
+}
+
+// A network that can manage Gatehouse keeps its firewall network when its port goes.
+func TestRemovingTheManagementPortKeepsItsFirewallNetwork(t *testing.T) {
+	c, _, _ := siteBox(t, "192.168.1.1/24")
+	_, _, raw := c.call("GET", "/api/fw/zones", nil)
+	var zs []map[string]any
+	json.Unmarshal(raw, &zs)
+	var mgmt string
+	for _, z := range zs {
+		if z["management"] == true {
+			mgmt = z["name"].(string)
+		}
+	}
+	if mgmt == "" {
+		t.Skip("the test box has no network that can manage it")
+	}
+	_, _, raw = c.call("GET", "/api/net/interfaces", nil)
+	var ifs []map[string]any
+	json.Unmarshal(raw, &ifs)
+	for _, i := range ifs {
+		_, _, zraw := c.call("GET", "/api/fw/zones", nil)
+		if i["zone_id"] == nil || !strings.Contains(string(zraw), mgmt) {
+			continue
+		}
+		rc, m, raw := c.call("GET", "/api/net/interfaces/"+fmtID(i["id"].(float64))+"/removal", nil)
+		if rc != 200 {
+			t.Fatalf("impact: %d %s", rc, raw)
+		}
+		if m["management"] == true && m["remove_zone"] != false {
+			t.Fatalf("a management network would lose its firewall network: %s", raw)
+		}
+	}
+}
+
+// Removing a firewall network also removes a leftover DHCP range of the same name whose port is gone.
+func TestRemovingAFirewallNetworkRemovesALeftoverRange(t *testing.T) {
+	c, _, _ := siteBox(t, "192.168.1.1/24")
+	if rc, _, raw := c.call("PUT", "/api/fw/zones", map[string]any{"name": "Wi-Fi", "kind": "trusted", "ifaces": []string{}, "internet": true, "gateway": true, "intra_allow": true}); rc != 200 {
+		t.Fatalf("zone: %d %s", rc, raw)
+	}
+	if _, err := c.app.Config.Exec(`INSERT INTO dhcp_scopes(name,iface,subnet,range_start,range_end,router) VALUES('Wi-Fi','wlp3s0','192.168.23.0/24','192.168.23.100','192.168.23.200','192.168.23.1')`); err != nil {
+		t.Fatal(err)
+	}
+	_, _, raw := c.call("GET", "/api/fw/zones", nil)
+	id := idOf(t, raw, "name", "Wi-Fi")
+	rc, m, raw := c.call("GET", "/api/fw/zones/"+fmtID(id)+"/removal", nil)
+	if rc != 200 || len(m["scopes"].([]any)) != 1 {
+		t.Fatalf("impact: %d %s", rc, raw)
+	}
+	if rc, _, raw := c.call("DELETE", "/api/fw/zones/"+fmtID(id), nil); rc != 200 {
+		t.Fatalf("remove: %d %s", rc, raw)
+	}
+	_, _, raw = c.call("GET", "/api/dhcp/scopes", nil)
+	if strings.Contains(string(raw), "Wi-Fi") {
+		t.Errorf("the Wi-Fi address range is still there: %s", raw)
+	}
+}
+
+func fmtID(f float64) string { return strconv.FormatInt(int64(f), 10) }

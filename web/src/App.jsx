@@ -16,6 +16,8 @@ import Logs from './pages/Logs.jsx';
 import Settings from './pages/Settings.jsx';
 import Installer from './pages/Installer.jsx';
 import Wizard from './pages/Wizard.jsx';
+import { SearchBox, useSearchShortcut } from './search.jsx';
+import { ReleaseNotes } from './whatsnew.jsx';
 
 export const PAGES = [
   { id: 'overview', label: 'Overview', icon: 'overview', el: Overview },
@@ -53,11 +55,16 @@ function Shell({ me, onSignOut, reloadMe }) {
   const { data: net } = useData('/api/net/status', { topics: ['net.status'] });
   const pending = (fw?.status?.pending || net?.status?.pending) ? true : false;
   const dirty = !!(fw?.status?.dirty || net?.status?.dirty);
+  const [finding, setFinding] = useState(false);
+  const [notes, setNotes] = useState(false);
+  const { data: upd } = useData('/api/system/update', { every: 600000 });
+  useSearchShortcut(useCallback(() => setFinding(true), []));
   const initials = (me.user.username || '?').slice(0, 2).toUpperCase();
   return (
     <div className="shell">
       <aside className="side">
         <div className="brand"><Icon name="logo" size={24} /><span>Gatehouse</span></div>
+        <button type="button" className="srchbtn" onClick={() => setFinding(true)} aria-label="Search"><Icon name="search" /><span>Search</span><kbd>/</kbd></button>
         <nav className="nav" aria-label="Primary">
           {PAGES.map((p) => (
             <a key={p.id} href={`#/${p.id}`} className={p.id === page.id ? 'on' : ''} aria-current={p.id === page.id ? 'page' : undefined}>
@@ -73,12 +80,15 @@ function Shell({ me, onSignOut, reloadMe }) {
             <span>{me.user.username}</span>
             <span className="small muted">{me.user.role === 'admin' ? 'Admin' : 'Viewer'}{me.user.totp_enabled ? ' · 2-step on' : ''}</span>
             <button className="link small" style={{ textAlign: 'left' }} onClick={onSignOut}>Sign out</button>
+            {upd?.current && <button className="link small" style={{ textAlign: 'left' }} onClick={() => setNotes(true)}>What's new in {upd.current}</button>}
           </div>
         </div>
       </aside>
       <main className="main" id="main">
         <Page me={me} reloadMe={reloadMe} />
       </main>
+      {finding && <SearchBox onClose={() => setFinding(false)} go={go} />}
+      {notes && <ReleaseNotes onClose={() => setNotes(false)} />}
     </div>
   );
 }

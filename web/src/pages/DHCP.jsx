@@ -74,6 +74,11 @@ function Scopes() {
                     {result[s.id].verdict === 'ok' && 'Only Gatehouse answered on this network.'}
                   </Note>
                 )}
+                {u && s.mode === 'serve' && u.size > 0 && u.active / u.size > 0.8 && (
+                  <Note tone="warn" title={u.active >= u.size ? 'No addresses left' : 'Nearly out of addresses'}>
+                    {u.active} of {u.size} are in use. {u.active >= u.size ? 'New devices cannot join until some are freed. ' : ''}Widen the range with Edit, or keep addresses for less time so unused ones come back sooner.
+                  </Note>
+                )}
                 {u && s.mode !== 'off' && <div className="stack" style={{ gap: 'var(--space-1)', marginTop: 'var(--space-2)', maxWidth: '24rem' }}><Bar pct={pct} thin /><span className="small muted">{u.active} of {u.size} addresses in use</span></div>}
               </div>
               <div className="actions"><Button small icon="refresh" disabled={checking === s.id || s.mode === 'relay'} onClick={() => check(s)}>{checking === s.id ? 'Listening…' : 'Check for other servers'}</Button><Button small icon="edit" onClick={() => setEdit(s)}>Edit</Button><Button small kind="danger" icon="trash" onClick={async () => await confirmBox(`Delete ${s.name}?`) && run(() => del(`/api/dhcp/scopes/${s.id}`)).then(reload)}>Delete</Button></div>

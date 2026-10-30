@@ -14,6 +14,11 @@ func Describe(m *Model) []string {
 			out = append(out, fmt.Sprintf("%s: nothing from the internet can start a connection to your networks%s.", z.Name, forwardsNote(m)))
 			continue
 		}
+		if len(z.Ifaces) == 0 {
+			// A network nothing is plugged into: say so in one line instead of listing what it could reach.
+			out = append(out, z.Name+": not attached to any port yet, so nothing is on it.")
+			continue
+		}
 		var s strings.Builder
 		s.WriteString(z.Name + ": ")
 		var can []string

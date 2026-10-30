@@ -2,8 +2,11 @@ package app
 
 import (
 	"context"
+	"io/fs"
 	"net/http"
 	"os"
+	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -26,7 +29,14 @@ type sysHealth struct {
 	Temp     float64 `json:"temp"` // degrees Celsius; 0 when the machine has no sensor
 	Uptime   int64   `json:"uptime"`
 	MemTotal int64   `json:"mem_total"`
+	MemUsed  int64   `json:"mem_used"` // bytes in use, not counting what Linux keeps as cache
 	DiskFree int64   `json:"disk_free"`
+	DiskSize int64   `json:"disk_size"`
+	DiskUsed int64   `json:"disk_used"`
+	Cores    int     `json:"cores"`
+	Load1    float64 `json:"load1"` // the usual "load average", shown on hover
+	Load5    float64 `json:"load5"`
+	Load15   float64 `json:"load15"`
 }
 
 type healthSampler struct {
@@ -103,6 +113,67 @@ func readTemp() float64 {
 	return best
 }
 
+func readLoad() (a, b, c float64) {
+	raw, err := os.ReadFile("/proc/loadavg")
+	if err != nil {
+		return 0, 0, 0
+	}
+	f := strings.Fields(string(raw))
+	if len(f) < 3 {
+		return 0, 0, 0
+	}
+	a, _ = strconv.ParseFloat(f[0], 64)
+	b, _ = strconv.ParseFloat(f[1], 64)
+	c, _ = strconv.ParseFloat(f[2], 64)
+	return
+}
+
+// diskPart is one line of "what is using the disk".
+type diskPart struct {
+	Name  string `json:"name"`
+	Bytes int64  `json:"bytes"`
+}
+
+// dirBytes adds up the size of the files under a path (a single file works too).
+func dirBytes(path string) int64 {
+	var n int64
+	filepath.WalkDir(path, func(_ string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		if info, e := d.Info(); e == nil {
+			n += info.Size()
+		}
+		return nil
+	})
+	return n
+}
+
+// diskBreakdown says what Gatehouse itself keeps on the disk, so a person running low can see
+// what to trim: the logs, saved backups, the settings database and downloaded blocklists. The
+// rest of what is in use is the system itself.
+func (a *App) diskBreakdown(used int64) []diskPart {
+	dir := a.Cfg.DataDir
+	parts := []diskPart{
+		{"Logs and history", dirBytes(filepath.Join(dir, "logs.db")) + dirBytes(filepath.Join(dir, "logs.db-wal")) + dirBytes(filepath.Join(dir, "logs.db-shm"))},
+		{"Saved backups", dirBytes(a.backupDir())},
+		{"Settings database", dirBytes(filepath.Join(dir, "config.db")) + dirBytes(filepath.Join(dir, "config.db-wal")) + dirBytes(filepath.Join(dir, "config.db-shm"))},
+		{"Blocklists", dirBytes(filepath.Join(dir, "lists"))},
+	}
+	var ours int64
+	for _, p := range parts {
+		ours += p.Bytes
+	}
+	if rest := dirBytes(dir) - ours; rest > 0 {
+		parts = append(parts, diskPart{"Other Gatehouse data", rest})
+		ours += rest
+	}
+	if used > ours {
+		parts = append(parts, diskPart{"System files", used - ours})
+	}
+	return parts
+}
+
 func readUptime() int64 {
 	b, err := os.ReadFile("/proc/uptime")
 	if err != nil {
@@ -125,8 +196,10 @@ func (h *healthSampler) Health(path string) sysHealth {
 	if !h.at.IsZero() && now.Sub(h.at) < time.Second {
 		return h.last
 	}
-	out := sysHealth{Uptime: readUptime(), Temp: readTemp()}
+	out := sysHealth{Uptime: readUptime(), Temp: readTemp(), Cores: runtime.NumCPU()}
 	out.Mem, out.MemTotal = readMem()
+	out.MemUsed = int64(out.Mem * float64(out.MemTotal) / 100)
+	out.Load1, out.Load5, out.Load15 = readLoad()
 	if idle, total, ok := readCPU(); ok {
 		if h.total > 0 && total > h.total {
 			out.CPU = 100 * (1 - float64(idle-h.idle)/float64(total-h.total))
@@ -142,6 +215,8 @@ func (h *healthSampler) Health(path string) sysHealth {
 	if syscall.Statfs(path, &st) == nil && st.Blocks > 0 {
 		out.Disk = float64(st.Blocks-st.Bavail) * 100 / float64(st.Blocks)
 		out.DiskFree = int64(st.Bavail) * int64(st.Bsize)
+		out.DiskSize = int64(st.Blocks) * int64(st.Bsize)
+		out.DiskUsed = int64(st.Blocks-st.Bfree) * int64(st.Bsize)
 	}
 	h.at, h.last = now, out
 	return out
@@ -533,6 +608,12 @@ func (a *App) registerOverviewRoutes() {
 	})
 	s.Handle("GET /api/system/health", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		api.JSON(w, 200, a.health.Health("/"))
+	})
+	s.Handle("GET /api/system/disk", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		api.JSON(w, 200, a.cached("disk", 30*time.Second, func() any {
+			h := a.health.Health("/")
+			return map[string]any{"size": h.DiskSize, "used": h.DiskUsed, "parts": a.diskBreakdown(h.DiskUsed)}
+		}))
 	})
 	s.Handle("GET /api/overview/devices", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		api.JSON(w, 200, a.cached("devs", 3*time.Second, func() any { return a.deviceCounts() }))

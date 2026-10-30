@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { del, post, put, useData, useStream } from '../api.js';
 import ApplyBar from '../ApplyBar.jsx';
+import { confirmRemoval } from '../removal.js';
 import AddNetwork from '../AddNetwork.jsx';
 import { go } from '../App.jsx';
 import { linkState } from '../linkstate.js';
@@ -98,11 +99,11 @@ function Networks({ ov, presets, reload }) {
           {zones.map((z) => (
             <div className="item" key={z.id}>
               <div>
-                <div className="name">{z.name} <Pill>{kindTitle(z.kind)}</Pill>{z.management && <Pill tone="good">Can manage Gatehouse</Pill>}</div>
-                <div className="meta">{z.ifaces?.length ? z.ifaces.join(', ') : 'no ports yet'}</div>
+                <div className="name">{z.name} <Pill>{kindTitle(z.kind)}</Pill>{z.management && <Pill tone="good">Can manage Gatehouse</Pill>}{!z.ifaces?.length && <Pill tone="warn">Not attached to anything</Pill>}</div>
+                <div className="meta">{z.ifaces?.length ? z.ifaces.join(', ') : 'Not attached to a port, so nothing is on it. Remove it if you no longer need it.'}</div>
               </div>
               <div className="actions"><Button small icon="edit" onClick={() => setEdit(z)}>Edit</Button>
-                <Button small kind="danger" icon="trash" onClick={async () => await confirmBox(`Remove ${z.name}?`) && run(() => del(`/api/fw/zones/${z.id}`)).then(reload)}>Remove</Button></div>
+                <Button small kind="danger" icon="trash" onClick={async () => await confirmRemoval(`/api/fw/zones/${z.id}/removal`, `Remove ${z.name}?`, { zoneRemoval: true }) && run(() => del(`/api/fw/zones/${z.id}`)).then(reload)}>Remove</Button></div>
             </div>
           ))}
           <InternetRow ov={ov} />

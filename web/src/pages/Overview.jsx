@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useData, useStream, put, post } from '../api.js';
+import { useData, useStream, put, post, get } from '../api.js';
 import { Button, Card, Empty, Icon, Note, Page, Pill, Segmented, fmt, Bar, useAction } from '../ui.jsx';
 import { go } from '../App.jsx';
 import { COUNTRIES, MAP_H, MAP_W } from '../worldmap.js';
 import { Chart, fmtBits, fmtBytes } from '../charts.jsx';
 import { linkMeasure, linkState } from '../linkstate.js';
 import { PRESET_KEY } from './Logs.jsx';
+import { WhatsNewCard } from '../whatsnew.jsx';
 
 const regionName = (cc) => { try { return new Intl.DisplayNames(undefined, { type: 'region' }).of(cc); } catch { return cc; } };
 const SERIES = ['var(--color-chart-series-1)', 'var(--color-chart-series-2)', 'var(--color-chart-series-3)', 'var(--color-chart-series-4)'];
@@ -72,7 +73,15 @@ function useAttention({ wanList, links, fw, net, rogue, vpn, util, dns, upd }) {
       if (v.state === 'down') a.push({ t: `VPN ${v.label} is down`, s: v.message, to: 'vpn' });
       else if (v.state === 'degraded') a.push({ t: `VPN ${v.label} is not passing traffic`, s: v.message, to: 'vpn' });
     });
-    (util || []).forEach((s) => { if (s.size && s.active / s.size > 0.8) a.push({ t: `${s.name} is ${Math.round((100 * s.active) / s.size)}% full`, s: 'Consider a larger address range.', to: 'dhcp' }); });
+    (util || []).forEach((s) => {
+      if (!s.size || s.active / s.size <= 0.8) return;
+      const left = Math.max(0, s.size - s.active);
+      a.push({
+        t: left === 0 ? `${s.name} has no addresses left` : `${s.name} is nearly out of addresses`,
+        s: `${s.active} of ${s.size} in use, ${left} left. ${left === 0 ? 'New devices cannot join until some are freed. ' : ''}Widen the range or shorten how long addresses are kept.`,
+        to: 'dhcp',
+      });
+    });
     if (dns?.upstreams?.length && !dns.upstreams.some((u) => u.state === 'healthy')) a.push({ t: 'No DNS server is answering', s: 'Devices cannot look up names until one answers. Open DNS and press Test.', to: 'dns' });
     if (upd?.available && upd.mode !== 'off' && upd.state === 'idle') a.push({ t: 'Updates are ready to install', s: [upd.gatehouse_new && upd.latest ? `Gatehouse ${upd.latest.version}` : '', upd.system_count > 0 ? `${upd.system_count} system update${upd.system_count === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and '), to: 'settings' });
     if (upd?.needs_reboot) a.push({ t: 'A restart is needed', s: 'The system was updated and needs a restart to finish.', to: 'settings' });
@@ -371,19 +380,43 @@ function BusiestCard({ rows }) {
 const upText = (s) => { const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60); return d ? `${d} d ${h} h` : h ? `${h} h ${m} min` : `${m} min`; };
 
 function MachineCard({ sys, upd, events }) {
-  const g = (label, v, text) => (
-    <div key={label}>
+  const [disk, setDisk] = useState(null);
+  const [open, setOpen] = useState(false);
+  const toggleDisk = async () => {
+    if (open) return setOpen(false);
+    setOpen(true);
+    try { setDisk(await get('/api/system/disk')); } catch { setDisk({ parts: [] }); }
+  };
+  const gb = (n) => (n >= 1e11 ? Math.round(n / 1e9) : Math.round(n / 1e8) / 10);
+  const g = (label, v, text, title, extra) => (
+    <div key={label} title={title}>
       <div className="spread small"><span>{label}</span><b>{text}</b></div>
       <div className={`bar ${v > 85 ? 'warnbar' : ''}`}><i style={{ width: `${Math.min(100, v || 0)}%` }} /></div>
+      {extra}
     </div>
   );
+  const memText = sys?.mem_total ? `${Math.round(sys.mem || 0)} % · ${gb(sys.mem_used || 0)} of ${gb(sys.mem_total)} GB` : `${Math.round(sys?.mem || 0)} %`;
+  const diskText = sys?.disk_size ? `${Math.round(sys.disk || 0)} % · ${gb(sys.disk_used || 0)} of ${gb(sys.disk_size)} GB` : `${Math.round(sys?.disk || 0)} %`;
+  const cpuText = sys?.cores ? `${Math.round(sys.cpu || 0)} % · ${sys.cores} core${sys.cores === 1 ? '' : 's'}` : `${Math.round(sys?.cpu || 0)} %`;
+  const loadTip = sys?.cores ? `Load average: ${sys.load1?.toFixed(2)} (1 min) · ${sys.load5?.toFixed(2)} (5 min) · ${sys.load15?.toFixed(2)} (15 min). Around ${sys.cores} or less is comfortable.` : undefined;
   return (
     <Card title="This machine" desc={`Gatehouse ${upd?.current || ''}${upd?.needs_reboot ? ' · restart needed' : ''}${sys?.uptime ? ` · up ${upText(sys.uptime)}` : ''}`}>
       <div className="ov-gauges">
-        {g('Processor', sys?.cpu, `${Math.round(sys?.cpu || 0)} %`)}
-        {g('Memory', sys?.mem, `${Math.round(sys?.mem || 0)} %`)}
-        {g('Disk', sys?.disk, `${Math.round(sys?.disk || 0)} %`)}
-        {sys?.temp > 0 ? g('Temperature', sys.temp, `${Math.round(sys.temp)} °C`) : <div><div className="spread small"><span>Temperature</span><b className="muted">No sensor</b></div></div>}
+        {g('Processor', sys?.cpu, cpuText, loadTip)}
+        {g('Memory', sys?.mem, memText, 'Memory in use, not counting what the system keeps as a speed-up cache')}
+        {g('Disk', sys?.disk, diskText, undefined, (
+          <>
+            <button type="button" className="linkbtn small" onClick={toggleDisk}>{open ? 'Hide' : "What's using it?"}</button>
+            {open && (
+              <div className="small stack" style={{ gap: 'var(--space-1)', marginTop: 'var(--space-1)' }}>
+                {!disk ? <span className="muted">Working it out…</span> : !disk.parts?.length ? <span className="muted">Could not work that out.</span> : disk.parts.map((p) => (
+                  <div className="spread" key={p.name}><span>{p.name}</span><span className="num muted">{fmtBytes(p.bytes)}</span></div>
+                ))}
+              </div>
+            )}
+          </>
+        ))}
+        {sys?.temp > 0 ? g('Temperature', sys.temp, `${Math.round(sys.temp)} °C`) : <div><div className="spread small"><span>Temperature</span><b className="muted">This machine has no sensor</b></div></div>}
       </div>
       <h3 className="ov-h3">Recent events</h3>
       {!events?.length ? <Empty>Nothing has happened yet.</Empty> : (
@@ -439,6 +472,7 @@ export default function Overview() {
           </div>
         </Card>
       )}
+      <WhatsNewCard current={upd?.current} />
       <SetupChecklist />
       <Hero wanList={wanList} links={links} thr={thr} />
       <section className="ov-g4" aria-label="Status">

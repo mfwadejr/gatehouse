@@ -59,12 +59,24 @@ func (a *App) registerFWRoutes() {
 			fail(w, errBadID)
 			return
 		}
-		if err := fw.Mutate(a.Config, func(tx *sql.Tx) error { return fw.DeleteZone(tx, id) }); err != nil {
+		var imp *removalImpact
+		if err := fw.Mutate(a.Config, func(tx *sql.Tx) error {
+			var e error
+			if imp, e = zoneImpact(tx, id); e != nil {
+				return e
+			}
+			deleteScopes(tx, imp.Scopes)
+			return fw.DeleteZone(tx, id)
+		}); err != nil {
 			fail(w, err)
 			return
 		}
+		if len(imp.Scopes) > 0 {
+			a.DHCP.Reload()
+			a.publishLeases()
+		}
 		a.markDirty()
-		ok(w)
+		api.JSON(w, 200, imp)
 	})
 	s.Handle("GET /api/fw/rules", a.fwRulesView)
 	s.HandleAdmin("PUT /api/fw/rules", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {

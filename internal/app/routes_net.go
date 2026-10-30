@@ -352,18 +352,43 @@ func (a *App) registerNetRoutes() {
 		a.publishNet()
 		api.JSON(w, 200, map[string]int64{"id": id})
 	})
+	a.networkCleanupRoutes(s)
+	// Removing a network takes its DHCP range with it, and its firewall network when this was
+	// the last port, so nothing is left behind (a "Wi-Fi" network with no port, an address range
+	// for a port that is gone).
 	s.HandleAdmin("DELETE /api/net/interfaces/{id}", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		id, good := pathID(r)
 		if !good {
 			fail(w, errBadID)
 			return
 		}
-		if err := a.mutateNet(func(tx *sql.Tx) error { _, e := tx.Exec(`DELETE FROM interfaces WHERE id=?`, id); return e }); err != nil {
+		var imp *removalImpact
+		if err := a.mutateNet(func(tx *sql.Tx) error {
+			var e error
+			if imp, e = ifaceImpact(tx, id); e != nil {
+				return e
+			}
+			if _, e = tx.Exec(`DELETE FROM interfaces WHERE id=?`, id); e != nil {
+				return e
+			}
+			deleteScopes(tx, imp.Scopes)
+			if imp.RemoveZone {
+				return fw.DeleteZone(tx, imp.ZoneID)
+			}
+			return nil
+		}); err != nil {
 			fail(w, err)
 			return
 		}
+		if len(imp.Scopes) > 0 {
+			a.DHCP.Reload()
+			a.publishLeases()
+		}
+		if imp.RemoveZone {
+			a.markDirty()
+		}
 		a.publishNet()
-		ok(w)
+		api.JSON(w, 200, imp)
 	})
 	s.Handle("GET /api/net/wans", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		v, err := a.listWans(a.Config)
