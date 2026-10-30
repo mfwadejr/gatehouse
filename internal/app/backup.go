@@ -207,9 +207,13 @@ func (a *App) pruneBackups(prefix string) {
 		os.Remove(f)
 		os.Remove(f + ".json")
 	}
-	for _, l := range safety {
+	for k, l := range safety {
 		sort.Strings(l)
-		for len(l) > 5 {
+		limit := 5
+		if k == restorePointKind {
+			limit = restorePointKeep
+		}
+		for len(l) > limit {
 			os.Remove(l[0])
 			os.Remove(l[0] + ".json")
 			l = l[1:]
@@ -694,6 +698,8 @@ func kindLabel(name string) string {
 		return "Before a reset"
 	case "before-restore":
 		return "Before a restore"
+	case restorePointKind:
+		return "Before a change"
 	case "before-update":
 		return "Before an update"
 	default:

@@ -460,4 +460,13 @@ ALTER TABLE nat_forwards ADD COLUMN app TEXT NOT NULL DEFAULT '';
 ALTER TABLE nat_forwards ADD COLUMN mac TEXT NOT NULL DEFAULT '';
 ALTER TABLE nat_forwards ADD COLUMN src TEXT NOT NULL DEFAULT '';
 ALTER TABLE nat_forwards ADD COLUMN countries TEXT NOT NULL DEFAULT '';
+`, `
+-- Profiles (a group of devices with presets): a stricter-or-looser filtering level, safe search,
+-- hours when the internet is off (JSON), and a pause that runs out by itself. A single device can
+-- also be paused. paused_until is a Unix time; 0 means not paused.
+ALTER TABLE groups ADD COLUMN preset TEXT NOT NULL DEFAULT '';
+ALTER TABLE groups ADD COLUMN safe_search INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE groups ADD COLUMN hours TEXT NOT NULL DEFAULT '';
+ALTER TABLE groups ADD COLUMN paused_until INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE devices ADD COLUMN paused_until INTEGER NOT NULL DEFAULT 0;
 `}

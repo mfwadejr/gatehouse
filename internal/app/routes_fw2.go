@@ -155,7 +155,7 @@ func (a *App) fwRulesView(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 	// The rules the countries page makes are not stored as rules; show them so nothing is hidden.
 	if m, err := fw.Load(a.Config); err == nil {
 		for _, ru := range m.Rules {
-			if !fw.IsCountryRule(ru.Name) {
+			if !fw.IsCountryRule(ru.Name) && !fw.IsPauseRule(ru) {
 				continue
 			}
 			row := fw.RuleRow{Name: ru.Name, From: ru.From, To: ru.To, Src: anyIfEmpty(ru.Src), Dst: anyIfEmpty(ru.Dst), Service: "any", Action: ru.Action, Enabled: true, Descr: ru.Descr}

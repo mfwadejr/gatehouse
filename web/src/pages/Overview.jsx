@@ -7,6 +7,8 @@ import { Chart, fmtBits, fmtBytes } from '../charts.jsx';
 import { linkMeasure, linkState } from '../linkstate.js';
 import { PRESET_KEY } from './Logs.jsx';
 import { WhatsNewCard } from '../whatsnew.jsx';
+import Security from './Security.jsx';
+import Recipes from './Recipes.jsx';
 
 const regionName = (cc) => { try { return new Intl.DisplayNames(undefined, { type: 'region' }).of(cc); } catch { return cc; } };
 const SERIES = ['var(--color-chart-series-1)', 'var(--color-chart-series-2)', 'var(--color-chart-series-3)', 'var(--color-chart-series-4)'];
@@ -474,6 +476,8 @@ export default function Overview() {
       )}
       <WhatsNewCard current={upd?.current} />
       <SetupChecklist />
+      <Security />
+      <Recipes />
       <Hero wanList={wanList} links={links} thr={thr} />
       <section className="ov-g4" aria-label="Status">
         <DevicesTile d={devs} />

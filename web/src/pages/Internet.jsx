@@ -7,6 +7,8 @@ import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill
 import { linkState, linkMeasure } from '../linkstate.js';
 import NatNotice from '../natnotice.jsx';
 import NetTools from './NetTools.jsx';
+import Why from './Why.jsx';
+import { PROVIDERS } from '../providers.js';
 
 const TYPES = [
   { value: 'dhcp', label: 'Automatic' },
@@ -44,7 +46,8 @@ function WanForm({ initial, ports, found, onClose, onSaved, wans }) {
   const [run, busy] = useAction();
   const set = (k) => (v) => setW((x) => ({ ...x, [k]: v }));
   const save = async () => {
-    const ok = await run(() => put('/api/net/wans', w), 'Saved. Apply it to start using it.');
+    const { preset, ...body } = w; // eslint-disable-line no-unused-vars
+    const ok = await run(() => put('/api/net/wans', body), 'Saved. Apply it to start using it.');
     if (ok) { onSaved(); onClose(); }
   };
   return (
@@ -52,6 +55,13 @@ function WanForm({ initial, ports, found, onClose, onSaved, wans }) {
       footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" onClick={save} disabled={busy}>Save</Button></>}>
       <Field label="Name" hint="For example the name of your provider."><Input value={w.name} onChange={set('name')} placeholder="My provider" /></Field>
       <Field label="Which port is the internet cable plugged into?"><PortPicker value={w.iface} onChange={set('iface')} ports={ports} found={found} /></Field>
+      {!w.id && (
+        <Field label="Who is your provider?" hint="Optional. Fills in the usual settings; check the note.">
+          <Select value={w.preset || ''} onChange={(v) => { const p = PROVIDERS.find((x) => x.id === v); setW((x) => ({ ...x, preset: v, ...(p ? { type: p.type, vlan: p.vlan } : {}) })); if (p && p.vlan) setAdv(true); }}
+            options={[{ value: '', label: 'Choose a provider…' }, ...PROVIDERS.map((p) => ({ value: p.id, label: `${p.label}${p.tested ? '' : ' (unverified)'}` }))]} />
+          {PROVIDERS.find((x) => x.id === w.preset) && <p className="small muted">{PROVIDERS.find((x) => x.id === w.preset).note} Gatehouse has not tested this with the provider itself, so if it does not connect, check your provider's own instructions.</p>}
+        </Field>
+      )}
       <Field label="How does your provider connect you?">
         <Segmented value={w.type} onChange={set('type')} options={TYPES} />
       </Field>
@@ -189,6 +199,7 @@ export default function Internet({ me }) {
       <Traffic wans={wans} links={links} />
       {wans.some((w) => w.enabled) && <SpeedTest wans={wans} links={links} />}
       {(!isNew && !!me && me.user?.role === 'admin') && <NetTools />}
+      {(!isNew && !!me && me.user?.role === 'admin') && <Why />}
 
       {edit && <WanForm initial={edit} wans={wans} ports={ports} found={found} onClose={() => setEdit(null)} onSaved={all} />}
       <ApplyBar kind="net" label="your network settings" status={stat} me={me} onChanged={all} />

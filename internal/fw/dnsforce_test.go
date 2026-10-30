@@ -177,3 +177,34 @@ func TestSSHIsClosedUntilTheMasterSwitchIsOnAndIsRateLimited(t *testing.T) {
 		t.Fatalf("nft rejected the rules: %v\n%s", err, b)
 	}
 }
+
+func TestBlockDoHDropsKnownServersAndNftAcceptsIt(t *testing.T) {
+	m := dnsModel()
+	for i := range m.Zones {
+		if m.Zones[i].Name == "Guests" {
+			m.Zones[i].DNSForce, m.Zones[i].Internet = true, true
+		}
+	}
+	off, _ := Compile(m)
+	if strings.Contains(off, "encrypted-dns servers") {
+		t.Fatal("the DoH block is on by default")
+	}
+	m.BlockDoH = true
+	out, err := Compile(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"th dport 443 counter drop comment \"block known public encrypted-dns servers\"", "1.1.1.1", "8.8.8.8", "2606:4700:4700::1111"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+	if _, err := exec.LookPath("nft"); err != nil || exec.Command("unshare", "-n", "true").Run() != nil {
+		return
+	}
+	f := filepath.Join(t.TempDir(), "r.nft")
+	os.WriteFile(f, []byte(out), 0o600)
+	if b, err := exec.Command("unshare", "-n", "nft", "-c", "-f", f).CombinedOutput(); err != nil {
+		t.Fatalf("nft rejected the ruleset: %v\n%s", err, b)
+	}
+}

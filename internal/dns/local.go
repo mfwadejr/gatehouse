@@ -17,6 +17,8 @@ type ClientInfo struct {
 	MAC       string
 	GroupID   int64
 	Filtering bool
+	// SafeSearch asks for the search engines' own safe modes (see safesearch.go).
+	SafeSearch bool
 }
 
 // Directory resolves a client address to a device. The DHCP and device tables implement it.

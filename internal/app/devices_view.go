@@ -390,6 +390,9 @@ func (a *App) registerDeviceViewRoutes() {
 		if a.Config.QueryRow(`SELECT scope_id,ip FROM dhcp_reservations WHERE lower(mac)=? LIMIT 1`, mac).Scan(&scope, &rip) == nil {
 			res["reservation"] = map[string]any{"scope_id": scope, "ip": rip}
 		}
+		var pu int64
+		a.Config.QueryRow(`SELECT paused_until FROM devices WHERE id=?`, id).Scan(&pu)
+		res["paused_until"] = pu
 		_, from, to, pts, _ := a.trafficSeries("1d", []string{mac})
 		res["traffic"] = map[string]any{"from": from, "to": to, "step": 900, "points": pts}
 		api.JSON(w, 200, res)

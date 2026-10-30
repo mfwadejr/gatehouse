@@ -48,9 +48,11 @@ function ZoneForm({ initial, presets, ifaces, taken, onClose, onSaved }) {
       <ToggleRow title="Can reach the internet" checked={z.internet} onChange={set('internet')} />
       <ToggleRow title="Devices here can talk to each other" checked={z.intra_allow} onChange={set('intra_allow')} />
       <ToggleRow title="Can manage Gatehouse" desc="Allows the console from this network. Keep at least one network on, so you can always get back in; Gatehouse refuses a change that would leave none." checked={z.management} onChange={set('management')} />
-      <ToggleRow title="Gatehouse is the gateway" desc="Off if another router on this network does that job." checked={z.gateway} onChange={set('gateway')} />
-      <ToggleRow title="Make devices here use the enforced DNS server" desc="Catches gadgets with a DNS server built in, such as smart TVs and cameras. Turn off for a network that needs its own DNS. A different server for this network, and exceptions for single devices, are under Protection." checked={z.dns_force} onChange={set('dns_force')} />
-      <ToggleRow title="Allow remote login (SSH)" checked={z.ssh} onChange={set('ssh')} />
+      <details className="more"><summary>Advanced</summary>
+        <ToggleRow title="Gatehouse is the gateway" desc="Off if another router on this network does that job." checked={z.gateway} onChange={set('gateway')} />
+        <ToggleRow title="Make devices here use the enforced DNS server" desc="Catches gadgets with a DNS server built in, such as smart TVs and cameras. Turn off for a network that needs its own DNS. A different server for this network, and exceptions for single devices, are under Protection." checked={z.dns_force} onChange={set('dns_force')} />
+        <ToggleRow title="Allow remote login (SSH)" checked={z.ssh} onChange={set('ssh')} />
+      </details>
       <p className="small muted">Letting devices open ports by themselves (UPnP) is set in one place: Firewall, Open ports.</p>
     </Modal>
   );
@@ -197,6 +199,7 @@ function Protection({ ov, reload, pickers }) {
     <ForcedDns s={s} save={save} pickers={pickers} reload={reload} />
     <Card title="Protection" desc="Extra safeguards that apply to every network.">
       <ToggleRow title="Block encrypted DNS to other servers" desc="Stops devices bypassing your filters with DNS-over-TLS. Follows the forced DNS settings above: a device left alone is not blocked." checked={s.block_dot} onChange={save('block_dot')} />
+      <ToggleRow title="Also block well-known encrypted-DNS websites" desc="Stops browsers that quietly switch to Cloudflare, Google, Quad9, OpenDNS, AdGuard or CleanBrowsing over HTTPS. This cannot be complete: any website can run such a server, so it stops the common cases, not a determined person." checked={!!s.block_doh} onChange={save('block_doh')} />
       <ToggleRow title="Ask for a code before changing the firewall" desc="Requires your authenticator code to apply network changes." checked={s.step_up} onChange={save('step_up')} />
       <ToggleRow title="Log blocked traffic" desc="Useful when troubleshooting. Uses more disk space." checked={s.log_drops} onChange={save('log_drops')} />
     </Card>

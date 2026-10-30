@@ -1,6 +1,20 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.16',
+    title: 'Profiles, pause, and finding out why',
+    items: [
+      'Profiles: Kids, Guests, Smart home and Work, each with a filtering level (Off, Basic, Enhanced or your own categories), safe search for Google, Bing, DuckDuckGo and YouTube, and hours when the internet is off, such as a bedtime. Put a device in a profile on the Devices page.',
+      'Pause: stop the internet for one device, or for everyone in a profile, for 30 minutes, an hour, two hours, or until you resume. It takes effect in seconds with nothing to apply and comes back by itself.',
+      "Why can't it reach that? Pick a device and a website. Gatehouse checks pauses, DNS filtering and the firewall in order, says which one is in the way, and offers a fix such as Allow this site. It is on the Internet page and inside each device.",
+      'Security check on the Overview: the things that most often leave a network exposed, each with a button that takes you to where it is fixed, and one plain sentence at the top.',
+      'Undo: before every firewall or network change goes live, Gatehouse keeps a restore point. Settings, Changes lists them with a Revert button. A revert is reviewed and applied the usual way, with the usual 60 seconds to take it back.',
+      'Common setups: guest Wi-Fi, cameras on their own network, Plex from outside, and UniFi access points, each as steps in order.',
+      'Internet provider presets fill in the usual settings for some providers. None is tested yet, and each says so.',
+      'Optional: also block the best-known public encrypted-DNS websites (Firewall, Protection). It cannot be complete, and it says so.',
+    ],
+  },
+  {
     version: '0.8.15',
     title: 'Fewer surprises: tests, alerts and simpler ports',
     items: [

@@ -161,6 +161,7 @@ func (a *App) registerFWRoutes() {
 			DNSRedirect bool   `json:"dns_redirect"`
 			DNSTarget   string `json:"dns_target"`
 			BlockDoT    bool   `json:"block_dot"`
+			BlockDoH    *bool  `json:"block_doh"`
 			LogDrops    bool   `json:"log_drops"`
 			StepUp      bool   `json:"step_up"`
 		}
@@ -176,6 +177,9 @@ func (a *App) registerFWRoutes() {
 		b := func(v bool) string { return strconv.Itoa(b2i(v)) }
 		for k, v := range map[string]string{"fw.dns_redirect": b(in.DNSRedirect), "fw.block_dot": b(in.BlockDoT), "fw.log_drops": b(in.LogDrops), "fw.stepup": b(in.StepUp)} {
 			a.Config.SetSetting(k, v)
+		}
+		if in.BlockDoH != nil {
+			a.Config.SetSetting("fw.block_doh", b(*in.BlockDoH))
 		}
 		a.markDirty()
 		ok(w)
@@ -289,7 +293,7 @@ func (a *App) fwOverview(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		return zs
 	}()
 	out["settings"] = map[string]any{
-		"dns_redirect": m.DNSRedirect, "block_dot": m.BlockDoT, "log_drops": m.LogDrops,
+		"dns_redirect": m.DNSRedirect, "block_dot": m.BlockDoT, "block_doh": m.BlockDoH, "log_drops": m.LogDrops,
 		"dns_target": m.DNSTarget,
 		"step_up":    a.Config.Setting("fw.stepup", "1") == "1",
 	}
@@ -401,6 +405,7 @@ func (a *App) fwApply(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		a.geoMaybeRefreshIfNeeded(context.Background())
 		return
 	}
+	a.restorePoint()
 	tok, deadline, err := a.FW.Apply(a.fullScript(m, script), confirmWindow, c.User.Username)
 	if err != nil {
 		if errors.Is(err, fw.ErrPending) {

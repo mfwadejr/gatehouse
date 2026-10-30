@@ -133,6 +133,9 @@ type Model struct {
 	DNSExceptions []DNSException
 	// BlockDoT drops DNS-over-TLS (port 853) toward the internet so clients cannot bypass filtering.
 	BlockDoT bool
+	// BlockDoH drops web traffic (port 443) to the best-known public encrypted-DNS servers, for the
+	// same devices that DNS is forced on. It cannot be complete: any website can run such a server.
+	BlockDoH bool
 	// LogDrops writes dropped packets to the event log (rate limited).
 	LogDrops bool
 	// UPnP lets port mappings made by the automatic port mapping service (a separate table) through the

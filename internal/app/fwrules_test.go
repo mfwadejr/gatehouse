@@ -86,7 +86,15 @@ func TestDeviceRulesFollowAddresses(t *testing.T) {
 		SrcChips []struct{ Kind, Label, Detail string } `json:"src_chips"`
 	}
 	_, _, raw = c.call("GET", "/api/fw/rules", nil)
+	raw = dropPaused(raw)
 	json.Unmarshal(raw, &view)
+	// The system pause rules are listed read-only after the editable ones; this test is about yours.
+	for i := 0; i < len(view); i++ {
+		if view[i].Name == "Paused" {
+			view = append(view[:i], view[i+1:]...)
+			i--
+		}
+	}
 	if len(view) != 1 || view[0].When != "Every day, 21:00 to 07:00" || view[0].SrcChips[0].Kind != "group" || view[0].SrcChips[0].Label != "Kids" {
 		t.Fatalf("view: %s", raw)
 	}
@@ -158,6 +166,7 @@ func TestDeviceRulesFollowAddresses(t *testing.T) {
 	// Renaming a group keeps the rules pointing at it.
 	c.call("PUT", "/api/fw/groups", map[string]any{"id": gid, "name": "Children", "members": []string{mac}})
 	_, _, raw = c.call("GET", "/api/fw/rules", nil)
+	raw = dropPaused(raw)
 	if !strings.Contains(string(raw), `"grp:Children"`) || strings.Contains(string(raw), `"grp:Kids"`) {
 		t.Fatalf("rename did not follow: %s", raw)
 	}
@@ -172,6 +181,7 @@ func TestDeviceRulesFollowAddresses(t *testing.T) {
 	ff.mu.Unlock()
 	a.sampleHits()
 	_, _, raw = c.call("GET", "/api/fw/rules", nil)
+	raw = dropPaused(raw)
 	var hv []struct {
 		Name    string
 		Hits    int64
@@ -232,7 +242,14 @@ func TestMatrixChangesAndKeepsHandRules(t *testing.T) {
 		Matrix                 bool
 	}
 	_, _, raw := c.call("GET", "/api/fw/rules", nil)
+	raw = dropPaused(raw)
 	json.Unmarshal(raw, &rules)
+	for i := 0; i < len(rules); i++ {
+		if rules[i].Name == "Paused" {
+			rules = append(rules[:i], rules[i+1:]...)
+			i--
+		}
+	}
 	if len(rules) != 2 || !rules[1].Matrix || rules[1].Action != "drop" || rules[0].Name != "Print" {
 		t.Fatalf("rules: %s", raw)
 	}
@@ -240,6 +257,7 @@ func TestMatrixChangesAndKeepsHandRules(t *testing.T) {
 	set("Guests", "Home", "block")
 	set("Guests", "Home", "block")
 	_, _, raw = c.call("GET", "/api/fw/rules", nil)
+	raw = dropPaused(raw)
 	json.Unmarshal(raw, &rules)
 	if len(rules) != 2 {
 		t.Fatalf("rules piled up: %s", raw)
@@ -247,6 +265,7 @@ func TestMatrixChangesAndKeepsHandRules(t *testing.T) {
 	// Two guest networks: replies-only from Home to Guests needs a way back, which the matrix adds.
 	set("Guests", "Home", "default")
 	_, _, raw = c.call("GET", "/api/fw/rules", nil)
+	raw = dropPaused(raw)
 	json.Unmarshal(raw, &rules)
 	if len(rules) != 1 {
 		t.Fatalf("default did not remove it: %s", raw)
@@ -273,4 +292,21 @@ func TestMatrixChangesAndKeepsHandRules(t *testing.T) {
 	if !strings.Contains(string(raw), `"pair_open"`) || !strings.Contains(string(raw), `"Home|Internet":true`) {
 		t.Fatalf("overview: %s", raw)
 	}
+}
+
+// dropPaused removes the read-only system pause rules from a rules listing, so a test sees only the
+// rules it made.
+func dropPaused(raw []byte) []byte {
+	var all []map[string]any
+	if json.Unmarshal(raw, &all) != nil {
+		return raw
+	}
+	out := []map[string]any{}
+	for _, r := range all {
+		if r["name"] != "Paused" {
+			out = append(out, r)
+		}
+	}
+	b, _ := json.Marshal(out)
+	return b
 }

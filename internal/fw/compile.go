@@ -354,6 +354,16 @@ func (c *compiler) forward() {
 			c.line(2, "oifname %s ether saddr %s udp dport 853 counter drop comment \"block dns-over-quic bypass (device)\"", ifSet(wan), setLit(forcedMACs))
 		}
 	}
+	if m.BlockDoH && len(wan) > 0 {
+		if forced := plan.forced(); len(forced) > 0 {
+			keep := ""
+			if len(offMACs) > 0 {
+				keep = " ether saddr != " + setLit(offMACs)
+			}
+			c.line(2, "iifname %s oifname %s%s ip daddr %s meta l4proto { tcp, udp } th dport 443 counter drop comment \"block known public encrypted-dns servers\"", ifSet(forced), ifSet(wan), keep, setLit(DoHServers4))
+			c.line(2, "iifname %s oifname %s%s ip6 daddr %s meta l4proto { tcp, udp } th dport 443 counter drop comment \"block known public encrypted-dns servers (ipv6)\"", ifSet(forced), ifSet(wan), keep, setLit(DoHServers6))
+		}
+	}
 	for _, srv := range plan.servers {
 		c.line(2, "iifname %s ip daddr %s meta l4proto { tcp, udp } th dport 53 ct status dnat accept comment \"enforced dns server\"", ifSet(plan.remote[srv]), srv)
 	}

@@ -634,6 +634,7 @@ func (a *App) netApply(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		fail(w, err)
 		return
 	}
+	a.restorePoint()
 	tok, deadline, err := a.Net.NetApply(*p, confirmWindow)
 	if err != nil {
 		if errors.Is(err, netcfg.ErrPending) {

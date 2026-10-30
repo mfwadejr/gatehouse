@@ -215,6 +215,13 @@ func (s *Server) handle(client string, r *dns.Msg, start time.Time, udp bool) *d
 		}
 	}
 
+	// 4b. Safe search for devices whose profile asks for it.
+	if ci.SafeSearch && (q.Qtype == dns.TypeA || q.Qtype == dns.TypeAAAA) {
+		if t := SafeSearchTarget(q.Name); t != "" {
+			return finish(s.safeSearchReply(r, q, t), OutForwarded, "safe search", "")
+		}
+	}
+
 	do := false
 	if opt := r.IsEdns0(); opt != nil {
 		do = opt.Do()

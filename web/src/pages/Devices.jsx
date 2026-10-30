@@ -3,6 +3,8 @@ import { del, get, patch, post, put, useData } from '../api.js';
 import DeviceIcon, { ICON_LABELS } from '../DeviceIcon.jsx';
 import { NewDevice } from '../AddrPicker.jsx';
 import DeviceMap from './DeviceMap.jsx';
+import { pauseChoices, whenText } from './Profiles.jsx';
+import { WhyBody } from './Why.jsx';
 import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, Select, Spark, ToggleRow, useAction, useToast, fmt, confirmBox } from '../ui.jsx';
 
 const POLICIES = [
@@ -106,8 +108,15 @@ function Details({ d, groups, onClose, onSaved }) {
         <>
           <Field label="Name"><Input value={f.name} onChange={(v) => setF({ ...f, name: v })} placeholder={d.hostname || 'Give it a friendly name'} /></Field>
           <Field label="Icon"><IconPicker d={d} onChanged={onSaved} /></Field>
-          <Field label="Profile" hint="Decides which blocklists apply. Manage profiles on the DNS page."><Select value={String(f.group_id)} onChange={(v) => setF({ ...f, group_id: Number(v) })} options={[{ value: '0', label: 'Default' }, ...groups.map((g) => ({ value: String(g.id), label: g.name }))]} /></Field>
+          <Field label="Profile" hint="Decides which blocklists apply. Manage profiles on the Profiles page."><Select value={String(f.group_id)} onChange={(v) => setF({ ...f, group_id: Number(v) })} options={[{ value: '0', label: 'Default' }, ...groups.map((g) => ({ value: String(g.id), label: g.name }))]} /></Field>
           <Field label="DNS filtering"><Select value={f.policy} onChange={(v) => setF({ ...f, policy: v })} options={POLICIES} /></Field>
+          <Field label="Pause the internet" hint={whenText(det?.paused_until) || 'Cuts this device off from the internet for a while. It comes back by itself.'}>
+            <div className="inline" style={{ gap: 6, flexWrap: 'wrap' }}>
+              {det?.paused_until * 1000 > Date.now()
+                ? <Button small kind="primary" disabled={busy} onClick={() => run(() => post(`/api/devices/${d.id}/pause`, { minutes: 0 }), 'Resumed.').then(reload)}>Resume now</Button>
+                : pauseChoices().map((c) => <Button key={c.m} small disabled={busy} onClick={() => run(() => post(`/api/devices/${d.id}/pause`, { minutes: c.m }), 'Paused.').then(reload)}>{c.t}</Button>)}
+            </div>
+          </Field>
           <ToggleRow title="Allowed online" desc="Turn off to pause this device without losing its settings." checked={f.internet} onChange={(v) => setF({ ...f, internet: v })} />
           <Field label="Notes"><Input value={f.notes} onChange={(v) => setF({ ...f, notes: v })} /></Field>
 
@@ -119,6 +128,9 @@ function Details({ d, groups, onClose, onSaved }) {
             )}
           </Field>
         </>
+      )}
+      {!vpn && (
+        <details className="more"><summary>Why can't it reach something?</summary><WhyBody device={d.id} /></details>
       )}
       <Field label="Firewall rules that mention it">
         {det?.rules?.length ? <ul className="stack" style={{ margin: 0, paddingLeft: '1.2rem' }}>{det.rules.map((r) => <li key={r}>{r}</li>)}</ul> : <span className="muted small">None.</span>}

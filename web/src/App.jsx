@@ -13,6 +13,7 @@ import Routes from './pages/Routes.jsx';
 import Firewall from './pages/Firewall.jsx';
 import Services from './pages/Services.jsx';
 import Devices from './pages/Devices.jsx';
+import Profiles from './pages/Profiles.jsx';
 import Logs from './pages/Logs.jsx';
 import Settings from './pages/Settings.jsx';
 import Installer from './pages/Installer.jsx';
@@ -31,6 +32,7 @@ export const PAGES = [
   { id: 'services', label: 'Services', icon: 'services', el: Services },
   { id: 'vpn', label: 'VPN', icon: 'vpn', el: VPN },
   { id: 'routes', label: 'Routes', icon: 'routes', el: Routes },
+  { id: 'profiles', label: 'Profiles', icon: 'devices', el: Profiles },
   { id: 'devices', label: 'Devices & access', icon: 'devices', el: Devices },
   { id: 'logs', label: 'Logs', icon: 'logs', el: Logs },
   { id: 'settings', label: 'Settings', icon: 'settings', el: Settings },

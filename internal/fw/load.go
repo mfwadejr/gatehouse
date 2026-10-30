@@ -64,6 +64,7 @@ func Load(db Queryer) (*Model, error) {
 	m.MgmtAllow = MgmtAllowFrom(db).Resolved
 	m.DNSRedirect = setting(db, "fw.dns_redirect", "1") == "1"
 	m.BlockDoT = setting(db, "fw.block_dot", "1") == "1"
+	m.BlockDoH = setting(db, "fw.block_doh", "0") == "1"
 	m.DNSTarget = strings.TrimSpace(setting(db, "fw.dns_target", ""))
 	m.LogDrops = setting(db, "fw.log_drops", "1") == "1"
 	m.LogAllowed = setting(db, "fw.log_allowed", "1") == "1"
@@ -275,6 +276,9 @@ func Load(db Queryer) (*Model, error) {
 		}
 		g.Close()
 	}
+	// Paused devices: the set is refilled by the dynamic sets, so it changes without an apply.
+	m.DevGroups[PausedGroup] = DevGroup{MACs: PausedDevices(db, m.Now)}
+	m.Rules = append(PauseRules(m.Zones), m.Rules...)
 	// The far end of VPN connections is never matched by a region rule.
 	if e, err := db.Query(`SELECT endpoint FROM vpn_wg_peers WHERE endpoint<>'' UNION SELECT endpoint_host FROM vpn_wg WHERE endpoint_host<>''`); err == nil {
 		for e.Next() {

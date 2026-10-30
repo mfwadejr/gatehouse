@@ -166,6 +166,10 @@ func New(cfg Config) (*App, error) {
 	a.registerAppForwardRoutes()
 	a.registerDiscoveryRoutes()
 	a.registerAlertRoutes()
+	a.registerProfileRoutes()
+	a.registerWhyRoutes()
+	a.registerSecurityRoutes()
+	a.registerChangeRoutes()
 	a.prepareSetup()
 
 	if err := a.reloadAll(); err != nil {

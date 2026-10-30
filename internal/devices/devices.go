@@ -22,6 +22,7 @@ type view struct {
 	byMAC   map[string]dnssrv.ClientInfo
 	defGrp  int64
 	defFilt bool
+	defSafe bool
 }
 
 // Directory implements dnssrv.Directory from the devices, groups and lease tables.
@@ -42,20 +43,20 @@ func NewDirectory(db *store.DB, e *dhcp.Engine) *Directory {
 func (d *Directory) Rebuild() {
 	v := &view{byMAC: map[string]dnssrv.ClientInfo{}, defFilt: true}
 	var gid int64
-	var filt int
-	if d.db.QueryRow(`SELECT id,filtering FROM groups WHERE name='Default'`).Scan(&gid, &filt) == nil {
-		v.defGrp, v.defFilt = gid, filt == 1
+	var filt, defSafe int
+	if d.db.QueryRow(`SELECT id,filtering,safe_search FROM groups WHERE name='Default'`).Scan(&gid, &filt, &defSafe) == nil {
+		v.defGrp, v.defFilt, v.defSafe = gid, filt == 1, defSafe == 1
 	}
-	rows, err := d.db.Query(`SELECT d.mac,d.name,COALESCE(d.group_id,0),d.policy,COALESCE(g.filtering,1) FROM devices d LEFT JOIN groups g ON g.id=d.group_id`)
+	rows, err := d.db.Query(`SELECT d.mac,d.name,COALESCE(d.group_id,0),d.policy,COALESCE(g.filtering,1),COALESCE(g.safe_search,0) FROM devices d LEFT JOIN groups g ON g.id=d.group_id`)
 	if err == nil {
 		for rows.Next() {
 			var mac, name, policy string
 			var g int64
-			var f int
-			rows.Scan(&mac, &name, &g, &policy, &f)
-			ci := dnssrv.ClientInfo{Name: name, MAC: strings.ToLower(mac), GroupID: g, Filtering: f == 1 && policy != "unfiltered"}
+			var f, safe int
+			rows.Scan(&mac, &name, &g, &policy, &f, &safe)
+			ci := dnssrv.ClientInfo{Name: name, MAC: strings.ToLower(mac), GroupID: g, Filtering: f == 1 && policy != "unfiltered", SafeSearch: safe == 1}
 			if g == 0 {
-				ci.GroupID, ci.Filtering = v.defGrp, v.defFilt && policy != "unfiltered"
+				ci.GroupID, ci.Filtering, ci.SafeSearch = v.defGrp, v.defFilt && policy != "unfiltered", defSafe == 1
 			}
 			v.byMAC[ci.MAC] = ci
 		}
@@ -80,7 +81,7 @@ func (d *Directory) Client(ip string) dnssrv.ClientInfo {
 	if h, ok := d.dhcp.Lookups().LookupAddr(net.ParseIP(ip)); ok {
 		name = h
 	}
-	return dnssrv.ClientInfo{Name: name, MAC: mac, GroupID: v.defGrp, Filtering: v.defFilt}
+	return dnssrv.ClientInfo{Name: name, MAC: mac, GroupID: v.defGrp, Filtering: v.defFilt, SafeSearch: v.defSafe}
 }
 
 // Seen records that a device was active. New devices appear in the list automatically.
