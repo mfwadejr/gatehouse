@@ -1,6 +1,20 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.19',
+    title: 'Device placement, approvals, undo and more',
+    items: [
+      'Move a device to another network (Devices, Details): like UniFi\'s Virtual Network Override. Pick a VLAN network and Gatehouse puts that one device on it, wired or wireless. The device must be plugged into the same port the VLAN is on, and takes the change when it next asks for an address.',
+      'New-device approval: new devices wait on a holding network until you allow or block them. Off by default; devices you already have are never held (Devices).',
+      'Fewer prompts, and Undo: everyday changes no longer ask for a code. Only serious ones do (reset, restore, going back to an earlier setup, turning on remote login, plain backup download), with your authenticator code or, if you have none, your password. Deleting a firewall rule or an unused service shows Undo.',
+      'Add more ports to this network (Networks, edit): turn a one-port network into a shared-port network without losing anything.',
+      'A map on My network: a printable picture of how your networks connect.',
+      'Keep delay low when the line is busy (Internet, under Speed test): holds a connection just under its plan speed so calls and games stay smooth. Needs the speeds your plan promises. Off by default.',
+      'Guest sign-in page (Settings, Advanced): guests tap Connect, with optional terms, before they get internet. It can never cover your management network or internet port.',
+      'Send traffic records (NetFlow or IPFIX) to a traffic-analysis tool, and let a monitoring tool read this device over SNMP, read only (Settings, Advanced). Both off by default; SNMP is reachable only from your management networks.',
+    ],
+  },
+  {
     version: '0.8.18',
     title: 'Pairs, bridge mode and traffic labels',
     items: [

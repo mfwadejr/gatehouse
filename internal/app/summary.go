@@ -53,12 +53,13 @@ type sumSection struct {
 	Head  []string
 	Rows  [][]string
 	Note  string
+	Raw   string // a ready-made picture, already escaped, shown instead of a table
 }
 
 func (a *App) networkSummary() (string, []sumSection) {
 	var s []sumSection
 	add := func(title, note string, head []string, rows [][]string) {
-		s = append(s, sumSection{title, head, rows, note})
+		s = append(s, sumSection{Title: title, Head: head, Rows: rows, Note: note})
 	}
 	ver := a.currentVersion()
 	add("This machine", "", []string{"Item", "Value"}, [][]string{
@@ -67,6 +68,7 @@ func (a *App) networkSummary() (string, []sumSection) {
 		{"If you are locked out", "Use the recovery menu on the screen of this machine. It does not need the network."},
 		{"Backups", a.backupSummary()},
 	})
+	s = append(s, sumSection{Title: "Map", Note: "The internet connection, Gatehouse, your networks and the devices Gatehouse has seen on each.", Raw: topologySVG(a.networkTopology())})
 	add("Internet connections", "", []string{"Name", "Port", "Type", "VLAN", "Address"},
 		a.table(`SELECT name,iface,type,CASE WHEN vlan_id=0 THEN '' ELSE vlan_id END,CASE WHEN type='static' THEN ipv4_addr ELSE 'from provider' END FROM wan_links WHERE enabled=1 ORDER BY priority,id`))
 	add("Networks", "", []string{"Network", "Kind", "Address", "VLAN", "Ports"},
@@ -133,12 +135,16 @@ func renderSummary(ver string, secs []sumSection, now time.Time) string {
 	var b strings.Builder
 	e := html.EscapeString
 	b.WriteString(`<!doctype html><html lang=en><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>My network</title>
-<style>body{font:15px/1.45 system-ui,sans-serif;margin:0;padding:2rem;max-width:56rem;margin-inline:auto;color:#111}h1{margin:0}h2{margin:1.6rem 0 .4rem;font-size:1.05rem;border-bottom:1px solid #999;padding-bottom:.2rem}table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:.25rem .5rem;border-bottom:1px solid #ddd;vertical-align:top}th{color:#555;font-weight:600}.note{color:#555;font-size:.85rem;margin:.2rem 0}.none{color:#777}.tip{color:#777;font-size:.85rem}@media print{.tip{display:none}body{padding:0}}</style>`)
+<style>body{font:15px/1.45 system-ui,sans-serif;margin:0;padding:2rem;max-width:56rem;margin-inline:auto;color:#111}h1{margin:0}h2{margin:1.6rem 0 .4rem;font-size:1.05rem;border-bottom:1px solid #999;padding-bottom:.2rem}table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:.25rem .5rem;border-bottom:1px solid #ddd;vertical-align:top}th{color:#555;font-weight:600}.note{color:#555;font-size:.85rem;margin:.2rem 0}.none{color:#777}.tip{color:#777;font-size:.85rem}@media print{.tip{display:none}body{padding:0}svg{break-inside:avoid}}</style>`)
 	fmt.Fprintf(&b, "<h1>My network</h1><p class=note>Made %s by Gatehouse %s. Contains no passwords or keys.</p><p class=tip>Print or save as PDF with Ctrl+P or Cmd+P.</p>", e(now.Format("2 January 2006, 15:04")), e(ver))
 	for _, s := range secs {
 		fmt.Fprintf(&b, "<h2>%s</h2>", e(s.Title))
 		if s.Note != "" {
 			fmt.Fprintf(&b, "<p class=note>%s</p>", e(s.Note))
+		}
+		if s.Raw != "" {
+			b.WriteString(s.Raw)
+			continue
 		}
 		if len(s.Rows) == 0 {
 			b.WriteString("<p class=none>None.</p>")

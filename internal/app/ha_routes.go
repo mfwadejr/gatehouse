@@ -384,7 +384,7 @@ func (a *App) registerHARoutes() {
 			fail(w, errors.New("high availability is not running yet"))
 			return
 		}
-		if a.Config.Setting("fw.stepup", "1") == "1" && c.User.TOTPEnabled {
+		if a.Config.Setting("fw.stepup", "0") == "1" && c.User.TOTPEnabled {
 			if err := a.Auth.VerifyStepUp(c.User.ID, in.Code); err != nil {
 				api.Error(w, http.StatusForbidden, "enter a current code from your authenticator")
 				return

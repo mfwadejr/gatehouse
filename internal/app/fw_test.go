@@ -141,7 +141,8 @@ func TestFirewallFlow(t *testing.T) {
 		t.Fatalf("overview: %s", body)
 	}
 
-	// Applying needs a current authenticator code.
+	// Applying asks for a code only when the person switched that on (it is off by default).
+	a.Config.SetSetting("fw.stepup", "1")
 	if code, _, _ = c.call("POST", "/api/fw/apply", map[string]string{"code": "000000"}); code != 403 {
 		t.Fatalf("apply without a valid code: %d", code)
 	}

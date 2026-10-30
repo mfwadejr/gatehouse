@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { del, post, put, saveFile, sendFile, useData } from '../api.js';
-import { Button, Card, Empty, Field, Input, Modal, Note, Pill, Select, useAction, fmt, confirmBox } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, Pill, Select, useAction, fmt, confirmBox, useStepUp, stepReady, StepUp } from '../ui.jsx';
 
 // Backups of the settings: made on a schedule, checked when they are made, and checkable again by
 // trying a restore without changing anything. Nothing here touches the network until a restore is
@@ -69,7 +69,8 @@ function RestoreModal({ b, me, onClose, onDone }) {
   const [code, setCode] = useState('');
   const [pw, setPw] = useState('');
   const [res, setRes] = useState(null);
-  const needCode = !!me?.user?.totp_enabled;
+  const su = useStepUp();
+  const [spw, setSpw] = useState('');
   if (res) {
     return (
       <Modal title="Settings restored" onClose={() => { onDone(); onClose(); }} footer={<Button kind="primary" onClick={() => { onDone(); onClose(); }}>Close</Button>}>
@@ -80,14 +81,28 @@ function RestoreModal({ b, me, onClose, onDone }) {
   }
   return (
     <Modal title="Restore this backup?" onClose={onClose}
-      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="danger" disabled={busy || word.toLowerCase() !== 'restore' || (needCode && code.length < 6)} onClick={async () => { const r = await run(() => post(`/api/backups/${b.name}/restore`, { confirm: word.toLowerCase(), code, password: pw })); if (r) setRes(r); }}>Restore</Button></>}>
+      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="danger" disabled={busy || word.toLowerCase() !== 'restore' || !stepReady(su, code, spw)} onClick={async () => { const r = await run(() => post(`/api/backups/${b.name}/restore`, { confirm: word.toLowerCase(), code, step_password: spw, password: pw })); if (r) setRes(r); }}>Restore</Button></>}>
       <div className="stack">
         <p>Your networks, firewall, DHCP, DNS, VPN and Wi-Fi settings are replaced with the ones in the backup made {fmt.dt(b.created)}. Nothing changes on the network until you apply it.</p>
         <p className="small muted">Your current settings are saved as a backup first, so you can come back. Sign-in accounts stay as they are, unless the backup came from a different machine.</p>
         {b.protected && <Field label="Password for this backup"><Input type="password" value={pw} onChange={setPw} /></Field>}
         <Field label="Type the word restore to confirm"><Input value={word} onChange={setWord} autoFocus /></Field>
-        {needCode && <Field label="Code from your authenticator app"><Input value={code} onChange={setCode} inputMode="numeric" autoComplete="one-time-code" /></Field>}
+        <StepUp su={su} code={code} setCode={setCode} password={spw} setPassword={setSpw} />
       </div>
+    </Modal>
+  );
+}
+
+function PlainDownload({ b, onClose }) {
+  const [run, busy] = useAction();
+  const su = useStepUp();
+  const [code, setCode] = useState('');
+  const [pw, setPw] = useState('');
+  return (
+    <Modal title="Download this backup?" onClose={onClose}
+      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy || !stepReady(su, code, pw)} onClick={async () => { if (await run(() => saveFile('POST', `/api/backups/${b.name}/plain`, { code, step_password: pw }, b.name))) onClose(); }}>Download</Button></>}>
+      <p>This file holds the secrets of this machine (Wi-Fi passwords, VPN keys and similar) and is not protected by a password. Keep it somewhere safe, or use "Download with password" instead.</p>
+      <StepUp su={su} code={code} setCode={setCode} password={pw} setPassword={setPw} autoFocus />
     </Modal>
   );
 }
@@ -110,6 +125,7 @@ export default function Backups({ me }) {
   const [check, setCheck] = useState(null);
   const [restore, setRestore] = useState(null);
   const [pdl, setPdl] = useState(null);
+  const [plain, setPlain] = useState(null);
   const [cfg, setCfg] = useState(null);
   const [upPw, setUpPw] = useState('');
   const file = useRef(null);
@@ -142,7 +158,7 @@ export default function Backups({ me }) {
                 <div className="actions">
                   <Button small onClick={() => setCheck(b)}>Check</Button>
                   <Button small kind="danger" onClick={() => setRestore(b)}>Restore…</Button>
-                  <Button small onClick={() => saveFile('GET', `/api/backups/${b.name}/download`, undefined, b.name)}>Download</Button>
+                  <Button small onClick={() => (b.protected ? run(() => saveFile('POST', `/api/backups/${b.name}/plain`, {}, b.name)) : setPlain(b))}>Download</Button>
                   {!b.protected && <Button small onClick={() => setPdl(b)}>Download with password</Button>}
                   <Button small icon="trash" onClick={async () => { if (await confirmBox('Delete this backup?')) { if (await run(() => del(`/api/backups/${b.name}`), 'Deleted.')) reload(); } }}>Delete</Button>
                 </div>
@@ -165,6 +181,7 @@ export default function Backups({ me }) {
       </div>
       {check && <CheckModal b={check} now={data.now} onClose={() => setCheck(null)} onChanged={reload} />}
       {restore && <RestoreModal b={restore} me={me} onClose={() => setRestore(null)} onDone={reload} />}
+      {plain && <PlainDownload b={plain} onClose={() => setPlain(null)} />}
       {pdl && <ProtectedDownload b={pdl} onClose={() => setPdl(null)} />}
     </Card>
   );

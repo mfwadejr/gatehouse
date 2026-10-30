@@ -51,6 +51,10 @@ type NetController interface {
 	HAApply(p netd.HAPlan) error
 	NDPIApply(p netd.NDPIPlan) error
 	NDPIInstalled() bool
+	OverrideApply(p netd.OverridePlan) error
+	FlowAcct(on bool) error
+	ConntrackDump() (string, error)
+	SQMApply(p netd.SQMPlan) (string, error)
 }
 
 const maxRequest = 16 << 20
@@ -345,6 +349,28 @@ func (s *Server) dispatchNet(r request) (any, error) {
 			return nil, errors.New("bad parameters")
 		}
 		return nil, s.Net.NDPIApply(p)
+	case "override.apply":
+		var p netd.OverridePlan
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return nil, s.Net.OverrideApply(p)
+	case "sqm.apply":
+		var p netd.SQMPlan
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return s.Net.SQMApply(p)
+	case "flow.acct":
+		var p struct {
+			On bool `json:"on"`
+		}
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return nil, s.Net.FlowAcct(p.On)
+	case "flow.dump":
+		return s.Net.ConntrackDump()
 	case "ndpi.installed":
 		return s.Net.NDPIInstalled(), nil
 	case "ssh.log":
@@ -579,6 +605,30 @@ func (c *Client) HAApply(p netd.HAPlan) error {
 // NDPIApply starts or stops the traffic-labelling program.
 func (c *Client) NDPIApply(p netd.NDPIPlan) error {
 	return c.callWithin(2*time.Minute, "ndpi.apply", p, nil)
+}
+
+// OverrideApply puts the per-device VLAN rules in place.
+func (c *Client) OverrideApply(p netd.OverridePlan) error {
+	return c.callWithin(time.Minute, "override.apply", p, nil)
+}
+
+// SQMApply puts the speed limits (smart queues) in place and says which queue type was used.
+func (c *Client) SQMApply(p netd.SQMPlan) (string, error) {
+	var out string
+	err := c.callWithin(2*time.Minute, "sqm.apply", p, &out)
+	return out, err
+}
+
+// FlowAcct turns per-connection traffic counting on or off.
+func (c *Client) FlowAcct(on bool) error {
+	return c.call("flow.acct", map[string]bool{"on": on}, nil)
+}
+
+// ConntrackDump returns the kernel's live connection list as text.
+func (c *Client) ConntrackDump() (string, error) {
+	var out string
+	err := c.callWithin(time.Minute, "flow.dump", nil, &out)
+	return out, err
 }
 
 // NDPIInstalled reports whether the program is present on this system.

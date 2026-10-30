@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { del, put, post, useData, useStream } from '../api.js';
-import { Button, Card, Empty, Field, Input, Note, NumberInput, Pill, Segmented, Select, ToggleRow, useAction, useToast, fmt, confirmBox } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Note, NumberInput, Pill, Segmented, Select, Switch, ToggleRow, useAction, useToast, fmt, confirmBox } from '../ui.jsx';
 import { Chart, fmtBits, fmtBytes } from '../charts.jsx';
 import { linkState } from '../linkstate.js';
 
@@ -26,6 +26,33 @@ function Result({ r, plan }) {
       <div className="muted">{fmt.dt(r.ts)} · {r.quick ? 'short test' : 'full test'} · {r.source === 'scheduled' ? 'scheduled' : 'run by hand'} · {r.server}</div>
       {r.grade && <div className="muted">{GRADE_TEXT[r.grade]}</div>}
     </div>
+  );
+}
+
+
+// Keep delay low when the line is busy: hold each connection just under its real speed.
+function SmoothLine({ reload: reloadSpeed }) {
+  const { data, reload } = useData('/api/sqm');
+  const [run, busy] = useAction();
+  if (!data?.links?.length) return null;
+  const toggle = (name, on) => run(async () => { await put('/api/sqm', { links: Object.fromEntries(data.links.map((l) => [l.name, l.name === name ? on : l.on])) }); reload(); reloadSpeed && reloadSpeed(); }, on ? 'Speed limit is on.' : 'Speed limit is off.');
+  return (
+    <Card title="Keep delay low when the line is busy" desc={`Holds each connection to ${data.share} % of the speed your plan promises, in both directions, so calls and games stay smooth during big downloads. Off by default.`}>
+      <div className="list">
+        {data.links.map((l) => (
+          <div className="item" key={l.name}>
+            <div>
+              <div className="name">{l.name}</div>
+              <div className="meta">{l.ready ? `Will hold to ${Math.floor(l.hold_down_mbps)} Mbps down and ${Math.floor(l.hold_up_mbps)} Mbps up.` : 'Fill in the speeds your plan promises (in the Speed test box above) to use this.'}</div>
+            </div>
+            <Switch checked={l.on} label={`Keep delay low on ${l.name}`} disabled={busy || (!l.ready && !l.on)} onChange={(v) => toggle(l.name, v)} />
+          </div>
+        ))}
+      </div>
+      {data.error && <Note tone="warn" title="Could not set it up">{data.error}</Note>}
+      {data.queue && <span className="small muted">Using the {data.queue === 'cake' ? 'CAKE' : 'fq_codel'} queue type.</span>}
+      <Note>Run a speed test afterwards. The busy-line grade should improve. If your speeds drop more than you expected, turn this off, or check the plan speeds above.</Note>
+    </Card>
   );
 }
 
@@ -173,6 +200,7 @@ export default function SpeedTest({ wans, links }) {
           </div>
         )}
       </Card>
+      <SmoothLine reload={reload} />
       <Servers st={st} reload={reload} />
       <History links={rows} />
     </>

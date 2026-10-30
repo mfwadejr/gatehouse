@@ -295,7 +295,7 @@ func (a *App) fwOverview(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 	out["settings"] = map[string]any{
 		"dns_redirect": m.DNSRedirect, "block_dot": m.BlockDoT, "block_doh": m.BlockDoH, "log_drops": m.LogDrops,
 		"dns_target": m.DNSTarget,
-		"step_up":    a.Config.Setting("fw.stepup", "1") == "1",
+		"step_up":    a.Config.Setting("fw.stepup", "0") == "1",
 	}
 	api.JSON(w, 200, out)
 }
@@ -388,7 +388,7 @@ func (a *App) fwApply(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		api.Error(w, http.StatusConflict, fw.ErrPending.Error())
 		return
 	}
-	if a.Config.Setting("fw.stepup", "1") == "1" && c.User.TOTPEnabled {
+	if a.Config.Setting("fw.stepup", "0") == "1" && c.User.TOTPEnabled {
 		if err := a.Auth.VerifyStepUp(c.User.ID, in.Code); err != nil {
 			api.Error(w, http.StatusForbidden, "enter a current code from your authenticator to apply firewall changes")
 			return

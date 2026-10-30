@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { get, post } from './api.js';
-import { Button, Field, Input, Modal, Note, Problems, useToast } from './ui.jsx';
+import { Button, Field, Input, Modal, Note, Problems, useToast, useStepUp } from './ui.jsx';
 
 // The "review and apply" bar shared by the firewall and the internet pages. Applying starts a
 // countdown; unless it is confirmed in time, the previous settings come back by themselves.
@@ -13,6 +13,7 @@ const readAuto = () => { try { return localStorage.getItem(autoKey) !== 'off'; }
 export default function ApplyBar({ kind, label, status, me, onChanged, summary }) {
   const toast = useToast();
   const [review, setReview] = useState(null);
+  const stepUp = useStepUp();
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [left, setLeft] = useState(null);
@@ -114,7 +115,7 @@ export default function ApplyBar({ kind, label, status, me, onChanged, summary }
           )}
           {review.warnings?.length > 0 && <Note tone="warn" title="Worth knowing"><ul>{review.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul></Note>}
           {review.ok && <Note tone="good">After you apply, Gatehouse checks that you can still reach it and keeps the change. If this change cuts you off, nothing more is needed: it undoes itself within 60 seconds.</Note>}
-          {me.user.totp_enabled && review.ok && (
+          {stepUp.everyday && review.ok && (
             <Field label="Code from your authenticator app" hint="Needed to apply changes to the network.">
               <Input className="codebox" value={code} onChange={setCode} inputMode="numeric" autoComplete="one-time-code" />
             </Field>

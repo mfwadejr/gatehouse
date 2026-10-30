@@ -17,7 +17,7 @@ func TestRestorePointBeforeApplyAndRevert(t *testing.T) {
 	}
 	// Change something, then revert to the point.
 	a.Config.SetSetting("fw.block_dot", "0")
-	rc, _, raw := c.call("POST", "/api/changes/revert", map[string]string{"name": pts[0].Name})
+	rc, _, raw := c.call("POST", "/api/changes/revert", map[string]string{"name": pts[0].Name, "password": "correct horse battery"})
 	if rc != 200 {
 		t.Fatalf("%d %s", rc, raw)
 	}

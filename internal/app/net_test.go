@@ -48,6 +48,12 @@ type fakeNet struct {
 	haPlans    []netd.HAPlan
 	ndpiPlans  []netd.NDPIPlan
 	ndpiHave   bool
+	ovPlans    []netd.OverridePlan
+	ovErr      error
+	flowAcct   []bool
+	flowDump   string
+	sqmPlans   []netd.SQMPlan
+	sqmErr     error
 }
 
 func (f *fakeNet) WifiHealth(ifaces []string, keepAwake bool) ([]netd.WifiState, error) {
@@ -88,6 +94,35 @@ func (f *fakeNet) NDPIApply(p netd.NDPIPlan) error {
 	defer f.mu.Unlock()
 	f.ndpiPlans = append(f.ndpiPlans, p)
 	return nil
+}
+func (f *fakeNet) OverrideApply(p netd.OverridePlan) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.ovPlans = append(f.ovPlans, p)
+	return f.ovErr
+}
+func (f *fakeNet) FlowAcct(on bool) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.flowAcct = append(f.flowAcct, on)
+	return nil
+}
+func (f *fakeNet) SQMApply(p netd.SQMPlan) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.sqmPlans = append(f.sqmPlans, p)
+	if f.sqmErr != nil {
+		return "", f.sqmErr
+	}
+	if len(p.Links) == 0 {
+		return "", nil
+	}
+	return "cake", nil
+}
+func (f *fakeNet) ConntrackDump() (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.flowDump, nil
 }
 func (f *fakeNet) NDPIInstalled() bool {
 	f.mu.Lock()

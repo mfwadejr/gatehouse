@@ -7,6 +7,7 @@
 package fw
 
 import (
+	"sort"
 	"time"
 
 	"gatehouse/internal/bridgemode"
@@ -121,6 +122,13 @@ type Model struct {
 	// SSHEnabled is the master switch for remote login. Off, nothing listens for SSH from any
 	// network, whatever each network's own SSH switch says.
 	SSHEnabled bool
+	// SNMPEnabled lets the management networks (and only them) ask this device for its status over
+	// SNMP. Off, nothing answers.
+	SNMPEnabled bool
+	// PortalIfaces are guest networks where a device must accept the sign-in page before it can use
+	// the internet. Only networks that are not internet-facing, not management and not the setup
+	// port are ever used (see PortalNets).
+	PortalIfaces []string
 	// MgmtAllow, when not empty, limits management (console and SSH) to these address ranges.
 	// Empty means every management network may manage. The setup port is never limited by it.
 	MgmtAllow []string
@@ -207,4 +215,45 @@ type DNSException struct {
 	Who    string `json:"who"`
 	Mode   string `json:"mode"`
 	Target string `json:"target"`
+}
+
+// The guest sign-in page.
+const (
+	// PortalSet holds the addresses of devices that have accepted the sign-in page.
+	PortalSet = "portal_ok"
+	// PortalPort is where the sign-in page listens on this router.
+	PortalPort = 8099
+)
+
+// PortalNets are the networks the sign-in page really applies to. Anything that could lock the
+// owner out is left out, whatever was chosen: internet-facing networks, management networks, and
+// the port the device was set up from.
+func (m *Model) PortalNets() []string {
+	skip := map[string]bool{}
+	for _, d := range m.WanIfaces() {
+		skip[d] = true
+	}
+	if m.RescueIface != "" {
+		skip[m.RescueIface] = true
+	}
+	inZone := map[string]bool{}
+	for _, z := range m.Zones {
+		for _, d := range z.Ifaces {
+			inZone[d] = true
+			if z.Management {
+				skip[d] = true
+			}
+		}
+	}
+	seen := map[string]bool{}
+	var out []string
+	for _, d := range m.PortalIfaces {
+		if skip[d] || !inZone[d] || seen[d] {
+			continue
+		}
+		seen[d] = true
+		out = append(out, d)
+	}
+	sort.Strings(out)
+	return out
 }

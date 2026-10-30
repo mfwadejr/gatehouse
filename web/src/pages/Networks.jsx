@@ -31,6 +31,13 @@ function EditNetwork({ n, zones, onClose, onSaved }) {
     if (p.use === 'network') return 'has a network of its own';
     return '';
   };
+  const plain = n.iface.kind === 'phys';
+  const [extra, setExtra] = useState([]);
+  const tickExtra = (name, on) => setExtra((x) => (on ? [...x.filter((m) => m !== name), name] : x.filter((m) => m !== name)));
+  const addPorts = async () => {
+    const ok = await run(() => post('/api/networks/add-ports', { id: n.iface.id, ports: extra }), 'Saved. Apply it to start using it.');
+    if (ok) { onSaved(); onClose(); }
+  };
   const movable = !isBridge;
   const moved = movable && (port !== (n.iface.kind === 'vlan' ? n.iface.parent : n.iface.name) || Number(vlan || 0) !== (n.iface.vlan || 0));
   const save = async () => {
@@ -70,6 +77,24 @@ function EditNetwork({ n, zones, onClose, onSaved }) {
             </div>
           </Field>
         )}
+        {plain && (
+          <Field label="Add more ports to this network" hint="Devices on these ports share this network's addresses, like extra ports on a switch. Nothing changes until you apply.">
+            <div className="stack">
+              {((allPorts && allPorts.ports) || []).filter((p) => !p.wifi && p.name !== n.iface.name).map((p) => {
+                const reason = why(p);
+                return (
+                  <label key={p.name} className="small" style={{ display: 'flex', gap: 8, alignItems: 'center', opacity: reason ? 0.6 : 1 }}>
+                    <input type="checkbox" checked={extra.includes(p.name)} disabled={!!reason} onChange={(e) => tickExtra(p.name, e.target.checked)} />
+                    <span className="mono">{p.name}</span>
+                    <span className="muted">{p.link ? `cable connected${p.speed > 0 ? `, ${p.speed} Mb/s` : ''}` : 'no cable'}{reason ? ` · ${reason}` : ''}</span>
+                  </label>
+                );
+              })}
+              {extra.length > 0 && <Note tone="warn">Gatehouse briefly restarts this network while it changes. If you manage Gatehouse through it, keep another way in until you have applied and checked it. Gatehouse puts the change back by itself if you cannot confirm it.</Note>}
+              <div><Button small disabled={busy || extra.length === 0} onClick={addPorts}>Add {extra.length ? extra.join(', ') : 'ports'} to this network</Button></div>
+            </div>
+          </Field>
+        )}
         <details className="more">
           <summary>More options</summary>
           <div className="stack">
@@ -85,7 +110,7 @@ function EditNetwork({ n, zones, onClose, onSaved }) {
               </>
             )}
             <p className="small muted">
-              {f.kind === 'vlan' ? <>This network is a VLAN: number {f.vlan} on port {f.parent}. Your switch must pass that number.</> : <>This network uses the whole port {f.name}. To add another network to the same port, add a network and choose this port: Gatehouse then uses a VLAN number for it.</>}
+              {f.kind === 'vlan' ? <>This network is a VLAN: number {f.vlan} on port {f.parent}. Your switch must pass that number.</> : f.kind === 'bridge' ? <>This network spreads over several ports ({(f.members || []).join(', ')}), carried by {f.name}.</> : <>This network uses the whole port {f.name}. To add another network to the same port, add a network and choose this port: Gatehouse then uses a VLAN number for it.</>}
             </p>
           </div>
         </details>

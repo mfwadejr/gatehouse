@@ -150,6 +150,9 @@ type deviceRow struct {
 	TodayUp   int64    `json:"today_up"`
 	Groups    []string `json:"groups"`
 	Reserved  bool     `json:"reserved"`
+	Override  string   `json:"override"`         // the VLAN network this device is placed on, if any
+	OverNet   string   `json:"override_network"` // that network's name
+	Approval  string   `json:"approval"`         // ok, pending or blocked
 }
 
 // zoneByIface maps a port to the name of its firewall network.
@@ -209,10 +212,11 @@ func (a *App) deviceRows() ([]deviceRow, error) {
 		}
 		rows.Close()
 	}
+	ovOf, apOf := a.overrideMaps()
 	out := make([]deviceRow, 0, len(list)+8)
 	for _, d := range list {
 		mac := strings.ToLower(d.MAC)
-		r := deviceRow{Device: d, Source: "device", Vendor: devices.Vendor(mac), Groups: groups[mac], Reserved: reserved[mac]}
+		r := deviceRow{Device: d, Override: ovOf[mac].Iface, OverNet: ovOf[mac].Network, Approval: apOf[mac], Source: "device", Vendor: devices.Vendor(mac), Groups: groups[mac], Reserved: reserved[mac]}
 		if r.Groups == nil {
 			r.Groups = []string{}
 		}

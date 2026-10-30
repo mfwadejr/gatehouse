@@ -190,4 +190,8 @@ func (f *fakeNetCtl) SSHApply(p netd.SSHPlan) error                    { return 
 func (f *fakeNetCtl) HAApply(p netd.HAPlan) error                      { return nil }
 func (f *fakeNetCtl) NDPIApply(p netd.NDPIPlan) error                  { return nil }
 func (f *fakeNetCtl) NDPIInstalled() bool                              { return true }
+func (f *fakeNetCtl) FlowAcct(on bool) error                           { return nil }
+func (f *fakeNetCtl) ConntrackDump() (string, error)                   { return "", nil }
+func (f *fakeNetCtl) SQMApply(p netd.SQMPlan) (string, error)          { return "cake", nil }
+func (f *fakeNetCtl) OverrideApply(p netd.OverridePlan) error          { return nil }
 func (f *fakeNetCtl) SSHLog(since int64) ([]string, error)             { return nil, nil }

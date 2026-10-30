@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { del, put, useData } from '../api.js';
-import { Button, Card, Empty, Field, Input, Modal, Page, useAction, confirmBox } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Page, useAction, confirmBox, useUndoDelete } from '../ui.jsx';
 
 // Services: the one place to see what Gatehouse knows by name and to make your own. A service is a
 // name for one or more ports. Rules pick services by searching for the name or a port.
@@ -26,6 +26,7 @@ export default function Services() {
   const [q, setQ] = useState('');
   const [edit, setEdit] = useState(null);
   const [run] = useAction();
+  const undoDelete = useUndoDelete();
   const needle = q.trim().toLowerCase();
   const hit = (x) => !needle || x.name.toLowerCase().includes(needle) || x.ports.some((p) => p.includes(needle));
   const mine = useMemo(() => (data?.custom || []).filter(hit), [data, needle]);
@@ -47,7 +48,7 @@ export default function Services() {
               </div>
               <div className="actions">
                 <Button small icon="edit" onClick={() => setEdit(s)}>Edit</Button>
-                <Button small kind="danger" icon="trash" onClick={async () => { if (await confirmBox(s.used_by.length ? `Delete "${s.name}"? It is used by ${s.used_by.join(', ')}; Gatehouse will refuse until those rules change.` : `Delete "${s.name}"?`)) { await run(() => del(`/api/fw/portlists/${s.id}`)); reload(); } }}>Delete</Button>
+                <Button small kind="danger" icon="trash" onClick={async () => { if (s.used_by.length) { if (await confirmBox(`Delete "${s.name}"? It is used by ${s.used_by.join(', ')}; Gatehouse will refuse until those rules change.`)) { await run(() => del(`/api/fw/portlists/${s.id}`)); reload(); } } else undoDelete(`The service "${s.name}"`, () => del(`/api/fw/portlists/${s.id}`), () => put('/api/fw/portlists', { name: s.name, ports: s.ports }), reload); }}>Delete</Button>
               </div>
             </div>
           ))}

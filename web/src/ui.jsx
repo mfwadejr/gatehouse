@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useId, useMemo, useState, useCallback, useRef } from 'react';
-import { refreshAll, useFailing } from './api.js';
+import { refreshAll, useFailing, useData } from './api.js';
 
 export const ICONS = {
   overview: 'M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z',
@@ -246,16 +246,26 @@ const ToastCtx = createContext(() => {});
 export const useToast = () => useContext(ToastCtx);
 export function ToastHost({ children }) {
   const [items, setItems] = useState([]);
-  const push = useCallback((text, tone = '') => {
+  // One message at a time: a new one replaces the old, so messages never pile up over the page.
+  // A message can offer Undo for a few seconds (opts.undo).
+  const push = useCallback((text, tone = '', opts = {}) => {
     const id = Math.random();
-    setItems((x) => [...x, { id, text, tone }]);
-    setTimeout(() => setItems((x) => x.filter((i) => i.id !== id)), tone === 'bad' ? 8000 : 4000);
+    setItems([{ id, text, tone, undo: opts.undo }]);
+    setTimeout(() => setItems((x) => x.filter((i) => i.id !== id)), opts.undo ? 9000 : tone === 'bad' ? 8000 : 4000);
   }, []);
+  const gone = (id) => setItems((x) => x.filter((t) => t.id !== id));
   return (
     <ToastCtx.Provider value={push}>
       {children}
       <DialogHost />
-      <div className="toasts" role="status" aria-live="polite">{items.map((i) => <div key={i.id} className={`toast ${i.tone}`} onClick={() => setItems((x) => x.filter((t) => t.id !== i.id))} title="Click to dismiss">{i.text}</div>)}</div>
+      <div className="toasts" role="status" aria-live="polite">
+        {items.map((i) => (
+          <div key={i.id} className={`toast ${i.tone}`} onClick={() => gone(i.id)} title="Click to dismiss">
+            {i.text}
+            {i.undo && <button type="button" className="link" style={{ marginLeft: 'var(--space-3)', fontWeight: 600 }} onClick={async (e) => { e.stopPropagation(); gone(i.id); try { await i.undo(); } catch (err) { push(err.message || 'Could not undo that.', 'bad'); } }}>Undo</button>}
+          </div>
+        ))}
+      </div>
     </ToastCtx.Provider>
   );
 }
@@ -378,3 +388,37 @@ export const fmt = {
   time: (ts) => new Date(ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
   dt: (ts) => new Date(ts * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }),
 };
+
+// What to ask for before a serious action: the authenticator code when two-factor sign-in is on,
+// the person's password when it is not. Routine changes ask for nothing (see useStepUp().everyday).
+export function useStepUp() {
+  const { data } = useData('/api/stepup');
+  return data || { everyday: false, serious: 'password' };
+}
+
+export function stepReady(su, code, password) {
+  return su.serious === 'code' ? (code || '').trim().length >= 6 : (password || '').length > 0;
+}
+
+export function StepUp({ su, code, setCode, password, setPassword, autoFocus }) {
+  if (su.serious === 'code') {
+    return <Field label="Code from your authenticator app"><Input className="codebox" value={code} onChange={setCode} inputMode="numeric" autoComplete="one-time-code" autoFocus={autoFocus} /></Field>;
+  }
+  return (
+    <Field label="Your password" hint="Asked before serious changes. Turn on two-factor sign-in in Settings if you would rather use a code.">
+      <Input type="password" value={password} onChange={setPassword} autoComplete="current-password" autoFocus={autoFocus} />
+    </Field>
+  );
+}
+
+// Delete something reversible at once and offer Undo, instead of asking "Are you sure?".
+// remove() does the delete; restore() puts it back; refresh() reloads the page's list.
+export function useUndoDelete() {
+  const toast = useToast();
+  return useCallback(async (what, remove, restore, refresh) => {
+    try { await remove(); } catch (e) { toast(e.message || 'Something went wrong.', 'bad'); return false; }
+    refresh && refresh();
+    toast(`${what} deleted.`, '', { undo: async () => { await restore(); refresh && refresh(); toast(`${what} is back.`); } });
+    return true;
+  }, [toast]);
+}

@@ -158,6 +158,9 @@ func (a *App) setContents(m *fw.Model, withGeo bool) map[string]fw.SetFill {
 			out[ds.Name] = fill
 		}
 	}
+	if len(m.PortalNets()) > 0 {
+		out[fw.PortalSet] = a.portalFill(leases)
+	}
 	if withGeo && len(wantGeo) > 0 {
 		pref := a.geoPrefixes(wantGeo)
 		for _, ds := range m.DynamicSets() {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { put, useData } from '../api.js';
-import { Button, Card, Field, Input, Modal, Note, Pill, useAction } from '../ui.jsx';
+import { Button, Card, Field, Input, Modal, Note, Pill, useAction, useStepUp, stepReady, StepUp } from '../ui.jsx';
 
 // Remote login (SSH) with the console's own administrator names and passwords. Off until switched on.
 
@@ -9,14 +9,16 @@ export default function RemoteLogin({ me }) {
   const [run, busy] = useAction();
   const [ask, setAsk] = useState(null); // 'on' | 'off'
   const [code, setCode] = useState('');
-  const needCode = !!me?.user?.totp_enabled;
+  const su = useStepUp();
+  const [pw, setPw] = useState('');
+  const needStep = ask === 'on';
   if (!data) return null;
   const addrs = (data.networks || []).filter((n) => n.address);
   const usable = (data.users || []).filter((u) => u.usable);
   const example = usable[0]?.login || 'name';
   const set = async () => {
-    const ok = await run(() => put('/api/system/ssh', { enabled: ask === 'on', code }), ask === 'on' ? 'Remote login is on.' : 'Remote login is off.');
-    if (ok) { setAsk(null); setCode(''); reload(); }
+    const ok = await run(() => put('/api/system/ssh', { enabled: ask === 'on', code, password: pw }), ask === 'on' ? 'Remote login is on.' : 'Remote login is off.');
+    if (ok) { setAsk(null); setCode(''); setPw(''); reload(); }
   };
   return (
     <Card title="Remote login (SSH)" desc="Sign in to the machine from another computer with a terminal, using your console name and password. Off unless you turn it on."
@@ -49,11 +51,11 @@ export default function RemoteLogin({ me }) {
       </div>
       {ask && (
         <Modal title={ask === 'on' ? 'Turn on remote login?' : 'Turn off remote login?'} onClose={() => setAsk(null)}
-          footer={<><Button onClick={() => setAsk(null)}>Cancel</Button><Button kind="primary" disabled={busy || (needCode && code.length < 6)} onClick={set}>{ask === 'on' ? 'Turn on' : 'Turn off'}</Button></>}>
+          footer={<><Button onClick={() => setAsk(null)}>Cancel</Button><Button kind="primary" disabled={busy || (needStep && !stepReady(su, code, pw))} onClick={set}>{ask === 'on' ? 'Turn on' : 'Turn off'}</Button></>}>
           {ask === 'on'
             ? <p>Administrators will be able to sign in over SSH from the networks that may manage Gatehouse. The firewall opens port 22 for them and limits how fast anyone can try.</p>
             : <p>The SSH server stops and port 22 closes. Anyone signed in is disconnected.</p>}
-          {needCode && <Field label="Code from your authenticator app"><Input value={code} onChange={setCode} inputMode="numeric" autoComplete="one-time-code" /></Field>}
+          {needStep && <StepUp su={su} code={code} setCode={setCode} password={pw} setPassword={setPw} />}
         </Modal>
       )}
     </Card>

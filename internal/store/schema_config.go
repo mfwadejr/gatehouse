@@ -484,4 +484,9 @@ CREATE TABLE network_profiles(
   zone TEXT PRIMARY KEY,
   group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE
 );
+`, `
+-- Package 8: Virtual Network Override (a device is placed on a chosen VLAN network by its hardware
+-- address) and new-device approval (ok, pending or blocked; existing devices stay ok).
+ALTER TABLE devices ADD COLUMN override_iface TEXT NOT NULL DEFAULT '';
+ALTER TABLE devices ADD COLUMN approval TEXT NOT NULL DEFAULT 'ok';
 `}

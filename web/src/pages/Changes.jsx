@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { post, useData } from '../api.js';
-import { Button, Card, Empty, Field, Input, Modal, Note, Pill, useAction } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, Pill, useAction, useStepUp, stepReady, StepUp } from '../ui.jsx';
 
 // Undo. Gatehouse saves a restore point just before every firewall or network change goes live.
 // Revert puts the settings back as they were, as changes that are not live yet: you review and apply
@@ -12,11 +12,13 @@ export default function Changes({ me }) {
   const { data, reload } = useData('/api/changes', { every: 30000 });
   const [pick, setPick] = useState(null);
   const [code, setCode] = useState('');
+  const [pw, setPw] = useState('');
+  const su = useStepUp();
   const [run, busy] = useAction();
   if (!data) return null;
   const go = async () => {
-    const r = await run(() => post('/api/changes/revert', { name: pick.name, code }), 'Reverted. Review and apply to put it live.');
-    if (r) { setPick(null); setCode(''); reload(); }
+    const r = await run(() => post('/api/changes/revert', { name: pick.name, code, password: pw }), 'Reverted. Review and apply to put it live.');
+    if (r) { setPick(null); setCode(''); setPw(''); reload(); }
   };
   return (
     <Card title="Changes" desc={`Before every change to the firewall or network, Gatehouse keeps a copy of how things were (the last ${data.keep}). Pick a point to go back to it.`}>
@@ -32,9 +34,9 @@ export default function Changes({ me }) {
       )}
       {pick && (
         <Modal title="Go back to this point?" onClose={() => setPick(null)}
-          footer={<><Button onClick={() => setPick(null)}>Cancel</Button><Button kind="primary" disabled={busy} onClick={go}>Revert settings</Button></>}>
+          footer={<><Button onClick={() => setPick(null)}>Cancel</Button><Button kind="primary" disabled={busy || !stepReady(su, code, pw)} onClick={go}>Revert settings</Button></>}>
           <Note title="Nothing changes on the network yet">The settings go back to how they were before {when(pick.created)}. A copy of what you have now is saved first. Then review and apply as usual; if it goes wrong, the 60-second rollback brings the current settings back.</Note>
-          {me?.user?.totp_enabled && <Field label="Code from your authenticator app"><Input className="codebox" value={code} onChange={setCode} inputMode="numeric" autoComplete="one-time-code" /></Field>}
+          <StepUp su={su} code={code} setCode={setCode} password={pw} setPassword={setPw} />
         </Modal>
       )}
     </Card>

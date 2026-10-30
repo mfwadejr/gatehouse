@@ -59,7 +59,7 @@ function Serves({ lv, enabled }) {
   const addr = sv.addr ? sv.addr.replace(/\/\d+$/, '') : '';
   return (
     <div className="small">
-      Carries the network <b>{name}</b>{sv.via ? <> through the bridge <span className="mono">{sv.via}</span></> : null}
+      Carries the network <b>{name}</b>{sv.via ? <> through the shared ports <span className="mono">{sv.via}</span></> : null}
       {addr ? <> · router address <span className="mono">{addr}</span></> : null}
     </div>
   );

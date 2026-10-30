@@ -208,3 +208,67 @@ func TestBlockDoHDropsKnownServersAndNftAcceptsIt(t *testing.T) {
 		t.Fatalf("nft rejected the ruleset: %v\n%s", err, b)
 	}
 }
+
+func TestSNMPIsClosedUntilSwitchedOnAndOnlyFromManagementNetworks(t *testing.T) {
+	m := dnsModel()
+	out, err := Compile(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "snmp") {
+		t.Fatalf("SNMP was open with the switch off:\n%s", out)
+	}
+	m.SNMPEnabled = true
+	m.MgmtAllow = []string{"192.168.1.0/24"}
+	out, err = Compile(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, `ip saddr 192.168.1.0/24 udp dport 161 accept comment "protected: management snmp"`) {
+		t.Fatalf("missing the limited SNMP rule:\n%s", out)
+	}
+	if strings.Count(out, "udp dport 161") != 1 {
+		t.Fatalf("SNMP should be allowed in exactly one place:\n%s", out)
+	}
+}
+
+func TestGuestSignInPageOnlyCoversSafeNetworksAndBlocksUntilSignedIn(t *testing.T) {
+	m := dnsModel()
+	out, err := Compile(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "portal") {
+		t.Fatalf("the sign-in page was on without being asked for:\n%s", out)
+	}
+	// Ask for a guest network, the management network, the internet port and a port in no zone.
+	m.PortalIfaces = []string{"eth3", "eth1", "eth0", "eth9"}
+	got := m.PortalNets()
+	if len(got) != 1 || got[0] != "eth3" {
+		t.Fatalf("PortalNets = %v; only the guest network is safe", got)
+	}
+	out, err = Compile(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"set portal_ok { type ipv4_addr; flags timeout; size 8192; }",
+		`iifname "eth3" ip saddr != @portal_ok tcp dport 80 counter redirect to :8099 comment "portal: sign-in page"`,
+		`iifname "eth3" tcp dport 8099 accept comment "protected: guest sign-in page"`,
+		`iifname "eth3" ip saddr != @portal_ok meta l4proto tcp counter reject with tcp reset`,
+		`iifname "eth3" ip saddr != @portal_ok counter drop comment "portal: not signed in"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+	// The block comes before the rule that lets open connections carry on.
+	if i, j := strings.Index(out, "portal: not signed in"), strings.Index(out, "ct state { established, related } accept"); i < 0 || j < 0 {
+		t.Fatal("rules missing")
+	} else if i2 := strings.Index(out[strings.Index(out, "chain forward"):], "portal: not signed in"); i2 > strings.Index(out[strings.Index(out, "chain forward"):], "ct state { established, related } accept") {
+		t.Fatal("the sign-in block must come before the established-connections rule in the forward chain")
+	}
+	if strings.Contains(out, `iifname "eth1" ip saddr != @portal_ok`) || strings.Contains(out, `"eth0" ip saddr != @portal_ok`) {
+		t.Fatal("the management or internet network was put behind the sign-in page")
+	}
+}

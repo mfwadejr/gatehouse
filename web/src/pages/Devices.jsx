@@ -3,6 +3,8 @@ import { del, get, patch, post, put, useData } from '../api.js';
 import DeviceIcon, { ICON_LABELS } from '../DeviceIcon.jsx';
 import { NewDevice } from '../AddrPicker.jsx';
 import DeviceMap from './DeviceMap.jsx';
+import VirtualOverride from './VirtualOverride.jsx';
+import Approval from './Approval.jsx';
 import { pauseChoices, whenText } from './Profiles.jsx';
 import { WhyBody } from './Why.jsx';
 import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, Select, Spark, ToggleRow, useAction, useToast, fmt, confirmBox } from '../ui.jsx';
@@ -118,6 +120,7 @@ function Details({ d, groups, onClose, onSaved }) {
             </div>
           </Field>
           <ToggleRow title="Allowed online" desc="Turn off to pause this device without losing its settings." checked={f.internet} onChange={(v) => setF({ ...f, internet: v })} />
+          <VirtualOverride d={d} onSaved={onSaved} />
           <Field label="Notes"><Input value={f.notes} onChange={(v) => setF({ ...f, notes: v })} /></Field>
 
           <Field label="Fixed address" hint="Always hand this device the same address.">
@@ -202,6 +205,7 @@ export default function Devices() {
   return (
     <Page title="Devices & access" sub="Every device that has joined your network. Rename it, give it an icon, filter it, or pause its internet."
       actions={<><Segmented value={view} onChange={setView} options={[{ value: 'list', label: 'List' }, { value: 'map', label: 'Map' }]} /><Button icon="plus" onClick={() => setAdding(true)}>Add a device</Button></>}>
+      <Approval />
       {view === 'map' && <DeviceMap devices={all} onOpen={setOpen} />}
       <div style={view === 'map' ? { display: 'none' } : undefined}>
         <Card actions={

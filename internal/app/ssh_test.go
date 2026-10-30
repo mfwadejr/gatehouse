@@ -13,7 +13,7 @@ func TestRemoteLoginIsOffUntilTurnedOnAndTheCheckWorksOnlyThen(t *testing.T) {
 	if rc, _, _ := c.call("POST", "/api/auth/ssh-verify", body); rc != 403 {
 		t.Fatalf("the password check answered while remote login was off: %d", rc)
 	}
-	if rc, _, raw := c.call("PUT", "/api/system/ssh", map[string]any{"enabled": true}); rc != 200 {
+	if rc, _, raw := c.call("PUT", "/api/system/ssh", map[string]any{"enabled": true, "password": "correct horse battery"}); rc != 200 {
 		t.Fatalf("turn on: %d %s", rc, raw)
 	}
 	fn.mu.Lock()
@@ -42,7 +42,7 @@ func TestRemoteLoginIsOffUntilTurnedOnAndTheCheckWorksOnlyThen(t *testing.T) {
 
 func TestTurningOnRemoteLoginOpensManagementNetworksOnlyAndFailureLeavesItOff(t *testing.T) {
 	c, _, _ := siteBox(t, "192.168.1.1/24")
-	c.call("PUT", "/api/system/ssh", map[string]any{"enabled": true})
+	c.call("PUT", "/api/system/ssh", map[string]any{"enabled": true, "password": "correct horse battery"})
 	_, m, raw := c.call("GET", "/api/system/ssh", nil)
 	if m["enabled"] != true {
 		t.Fatalf("%s", raw)

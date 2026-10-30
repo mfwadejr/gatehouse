@@ -87,6 +87,9 @@ func compileBridge(m *Model) (string, error) {
 	if m.SSHEnabled {
 		c.line(2, "iifname %s%s tcp dport 22 accept comment \"protected: management ssh\"", ifSet(local), lim)
 	}
+	if m.SNMPEnabled {
+		c.line(2, "iifname %s%s udp dport 161 accept comment \"protected: management snmp\"", ifSet(local), lim)
+	}
 	if r := m.RescueIface; r != "" && r != b.Outside {
 		c.line(2, "iifname %s tcp dport %s accept comment \"protected: setup port\"", ifSet([]string{r}), ports)
 	}

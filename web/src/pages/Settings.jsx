@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { del, get, post, put, useData } from '../api.js';
-import { Button, Card, Empty, Field, Form, Input, Modal, Note, Page, Pill, Segmented, Select, ToggleRow, useAction, fmt } from '../ui.jsx';
+import { Button, Card, Empty, Field, Form, Input, Modal, Note, Page, Pill, Segmented, Select, ToggleRow, useAction, fmt, useStepUp, stepReady, StepUp } from '../ui.jsx';
 import { Enrol } from './Auth.jsx';
 import Backups from './Backups.jsx';
 import Changes from './Changes.jsx';
 import Syslog from './Syslog.jsx';
+import FlowExport from './FlowExport.jsx';
+import Snmp from './Snmp.jsx';
+import GuestPortal from './GuestPortal.jsx';
 import BridgeMode from './BridgeMode.jsx';
 import HighAvailability from './HighAvailability.jsx';
 import TrafficLabels from './TrafficLabels.jsx';
@@ -169,7 +172,7 @@ function PowerModal({ action, me, onClose }) {
   const [code, setCode] = useState('');
   const [run, busy] = useAction();
   const [waiting, setWaiting] = useReconnect();
-  const needCode = !!me?.user?.totp_enabled;
+  const needCode = useStepUp().everyday;
   const go = async () => { if (await run(() => post('/api/system/power', { action, code }))) setWaiting(true); };
   if (waiting) {
     return (
@@ -220,8 +223,9 @@ function ResetModal({ level, me, onClose }) {
   const [word, setWord] = useState('');
   const [run, busy] = useAction();
   const [waiting, setWaiting] = useReconnect();
-  const needCode = !!me?.user?.totp_enabled;
-  const go = async () => { if (await run(() => post('/api/system/reset', { level, code, confirm: word }))) setWaiting(true); };
+  const su = useStepUp();
+  const [pw, setPw] = useState('');
+  const go = async () => { if (await run(() => post('/api/system/reset', { level, code, password: pw, confirm: word }))) setWaiting(true); };
   if (waiting) {
     return (
       <Modal title="Resetting…" onClose={() => {}} footer={null}>
@@ -232,11 +236,11 @@ function ResetModal({ level, me, onClose }) {
   }
   return (
     <Modal title={meta.title} onClose={onClose}
-      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="danger" disabled={busy || (needCode && code.length < 6) || (level === 'factory' && word.toLowerCase() !== 'reset')} onClick={go}>{meta.verb}</Button></>}>
+      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="danger" disabled={busy || !stepReady(su, code, pw) || (level === 'factory' && word.toLowerCase() !== 'reset')} onClick={go}>{meta.verb}</Button></>}>
       {meta.lines.map((l) => <p key={l}>{l}</p>)}
       <p>A copy of the settings is saved on the machine first. Download one from the Backups card above to keep it somewhere safe.</p>
       {level === 'factory' && <Field label="Type the word reset to confirm"><Input value={word} onChange={setWord} autoFocus /></Field>}
-      {needCode && <Field label="Code from your authenticator app"><Input value={code} onChange={setCode} inputMode="numeric" autoComplete="one-time-code" /></Field>}
+      <StepUp su={su} code={code} setCode={setCode} password={pw} setPassword={setPw} />
     </Modal>
   );
 }
@@ -244,7 +248,7 @@ function ResetModal({ level, me, onClose }) {
 function ResetCard({ me }) {
   const [level, setLevel] = useState(null);
   return (
-    <Card title="Reset to default" desc="Start over. A copy of your settings is always saved first, and you can download it. Asks for your authenticator code only if you use one.">
+    <Card title="Reset to default" desc="Start over. A copy of your settings is always saved first, and you can download it. Asks for your authenticator code if you use one, or your password if you do not.">
       <div className="actions">
         <Button onClick={() => setLevel('network')}>Reset network settings…</Button>
         <Button kind="danger" onClick={() => setLevel('factory')}>Factory reset…</Button>
@@ -319,7 +323,8 @@ function Updates({ me }) {
     const r = await run(() => post('/api/system/update/install', { code }));
     if (r) { setAsking(false); setCode(''); setOutcome(null); setJob({ since: Math.floor(Date.now() / 1000) - 5 }); }
   };
-  const start = () => { if (me?.user?.totp_enabled) setAsking(true); else go(); };
+  const everyday = useStepUp().everyday;
+  const start = () => { if (everyday) setAsking(true); else go(); };
   const save = (patch) => run(() => put('/api/system/update/settings', patch)).then(reload);
   const l = d.latest;
   const steps = d.steps || [];
@@ -402,7 +407,7 @@ export default function Settings({ me, reloadMe }) {
         </Card>
       )}
       {me?.user?.role === 'admin' && <Changes me={me} />}
-      {me?.user?.role === 'admin' && <details className="more"><summary>Advanced</summary><HighAvailability me={me} /><BridgeMode /><TrafficLabels /><Syslog /></details>}
+      {me?.user?.role === 'admin' && <details className="more"><summary>Advanced</summary><HighAvailability me={me} /><BridgeMode /><TrafficLabels /><Syslog /><GuestPortal /><FlowExport /><Snmp /></details>}
       {me?.user?.role === 'admin' && <Backups me={me} />}
       {me?.user?.role === 'admin' && <ResetCard me={me} />}
       <Password />

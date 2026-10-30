@@ -52,6 +52,10 @@ type NetController interface {
 	HAApply(p netd.HAPlan) error
 	NDPIApply(p netd.NDPIPlan) error
 	NDPIInstalled() bool
+	FlowAcct(on bool) error
+	ConntrackDump() (string, error)
+	SQMApply(p netd.SQMPlan) (string, error)
+	OverrideApply(p netd.OverridePlan) error
 }
 
 // IfaceRow is a LAN-side port or VLAN as the console edits it.
@@ -630,7 +634,7 @@ func (a *App) netApply(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		api.Error(w, http.StatusConflict, netcfg.ErrPending.Error())
 		return
 	}
-	if a.Config.Setting("fw.stepup", "1") == "1" && c.User.TOTPEnabled {
+	if a.Config.Setting("fw.stepup", "0") == "1" && c.User.TOTPEnabled {
 		if err := a.Auth.VerifyStepUp(c.User.ID, in.Code); err != nil {
 			api.Error(w, http.StatusForbidden, "enter a current code from your authenticator to apply network changes")
 			return

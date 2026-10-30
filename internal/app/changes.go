@@ -54,8 +54,9 @@ func (a *App) registerChangeRoutes() {
 	})
 	s.HandleAdmin("POST /api/changes/revert", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		var in struct {
-			Name string `json:"name"`
-			Code string `json:"code"`
+			Name     string `json:"name"`
+			Code     string `json:"code"`
+			Password string `json:"password"`
 		}
 		if !api.Decode(w, r, &in) {
 			return
@@ -65,11 +66,9 @@ func (a *App) registerChangeRoutes() {
 			fail(w, errors.New("that restore point was not found"))
 			return
 		}
-		if a.Config.Setting("fw.stepup", "1") == "1" && c.User.TOTPEnabled {
-			if err := a.Auth.VerifyStepUp(c.User.ID, in.Code); err != nil {
-				api.Error(w, http.StatusForbidden, "enter a current code from your authenticator")
-				return
-			}
+		if err := a.serious(c, in.Code, in.Password); err != nil {
+			api.Error(w, http.StatusForbidden, err.Error())
+			return
 		}
 		if st := update.ReadState(a.updateState()); st != "idle" {
 			api.Error(w, http.StatusConflict, "an update is running ("+st+"); wait for it to finish")

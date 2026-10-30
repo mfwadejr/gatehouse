@@ -169,6 +169,9 @@ func (c *compiler) build() string {
 	for _, n := range []string{AcctTo, AcctFrom} {
 		c.line(1, "set %s { type ipv4_addr; flags dynamic, timeout; timeout 10m; size 65535; counter; }", n)
 	}
+	if len(m.PortalNets()) > 0 {
+		c.line(1, "set %s { type ipv4_addr; flags timeout; size 8192; }", PortalSet)
+	}
 	c.input()
 	c.forward()
 	c.line(1, "chain output {")
@@ -266,11 +269,18 @@ func (c *compiler) input() {
 	}
 	for _, lim := range limits {
 		c.line(2, "iifname %s%s tcp dport %s accept comment \"protected: management console\"", ifSet(mgmt), lim, portList(m.ConsolePorts))
+		if m.SNMPEnabled {
+			c.line(2, "iifname %s%s udp dport 161 accept comment \"protected: management snmp\"", ifSet(mgmt), lim)
+		}
 		if len(ssh) > 0 && m.SSHEnabled {
 			c.line(2, "iifname %s%s tcp dport 22 ct state new add @ssh_rate4 { ip saddr limit rate over 8/minute burst 5 packets } drop comment \"protected: management ssh limit\"", ifSet(ssh), lim)
 			c.line(2, "iifname %s%s tcp dport 22 ct state new add @ssh_rate6 { ip6 saddr limit rate over 8/minute burst 5 packets } drop comment \"protected: management ssh limit\"", ifSet(ssh), lim)
 			c.line(2, "iifname %s%s tcp dport 22 accept comment \"protected: management ssh\"", ifSet(ssh), lim)
 		}
+	}
+	// The guest sign-in page, reachable only from the networks it applies to.
+	if pn := m.PortalNets(); len(pn) > 0 {
+		c.line(2, "iifname %s tcp dport %d accept comment \"protected: guest sign-in page\"", ifSet(pn), PortalPort)
 	}
 	// The last resort: the port the device was set up from keeps reaching the console, whatever
 	// the networks look like. Never on an internet-facing port or one already covered above.
@@ -331,6 +341,13 @@ func (c *compiler) forward() {
 	c.line(1, "chain forward {")
 	c.line(2, "type filter hook forward priority filter; policy drop;")
 	c.line(2, "ct state invalid drop")
+	// A guest who has not accepted the sign-in page gets nothing through, even on a connection that
+	// was open before the sign-in expired. Web pages fail at once so the phone shows the page.
+	if pn := m.PortalNets(); len(pn) > 0 {
+		c.line(2, "iifname %s ip saddr != @%s meta l4proto tcp counter reject with tcp reset comment \"portal: not signed in\"", ifSet(pn), PortalSet)
+		c.line(2, "iifname %s ip saddr != @%s counter drop comment \"portal: not signed in\"", ifSet(pn), PortalSet)
+		c.line(2, "iifname %s meta nfproto ipv6 counter drop comment \"portal: sign-in covers IPv4 only\"", ifSet(pn))
+	}
 	wan := m.WanIfaces()
 	if toNet := append(append([]string(nil), wan...), m.TunnelIfaces()...); len(toNet) > 0 {
 		c.line(2, "oifname %s add @%s { ip saddr }", ifSet(toNet), AcctUp)
@@ -608,11 +625,16 @@ func (c *compiler) nat() {
 	plan := c.dnsEnforced()
 	offMACs, gateMACs, srvMACs, srvKeys := m.exceptionMACs()
 	redirect := len(plan.local)+len(plan.servers) > 0 || len(offMACs)+len(gateMACs)+len(srvKeys) > 0
-	if !redirect && len(m.Forwards) == 0 && len(wan) == 0 && len(m.Tunnels) == 0 {
+	portal := m.PortalNets()
+	if !redirect && len(portal) == 0 && len(m.Forwards) == 0 && len(wan) == 0 && len(m.Tunnels) == 0 {
 		return
 	}
 	c.line(1, "chain prerouting {")
 	c.line(2, "type nat hook prerouting priority dstnat; policy accept;")
+	if len(portal) > 0 {
+		// Any web page asked for by a guest who has not signed in lands on the sign-in page.
+		c.line(2, "iifname %s ip saddr != @%s tcp dport 80 counter redirect to :%d comment \"portal: sign-in page\"", ifSet(portal), PortalSet, PortalPort)
+	}
 	// Devices and groups with their own treatment come first, so they win over their network.
 	const dns = "meta l4proto { tcp, udp } th dport 53"
 	if len(offMACs) > 0 {

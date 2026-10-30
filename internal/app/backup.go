@@ -827,16 +827,36 @@ func (a *App) registerBackupRoutes() {
 		os.Remove(p + ".json")
 		ok(w)
 	})
-	s.HandleAdmin("GET /api/backups/{name}/download", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+	// The file as it is. A backup that is not protected by a password holds the secrets of this
+	// machine, so downloading it is a serious action; one already protected by a password is not.
+	s.HandleAdmin("POST /api/backups/{name}/plain", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		p, err := a.backupPath(r.PathValue("name"))
 		if err != nil {
 			fail(w, err)
 			return
 		}
+		var in struct {
+			Code     string `json:"code"`
+			StepPass string `json:"step_password"`
+		}
+		if !api.Decode(w, r, &in) {
+			return
+		}
+		raw, err := os.ReadFile(p)
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		if !bytes.HasPrefix(raw, []byte(bkEncMagic)) {
+			if err := a.serious(c, in.Code, in.StepPass); err != nil {
+				api.Error(w, http.StatusForbidden, err.Error())
+				return
+			}
+		}
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Header().Set("Content-Disposition", `attachment; filename="`+filepath.Base(p)+`"`)
 		w.Header().Set("Cache-Control", "no-store")
-		http.ServeFile(w, r, p)
+		w.Write(raw)
 	})
 	// The same file protected by a password of the person's choice.
 	s.HandleAdmin("POST /api/backups/{name}/download", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
@@ -908,6 +928,7 @@ func (a *App) registerBackupRoutes() {
 		}
 		var in struct {
 			Code     string `json:"code"`
+			StepPass string `json:"step_password"`
 			Confirm  string `json:"confirm"`
 			Password string `json:"password"`
 		}
@@ -918,11 +939,9 @@ func (a *App) registerBackupRoutes() {
 			fail(w, errors.New("type the word restore to confirm"))
 			return
 		}
-		if a.Config.Setting("fw.stepup", "1") == "1" && c.User.TOTPEnabled {
-			if err := a.Auth.VerifyStepUp(c.User.ID, in.Code); err != nil {
-				api.Error(w, http.StatusForbidden, "enter a current code from your authenticator")
-				return
-			}
+		if err := a.serious(c, in.Code, in.StepPass); err != nil {
+			api.Error(w, http.StatusForbidden, err.Error())
+			return
 		}
 		if st := update.ReadState(a.updateState()); st != "idle" {
 			api.Error(w, http.StatusConflict, "an update is running ("+st+"); wait for it to finish")

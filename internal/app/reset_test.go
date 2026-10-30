@@ -17,7 +17,7 @@ func TestNetworkResetClearsNetworksAndKeepsTheAccount(t *testing.T) {
 	if before == 0 {
 		t.Fatal("test box has no zone to reset")
 	}
-	if rc, _, raw := c.call("POST", "/api/system/reset", map[string]any{"level": "network"}); rc != 200 {
+	if rc, _, raw := c.call("POST", "/api/system/reset", map[string]any{"level": "network", "password": "correct horse battery"}); rc != 200 {
 		t.Fatalf("reset: %d %s", rc, raw)
 	}
 	var zones, users int
@@ -61,7 +61,7 @@ func TestFactoryResetNeedsTheWordAndReopensSetup(t *testing.T) {
 	if rc, _, _ := c.call("POST", "/api/system/reset", map[string]any{"level": "factory", "confirm": "RESET?"}); rc == 200 {
 		t.Fatal("factory reset with the wrong word")
 	}
-	if rc, _, raw := c.call("POST", "/api/system/reset", map[string]any{"level": "factory", "confirm": "reset"}); rc != 200 {
+	if rc, _, raw := c.call("POST", "/api/system/reset", map[string]any{"level": "factory", "confirm": "reset", "password": "correct horse battery"}); rc != 200 {
 		t.Fatalf("%d %s", rc, raw)
 	}
 	var users int

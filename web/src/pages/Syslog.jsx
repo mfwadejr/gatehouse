@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { put, useData } from '../api.js';
-import { Button, Card, Field, Input, NumberInput, Note, Select, ToggleRow, useAction } from '../ui.jsx';
+import { Button, Card, Field, Input, NumberInput, Select, ToggleRow, useAction } from '../ui.jsx';
 
 // Send logs to a syslog server on your network. Off by default.
 export default function Syslog() {
@@ -28,7 +28,6 @@ export default function Syslog() {
           </>
         )}
         <div><Button kind="primary" disabled={busy} onClick={save}>Save</Button></div>
-        <Note>Flow export (NetFlow) and SNMP are not part of this yet.</Note>
       </div>
     </Card>
   );

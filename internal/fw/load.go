@@ -106,6 +106,8 @@ func Load(db Queryer) (*Model, error) {
 	}
 	m.DNSExceptions = DNSExceptions(db)
 	m.SSHEnabled = settingOn(db, "ssh.enabled")
+	m.SNMPEnabled = settingOn(db, "snmp.enabled")
+	m.PortalIfaces = portalSetting(db)
 
 	irows, err := db.Query(`SELECT name,zone_id FROM interfaces WHERE enabled=1 AND zone_id IS NOT NULL ORDER BY id`)
 	if err != nil {
@@ -464,4 +466,25 @@ func splitList(s string) []string {
 		}
 	}
 	return out
+}
+
+// portalSetting reads which networks the guest sign-in page is switched on for.
+func portalSetting(db Queryer) []string {
+	rows, err := db.Query(`SELECT value FROM settings WHERE key='portal.config'`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var v string
+	if rows.Next() {
+		rows.Scan(&v)
+	}
+	var c struct {
+		On     bool     `json:"on"`
+		Ifaces []string `json:"ifaces"`
+	}
+	if json.Unmarshal([]byte(v), &c) != nil || !c.On {
+		return nil
+	}
+	return c.Ifaces
 }

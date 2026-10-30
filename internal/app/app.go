@@ -30,14 +30,16 @@ import (
 
 // Config says where things live and listen. Defaults suit the installed appliance.
 type Config struct {
-	DataDir  string   // databases, key, blocklist cache
-	WebAddr  string   // console listen address
-	DNSAddrs []string // DNS listen addresses
-	DHCPAddr string   // DHCP listen address; empty disables the DHCP socket
-	TLSCert  string
-	TLSKey   string
-	Static   http.Handler // embedded console files
-	Version  string       // the version of this program
+	DataDir    string   // databases, key, blocklist cache
+	WebAddr    string   // console listen address
+	DNSAddrs   []string // DNS listen addresses
+	SNMPAddr   string   // SNMP listen address; ":161" when empty
+	PortalAddr string   // guest sign-in page listen address; ":8099" when empty
+	DHCPAddr   string   // DHCP listen address; empty disables the DHCP socket
+	TLSCert    string
+	TLSKey     string
+	Static     http.Handler // embedded console files
+	Version    string       // the version of this program
 	// Update settings; empty values use the real ones. Tests point these elsewhere.
 	UpdateAPI       string
 	UpdateAllowHTTP bool
@@ -56,12 +58,17 @@ func DefaultConfig() Config {
 // App is the running daemon.
 type App struct {
 	sysout       syslogOut
+	flow         flowOut
+	snmp         snmpState
+	sqm          sqmState
+	portal       portalState
 	ddns         ddnsState
 	haActiveFn   func() bool // tests replace the check for holding the shared addresses
 	haOwnsFn     func(addr string) bool
 	haListen     string // the link's listen address; empty means the usual port
 	haBound      atomic.Value
 	NDPI         *ndpi.Table
+	ov           ovState
 	ndpiOnce     sync.Once
 	haApplyMu    sync.Mutex
 	Cfg          Config
@@ -184,11 +191,18 @@ func New(cfg Config) (*App, error) {
 	a.registerBridgeRoutes()
 	a.registerHARoutes()
 	a.registerNDPIRoutes()
+	a.registerOverrideRoutes()
+	a.registerBridgeifyRoutes()
+	a.registerStepUpRoutes()
 	a.registerWifiCardRoutes()
 	a.registerSummaryRoutes()
 	a.registerISPRoutes()
 	a.registerDNSEncRoutes()
 	a.registerSyslogRoutes()
+	a.registerFlowRoutes()
+	a.registerSNMPRoutes()
+	a.registerSQMRoutes()
+	a.registerPortalRoutes()
 	a.registerDDNSRoutes()
 	a.registerNetFilterRoutes()
 	a.loadSyslog()
@@ -377,6 +391,11 @@ func (a *App) Run(ctx context.Context) error {
 	run(func() { a.ddnsLoop(ctx) })
 	run(func() { a.haServe(ctx) })
 	run(func() { a.ndpiLoop(ctx) })
+	run(func() { a.flowLoop(ctx) })
+	run(func() { a.snmpLoop(ctx) })
+	run(func() { a.sqmLoop(ctx) })
+	run(func() { a.portalLoop(ctx) })
+	run(func() { a.overrideLoop(ctx) })
 	run(func() { a.haSyncLoop(ctx) })
 	run(func() { a.updateLoop(ctx) })
 	run(func() { a.dynLoop(ctx) })

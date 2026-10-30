@@ -38,9 +38,10 @@ func (a *App) registerResetRoutes() {
 
 	a.API.HandleAdmin("POST /api/system/reset", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		var in struct {
-			Level   string `json:"level"`
-			Code    string `json:"code"`
-			Confirm string `json:"confirm"`
+			Level    string `json:"level"`
+			Code     string `json:"code"`
+			Password string `json:"password"`
+			Confirm  string `json:"confirm"`
 		}
 		if !api.Decode(w, r, &in) {
 			return
@@ -53,12 +54,9 @@ func (a *App) registerResetRoutes() {
 			fail(w, errors.New("type the word reset to confirm a factory reset"))
 			return
 		}
-		// The authenticator code is asked for only when the administrator set one up.
-		if a.Config.Setting("fw.stepup", "1") == "1" && c.User.TOTPEnabled {
-			if err := a.Auth.VerifyStepUp(c.User.ID, in.Code); err != nil {
-				api.Error(w, http.StatusForbidden, "enter a current code from your authenticator")
-				return
-			}
+		if err := a.serious(c, in.Code, in.Password); err != nil {
+			api.Error(w, http.StatusForbidden, err.Error())
+			return
 		}
 		if st := update.ReadState(a.updateState()); st != "idle" {
 			api.Error(w, http.StatusConflict, "an update is running ("+st+"); wait for it to finish")

@@ -83,15 +83,17 @@ func (a *App) registerSSHRoutes() {
 	})
 	s.HandleAdmin("PUT /api/system/ssh", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		var in struct {
-			Enabled bool   `json:"enabled"`
-			Code    string `json:"code"`
+			Enabled  bool   `json:"enabled"`
+			Code     string `json:"code"`
+			Password string `json:"password"`
 		}
 		if !api.Decode(w, r, &in) {
 			return
 		}
-		if a.Config.Setting("fw.stepup", "1") == "1" && c.User.TOTPEnabled {
-			if err := a.Auth.VerifyStepUp(c.User.ID, in.Code); err != nil {
-				api.Error(w, http.StatusForbidden, "enter a current code from your authenticator")
+		// Turning remote login on is serious; turning it off never asks.
+		if in.Enabled {
+			if err := a.serious(c, in.Code, in.Password); err != nil {
+				api.Error(w, http.StatusForbidden, err.Error())
 				return
 			}
 		}

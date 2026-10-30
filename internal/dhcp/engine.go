@@ -54,7 +54,10 @@ type Engine struct {
 	scopes atomic.Pointer[[]*Scope]
 	// Silent stops every answer: set on the standby unit of a high-availability pair.
 	Silent atomic.Bool
-	snap   atomic.Pointer[Snapshot]
+	// Hold, when set, is asked before a new device is offered an address. Returning true means stay
+	// quiet this time (the device asks again a few seconds later).
+	Hold func(mac, iface string) bool
+	snap atomic.Pointer[Snapshot]
 
 	// OnChange is called after the lease table changes (for live widgets).
 	OnChange func()
@@ -357,6 +360,10 @@ func (e *Engine) Handle(req *Packet, in Ingress) (*Packet, error) {
 	mac := macKey(req.CHAddr)
 	host := cleanHostname(req.Options[OptHostname])
 	cid := fmt.Sprintf("%x", req.Options[OptClientID])
+	// Asked before the lock is taken: the answer may need to look at leases itself.
+	if req.Type() == Discover && e.Hold != nil && e.Hold(mac, s.Iface) {
+		return nil, nil
+	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	switch req.Type() {
@@ -509,6 +516,15 @@ func (e *Engine) Revoke(scope int64, ip string) error {
 	}
 	e.changed()
 	return nil
+}
+
+// ForgetMAC drops every lease held by one device, so it is offered a fresh address on whichever
+// network it is on when it next asks (used when a device is moved to another network).
+func (e *Engine) ForgetMAC(mac string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.db.Exec(`DELETE FROM dhcp_leases WHERE lower(mac)=?`, strings.ToLower(mac))
+	e.changed()
 }
 
 // Utilisation is how full each scope is.

@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { del, post, put, useData } from '../api.js';
 import { go } from '../App.jsx';
 import { AddrPicker, Chip, NewDevice, ScheduleEditor, ServicePicker, tokens } from '../AddrPicker.jsx';
-import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Pill, Segmented, Select, ToggleRow, useAction, fmt, confirmBox, noticeBox } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Pill, Segmented, Select, ToggleRow, useAction, fmt, confirmBox, noticeBox, useUndoDelete } from '../ui.jsx';
 
 const ACTIONS = [{ value: 'accept', label: 'Allow' }, { value: 'drop', label: 'Block silently' }, { value: 'reject', label: 'Block and tell the sender' }];
 // Only the fields the server stores; it refuses anything else.
@@ -185,6 +185,7 @@ export function RulesList({ ov, rules, countryRules, pickers, reloadPickers, rel
   const [act, setAct] = useState('');
   const [showSys, setShowSys] = useState(false);
   const [run] = useAction();
+  const undoDelete = useUndoDelete();
   const { data: prot } = useData('/api/fw/protected');
   const names = (ov?.matrix_zones || []).map((z) => z.name);
   const fromNames = names;
@@ -244,7 +245,7 @@ export function RulesList({ ov, rules, countryRules, pickers, reloadPickers, rel
               <Button small aria-label="Move down" onClick={() => move(pos, 1)} disabled={pos === visible.length - 1}>↓</Button>
               <Button small onClick={() => toggle(r)}>{r.enabled ? 'Turn off' : 'Turn on'}</Button>
               <Button small icon="edit" onClick={() => setEdit(r)}>Edit</Button>
-              <Button small kind="danger" icon="trash" onClick={async () => await confirmBox(`Delete "${r.name}"?`) && run(() => del(`/api/fw/rules/${r.id}`)).then(reload)}>Delete</Button>
+              <Button small kind="danger" icon="trash" onClick={() => undoDelete(`The rule "${r.name}"`, () => del(`/api/fw/rules/${r.id}`), () => put('/api/fw/rules', ruleBody({ ...r, id: undefined })), reload)}>Delete</Button>
             </div>
           </div>
         ))}
