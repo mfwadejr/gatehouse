@@ -179,7 +179,7 @@ function RuleSide({ chips, pickers }) {
   );
 }
 
-export function RulesList({ ov, rules, pickers, reloadPickers, reload, filter, setFilter, startNew }) {
+export function RulesList({ ov, rules, countryRules, pickers, reloadPickers, reload, filter, setFilter, startNew }) {
   const [edit, setEdit] = useState(null);
   const [q, setQ] = useState('');
   const [act, setAct] = useState('');
@@ -219,6 +219,9 @@ export function RulesList({ ov, rules, pickers, reloadPickers, reload, filter, s
             <div className="item" key={r.title}><div><div className="name">🔒 {r.title}</div><div className="meta">{r.text}</div></div><Pill tone={r.active ? 'good' : ''}>{r.active ? 'Always on' : 'Standing by'}</Pill></div>
           ))}
           <p className="small muted">Built in, always above your rules, and cannot be changed or removed.</p>
+          {(countryRules || []).map((r, i) => (
+            <div className="item" key={`c${i}`}><div><div className="name">🏳 {r.name}: {r.from} → {r.to === 'self' ? 'Gatehouse' : r.to} <Pill tone="bad">{actionWord(r.action)}</Pill></div><div className="meta">{r.descr}</div></div><Pill>Set on the Countries tab</Pill></div>
+          ))}
         </div>
       )}
       <div className="list">

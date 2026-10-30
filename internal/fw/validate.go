@@ -207,6 +207,22 @@ func (m *Model) Validate() error {
 			add("rule %q: rate limit is out of range", r.Name)
 		}
 	}
+	for _, r := range m.Routes {
+		if _, _, refs, err := SplitAddrField(r.Dst); err != nil {
+			add("route %q: %v", r.Name, err)
+		} else {
+			for _, ref := range refs {
+				if ref.Kind != RefDomain && ref.Kind != RefGeo {
+					add("route %q: only websites and countries can be used as a destination", r.Name)
+				}
+			}
+		}
+		if plain, _, _, _ := SplitAddrField(r.Dst); strings.TrimSpace(plain) != "" {
+			if _, _, err := parseAddrs(plain, nil, 0); err != nil {
+				add("route %q: %v", r.Name, err)
+			}
+		}
+	}
 	if n := len(m.DynamicSets()); n > MaxDynSets {
 		add("the rules use %d devices, groups, domains and countries; the limit is %d", n, MaxDynSets)
 	}
@@ -371,8 +387,11 @@ func (m *Model) checkSide(r Rule, isSrc bool, field string, add func(string, ...
 				add("rule %q: there is no device group called %q", r.Name, ref.Val)
 			}
 		case RefDomain, RefGeo:
+			if isSrc && ref.Kind == RefGeo && found && z.Kind == KindWan {
+				break // a country the traffic comes from, on a rule that starts on the internet
+			}
 			if isSrc {
-				add("rule %q: domains and countries can only be used as the destination", r.Name)
+				add("rule %q: domains can only be used as the destination, and countries as the source only for traffic coming from the internet", r.Name)
 			} else if r.To == "self" {
 				add("rule %q: domains and countries need a destination network or the internet", r.Name)
 			}

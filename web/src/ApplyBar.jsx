@@ -1,9 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import { post } from './api.js';
+import React, { useEffect, useRef, useState } from 'react';
+import { get, post } from './api.js';
 import { Button, Field, Input, Modal, Note, Problems, useToast } from './ui.jsx';
 
 // The "review and apply" bar shared by the firewall and the internet pages. Applying starts a
 // countdown; unless it is confirmed in time, the previous settings come back by themselves.
+// After applying, if this browser can still reach the console a moment later, the change is kept
+// without asking. That is the very thing the countdown protects: a change that cuts you off never
+// gets the second answer, so it undoes itself. "Ask me every time" turns this off for this browser.
+const autoKey = 'gatehouse.autoConfirm';
+const readAuto = () => { try { return localStorage.getItem(autoKey) !== 'off'; } catch { return true; } };
+
 export default function ApplyBar({ kind, label, status, me, onChanged, summary }) {
   const toast = useToast();
   const [review, setReview] = useState(null);
@@ -11,6 +17,31 @@ export default function ApplyBar({ kind, label, status, me, onChanged, summary }
   const [busy, setBusy] = useState(false);
   const [left, setLeft] = useState(null);
   const pending = status?.pending;
+  const [auto, setAuto] = useState(readAuto);
+  const tried = useRef('');
+  const setAutoPref = (v) => { setAuto(v); try { localStorage.setItem(autoKey, v ? 'on' : 'off'); } catch { /* ignore */ } };
+
+  useEffect(() => {
+    if (!pending || !auto || tried.current === pending.token) return undefined;
+    tried.current = pending.token;
+    let dead = false;
+    const run = async () => {
+      try {
+        await new Promise((r) => setTimeout(r, 4000));
+        if (dead) return;
+        await get('/api/auth/me');
+        await new Promise((r) => setTimeout(r, 2000));
+        if (dead) return;
+        await get('/api/auth/me');
+        if (dead) return;
+        await post(`/api/${kind}/confirm`, { token: pending.token });
+        toast('Applied and kept. You can still reach Gatehouse, so the change is permanent.');
+        onChanged?.();
+      } catch { /* cannot reach it: leave the countdown so the change undoes itself or is confirmed by hand */ }
+    };
+    run();
+    return () => { dead = true; };
+  }, [pending, auto]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!pending) { setLeft(null); return undefined; }
@@ -50,7 +81,8 @@ export default function ApplyBar({ kind, label, status, me, onChanged, summary }
       <div className="confirmbar countdown" role="alert">
         <div>
           <div className="count">{left ?? ''}s</div>
-          <div className="sec">Does everything still work? Confirm to keep this change. If you do nothing, the previous settings come back on their own.</div>
+          <div className="sec">{auto ? 'Checking that you can still reach Gatehouse. If you can, the change is kept on its own.' : 'Does everything still work? Confirm to keep this change.'} If you cannot, the previous settings come back on their own.</div>
+          <button type="button" className="link small" onClick={() => setAutoPref(!auto)}>{auto ? 'Ask me to confirm every time' : 'Keep changes automatically when I can still reach Gatehouse'}</button>
         </div>
         <div className="actions">
           <Button onClick={undo} disabled={busy}>Undo now</Button>
@@ -81,7 +113,7 @@ export default function ApplyBar({ kind, label, status, me, onChanged, summary }
             </div>
           )}
           {review.warnings?.length > 0 && <Note tone="warn" title="Worth knowing"><ul>{review.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul></Note>}
-          {review.ok && <Note tone="good">After you apply, you have 60 seconds to confirm. If this change cuts you off, do nothing and it undoes itself.</Note>}
+          {review.ok && <Note tone="good">After you apply, Gatehouse checks that you can still reach it and keeps the change. If this change cuts you off, nothing more is needed: it undoes itself within 60 seconds.</Note>}
           {me.user.totp_enabled && review.ok && (
             <Field label="Code from your authenticator app" hint="Needed to apply changes to the network.">
               <Input className="codebox" value={code} onChange={setCode} inputMode="numeric" autoComplete="one-time-code" />

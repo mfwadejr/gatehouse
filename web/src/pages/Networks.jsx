@@ -17,18 +17,32 @@ function EditNetwork({ n, zones, onClose, onSaved }) {
   const { data: sug } = useData('/api/networks/suggest');
   const [port, setPort] = useState(n.iface.kind === 'vlan' ? n.iface.parent : n.iface.name);
   const [vlan, setVlan] = useState(String(n.iface.vlan || ''));
-  const movable = n.iface.kind !== 'bridge';
+  const isBridge = n.iface.kind === 'bridge';
+  const { data: allPorts } = useData('/api/networks/suggest?all=1');
+  const [mem, setMem] = useState(n.iface.members || []);
+  const first = n.iface.members || [];
+  const dropped = first.filter((m) => !mem.includes(m));
+  const added = mem.filter((m) => !first.includes(m));
+  const tick = (name, on) => setMem((x) => (on ? [...x.filter((m) => m !== name), name] : x.filter((m) => m !== name)));
+  const why = (p) => {
+    if (mem.includes(p.name) || first.includes(p.name)) return '';
+    if (p.use === 'internet') return 'used for the internet';
+    if (p.use === 'bridge') return 'part of another network';
+    if (p.use === 'network') return 'has a network of its own';
+    return '';
+  };
+  const movable = !isBridge;
   const moved = movable && (port !== (n.iface.kind === 'vlan' ? n.iface.parent : n.iface.name) || Number(vlan || 0) !== (n.iface.vlan || 0));
   const save = async () => {
     const ok = await run(async () => {
-      await put('/api/net/interfaces', f);
+      await put('/api/net/interfaces', isBridge ? { ...f, members: mem } : f);
       if (moved) await post('/api/networks/move', { id: n.iface.id, port, vlan: Number(vlan || 0) });
     }, 'Saved. Apply it to start using it.');
     if (ok) { onSaved(); onClose(); }
   };
   return (
     <Modal title={`Edit ${n.title}`} onClose={onClose}
-      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" onClick={save} disabled={busy}>Save</Button></>}>
+      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" onClick={save} disabled={busy || (isBridge && mem.length === 0)}>Save</Button></>}>
       <div className="stack">
         <Field label="Address of this router on the network" hint="With the size, like 192.168.10.1/24. Devices here use it as their gateway.">
           <Input value={f.ipv4 || ''} onChange={set('ipv4')} className="in mono" />
@@ -37,6 +51,25 @@ function EditNetwork({ n, zones, onClose, onSaved }) {
           <Select value={String(f.zone_id || 0)} onChange={(v) => set('zone_id')(Number(v))} options={[{ value: '0', label: 'Not assigned yet' }, ...zones.map((z) => ({ value: String(z.id), label: z.name }))]} />
         </Field>
         <ToggleRow title="In use" desc="Turn off to switch the network off without deleting it." checked={f.enabled} onChange={set('enabled')} />
+        {isBridge && (
+          <Field label="Ports on this network" hint="Tick the ports that act as a switch for this network. Devices plugged into any ticked port share the same addresses. Nothing changes until you apply.">
+            <div className="stack">
+              {((allPorts && allPorts.ports) || []).map((p) => {
+                const reason = why(p);
+                const on = mem.includes(p.name);
+                return (
+                  <label key={p.name} className="small" style={{ display: 'flex', gap: 8, alignItems: 'center', opacity: reason ? 0.6 : 1 }}>
+                    <input type="checkbox" checked={on} disabled={!!reason} onChange={(e) => tick(p.name, e.target.checked)} />
+                    <span className="mono">{p.name}</span>
+                    <span className="muted">{p.wifi ? 'Wi-Fi card' : p.link ? `cable connected${p.speed > 0 ? `, ${p.speed} Mb/s` : ''}` : 'no cable'}{reason ? ` · ${reason}` : on && !first.includes(p.name) ? ' · will join' : ''}</span>
+                  </label>
+                );
+              })}
+              {mem.length === 0 && <Note tone="warn">A network needs at least one port.</Note>}
+              {(dropped.length > 0 || added.length > 0) && <Note tone="warn">{dropped.length ? `Taking ${dropped.join(', ')} out cuts off devices plugged into ${dropped.length === 1 ? 'it' : 'them'}. ` : ''}If you manage Gatehouse through one of these ports, keep another way in until you have applied and checked it. Gatehouse puts the change back by itself if you cannot confirm it.</Note>}
+            </div>
+          </Field>
+        )}
         <details className="more">
           <summary>More options</summary>
           <div className="stack">

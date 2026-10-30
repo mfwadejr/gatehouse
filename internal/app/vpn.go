@@ -253,6 +253,7 @@ func (a *App) addVPNToPlan(q querier, p *netd.Plan) error {
 	if err != nil {
 		return err
 	}
+	routeSpecs, _ := fw.RouteSpecs(q)
 	for _, w := range wgs {
 		peers, err := a.listWGPeers(q, w.ID)
 		if err != nil {
@@ -262,7 +263,7 @@ func (a *App) addVPNToPlan(q querier, p *netd.Plan) error {
 		if w.Mode == "server" {
 			nw.Port = w.Port
 		} else {
-			nw.Table, nw.Sources = tables[w.Name], srcs[w.Name]
+			nw.Table, nw.Sources, nw.Marks = tables[w.Name], srcs[w.Name], fw.RouteMarksFor(routeSpecs, w.Name)
 		}
 		for _, pr := range peers {
 			np := netcfg.WGPeer{Name: pr.Name, PublicKey: pr.PublicKey, PSK: pr.PSK, Endpoint: pr.Endpoint, Keepalive: pr.Keepalive, Enabled: pr.Enabled}
@@ -277,7 +278,7 @@ func (a *App) addVPNToPlan(q querier, p *netd.Plan) error {
 	}
 	for _, o := range ovs {
 		if o.Mode == "client" {
-			p.Config.Tunnels = append(p.Config.Tunnels, netcfg.Tunnel{Name: o.Name, Table: tables[o.Name], Sources: srcs[o.Name], Enabled: o.Enabled})
+			p.Config.Tunnels = append(p.Config.Tunnels, netcfg.Tunnel{Name: o.Name, Table: tables[o.Name], Sources: srcs[o.Name], Marks: fw.RouteMarksFor(routeSpecs, o.Name), Enabled: o.Enabled})
 		}
 	}
 	return nil

@@ -53,6 +53,11 @@ type Rule struct {
 	Sched   string // stored schedule, empty for always
 	Descr   string
 	AlsoMAC bool // the device's MAC address must match too (local networks only)
+	// Not and Early are set only on the rules the countries page makes. Not matches every public
+	// address that is NOT in the listed countries. Early puts an internet-facing rule ahead of port
+	// forwards and VPN servers, so it covers those too.
+	Not   bool
+	Early bool
 }
 
 // DevGroup is a named set of devices.
@@ -137,6 +142,8 @@ type Model struct {
 	Now time.Time
 	// GeoExempt are addresses that region rules never match, such as the far end of a VPN.
 	GeoExempt []string
+	// Routes send chosen sources through a tunnel or one connection (see routes.go).
+	Routes []RouteSpec
 	// LogAllowed records new connections that were allowed, with the reason, in the event log.
 	LogAllowed bool
 }

@@ -279,3 +279,33 @@ func TestRemovingAFirewallNetworkRemovesALeftoverRange(t *testing.T) {
 }
 
 func fmtID(f float64) string { return strconv.FormatInt(int64(f), 10) }
+
+// A port can sit in a bridge only if it belongs nowhere else, and the reason is said in words.
+func TestBridgeRefusesPortsInUseElsewhere(t *testing.T) {
+	c, _, _ := siteBox(t, "192.168.1.1/24")
+	if rc, _, raw := c.call("POST", "/api/networks/add", map[string]any{"name": "Cameras", "port": "eth2", "internet": true, "isolate": true}); rc != 200 {
+		t.Fatalf("add: %d %s", rc, raw)
+	}
+	br := map[string]any{"name": "br-test", "kind": "bridge", "ipv4": "10.77.0.1/24", "enabled": true, "members": []string{"eth2"}}
+	rc, _, raw := c.call("PUT", "/api/net/interfaces", br)
+	if rc == 200 || !strings.Contains(string(raw), "already has a network of its own") {
+		t.Fatalf("a port with its own network must be refused: %d %s", rc, raw)
+	}
+	br["members"] = []string{"eth3", "eth3"}
+	if rc, _, raw = c.call("PUT", "/api/net/interfaces", br); rc == 200 || !strings.Contains(string(raw), "listed twice") {
+		t.Fatalf("duplicate: %d %s", rc, raw)
+	}
+	br["members"] = []string{"eth3"}
+	if rc, _, raw = c.call("PUT", "/api/net/interfaces", br); rc != 200 {
+		t.Fatalf("a free port must join: %d %s", rc, raw)
+	}
+	// A second bridge cannot take the same port.
+	br2 := map[string]any{"name": "br-two", "kind": "bridge", "ipv4": "10.78.0.1/24", "enabled": true, "members": []string{"eth3"}}
+	if rc, _, raw = c.call("PUT", "/api/net/interfaces", br2); rc == 200 || !strings.Contains(string(raw), "already belongs to another network") {
+		t.Fatalf("port in two bridges: %d %s", rc, raw)
+	}
+	// The suggest list shows Wi-Fi cards only on request.
+	if _, m, _ := c.call("GET", "/api/networks/suggest?all=1", nil); m["ports"] == nil {
+		t.Fatal("ports missing")
+	}
+}

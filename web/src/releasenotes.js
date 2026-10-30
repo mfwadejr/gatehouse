@@ -1,6 +1,17 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.14',
+    title: 'Countries, Routes and spare ports',
+    items: [
+      'Countries: block or allow whole countries in one place, for traffic going out, coming in, or both. Gatehouse warns you before a choice could lock you out of your own country.',
+      'Routes: send only the websites, addresses or countries you choose through a VPN, or through one internet connection, and leave everything else alone. A "stop if down" switch keeps traffic from leaking if the VPN drops. Routes carry IPv4 only.',
+      'Spare ports: on a network that uses a bridge, tick the ports that should act as a switch for it. Gatehouse tells you why a port cannot be ticked, and nothing changes until you apply.',
+      'Adding a VPN no longer forces you to choose who uses it: pick "Nobody yet" and decide later.',
+      'After you apply a change, Gatehouse checks that you can still reach it and keeps the change by itself. If you cannot, it still undoes itself within 60 seconds. You can switch this off to confirm by hand.',
+    ],
+  },
+  {
     version: '0.8.13',
     title: 'Tidy-ups and small features',
     items: [

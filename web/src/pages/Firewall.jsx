@@ -6,6 +6,7 @@ import AddNetwork from '../AddNetwork.jsx';
 import { go } from '../App.jsx';
 import { linkState } from '../linkstate.js';
 import ForcedDns from './ForcedDns.jsx';
+import Countries from './Countries.jsx';
 import { GroupsAndLists, Matrix, PairModal, RuleForm, RulesList } from './FirewallRules.jsx';
 import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Problems, Select, Tabs, ToggleRow, useAction, useToast, fmt, confirmBox } from '../ui.jsx';
 
@@ -333,19 +334,21 @@ export default function Firewall({ me }) {
   const [filter, setFilter] = useState({});
   const [pair, setPair] = useState(null);
   const [newRule, setNewRule] = useState(null);
+  const countryRules = (rules || []).filter((r) => r.countries);
   const presets = pr?.presets || [];
   const all = () => { reload(); reloadRules(); reloadPickers(); };
   const names = (ov?.matrix_zones || []).map((z) => z.name);
   return (
     <Page title="Firewall" sub="Decide what each network may reach. Changes only take effect when you apply them.">
       <Protected reload={reload} />
-      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'networks', label: 'Networks' }, { value: 'rules', label: `Rules${rules?.length ? ` (${rules.length})` : ''}` }, { value: 'groups', label: 'Groups & lists' }, { value: 'ports', label: 'Open ports' }, { value: 'upnp', label: 'UPnP' }, { value: 'protection', label: 'Protection' }, { value: 'history', label: 'History' }]} />
-      {tab === 'networks' && <><Networks ov={ov} presets={presets} reload={reload} /><Matrix ov={ov} rules={rules} onPick={(from, to, p) => setPair({ from, to, p })} /></>}
-      {tab === 'rules' && <RulesList ov={ov} rules={rules} pickers={pickers} reloadPickers={reloadPickers} reload={all} filter={filter} setFilter={setFilter} startNew={(init) => setNewRule(init)} />}
+      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'networks', label: 'Networks' }, { value: 'rules', label: `Rules${(rules || []).filter((r) => !r.countries).length ? ` (${(rules || []).filter((r) => !r.countries).length})` : ''}` }, { value: 'groups', label: 'Groups & lists' }, { value: 'ports', label: 'Open ports' }, { value: 'upnp', label: 'UPnP' }, { value: 'countries', label: 'Countries' }, { value: 'protection', label: 'Protection' }, { value: 'history', label: 'History' }]} />
+      {tab === 'networks' && <><Networks ov={ov} presets={presets} reload={reload} /><Matrix ov={ov} rules={(rules || []).filter((r) => !r.countries)} onPick={(from, to, p) => setPair({ from, to, p })} /></>}
+      {tab === 'rules' && <RulesList ov={ov} rules={(rules || []).filter((r) => !r.countries)} countryRules={countryRules} pickers={pickers} reloadPickers={reloadPickers} reload={all} filter={filter} setFilter={setFilter} startNew={(init) => setNewRule(init)} />}
       {tab === 'groups' && <GroupsAndLists pickers={pickers} reloadPickers={reloadPickers} reload={all} />}
       {tab === 'ports' && <Forwards reload={reload} />}
       {tab === 'upnp' && <UPnP />}
       {tab === 'protection' && <Protection ov={ov} reload={reload} pickers={pickers} />}
+      {tab === 'countries' && <Countries reload={all} />}
       {tab === 'history' && <History />}
       {pair && (
         <PairModal pair={pair} ov={ov} onClose={() => setPair(null)} onChanged={all}

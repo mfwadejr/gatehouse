@@ -156,7 +156,10 @@ function AddVPN({ endpoint, onClose, onDone }) {
       if (r.device_error) noticeBox(`The VPN was created, but the device could not be added: ${r.device_error}`);
       if (r.device) { setFirst(r.device); return; }
     }
-    if (r && goal === 'out' && f.scope === 'all') {
+    if (r && goal === 'out' && f.scope === 'later') {
+      // nobody is chosen yet: the VPN is added and waits; Routes can send traffic through it
+      onDone(r.id, 'out-all', tech); onClose();
+    } else if (r && goal === 'out' && f.scope === 'all') {
       // everything on the network uses the VPN: tick every network for them
       const ch = await run(() => get('/api/vpn/choices'));
       const uses = (ch?.networks || []).map((n) => ({ kind: 'network', value: n.name, label: '' }));
@@ -298,7 +301,7 @@ function AddVPN({ endpoint, onClose, onDone }) {
             )}
             <Field label="Test address" hint="Gatehouse checks the VPN is really working by reaching this address through it. Leave empty for 1.1.1.1."><Input value={f.check} onChange={set('check')} placeholder="1.1.1.1" /></Field>
             <Field label="Who uses it?">
-              <Segmented value={f.scope} onChange={set('scope')} options={[{ value: 'all', label: 'Everything on my network' }, { value: 'pick', label: 'Only the networks and devices I pick' }]} />
+              <Segmented value={f.scope} onChange={set('scope')} options={[{ value: 'all', label: 'Everything on my network' }, { value: 'pick', label: 'Only what I pick' }, { value: 'later', label: 'Nobody yet' }]} />
             </Field>
             <ToggleRow title="Kill switch" desc="If the VPN drops, the devices using it lose internet instead of falling back to your normal connection." checked={f.killswitch} onChange={set('killswitch')} />
           </>
@@ -340,9 +343,9 @@ function Uses({ v, onClose, onSaved }) {
     }
   };
   return (
-    <Modal title={`Who uses ${v.label}`} onClose={onClose} footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy} onClick={save}>Save</Button></>}>
+    <Modal title={`Who uses ${v.label} (optional)`} onClose={onClose} footer={<><Button onClick={onClose}>Skip for now</Button><Button kind="primary" disabled={busy} onClick={save}>Save</Button></>}>
       <div className="stack">
-        <p className="sec">Tick the networks and devices whose internet should go through this VPN. Everything you leave unticked keeps using your normal connection.</p>
+        <p className="sec">Tick the networks and devices whose internet should go through this VPN. Everything you leave unticked keeps using your normal connection. You can skip this and choose later, or use the Routes page to send only some websites or countries through it.</p>
         <Field label="Whole networks">
           <div className="stack" style={{ gap: 'var(--space-1)' }}>
             {(ch?.networks || []).map((n) => (

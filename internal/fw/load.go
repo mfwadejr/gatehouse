@@ -233,6 +233,10 @@ func Load(db Queryer) (*Model, error) {
 		m.Rules = append(m.Rules, r)
 	}
 	rrows.Close()
+	// The countries page adds its own rules last, so a hand-written exception can still win.
+	m.Rules = append(m.Rules, CountryRules(m.Zones, CountryPolicyFrom(db))...)
+
+	m.Routes, _ = RouteSpecs(db)
 
 	m.Now = time.Now()
 	m.Loc = time.UTC

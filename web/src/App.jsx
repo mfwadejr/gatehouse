@@ -9,6 +9,7 @@ import Wifi from './pages/Wifi.jsx';
 import DNS from './pages/DNS.jsx';
 import DHCP from './pages/DHCP.jsx';
 import VPN from './pages/VPN.jsx';
+import Routes from './pages/Routes.jsx';
 import Firewall from './pages/Firewall.jsx';
 import Services from './pages/Services.jsx';
 import Devices from './pages/Devices.jsx';
@@ -29,6 +30,7 @@ export const PAGES = [
   { id: 'firewall', label: 'Firewall', icon: 'firewall', el: Firewall },
   { id: 'services', label: 'Services', icon: 'services', el: Services },
   { id: 'vpn', label: 'VPN', icon: 'vpn', el: VPN },
+  { id: 'routes', label: 'Routes', icon: 'routes', el: Routes },
   { id: 'devices', label: 'Devices & access', icon: 'devices', el: Devices },
   { id: 'logs', label: 'Logs', icon: 'logs', el: Logs },
   { id: 'settings', label: 'Settings', icon: 'settings', el: Settings },

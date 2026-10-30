@@ -436,4 +436,19 @@ ALTER TABLE blocklists ADD COLUMN allowed INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE blocklists ADD COLUMN skipped INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE blocklists ADD COLUMN failures INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE blocklists ADD COLUMN retry_at INTEGER NOT NULL DEFAULT 0;
+`, `
+-- Routes: send chosen devices or networks through a VPN tunnel or one internet connection, for
+-- everything or only for chosen destinations (addresses, websites, countries). Each route has its
+-- own kill switch. srcs and dests are JSON lists; an empty srcs means nobody uses it yet.
+CREATE TABLE routes(
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  target_kind TEXT NOT NULL,           -- tunnel or wan
+  target TEXT NOT NULL,                -- the tunnel device (wg1, tun1) or the connection's name
+  kill INTEGER NOT NULL DEFAULT 1,
+  srcs TEXT NOT NULL DEFAULT '[]',
+  dests TEXT NOT NULL DEFAULT '[]',
+  position INTEGER NOT NULL DEFAULT 0
+);
 `}

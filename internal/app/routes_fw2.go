@@ -23,15 +23,16 @@ type chip struct {
 
 type ruleView struct {
 	fw.RuleRow
-	Tag      string   `json:"tag"`
-	Hits     int64    `json:"hits"`
-	Bytes    int64    `json:"bytes"`
-	LastHit  int64    `json:"last_hit"`
-	When     string   `json:"when"`
-	SrcChips []chip   `json:"src_chips"`
-	DstChips []chip   `json:"dst_chips"`
-	Warnings []string `json:"warnings"`
-	Matrix   bool     `json:"matrix"` // made by the matrix, not by hand
+	Tag       string   `json:"tag"`
+	Hits      int64    `json:"hits"`
+	Bytes     int64    `json:"bytes"`
+	LastHit   int64    `json:"last_hit"`
+	When      string   `json:"when"`
+	SrcChips  []chip   `json:"src_chips"`
+	DstChips  []chip   `json:"dst_chips"`
+	Warnings  []string `json:"warnings"`
+	Matrix    bool     `json:"matrix"`    // made by the matrix, not by hand
+	Countries bool     `json:"countries"` // made by the countries page; change it there
 }
 
 type nameBook struct {
@@ -151,7 +152,29 @@ func (a *App) fwRulesView(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		v.Warnings = append(w1, w2...)
 		out = append(out, v)
 	}
+	// The rules the countries page makes are not stored as rules; show them so nothing is hidden.
+	if m, err := fw.Load(a.Config); err == nil {
+		for _, ru := range m.Rules {
+			if !fw.IsCountryRule(ru.Name) {
+				continue
+			}
+			row := fw.RuleRow{Name: ru.Name, From: ru.From, To: ru.To, Src: anyIfEmpty(ru.Src), Dst: anyIfEmpty(ru.Dst), Service: "any", Action: ru.Action, Enabled: true, Descr: ru.Descr}
+			v := ruleView{RuleRow: row, Tag: fwTag(row), Countries: true}
+			h := hits[v.Tag]
+			v.Hits, v.Bytes, v.LastHit = h.Hits, h.Bytes, h.LastHit
+			v.SrcChips, _ = nb.chips(row.Src, true)
+			v.DstChips, _ = nb.chips(row.Dst, false)
+			out = append(out, v)
+		}
+	}
 	api.JSON(w, 200, out)
+}
+
+func anyIfEmpty(s string) string {
+	if s == "" {
+		return "any"
+	}
+	return s
 }
 
 func (a *App) registerFWObjectRoutes() {

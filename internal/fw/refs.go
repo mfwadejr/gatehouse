@@ -179,6 +179,20 @@ func (m *Model) DynamicSets() []DynSet {
 			}
 		}
 	}
+	for _, r := range m.Routes {
+		_, _, refs, err := SplitAddrField(r.Dst)
+		if err != nil {
+			continue
+		}
+		for _, ref := range refs {
+			for _, s := range refSets(ref, false) {
+				if !seen[s.Name] {
+					seen[s.Name] = true
+					out = append(out, s)
+				}
+			}
+		}
+	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
 }

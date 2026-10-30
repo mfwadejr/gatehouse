@@ -178,6 +178,7 @@ func (c *compiler) build() string {
 		c.line(1, "}")
 	}
 	c.marks()
+	c.routeMarks()
 	c.nat()
 	c.line(0, "}")
 	_ = m
@@ -289,6 +290,12 @@ func (c *compiler) input() {
 		c.line(2, "iifname %s udp sport 547 udp dport 546 accept comment \"wan dhcpv6 client\"", ifSet(wan))
 	}
 
+	// Country rules for what arrives from the internet come before the VPN servers are let in.
+	for _, r := range m.Rules {
+		if r.Enabled && r.Early && r.To == "self" {
+			c.explicit(2, r, false)
+		}
+	}
 	// Incoming VPN connections, from the internet side only.
 	if wan := m.WanIfaces(); len(wan) > 0 {
 		for _, v := range m.VPNPorts {
@@ -298,7 +305,7 @@ func (c *compiler) input() {
 
 	// Explicit exceptions that target the router itself.
 	for _, r := range m.Rules {
-		if r.Enabled && r.To == "self" {
+		if r.Enabled && r.To == "self" && !r.Early {
 			c.explicit(2, r, false)
 		}
 	}
@@ -350,11 +357,16 @@ func (c *compiler) forward() {
 	for _, srv := range srvKeys {
 		c.line(2, "ether saddr %s ip daddr %s meta l4proto { tcp, udp } th dport 53 ct status dnat accept comment \"enforced dns server (device)\"", setLit(srvMACs[srv]), srv)
 	}
+	for _, r := range m.Rules {
+		if r.Enabled && r.Early && r.To != "self" {
+			c.explicit(2, r, true)
+		}
+	}
 	if len(m.Forwards) > 0 || m.UPnP {
 		c.decide(2, "ct status dnat", "accept", "forward")
 	}
 	for _, r := range m.Rules {
-		if r.Enabled && r.To != "self" {
+		if r.Enabled && r.To != "self" && !r.Early {
 			c.explicit(2, r, true)
 		}
 	}
@@ -363,6 +375,11 @@ func (c *compiler) forward() {
 	for _, t := range m.Tunnels {
 		if t.KillSwitch && len(t.Sources) > 0 && len(wan) > 0 {
 			c.decide(2, fmt.Sprintf("ip saddr %s oifname %s", setLit(t.Sources), ifSet(wan)), "drop", "killswitch:"+t.Name)
+		}
+	}
+	for _, r := range m.Routes {
+		if r.Kill && r.TunnelIface != "" && len(wan) > 0 {
+			c.decide(2, fmt.Sprintf("meta mark 0x%x oifname %s", r.Mark, ifSet(wan)), "drop", "killswitch:"+r.Name)
 		}
 	}
 	out := append(append([]string(nil), wan...), m.TunnelIfaces()...)
@@ -487,6 +504,14 @@ func (c *compiler) explicit(indent int, r Rule, forward bool) {
 	}
 	srcT := c.sideTerms(r.Src, true, r.AlsoMAC)
 	dstT := c.sideTerms(r.Dst, false, false)
+	if r.Not {
+		if _, _, refs, _ := SplitAddrField(r.Src); len(refs) > 0 {
+			srcT = c.notGeoTerms(r.Src, true)
+		}
+		if _, _, refs, _ := SplitAddrField(r.Dst); len(refs) > 0 {
+			dstT = c.notGeoTerms(r.Dst, false)
+		}
+	}
 	specs, _ := ParseServices(r.Service, m.PortLists)
 	if len(specs) == 0 {
 		specs = []PortSpec{{}}

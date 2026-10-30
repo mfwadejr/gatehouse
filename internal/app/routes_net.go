@@ -298,6 +298,45 @@ func ports() []map[string]any {
 	return out
 }
 
+// bridgePortsFree checks that every port chosen for a bridge belongs nowhere else: not to the
+// internet, not to another bridge, and not to a network of its own. The people editing see the
+// reason in words instead of a networking error.
+func bridgePortsFree(tx *sql.Tx, self int64, members []string) error {
+	seen := map[string]bool{}
+	for _, m := range members {
+		if seen[m] {
+			return fmt.Errorf("%s is listed twice", m)
+		}
+		seen[m] = true
+		var n int
+		tx.QueryRow(`SELECT COUNT(*) FROM wan_links WHERE iface=?`, m).Scan(&n)
+		if n > 0 {
+			return fmt.Errorf("%s is used for the internet, so it cannot also be on this network", m)
+		}
+	}
+	rows, err := tx.Query(`SELECT id,name,kind,members,ipv4_cidr,COALESCE(zone_id,0) FROM interfaces WHERE id<>?`, self)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, zone int64
+		var name, kind, mem, cidr string
+		if err := rows.Scan(&id, &name, &kind, &mem, &cidr, &zone); err != nil {
+			return err
+		}
+		for _, o := range strings.Split(mem, ",") {
+			if o != "" && seen[o] {
+				return fmt.Errorf("%s already belongs to another network (%s); take it out of there first", o, name)
+			}
+		}
+		if kind != "vlan" && kind != "bridge" && seen[name] && (cidr != "" || zone != 0) {
+			return fmt.Errorf("%s already has a network of its own; remove or move that network first", name)
+		}
+	}
+	return rows.Err()
+}
+
 func (a *App) registerNetRoutes() {
 	s := a.API
 	s.Handle("GET /api/net/ports", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
@@ -330,6 +369,11 @@ func (a *App) registerNetRoutes() {
 			var zone any
 			if in.ZoneID > 0 {
 				zone = in.ZoneID
+			}
+			if in.Kind == "bridge" {
+				if err := bridgePortsFree(tx, in.ID, in.Members); err != nil {
+					return err
+				}
 			}
 			if in.ID == 0 {
 				res, err := tx.Exec(`INSERT INTO interfaces(name,kind,parent,vlan_id,zone_id,ipv4_cidr,ipv6_cidr,ipv6_pd,mtu,enabled,dhcp,gateway,dns,members) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
