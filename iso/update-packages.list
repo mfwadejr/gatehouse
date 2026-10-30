@@ -7,3 +7,4 @@ ieee-data
 openssh-server
 keepalived
 conntrackd
+iputils-arping

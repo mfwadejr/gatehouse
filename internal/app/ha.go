@@ -18,6 +18,7 @@ import (
 	"gatehouse/internal/ha"
 	"gatehouse/internal/netcfg"
 	"gatehouse/internal/netd"
+	"gatehouse/internal/update"
 )
 
 // High availability. Two units hold the same settings. The primary is where changes are made; the
@@ -38,8 +39,9 @@ type haLocal struct {
 	Seq       int64       `json:"seq"`
 	SyncedAt  int64       `json:"synced_at"`
 	LastHash  string      `json:"last_hash"`
-	Activated bool        `json:"activated"` // the shared-address services are installed
-	Applied   bool        `json:"applied"`   // the first copy of the settings has been applied here
+	HeartDev  string      `json:"heart_dev,omitempty"` // this unit's port for the optional cable to the partner
+	Activated bool        `json:"activated"`           // the shared-address services are installed
+	Applied   bool        `json:"applied"`             // the first copy of the settings has been applied here
 	LastError string      `json:"last_error,omitempty"`
 }
 
@@ -134,10 +136,29 @@ func (s *haLocal) peerAddr() string {
 	return s.Pairing.Standby
 }
 
+// heartCarrier says whether a port has a cable plugged in and connected. Tests replace it.
+var heartCarrier = func(dev string) bool {
+	b, err := os.ReadFile(filepath.Join("/sys/class/net", dev, "carrier"))
+	return err == nil && strings.TrimSpace(string(b)) == "1"
+}
+
+// heart is this unit's own address on the cable and the partner's, when a cable is set up.
+func (s *haLocal) heart() (own netip.Prefix, peer netip.Addr, ok bool) {
+	if s.HeartDev == "" {
+		return
+	}
+	o, p, err := ha.HeartOwn(s.Pairing.ID, s.Role)
+	return o, p, err == nil
+}
+
 func (s *haLocal) peerHost() string {
 	port := s.PeerPort
 	if port == 0 {
 		port = ha.LinkPort
+	}
+	// The cable is used while it is connected; otherwise the shared network carries the same talk.
+	if _, peer, ok := s.heart(); ok && heartCarrier(s.HeartDev) {
+		return net.JoinHostPort(peer.String(), strconv.Itoa(port))
 	}
 	return net.JoinHostPort(s.peerAddr(), strconv.Itoa(port))
 }
@@ -261,7 +282,18 @@ func (a *App) haInstall(s *haLocal) error {
 	if err != nil {
 		return err
 	}
-	return a.Net.HAApply(netd.HAPlan{Enabled: true, Keepalived: ka, Conntrackd: ct, WanDevs: a.haWanDevs()})
+	plan := netd.HAPlan{Enabled: true, Keepalived: ka, Conntrackd: ct, WanDevs: a.haWanDevs()}
+	if a.haWarmOn() {
+		sp := a.haWanSplit(true)
+		plan.WanDevs, plan.WarmDevs, plan.WanStatic, plan.WanMACs = sp.Down, sp.Warm, sp.Static, a.haPartnerMACs(s)
+	}
+	if own, _, ok := s.heart(); ok {
+		if ct, err = ha.HeartConntrackdConf(s.local(), s.Role, s.HeartDev); err != nil {
+			return err
+		}
+		plan.Conntrackd, plan.HeartDev, plan.HeartCIDR = ct, s.HeartDev, own.String()
+	}
+	return a.Net.HAApply(plan)
 }
 
 // haSetFirewallPeer records the partner's address for the firewall's partner rules.
@@ -300,6 +332,7 @@ func (a *App) haLink() *ha.Link {
 			return nil
 		},
 		OnSnapshot: a.haReceive,
+		OnUpdate:   a.haOnUpdate,
 		Status:     a.haLocalStatus,
 		OnHandover: func() error {
 			st := a.haLoad()
@@ -321,7 +354,13 @@ func (a *App) haLink() *ha.Link {
 
 func (a *App) haLocalStatus() ha.Status {
 	s := a.haLoad()
-	st := ha.Status{Version: a.Cfg.Version, Time: time.Now().Unix()}
+	st := ha.Status{Version: a.Cfg.Version, Time: time.Now().Unix(), WanMACs: a.haOwnWanMACs(), Update: update.ReadState(a.updateState())}
+	if r, ok := update.ReadResult(a.updateState()); ok {
+		st.ResultTo, st.Result = r.To, "failed"
+		if r.OK {
+			st.Result = "ok"
+		}
+	}
 	if s != nil {
 		st.Role, st.Seq, st.Active = string(s.Role), s.Seq, a.haActive(s)
 	}
@@ -518,7 +557,17 @@ func (a *App) haLocalize(s *haLocal) error {
 		return err
 	}
 	a.Config.SetSetting("ha.peer", s.peerAddr())
+	a.haSetHeartSetting(s)
 	return nil
+}
+
+// haSetHeartSetting tells the firewall about the cable. It is kept out of the copied settings.
+func (a *App) haSetHeartSetting(s *haLocal) {
+	if _, peer, ok := s.heart(); ok && s != nil {
+		a.Config.SetSetting("ha.heart", s.HeartDev+"|"+peer.String())
+		return
+	}
+	a.Config.Exec(`DELETE FROM settings WHERE key='ha.heart'`)
 }
 
 func renamePort(n string, ms []ha.Match) string {

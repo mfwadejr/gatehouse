@@ -1,6 +1,17 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.20',
+    title: 'Safer pair updates, any-port device placement, warm spare',
+    items: [
+      'Updating a pair: from the active unit, Update now updates the spare first, checks that it works, hands the role to it, then updates the other unit, with one progress list. If the spare cannot update, the active unit is never touched. The roles end up swapped; hand back whenever you like.',
+      'Move a device to another network now works from any port or Wi-Fi: Gatehouse moves that one device across to the VLAN network, so the device does not have to be plugged into the VLAN\'s port.',
+      'Cable between the two units (optional): choose a spare port on each and the pair talks over it (settings copy, updates, connection copy), falling back to the shared network if it is unplugged. An unplugged cable never makes a unit take over (Settings, Advanced, pair).',
+      'Keep the spare\'s internet connection ready (optional): the spare keeps its internet port connected but silent, copies the active unit\'s hardware address, and takes over faster. Not for PPPoE or Wi-Fi connections.',
+      'Fixed: a build could fail on a slow machine because a test did not wait long enough for the console to start.',
+    ],
+  },
+  {
     version: '0.8.19',
     title: 'Device placement, approvals, undo and more',
     items: [

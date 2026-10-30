@@ -127,15 +127,15 @@ func (a *App) overrideSync(force bool) error {
 		return nil
 	}
 	ts := a.ovTargets()
-	rows, err := a.Config.Query(`SELECT lower(mac),override_iface FROM devices WHERE override_iface<>''`)
+	rows, err := a.Config.Query(`SELECT lower(mac),override_iface,override_home FROM devices WHERE override_iface<>''`)
 	if err != nil {
 		return err
 	}
-	type pair struct{ mac, iface string }
+	type pair struct{ mac, iface, home string }
 	var ps []pair
 	for rows.Next() {
 		var p pair
-		if rows.Scan(&p.mac, &p.iface) == nil {
+		if rows.Scan(&p.mac, &p.iface, &p.home) == nil {
 			ps = append(ps, p)
 		}
 	}
@@ -153,7 +153,17 @@ func (a *App) overrideSync(force bool) error {
 		if !ok {
 			continue // the network was removed; the device simply returns to its own
 		}
-		plan.Rules = append(plan.Rules, netd.OverrideRule{Parent: t.Parent, MAC: p.mac, VID: t.VID})
+		rule := netd.OverrideRule{Parent: t.Parent, MAC: p.mac, VID: t.VID}
+		if p.home != "" && p.home != t.Parent && p.home != t.Iface {
+			rule.Home, rule.Iface = p.home, t.Iface
+			for _, d := range []string{p.home, t.Iface} {
+				if !seen[d] {
+					seen[d] = true
+					plan.Parents = append(plan.Parents, d)
+				}
+			}
+		}
+		plan.Rules = append(plan.Rules, rule)
 	}
 	sort.Slice(plan.Rules, func(i, j int) bool { return plan.Rules[i].MAC < plan.Rules[j].MAC })
 	sort.Strings(plan.Parents)
@@ -199,25 +209,38 @@ func (a *App) setOverride(id int64, iface string) error {
 	if a.Config.QueryRow(`SELECT lower(mac) FROM devices WHERE id=?`, id).Scan(&mac) != nil {
 		return errors.New("that device is not in the list")
 	}
+	home := ""
 	if iface != "" {
 		ts := a.ovTargets()
 		t, ok := ovFind(ts, iface)
 		if !ok {
 			return errors.New("choose one of your VLAN networks (a network with a VLAN number)")
 		}
-		if home := a.deviceHomeIface(mac); home != "" && home != t.Parent {
-			if h, ok := ovFind(ts, home); !ok || h.Parent != t.Parent {
-				return fmt.Errorf("this device is on %s, but %s is on %s. Gatehouse can only place a device on a VLAN that is on the port the device is plugged into", home, t.Network, t.Parent)
+		// Where the device is plugged in does not matter: on the VLAN's own port it is tagged, on
+		// any other port or on Wi-Fi it is moved across. A device already placed keeps its port.
+		var curHome string
+		a.Config.QueryRow(`SELECT override_home FROM devices WHERE id=?`, id).Scan(&curHome)
+		home = curHome
+		if home == "" {
+			if h := a.deviceHomeIface(mac); h != "" {
+				if _, isVLAN := ovFind(ts, h); !isVLAN {
+					home = h
+				}
 			}
+		}
+		if home == t.Parent {
+			home = ""
 		}
 	}
 	prev := ""
 	a.Config.QueryRow(`SELECT override_iface FROM devices WHERE id=?`, id).Scan(&prev)
-	if _, err := a.Config.Exec(`UPDATE devices SET override_iface=? WHERE id=?`, iface, id); err != nil {
+	prevHome := ""
+	a.Config.QueryRow(`SELECT override_home FROM devices WHERE id=?`, id).Scan(&prevHome)
+	if _, err := a.Config.Exec(`UPDATE devices SET override_iface=?,override_home=? WHERE id=?`, iface, home, id); err != nil {
 		return err
 	}
 	if err := a.overrideSync(true); err != nil {
-		a.Config.Exec(`UPDATE devices SET override_iface=? WHERE id=?`, prev, id)
+		a.Config.Exec(`UPDATE devices SET override_iface=?,override_home=? WHERE id=?`, prev, prevHome, id)
 		a.overrideSync(true)
 		return err
 	}
@@ -244,7 +267,7 @@ func (a *App) approvalHold(mac, iface string) bool {
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		now := time.Now().Unix()
-		if _, e := a.Config.Exec(`INSERT OR IGNORE INTO devices(mac,name,first_seen,last_seen,override_iface,approval) VALUES(?,?,?,?,?,'pending')`, mac, "", now, now, hold.Iface); e != nil {
+		if _, e := a.Config.Exec(`INSERT OR IGNORE INTO devices(mac,name,first_seen,last_seen,override_iface,override_home,approval) VALUES(?,?,?,?,?,?,'pending')`, mac, "", now, now, hold.Iface, homeOf(ts, iface, hold)); e != nil {
 			return false
 		}
 		changed = true
@@ -254,7 +277,7 @@ func (a *App) approvalHold(mac, iface string) bool {
 	case ap == "ok":
 		return false
 	case ov != hold.Iface:
-		a.Config.Exec(`UPDATE devices SET override_iface=? WHERE mac=?`, hold.Iface, mac)
+		a.Config.Exec(`UPDATE devices SET override_iface=?,override_home=? WHERE mac=?`, hold.Iface, homeOf(ts, iface, hold), mac)
 		changed = true
 	}
 	// Never leave a device without a network: after a few quiet answers, let it onto its own.
@@ -412,4 +435,16 @@ func (a *App) registerOverrideRoutes() {
 	s.HandleAdmin("POST /api/approval/{id}/allow", decide("allow"))
 	s.HandleAdmin("POST /api/approval/{id}/block", decide("block"))
 	s.HandleAdmin("POST /api/approval/{id}/place", decide("place"))
+}
+
+// homeOf is the port a device arrived on, for placing it on the holding network. Nothing when it
+// came in on the holding network's own port or on a VLAN.
+func homeOf(ts []ovTarget, arrived string, hold ovTarget) string {
+	if arrived == "" || arrived == hold.Parent || arrived == hold.Iface {
+		return ""
+	}
+	if _, isVLAN := ovFind(ts, arrived); isVLAN {
+		return ""
+	}
+	return arrived
 }

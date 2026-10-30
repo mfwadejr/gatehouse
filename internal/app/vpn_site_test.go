@@ -36,7 +36,8 @@ func siteBoxWith(t *testing.T, lan string, tune func(*Config)) (*client, *fakeNe
 	t.Cleanup(func() { cancel(); <-done })
 	jar, _ := cookiejar.New(nil)
 	c := &client{t: t, base: "http://" + web, hc: &http.Client{Jar: jar}, app: a}
-	for i := 0; i < 50; i++ {
+	// A busy machine (CI runs many packages at once) can take a few seconds to start listening.
+	for i := 0; i < 300; i++ {
 		if resp, err := c.hc.Get(c.base + "/api/health"); err == nil {
 			resp.Body.Close()
 			break

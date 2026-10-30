@@ -67,6 +67,9 @@ type App struct {
 	haOwnsFn     func(addr string) bool
 	haListen     string // the link's listen address; empty means the usual port
 	haBound      atomic.Value
+	pairRun      pairRun
+	warmMACs     string
+	pairHooks    pairHooks
 	NDPI         *ndpi.Table
 	ov           ovState
 	ndpiOnce     sync.Once
@@ -203,6 +206,7 @@ func New(cfg Config) (*App, error) {
 	a.registerSNMPRoutes()
 	a.registerSQMRoutes()
 	a.registerPortalRoutes()
+	a.registerHAWarmRoutes()
 	a.registerDDNSRoutes()
 	a.registerNetFilterRoutes()
 	a.loadSyslog()
@@ -395,6 +399,7 @@ func (a *App) Run(ctx context.Context) error {
 	run(func() { a.snmpLoop(ctx) })
 	run(func() { a.sqmLoop(ctx) })
 	run(func() { a.portalLoop(ctx) })
+	run(func() { a.haWarmLoop(ctx) })
 	run(func() { a.overrideLoop(ctx) })
 	run(func() { a.haSyncLoop(ctx) })
 	run(func() { a.updateLoop(ctx) })

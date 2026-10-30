@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { get, post, useData } from '../api.js';
+import { get, post, put, useData } from '../api.js';
 import ApplyBar from '../ApplyBar.jsx';
-import { Button, Card, Field, Input, Note, Pill, Segmented, Select, useAction, confirmBox } from '../ui.jsx';
+import { Button, Card, Field, Input, Note, Pill, Segmented, Select, ToggleRow, useAction, confirmBox } from '../ui.jsx';
 
 // High availability: two Gatehouse machines, one active at a time. The first-time setup is a short
 // list of steps; once it runs, this card is the status page.
@@ -116,6 +116,14 @@ export default function HighAvailability({ me }) {
           <div className="item"><div><div className="name">Shared addresses</div><div className="meta">{(data.vips || []).map((v) => `${v.cidr} on ${v.iface}`).join(' · ')}</div></div></div>
           <div className="item"><div><div className="name">Settings copied</div><div className="meta">{ago(data.synced_at)}. Changes are made on the active unit and copied across.</div></div></div>
         </div>
+        <ToggleRow title="Keep the spare's internet connection ready" desc="The spare keeps its internet port connected but silent, copies the active unit's hardware address and takes over faster. Set it on the active unit. A login connection (PPPoE) and a Wi-Fi connection are not part of this; they start fresh on takeover." checked={!!data.warm} disabled={busy || !data.active} onChange={(v) => run(async () => { await put('/api/ha/warm', { on: v }); all(); }, v ? 'The spare is kept ready.' : 'Back to keeping the spare\'s internet port down.')} />
+        <Field label="Cable between the two units (optional)" hint="Plug a cable between one spare port on each unit and choose that port on both. The two units then talk over the cable (settings copy, updates, connection copy) and fall back to your shared network if it is unplugged. An unplugged cable never makes either unit take over.">
+          <div className="inline">
+            <Select value={data.heart?.dev || ''} onChange={(v) => run(async () => { await put('/api/ha/heart', { dev: v }); all(); }, v ? 'The cable port is set on this unit. Set the other unit too.' : 'The cable is no longer used.')}
+              options={[{ value: '', label: 'No cable' }, ...((data.heart_choices || []).concat(data.heart?.dev && !(data.heart_choices || []).includes(data.heart.dev) ? [data.heart.dev] : [])).map((p) => ({ value: p, label: p }))]} />
+            {data.heart && <Pill tone={data.heart.connected ? 'good' : 'warn'}>{data.heart.connected ? 'Cable connected' : 'Cable not connected'}</Pill>}
+          </div>
+        </Field>
         <div className="inline">
           {data.active && <Button disabled={busy} onClick={() => run(async () => { await post('/api/ha/sync', {}); all(); }, 'Sent.')}>Copy settings now</Button>}
           {!data.active && <Button kind="primary" disabled={busy} onClick={async () => { if (await confirmBox('Make this unit the active one? Connections may pause for a few seconds.', { title: 'Switch units', yes: 'Switch' })) run(async () => { await post('/api/ha/failover', { code: '' }); all(); }, 'The active role is moving to this unit.'); }}>Make this unit active</Button>}

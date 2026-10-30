@@ -83,6 +83,14 @@ type Status struct {
 	Role    string `json:"role"`   // primary or standby: how it was paired
 	Seq     int64  `json:"seq"`    // newest settings snapshot it has
 	Time    int64  `json:"time"`
+	// Update is what this unit's updater is doing ("idle" when nothing). ResultTo and Result say
+	// how the last update ended: Result is "ok" or "failed", ResultTo the version it aimed for.
+	Update   string `json:"update,omitempty"`
+	Result   string `json:"result,omitempty"`
+	ResultTo string `json:"result_to,omitempty"`
+	// WanMACs are the hardware addresses on the internet ports, by connection name, reported by the
+	// active unit for a warm standby to copy.
+	WanMACs map[string]string `json:"wan_macs,omitempty"`
 }
 
 // Overview is what the primary tells a unit that is about to join.
@@ -105,6 +113,8 @@ type Link struct {
 	// OnHandover makes this unit step aside; OnLeave unpairs it. Both come from the partner only.
 	OnHandover func() error
 	OnLeave    func() error
+	// OnUpdate takes a signed update package from the active partner and installs it here.
+	OnUpdate func(pkg []byte, sig, version string) error
 }
 
 func (l *Link) tlsConfig() (*tls.Config, error) {
@@ -193,6 +203,22 @@ func (l *Link) Handler() http.Handler {
 			return
 		}
 		if err := l.OnLeave(); err != nil {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		w.Write([]byte("ok"))
+	})
+	mux.HandleFunc("POST /ha/update", func(w http.ResponseWriter, r *http.Request) {
+		if !known(r) || l.OnUpdate == nil {
+			deny(w)
+			return
+		}
+		body, err := io.ReadAll(io.LimitReader(r.Body, 256<<20))
+		if err != nil {
+			http.Error(w, "unreadable", http.StatusBadRequest)
+			return
+		}
+		if err := l.OnUpdate(body, r.Header.Get("X-GH-Sig"), r.Header.Get("X-GH-Version")); err != nil {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}

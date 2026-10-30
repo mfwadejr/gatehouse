@@ -77,3 +77,30 @@ func TestOverrideApplyFailureCleansUp(t *testing.T) {
 		t.Fatalf("should end with clean-up: %v", ran)
 	}
 }
+
+func TestOverrideCommandsForADeviceOnAnotherPort(t *testing.T) {
+	cmds, err := OverrideCommands(OverridePlan{Rules: []OverrideRule{{Parent: "eth1", MAC: "AA:BB:CC:00:11:22", VID: 20, Home: "wlan0", Iface: "eth1.20"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := ""
+	for _, c := range cmds {
+		out += strings.Join(c, " ") + "\n"
+	}
+	for _, want := range []string{
+		"qdisc replace dev wlan0 clsact", "qdisc replace dev eth1.20 clsact",
+		"filter add dev wlan0 ingress protocol all prio 4100 flower src_mac aa:bb:cc:00:11:22 action mirred ingress redirect dev eth1.20",
+		"filter add dev eth1.20 egress protocol all prio 4100 flower dst_mac aa:bb:cc:00:11:22 action mirred egress redirect dev wlan0",
+		"dst_mac 01:00:00:00:00:00/01:00:00:00:00:00 action mirred egress mirror dev wlan0",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "vlan push") {
+		t.Fatalf("another port must not use tagging:\n%s", out)
+	}
+	if _, err := OverrideCommands(OverridePlan{Rules: []OverrideRule{{Parent: "eth1", MAC: "aa:bb:cc:00:11:22", VID: 20, Home: "bad name", Iface: "eth1.20"}}}); err == nil {
+		t.Fatal("accepted a bad port name")
+	}
+}

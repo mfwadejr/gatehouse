@@ -238,7 +238,7 @@ func TestNetworkFlow(t *testing.T) {
 	defer func() { cancel(); <-done }()
 	jar, _ := cookiejar.New(nil)
 	c := &client{t: t, base: "http://" + web, hc: &http.Client{Jar: jar}}
-	for i := 0; i < 50; i++ {
+	for i := 0; i < 300; i++ {
 		if resp, err := c.hc.Get(c.base + "/api/health"); err == nil {
 			resp.Body.Close()
 			break
@@ -327,7 +327,7 @@ func TestFirstRunSetup(t *testing.T) {
 	defer func() { cancel(); <-done }()
 	jar, _ := cookiejar.New(nil)
 	c := &client{t: t, base: "http://" + web, hc: &http.Client{Jar: jar}}
-	for i := 0; i < 50; i++ {
+	for i := 0; i < 300; i++ {
 		if resp, err := c.hc.Get(c.base + "/api/health"); err == nil {
 			resp.Body.Close()
 			break

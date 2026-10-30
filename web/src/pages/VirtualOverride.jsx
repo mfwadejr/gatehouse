@@ -33,7 +33,7 @@ export default function VirtualOverride({ d, onSaved }) {
           }}>Move it</Button>
         </div>
       )}
-      <Note tone="">Works the same for wired and Wi-Fi devices. The VLAN network must be on the same port the device is plugged into, and the device has to ask for an address again to join it.</Note>
+      <Note tone="">Works the same for wired and Wi-Fi devices, on any port. Gatehouse moves this one device across to the VLAN network at its own ports. The device has to ask for an address again to join it, and the VLAN's broadcasts (such as address offers) are also copied to the port it is on.</Note>
     </Field>
   );
 }

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 // addVLAN puts a VLAN network (with an address service) into the settings, the way the Networks
@@ -261,5 +262,51 @@ func TestAddPortsToAPlainNetwork(t *testing.T) {
 	// Doing it again is refused: it is no longer a plain network.
 	if rc, _, _ := c.call("POST", "/api/networks/add-ports", map[string]any{"id": id, "ports": []string{"tp2"}}); rc == 200 {
 		t.Fatal("a shared-port network cannot be converted again")
+	}
+}
+
+func TestDeviceOnAnotherPortCanBeMovedToAnyVLAN(t *testing.T) {
+	c, fn, _ := siteBox(t, "192.168.1.1/24")
+	a := c.app
+	// A VLAN on eth3; the device is on the home network (eth1), so it arrives on another port.
+	addVLAN(t, a, "eth3.20", "Cameras", 20, "eth3", true)
+	res, err := a.Config.Exec(`INSERT INTO dhcp_scopes(name,iface,mode,subnet,range_start,range_end,router) VALUES('Home','eth1','serve','192.168.1.0/24','192.168.1.100','192.168.1.200','192.168.1.1')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sid, _ := res.LastInsertId()
+	now := time.Now().Unix()
+	if _, err := a.Config.Exec(`INSERT INTO dhcp_leases(scope_id,ip,mac,start,expires,state) VALUES(?,?,?,?,?,'active')`, sid, "192.168.1.150", "aa:bb:cc:00:11:22", now, now+3600); err != nil {
+		t.Fatal(err)
+	}
+	a.DHCP.Reload()
+	id, err := a.Devices.Create("aa:bb:cc:00:11:22", "phone")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rc, _, raw := c.call("PUT", "/api/devices/"+itoa(id)+"/override", map[string]any{"network": "eth3.20"}); rc != 200 {
+		t.Fatalf("a device on another port must be accepted: %d %s", rc, raw)
+	}
+	fn.mu.Lock()
+	p := fn.ovPlans[len(fn.ovPlans)-1]
+	fn.mu.Unlock()
+	if len(p.Rules) != 1 || p.Rules[0].Home != "eth1" || p.Rules[0].Iface != "eth3.20" || p.Rules[0].Parent != "eth3" {
+		t.Fatalf("the rule should move the device across from its own port: %+v", p.Rules)
+	}
+	// Both ports are covered by the clean-up list.
+	have := map[string]bool{}
+	for _, d := range p.Parents {
+		have[d] = true
+	}
+	if !have["eth1"] || !have["eth3"] || !have["eth3.20"] {
+		t.Fatalf("clean-up list: %v", p.Parents)
+	}
+	// Putting it back removes the rule.
+	c.call("PUT", "/api/devices/"+itoa(id)+"/override", map[string]any{"network": ""})
+	fn.mu.Lock()
+	p = fn.ovPlans[len(fn.ovPlans)-1]
+	fn.mu.Unlock()
+	if len(p.Rules) != 0 {
+		t.Fatalf("rules left: %+v", p.Rules)
 	}
 }

@@ -288,6 +288,11 @@ func (c *compiler) input() {
 		c.line(2, "iifname %s tcp dport %s accept comment \"protected: setup port\"", ifSet([]string{r}), portList(m.ConsolePorts))
 	}
 
+	// The cable to the partner unit: its address on that port only, for the link and the table copy.
+	if m.HeartDev != "" && m.HeartPeer != "" {
+		c.line(2, "iifname %s ip saddr %s tcp dport 8444 accept comment \"protected: partner unit link (cable)\"", q(m.HeartDev), m.HeartPeer)
+		c.line(2, "iifname %s ip saddr %s udp dport 3780 accept comment \"protected: partner unit connection copy (cable)\"", q(m.HeartDev), m.HeartPeer)
+	}
 	// The partner unit of a high-availability pair, by its own address only.
 	if m.HAPeer != "" {
 		c.line(2, "ip saddr %s tcp dport 8444 accept comment \"protected: partner unit link\"", m.HAPeer)

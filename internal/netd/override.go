@@ -19,6 +19,10 @@ type OverrideRule struct {
 	Parent string `json:"parent"`
 	MAC    string `json:"mac"`
 	VID    int    `json:"vid"`
+	// Home is the port or network the device is really plugged into, when that is not Parent. Then
+	// the device's frames are moved into the VLAN network Iface instead of being tagged.
+	Home  string `json:"home,omitempty"`
+	Iface string `json:"iface,omitempty"`
 }
 
 // OverridePlan is the whole set. Applying it replaces what was applied before.
@@ -61,6 +65,12 @@ func OverrideCommands(p OverridePlan) ([][]string, error) {
 			return nil, fmt.Errorf("%d is not a VLAN number", r.VID)
 		}
 		parents[r.Parent] = true
+		if r.Home != "" && r.Home != r.Parent {
+			if !reHADev.MatchString(r.Home) || !reHADev.MatchString(r.Iface) {
+				return nil, fmt.Errorf("%q or %q is not a usable port name", r.Home, r.Iface)
+			}
+			parents[r.Home], parents[r.Iface] = true, true
+		}
 	}
 	names := make([]string, 0, len(parents))
 	for d := range parents {
@@ -78,6 +88,22 @@ func OverrideCommands(p OverridePlan) ([][]string, error) {
 		hw, _ := net.ParseMAC(r.MAC)
 		mac := hw.String()
 		vid := fmt.Sprint(r.VID)
+		if r.Home != "" && r.Home != r.Parent {
+			// A device on another port: its frames are moved into the VLAN network as if they had
+			// arrived there, and what the VLAN network sends to it goes back out of its own port.
+			cmds = append(cmds,
+				[]string{"filter", "add", "dev", r.Home, "ingress", "protocol", "all", "prio", overridePrio,
+					"flower", "src_mac", mac, "action", "mirred", "ingress", "redirect", "dev", r.Iface},
+				[]string{"filter", "add", "dev", r.Iface, "egress", "protocol", "all", "prio", overridePrio,
+					"flower", "dst_mac", mac, "action", "mirred", "egress", "redirect", "dev", r.Home})
+			k := pv{r.Iface + ">" + r.Home, 0}
+			if !bc[k] {
+				bc[k] = true
+				cmds = append(cmds, []string{"filter", "add", "dev", r.Iface, "egress", "protocol", "all", "prio", overrideBcast,
+					"flower", "dst_mac", "01:00:00:00:00:00/01:00:00:00:00:00", "action", "mirred", "egress", "mirror", "dev", r.Home})
+			}
+			continue
+		}
 		for _, proto := range []string{"ip", "ipv6", "arp"} {
 			cmds = append(cmds, []string{"filter", "add", "dev", r.Parent, "ingress", "protocol", proto, "prio", overridePrio,
 				"flower", "src_mac", mac, "action", "vlan", "push", "id", vid})

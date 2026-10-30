@@ -489,4 +489,7 @@ CREATE TABLE network_profiles(
 -- address) and new-device approval (ok, pending or blocked; existing devices stay ok).
 ALTER TABLE devices ADD COLUMN override_iface TEXT NOT NULL DEFAULT '';
 ALTER TABLE devices ADD COLUMN approval TEXT NOT NULL DEFAULT 'ok';
+`, `
+-- Package 9: the port a placed device is really plugged into, when that is not its VLAN's port.
+ALTER TABLE devices ADD COLUMN override_home TEXT NOT NULL DEFAULT '';
 `}

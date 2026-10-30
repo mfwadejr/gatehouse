@@ -88,3 +88,4 @@ debian-archive-keyring
 
 # Names of network card makers on the Devices page (the IEEE registry, refreshed by Debian updates)
 ieee-data
+iputils-arping

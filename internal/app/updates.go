@@ -146,6 +146,7 @@ func (a *App) checkSystem() {
 // off), reports what the last update did, and in "automatic" mode installs in the chosen hour.
 func (a *App) updateLoop(ctx context.Context) {
 	a.reportUpdateResult()
+	go a.pairResumeLoop(ctx)
 	first := time.NewTimer(45 * time.Second)
 	defer first.Stop()
 	tick := time.NewTicker(10 * time.Minute)
@@ -196,7 +197,7 @@ func (a *App) autoInstall(now time.Time) {
 		return
 	}
 	a.Config.SetSetting(updateAutoAtSetting, strconv.FormatInt(now.Unix(), 10))
-	if _, err := a.startUpdate("automatic update", true); err != nil {
+	if _, err := a.startAnyUpdate("automatic update", true); err != nil {
 		a.event("system", "warning", "The automatic update could not start", err.Error())
 	}
 }
@@ -261,6 +262,14 @@ type updateView struct {
 	Window        int             `json:"window"` // hour automatic updates may start
 	NeedsReboot   bool            `json:"needs_reboot"`
 	RebootComment string          `json:"-"`
+	Pair          *pairView       `json:"pair,omitempty"`
+}
+
+// pairView is the state of an update of both units of a pair.
+type pairView struct {
+	Phase  string `json:"phase"`
+	Target string `json:"target"`
+	Error  string `json:"error,omitempty"`
 }
 
 // updateSteps builds the progress list for the run that is going on.
@@ -327,6 +336,14 @@ func (a *App) updateStatus() updateView {
 		v.Result = &r
 	}
 	v.NeedsReboot = rebootNeeded()
+	if ps, p := a.pairSteps(); p != nil {
+		v.Pair = &pairView{Phase: p.Phase, Target: p.Target, Error: p.Error}
+		if len(ps) > 0 {
+			v.Steps = ps
+			v.Working = p.Phase != "failed"
+			return v
+		}
+	}
 	if working && step != "" {
 		v.Steps = updateSteps(plan, step)
 	} else if v.State != "idle" {
@@ -417,7 +434,7 @@ func (a *App) updateInstall(w http.ResponseWriter, r *http.Request, c *api.Ctx) 
 			return
 		}
 	}
-	to, err := a.startUpdate(c.User.Username, false)
+	to, err := a.startAnyUpdate(c.User.Username, false)
 	if err != nil {
 		if errors.Is(err, update.ErrBusy) {
 			api.Error(w, http.StatusConflict, err.Error())
@@ -427,6 +444,23 @@ func (a *App) updateInstall(w http.ResponseWriter, r *http.Request, c *api.Ctx) 
 		return
 	}
 	api.JSON(w, 200, map[string]any{"started": true, "to": to})
+}
+
+// startAnyUpdate updates a running pair the safe way (spare first) when there is a newer Gatehouse,
+// and a single unit, or a system-only update, the ordinary way.
+func (a *App) startAnyUpdate(user string, auto bool) (string, error) {
+	if st := a.haLoad(); st != nil && st.Activated && st.PeerFP != "" {
+		a.upd.mu.Lock()
+		rel := a.upd.latest
+		a.upd.mu.Unlock()
+		if rel != nil && update.Compare(rel.Version, a.currentVersion()) > 0 {
+			if _, err := a.startPairUpdate(user); err != nil {
+				return "", err
+			}
+			return rel.Version, nil
+		}
+	}
+	return a.startUpdate(user, auto)
 }
 
 // startUpdate checks that there is something to install and starts the run in the background:

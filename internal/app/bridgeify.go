@@ -104,6 +104,7 @@ func (a *App) addPortsToNetwork(id int64, add []string) (string, error) {
 			tx.Exec(`UPDATE devices SET override_iface=? WHERE override_iface=?`, nn, v.name)
 			tx.Exec(`UPDATE settings SET value=? WHERE key='approval.holding' AND value=?`, nn, v.name)
 		}
+		tx.Exec(`UPDATE devices SET override_home=? WHERE override_home=?`, br, name)
 		name = br
 		return nil
 	})

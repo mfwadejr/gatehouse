@@ -69,6 +69,11 @@ func Load(db Queryer) (*Model, error) {
 	m.LogDrops = setting(db, "fw.log_drops", "1") == "1"
 	m.LogAllowed = setting(db, "fw.log_allowed", "1") == "1"
 	m.Bridge = BridgeFrom(db)
+	if d, pr, found := strings.Cut(strings.TrimSpace(setting(db, "ha.heart", "")), "|"); found {
+		if a, err := netip.ParseAddr(pr); err == nil && a.Is4() && d != "" && !strings.ContainsAny(d, " \t\n{}\"#;") && len(d) <= 15 {
+			m.HeartDev, m.HeartPeer = d, a.String()
+		}
+	}
 	if a, err := netip.ParseAddr(strings.TrimSpace(setting(db, "ha.peer", ""))); err == nil && a.Is4() {
 		m.HAPeer = a.String()
 	}

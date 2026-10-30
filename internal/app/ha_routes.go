@@ -93,6 +93,13 @@ func (a *App) haStatus() map[string]any {
 	st["synced_at"], st["error"], st["version"] = s.SyncedAt, s.LastError, a.Cfg.Version
 	st["joined"] = s.PeerFP != "" && (s.Role == ha.Standby || s.PeerFP != "")
 	st["peer"] = a.haPeerStatus(s)
+	st["warm"] = a.haWarmOn()
+	if own, peer, ok := s.heart(); ok {
+		st["heart"] = map[string]any{"dev": s.HeartDev, "own": own.Addr().String(), "peer": peer.String(), "connected": heartCarrier(s.HeartDev)}
+	} else {
+		st["heart"] = nil
+	}
+	st["heart_choices"] = a.haHeartChoices(s)
 	if s.Role == ha.Primary && !s.Activated || s.PeerFP == "" {
 		if code, err := ha.Encode(s.pairingForCode()); err == nil && s.Role == ha.Primary {
 			st["code"] = code
@@ -404,6 +411,57 @@ func (a *App) registerHARoutes() {
 		ok(w)
 	})
 
+	// The optional cable to the partner: pick a spare port, or "" to stop using one.
+	s.HandleAdmin("PUT /api/ha/heart", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		var in struct {
+			Dev string `json:"dev"`
+		}
+		if !api.Decode(w, r, &in) {
+			return
+		}
+		st := a.haLoad()
+		if st == nil {
+			fail(w, errors.New("this unit is not paired"))
+			return
+		}
+		if in.Dev != "" {
+			good := false
+			for _, ch := range a.haHeartChoices(st) {
+				good = good || ch == in.Dev
+			}
+			if !good {
+				fail(w, errors.New(in.Dev+" cannot be used for the cable: it must be a wired port that nothing else uses"))
+				return
+			}
+			own, _, ok := (&haLocal{Pairing: st.Pairing, Role: st.Role, HeartDev: in.Dev}).heart()
+			if !ok {
+				fail(w, errors.New("the cable network could not be worked out"))
+				return
+			}
+			if clash := a.heartClash(own); clash != "" {
+				fail(w, errors.New("the cable's private network ("+own.Masked().String()+") overlaps "+clash+"; change that network first"))
+				return
+			}
+		}
+		prev := st.HeartDev
+		a.haUpdate(func(x *haLocal) { x.HeartDev = in.Dev })
+		st = a.haLoad()
+		if st.Activated {
+			if err := a.haInstall(st); err != nil {
+				a.haUpdate(func(x *haLocal) { x.HeartDev = prev })
+				fail(w, err)
+				return
+			}
+		}
+		a.haSetHeartSetting(st)
+		if err := a.refreshFirewallQuiet(c.User.Username); err != nil {
+			fail(w, errors.New("the firewall could not be updated: "+err.Error()))
+			return
+		}
+		a.publishFW()
+		ok(w)
+	})
+
 	s.HandleAdmin("POST /api/ha/unpair", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		st := a.haLoad()
 		if st == nil {
@@ -432,6 +490,7 @@ func (a *App) haLeave(st *haLocal) error {
 	}
 	a.haSave(nil)
 	a.haSetFirewallPeer(nil)
+	a.Config.Exec(`DELETE FROM settings WHERE key='ha.heart'`)
 	a.DHCP.Silent.Store(false)
 	a.event("system", "info", "This unit is no longer part of a pair", "It runs on its own again. Apply the network changes if the addresses need to go back.")
 	return nil
@@ -556,4 +615,46 @@ func (a *App) haAutoApply() {
 	}
 	a.publishFW()
 	a.publishNet()
+}
+
+// haHeartChoices are the ports that could carry the cable: wired, and used by nothing.
+func (a *App) haHeartChoices(st *haLocal) []string {
+	used := map[string]bool{}
+	for _, r := range a.haRoles() {
+		used[r.Port] = true
+	}
+	if ifs, err := a.listIfaces(a.Config); err == nil {
+		for _, i := range ifs {
+			used[i.Name], used[i.Parent] = true, true
+			for _, m := range i.Members {
+				used[m] = true
+			}
+		}
+	}
+	if wans, err := a.listWans(a.Config); err == nil {
+		for _, w := range wans {
+			used[w.Iface] = true
+		}
+	}
+	out := []string{}
+	for _, p := range a.haPortList() {
+		if !p.Wireless && !used[p.Name] || st != nil && p.Name == st.HeartDev && !p.Wireless {
+			out = append(out, p.Name)
+		}
+	}
+	return out
+}
+
+// heartClash names a network of this unit that overlaps the cable's, or "".
+func (a *App) heartClash(own netip.Prefix) string {
+	ifs, err := a.listIfaces(a.Config)
+	if err != nil {
+		return ""
+	}
+	for _, i := range ifs {
+		if pf, err := netip.ParsePrefix(i.IPv4); err == nil && pf.Masked().Overlaps(own.Masked()) {
+			return i.Name
+		}
+	}
+	return ""
 }

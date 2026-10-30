@@ -33,6 +33,8 @@ const STATIC = [
   ['Traffic labels', 'settings', 'Name the app behind each connection by looking at packets', 'ndpi dpi deep packet inspection application youtube zoom bittorrent labels'],
   ['Bridge mode', 'settings', 'Filter between another router and your network without routing', 'bridge transparent filtering inline passthrough'],
   ['Send logs elsewhere', 'settings', 'Copy logs to a syslog server', 'syslog export siem'],
+  ['Pair: cable between the two units', 'settings', 'Optional cable for the pair to talk over', 'heartbeat ha high availability cable link'],
+  ['Pair: keep the spare internet ready', 'settings', 'Silent warm standby for faster takeover', 'warm standby ha failover mac'],
   ['Guest sign-in page', 'settings', 'Make guests tap Connect before they get internet', 'captive portal guest wifi terms splash sign in hotspot'],
   ['Send traffic records (NetFlow / IPFIX)', 'settings', 'Tell a traffic analysis tool about connections', 'netflow ipfix flow export collector'],
   ['Let a monitoring tool read this device (SNMP)', 'settings', 'Read only status for monitoring tools', 'snmp monitoring librenms zabbix prometheus'],

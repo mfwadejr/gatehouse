@@ -173,6 +173,8 @@ type Model struct {
 	// HAPeer is the partner unit's own address when this unit is half of a high-availability pair. It
 	// may reach the link port, the shared-address protocol and the connection-table copy, nothing else.
 	HAPeer string
+	// HeartDev and HeartPeer are the cable port to the partner unit and the partner's address on it.
+	HeartDev, HeartPeer string
 }
 
 // ZoneByName returns a zone.

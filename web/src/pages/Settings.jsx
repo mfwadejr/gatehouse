@@ -338,6 +338,7 @@ function Updates({ me }) {
         {!d.key_set && <Note tone="warn" title="Updates are not set up in this build">This copy of Gatehouse has no update signing key, so it cannot install updates. Build a new installer once with a key (docs/UPDATES.md); after that, updates need no installer.</Note>}
         {d.key_set && d.error && <Note tone="warn" title="Could not look for Gatehouse updates">{d.error}</Note>}
         {d.key_set && d.system_error && <Note tone="warn" title="Could not look at the system updates">{d.system_error}</Note>}
+        {d.pair?.phase === 'failed' && d.pair.error && <Note tone="warn" title="The update of both units stopped">{d.pair.error}</Note>}
         {d.checking && !working && <p className="muted">Looking at what the system has waiting…</p>}
         {working && (
           <Note tone="good" title="Updating">
