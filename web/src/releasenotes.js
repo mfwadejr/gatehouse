@@ -1,6 +1,13 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.23',
+    title: 'Build fix',
+    items: [
+      'Fixed: the build for 0.8.21 and 0.8.22 failed on a test that was too strict about timing. Nothing about how Gatehouse runs changed, and 0.8.21 and 0.8.22 include nothing else that is different.',
+    ],
+  },
+  {
     version: '0.8.22',
     title: 'Clearer Who can reach whom',
     items: [

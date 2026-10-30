@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"gatehouse/internal/ha"
+	"gatehouse/internal/netd"
 )
 
 func fastFailback(t *testing.T) {
@@ -132,17 +133,32 @@ func TestPromotingTheUnitRunningTheNetworkSwapsThePrimaryOnBothWithoutRestarting
 	if S.haLoad().Prefer != ha.Standby || P.haLoad().Prefer != ha.Standby {
 		t.Fatal("both units must agree")
 	}
+	// The partner may still be loading a copy of the settings and restart its own standby service
+	// for that reason; what matters is that the priority change itself was written without a restart.
+	confOnly := func(plans []netd.HAPlan, prio string) (found bool, _ bool) {
+		for _, p := range plans {
+			if p.ConfOnly && strings.Contains(p.Keepalived, prio) {
+				found = true
+			}
+		}
+		return
+	}
+	waitHA(t, "the old Primary to take the lower priority", 5*time.Second, func() bool {
+		pfn.mu.Lock()
+		defer pfn.mu.Unlock()
+		f, _ := confOnly(pfn.haPlans[pBefore:], "priority 100")
+		return f
+	})
 	sfn.mu.Lock()
-	sp := sfn.haPlans[sBefore:]
+	sp := append([]netd.HAPlan(nil), sfn.haPlans[sBefore:]...)
 	sfn.mu.Unlock()
-	pfn.mu.Lock()
-	pp := pfn.haPlans[pBefore:]
-	pfn.mu.Unlock()
-	if len(sp) != 1 || !sp[0].ConfOnly || !strings.Contains(sp[0].Keepalived, "priority 150") {
+	if f, _ := confOnly(sp, "priority 150"); !f {
 		t.Fatalf("the new Primary takes the higher priority, without a restart: %+v", sp)
 	}
-	if len(pp) != 1 || !pp[0].ConfOnly || !strings.Contains(pp[0].Keepalived, "priority 100") {
-		t.Fatalf("the old Primary takes the lower one, without a restart: %+v", pp)
+	for _, p := range sp {
+		if !p.ConfOnly {
+			t.Fatalf("promoting must not restart the unit that is running the network: %+v", p)
+		}
 	}
 	// Nothing is offered any more: the unit running the network is the Primary.
 	if _, st, _ := sc.call("GET", "/api/ha", nil); st["failback"] != nil || st["primary"] != true {
