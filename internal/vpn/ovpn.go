@@ -149,6 +149,7 @@ var allowed = map[string]bool{
 	"server-poll-timeout": true, "ignore-unknown-option": true, "lport": true, "rport": true, "topology": true,
 	"sndbuf": true, "rcvbuf": true, "mute-replay-warnings": true, "peer-fingerprint": true,
 	"remote-cert-ku": true, "remote-cert-eku": true, "ncp-ciphers": true, "tls-groups": true, "auth-retry": true,
+	"tls-timeout": true, "hand-window": true, "tran-window": true, "replay-window": true, "connect-timeout": true,
 }
 
 // ignored are accepted and dropped: the router decides routes, DNS and the device name.
@@ -161,6 +162,9 @@ var ignored = map[string]bool{
 	"allow-compression": true, "route-gateway": true, "ifconfig-nowarn": true, "show-net-up": true, "disable-dco": true,
 	"allow-pull-fqdn": true, "ping-timer-rem": true, "http-proxy-retry": true, "tls-exit": true, "nice": true,
 	"fast-io": true, "inactive": true, "ca-from-system": false,
+	// Old settings that do nothing useful today (the key size comes from the cipher; key
+	// method 2 is the only one in use).
+	"keysize": true, "key-method": true, "no-replay": true, "persist-local-ip": true, "persist-remote-ip": true,
 }
 
 // ImportProfile reads a provider's .ovpn file. It keeps the certificates and the security
@@ -172,7 +176,8 @@ func ImportProfile(text string) (*ImportedProfile, error) {
 	var out strings.Builder
 	ip := &ImportedProfile{}
 	lines := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
-	hasCA, hasRemote := false, false
+	hasCA, hasRemote, sawCertTLS := false, false, false
+	var refused []string
 	for i := 0; i < len(lines); i++ {
 		line := strings.TrimSpace(lines[i])
 		if line == "" || line[0] == '#' || line[0] == ';' {
@@ -219,6 +224,19 @@ func ImportProfile(text string) (*ImportedProfile, error) {
 				ip.Remote = f[1]
 			}
 			fmt.Fprintln(&out, strings.Join(f, " "))
+		case d == "ns-cert-type":
+			// The old form of remote-cert-tls. Newer OpenVPN is dropping it, so it is written
+			// the modern way (once).
+			if len(f) > 1 && (strings.EqualFold(f[1], "server") || strings.EqualFold(f[1], "client")) && !sawCertTLS {
+				sawCertTLS = true
+				fmt.Fprintf(&out, "remote-cert-tls %s\n", strings.ToLower(f[1]))
+			}
+		case d == "remote-cert-tls":
+			if sawCertTLS {
+				continue
+			}
+			sawCertTLS = true
+			fmt.Fprintln(&out, strings.Join(f, " "))
 		case ignored[d]:
 			// dropped
 		case allowed[d]:
@@ -229,8 +247,23 @@ func ImportProfile(text string) (*ImportedProfile, error) {
 			}
 			fmt.Fprintln(&out, strings.Join(f, " "))
 		default:
-			return nil, fmt.Errorf("this profile uses %q, which Gatehouse does not run for safety. Ask your provider for a standard profile", d)
+			// Keep reading so every refused setting is named at once.
+			dup := false
+			for _, r := range refused {
+				if r == d {
+					dup = true
+				}
+			}
+			if !dup {
+				refused = append(refused, d)
+			}
 		}
+	}
+	if len(refused) == 1 {
+		return nil, fmt.Errorf("this profile uses %q, which Gatehouse does not run for safety. Ask your provider for a standard profile", refused[0])
+	}
+	if len(refused) > 1 {
+		return nil, fmt.Errorf("this profile uses %d settings Gatehouse does not run for safety: %s. Ask your provider for a standard profile", len(refused), strings.Join(refused, ", "))
 	}
 	if !hasRemote {
 		return nil, errors.New("that profile does not name a server (no remote line)")

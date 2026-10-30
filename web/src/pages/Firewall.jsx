@@ -157,7 +157,13 @@ function UPnP() {
   const { data, reload } = useData('/api/upnp', { topics: ['upnp.maps'], every: 10000 });
   const [run, busy] = useAction();
   const [mac, setMac] = useState('');
+  const [q, setQ] = useState('');
+  const { data: ch } = useData('/api/vpn/choices');
   if (!data) return null;
+  const known = new Map((ch?.devices || []).map((d) => [d.mac.toLowerCase(), d]));
+  const listed = new Set(data.allowed.map((a) => a.mac.toLowerCase()));
+  const found = (ch?.devices || []).filter((d) => !listed.has(d.mac.toLowerCase()) && (!q || `${d.name} ${d.ip} ${d.mac}`.toLowerCase().includes(q.toLowerCase())));
+  const addDevice = (d) => save({ allowed: [...data.allowed, { mac: d.mac, note: d.name || '' }] });
   const save = (patch) => run(() => put('/api/upnp/settings', { restrict: data.restrict, max_lease_hours: data.max_lease_hours, allowed: data.allowed, ...patch })).then(reload);
   return (
     <>
@@ -181,15 +187,30 @@ function UPnP() {
         {data.restrict && (
           <>
             <div className="list">
-              {data.allowed.map((a) => (
-                <div className="item" key={a.mac}><div><div className="name">{a.mac}</div><div className="meta">{a.note}</div></div>
-                  <div className="actions"><Button small kind="danger" icon="trash" onClick={() => save({ allowed: data.allowed.filter((x) => x.mac !== a.mac) })}>Remove</Button></div></div>
-              ))}
+              {data.allowed.map((a) => {
+                const d = known.get(a.mac.toLowerCase());
+                return (
+                  <div className="item" key={a.mac}><div><div className="name">{d?.name || a.note || a.mac}</div><div className="meta mono">{a.mac}{d?.ip ? ` · ${d.ip}` : ''}</div></div>
+                    <div className="actions"><Button small kind="danger" icon="trash" onClick={() => save({ allowed: data.allowed.filter((x) => x.mac !== a.mac) })}>Remove</Button></div></div>
+                );
+              })}
               {!data.allowed.length && <Empty>No devices listed, so nothing can open a port.</Empty>}
             </div>
-            <div className="formgrid">
-              <Field label="Device address (MAC)"><Input value={mac} onChange={setMac} placeholder="aa:bb:cc:dd:ee:ff" /></Field>
-              <Field label=" "><Button disabled={busy || !mac} onClick={async () => { await save({ allowed: [...data.allowed, { mac, note: '' }] }); setMac(''); }}>Add</Button></Field>
+            <Field label="Add a device">
+              <Input value={q} onChange={setQ} placeholder="Search by name, address or MAC" aria-label="Search devices" />
+            </Field>
+            <div className="list" style={{ maxHeight: '14rem', overflow: 'auto' }}>
+              {found.slice(0, 50).map((d) => (
+                <div className="item" key={d.mac}>
+                  <div><div className="name"><span className={`dot ${d.online ? '' : 'off'}`} /> {d.name}</div><div className="meta mono">{d.ip || 'not seen yet'} · {d.mac}</div></div>
+                  <div className="actions"><Button small disabled={busy} onClick={() => addDevice(d)}>Allow</Button></div>
+                </div>
+              ))}
+              {ch && !found.length && <Empty>{q ? 'No matching devices.' : 'Every known device is already listed.'}</Empty>}
+            </div>
+            <div className="addrow" style={{ gridTemplateColumns: 'minmax(0, 1fr) auto' }}>
+              <Field label="Or type a device address (MAC)"><Input value={mac} onChange={setMac} placeholder="aa:bb:cc:dd:ee:ff" /></Field>
+              <Button disabled={busy || !mac} onClick={async () => { await save({ allowed: [...data.allowed, { mac, note: '' }] }); setMac(''); }}>Add</Button>
             </div>
           </>
         )}

@@ -62,7 +62,7 @@ function Overview() {
           actions={<button type="button" className="link small" onClick={() => setSelf((x) => !x)}>{self ? 'Hide this router' : 'Show this router'}</button>}>
           {!top?.clients?.length ? <Empty>No activity yet.</Empty> : (
             <div className="list">
-              {top.clients.slice(0, 6).map((c) => <div className="item" key={c.key}><div><div className="name">{c.label || c.key}</div><div className="meta">{c.key === '127.0.0.1' || c.key === '::1' ? 'This router, asking for itself' : c.key}</div></div><span>{fmt.n(c.n)}</span></div>)}
+              {top.clients.slice(0, 6).map((c) => { const self = c.addrs?.length === 1 && (c.addrs[0] === '127.0.0.1' || c.addrs[0] === '::1'); return <div className="item" key={c.key}><div><div className="name">{c.label || (c.addrs || [c.key])[0]}</div><div className="meta">{self ? 'This router, asking for itself' : (c.addrs || [c.key]).join(' · ')}</div></div><span>{fmt.n(c.n)}</span></div>; })}
             </div>
           )}
         </Card>
@@ -94,7 +94,7 @@ function Overview() {
 }
 
 // How a server is doing, in words a person can act on. Only every server being down is "No upstream".
-function UpstreamRow({ u, first, last, ordered, onMove, onRemove, reload }) {
+function UpstreamRow({ u, num, first, last, ordered, onMove, onRemove, reload }) {
   const [res, setRes] = useState(null);
   const [run, busy] = useAction();
   const tone = u.state === 'healthy' ? 'good' : u.state === 'degraded' ? 'warn' : 'bad';
@@ -107,7 +107,7 @@ function UpstreamRow({ u, first, last, ordered, onMove, onRemove, reload }) {
   return (
     <div className="item" style={{ alignItems: 'flex-start' }}>
       <div style={{ display: 'flex', gap: '0.75rem', minWidth: 0 }}>
-        {ordered && <span className="muted" style={{ fontVariantNumeric: 'tabular-nums', minWidth: '1.2rem', paddingTop: '0.1rem' }} aria-label={`Number ${u.position}`}>{u.position}</span>}
+        {ordered && <span className="muted" style={{ fontVariantNumeric: 'tabular-nums', minWidth: '1.2rem', paddingTop: '0.1rem' }} aria-label={`Number ${num}`}>{num}</span>}
         <div style={{ minWidth: 0 }}>
           <div className="name">{u.name}</div>
           <div className="meta">{u.addr} · {u.proto.toUpperCase()}{u.reused ? ' · connection kept open' : ''}</div>
@@ -155,7 +155,7 @@ function Upstreams({ ups, reload, onAdd }) {
       {allDown && <Note tone="warn" title="No server is answering">Names that are not already saved cannot be looked up until one of these answers again.</Note>}
       <div className="list">
         {sorted.map((u, i) => (
-          <UpstreamRow key={u.id} u={u} first={i === 0} last={i === sorted.length - 1} ordered={ordered} onMove={(d) => move(i, d)} reload={reload}
+          <UpstreamRow key={u.id} u={u} num={i + 1} first={i === 0} last={i === sorted.length - 1} ordered={ordered} onMove={(d) => move(i, d)} reload={reload}
             onRemove={() => run(() => del(`/api/dns/upstreams/${u.id}`)).then(reload)} />
         ))}
         {!ups.length && <Empty>No upstream servers.</Empty>}
@@ -278,10 +278,23 @@ function AddList({ onClose, onSaved }) {
 
 function Records() {
   const { data, reload } = useData('/api/dns/records');
+  const { data: dset } = useData('/api/dns/settings');
   const [f, setF] = useState({ name: '', type: 'A', value: '', ttl: 300 });
   const [run] = useAction();
+  // "Name this firewall": firewall.<home domain> pointing at the address this page was opened on.
+  const host = typeof window !== 'undefined' ? window.location.hostname : '';
+  const isV4 = /^\d{1,3}(\.\d{1,3}){3}$/.test(host);
+  const fwName = `firewall.${dset?.local_domain || 'lan'}`;
+  const hasFw = (data || []).some((r) => r.name === fwName && r.type === 'A' && !r.problem);
   return (
     <Card enter title="Your own names" desc="Make a name point somewhere on your network, like nas.lan → 192.168.1.10. Devices that get an address from Gatehouse already have a name automatically.">
+      {data && dset && isV4 && !hasFw && (
+        <Note title="Give this firewall a name">
+          Then you can open the console at <b>https://{fwName}</b> instead of remembering {host}.{' '}
+          <Button small onClick={() => run(() => post('/api/dns/records', { name: fwName, type: 'A', value: host, ttl: 300 }), 'Saved.').then(reload)}>Add {fwName}</Button>
+        </Note>
+      )}
+      {hasFw && <p className="small muted">Open the console at <a href={`https://${fwName}`}>https://{fwName}</a>. Type the https:// part, or the browser will search the web instead.</p>}
       <div className="inline">
         <div style={{ flex: '1 1 10rem' }}><Input value={f.name} onChange={(v) => setF({ ...f, name: v })} aria-label="Name" placeholder="nas.lan" /></div>
         <Select aria-label="Record type" value={f.type} onChange={(v) => setF({ ...f, type: v })} options={['A', 'AAAA', 'CNAME', 'TXT', 'MX']} />
@@ -289,7 +302,7 @@ function Records() {
         <Button kind="primary" disabled={!f.name || !f.value} onClick={() => run(() => post('/api/dns/records', f), 'Saved.').then(() => { setF({ ...f, name: '', value: '' }); reload(); })}>Add</Button>
       </div>
       <div className="list">
-        {(data || []).map((r) => <div className="item" key={r.id}><div><span className="name">{r.name}</span> <span className="muted">{r.type} → {r.value}</span></div><Button small kind="danger" icon="trash" onClick={() => run(() => del(`/api/dns/records/${r.id}`)).then(reload)}>Remove</Button></div>)}
+        {(data || []).map((r) => <div className="item" key={r.id}><div><span className="name">{r.name}</span> <span className="muted">{r.type} → {r.value}</span>{r.problem && <div className="small" style={{ color: 'var(--color-status-warning)' }}>{r.problem}</div>}</div><Button small kind="danger" icon="trash" onClick={() => run(() => del(`/api/dns/records/${r.id}`)).then(reload)}>Remove</Button></div>)}
         {!data?.length && <Empty>No custom names.</Empty>}
       </div>
     </Card>

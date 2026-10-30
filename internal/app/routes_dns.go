@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -57,10 +58,11 @@ func (a *App) dnsTop(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		hours = h
 	}
 	since := time.Now().Add(-time.Duration(hours) * time.Hour).Unix()
-	clients, _ := a.QLog.TopClients(since, 10, r.URL.Query().Get("self") == "1")
+	raw, _ := a.QLog.TopClients(since, 200, r.URL.Query().Get("self") == "1")
+	clients := a.namedClients(raw, 10)
 	blocked, _ := a.QLog.TopBlocked(since, 10)
 	domains, _ := a.QLog.TopDomains(since, 10)
-	api.JSON(w, 200, map[string]any{"clients": nz(clients), "blocked": nz(blocked), "domains": nz(domains), "total": a.QLog.Count(since), "hours": hours})
+	api.JSON(w, 200, map[string]any{"clients": clients, "blocked": nz(blocked), "domains": nz(domains), "total": a.QLog.Count(since), "hours": hours})
 }
 
 func nz(t []dnssrv.Top) []dnssrv.Top {
@@ -117,21 +119,22 @@ func (a *App) dnsAddRecord(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		return
 	}
 	in.Type = strings.ToUpper(strings.TrimSpace(in.Type))
-	in.Name = strings.ToLower(strings.TrimSpace(in.Name))
-	if in.Name == "" || strings.TrimSpace(in.Value) == "" {
+	if strings.TrimSpace(in.Name) == "" || strings.TrimSpace(in.Value) == "" {
 		fail(w, errors.New("name and value are required"))
 		return
 	}
-	switch in.Type {
-	case "A", "AAAA", "CNAME", "TXT", "MX":
-	default:
-		fail(w, errors.New("type must be A, AAAA, CNAME, TXT or MX"))
+	// Check the record the way the resolver will read it, so a bad value is refused here
+	// instead of being saved and then silently ignored.
+	name, value, err := dnssrv.CleanRecord(in.Name, in.Type, in.Value)
+	if err != nil {
+		fail(w, err)
 		return
 	}
+	in.Name, in.Value = name, value
 	if in.TTL <= 0 {
 		in.TTL = 300
 	}
-	if _, err := a.Config.Exec(`INSERT OR IGNORE INTO dns_records(name,type,value,ttl) VALUES(?,?,?,?)`, in.Name, in.Type, strings.TrimSpace(in.Value), in.TTL); err != nil {
+	if _, err := a.Config.Exec(`INSERT OR IGNORE INTO dns_records(name,type,value,ttl) VALUES(?,?,?,?)`, in.Name, in.Type, in.Value, in.TTL); err != nil {
 		fail(w, err)
 		return
 	}
@@ -264,4 +267,49 @@ func (a *App) dnsOrderUpstreams(w http.ResponseWriter, r *http.Request, c *api.C
 	}
 	a.loadUpstreams()
 	ok(w)
+}
+
+// topClient is one row of the busiest-devices list: a device, which can have more than one address.
+type topClient struct {
+	Key   string   `json:"key"`
+	Label string   `json:"label,omitempty"`
+	N     int64    `json:"n"`
+	Addrs []string `json:"addrs"`
+}
+
+// namedClients turns the per-address ranking into a per-device one. A device is named the way
+// the Devices page names it (the alias you chose, else its own name), and addresses that belong
+// to one device (same hardware address) are added together. The label recorded at query time is
+// only the fallback, so renaming a device shows at once.
+func (a *App) namedClients(raw []dnssrv.Top, limit int) []topClient {
+	out := []topClient{}
+	byMAC := map[string]int{}
+	for _, t := range raw {
+		ci := a.Devices.Client(t.Key)
+		label := ci.Name
+		if label == "" {
+			label = t.Label
+		}
+		if ci.MAC != "" {
+			if i, ok := byMAC[ci.MAC]; ok {
+				out[i].N += t.N
+				out[i].Addrs = append(out[i].Addrs, t.Key)
+				if out[i].Label == "" {
+					out[i].Label = label
+				}
+				continue
+			}
+			byMAC[ci.MAC] = len(out)
+		}
+		key := t.Key
+		if ci.MAC != "" {
+			key = ci.MAC
+		}
+		out = append(out, topClient{Key: key, Label: label, N: t.N, Addrs: []string{t.Key}})
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].N > out[j].N })
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return out
 }

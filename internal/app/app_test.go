@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/cookiejar"
+	"strings"
 	"testing"
 	"time"
 
@@ -97,6 +98,42 @@ func TestDaemonEndToEnd(t *testing.T) {
 	resp, _, err := (&dns.Client{Net: "udp"}).Exchange(r, dnsAddr)
 	if err != nil || len(resp.Answer) != 1 || resp.Answer[0].(*dns.A).A.String() != "192.168.1.10" {
 		t.Fatalf("dns answer: %v %v", resp, err)
+	}
+
+	// A pasted web address is tidied up; a value that cannot work is refused, not saved.
+	if code, _, body := c.call("POST", "/api/dns/records", map[string]any{"name": "firewall.lan", "type": "A", "value": "https://192.168.50.1/"}); code != 200 {
+		t.Fatalf("tidy record: %d %s", code, body)
+	}
+	r = new(dns.Msg)
+	r.SetQuestion("firewall.lan.", dns.TypeA)
+	resp, _, err = (&dns.Client{Net: "udp"}).Exchange(r, dnsAddr)
+	if err != nil || len(resp.Answer) != 1 || resp.Answer[0].(*dns.A).A.String() != "192.168.50.1" {
+		t.Fatalf("firewall.lan answer: %v %v", resp, err)
+	}
+	if code, _, body := c.call("POST", "/api/dns/records", map[string]any{"name": "bad.lan", "type": "A", "value": "not an address"}); code != 400 || !strings.Contains(string(body), "IPv4") {
+		t.Fatalf("bad record: %d %s", code, body)
+	}
+
+	// The busiest-devices list gives one row per device with its addresses (the log is written
+	// in the background, so wait for the first rows).
+	var topBody []byte
+	for i := 0; i < 40; i++ {
+		code, m, body := c.call("GET", "/api/dns/top?hours=24&self=1", nil)
+		if code != 200 {
+			t.Fatalf("top: %d %s", code, body)
+		}
+		topBody = body
+		if cl, _ := m["clients"].([]any); len(cl) > 0 {
+			if first, _ := cl[0].(map[string]any); first["addrs"] == nil {
+				t.Fatalf("busiest device has no addresses: %s", body)
+			}
+			topBody = nil
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if topBody != nil {
+		t.Fatalf("no busiest devices: %s", topBody)
 	}
 
 	// A custom block rule changes the answer.

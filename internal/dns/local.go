@@ -1,7 +1,10 @@
 package dnssrv
 
 import (
+	"errors"
 	"net"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync/atomic"
 
@@ -184,4 +187,77 @@ func reverseToIP(name string) net.IP {
 
 func isPrivate(ip net.IP) bool {
 	return ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast()
+}
+
+var reHostName = regexp.MustCompile(`^(\*\.)?[a-z0-9_]([a-z0-9_.-]*[a-z0-9_])?$`)
+
+// CleanRecord checks one custom record the way the resolver will read it, and returns the
+// value tidied up (a pasted web address loses its https:// and anything after the host).
+// The error text is meant to be shown to the person as it is.
+func CleanRecord(name, typ, value string) (string, string, error) {
+	typ = strings.ToUpper(strings.TrimSpace(typ))
+	value = strings.TrimSpace(value)
+	if typ != "TXT" {
+		value = stripWebAddress(value)
+	}
+	name = strings.ToLower(stripWebAddress(strings.TrimSpace(name)))
+	if !reHostName.MatchString(name) {
+		return "", "", errors.New("Names can use letters, numbers, dashes and dots, like nas.lan")
+	}
+	switch typ {
+	case "A":
+		ip := net.ParseIP(value)
+		if ip == nil || ip.To4() == nil || strings.Contains(value, ":") {
+			return "", "", errors.New("An A record points to one IPv4 address, like 192.168.50.10. Enter just the address, with no https:// and no slash")
+		}
+		return name, ip.To4().String(), nil
+	case "AAAA":
+		ip := net.ParseIP(value)
+		if ip == nil || !strings.Contains(value, ":") {
+			return "", "", errors.New("An AAAA record points to one IPv6 address, like fd00::10. Enter just the address")
+		}
+		return name, ip.String(), nil
+	case "CNAME":
+		if !reHostName.MatchString(strings.ToLower(value)) || strings.HasPrefix(value, "*") {
+			return "", "", errors.New("A CNAME points to another name, like nas.lan. Enter just the name, with no https:// and no slash")
+		}
+		return name, strings.ToLower(value), nil
+	case "MX":
+		f := strings.Fields(value)
+		if len(f) != 2 {
+			return "", "", errors.New("An MX record is a number and a mail server name, like: 10 mail.lan")
+		}
+		if n, err := strconv.Atoi(f[0]); err != nil || n < 0 || n > 65535 || !reHostName.MatchString(strings.ToLower(f[1])) {
+			return "", "", errors.New("An MX record is a number and a mail server name, like: 10 mail.lan")
+		}
+		return name, f[0] + " " + strings.ToLower(f[1]), nil
+	case "TXT":
+		if value == "" || len(value) > 255 {
+			return "", "", errors.New("Text can be up to 255 characters")
+		}
+		return name, value, nil
+	}
+	return "", "", errors.New("type must be A, AAAA, CNAME, TXT or MX")
+}
+
+// stripWebAddress turns "https://192.168.50.1/" or "http://nas.lan:8080/x" into the bare host.
+func stripWebAddress(v string) string {
+	l := strings.ToLower(v)
+	if i := strings.Index(l, "://"); i >= 0 && i <= 6 {
+		v = v[i+3:]
+		if j := strings.IndexAny(v, "/?#"); j >= 0 {
+			v = v[:j]
+		}
+		if k := strings.LastIndex(v, ":"); k >= 0 && !strings.Contains(v[:k], ":") {
+			v = v[:k]
+		}
+	}
+	return strings.TrimRight(v, "/")
+}
+
+// UsableRecord reports whether the resolver can answer from a saved record. Records saved
+// before CleanRecord existed may not be usable.
+func UsableRecord(r LocalRecord) bool {
+	z := buildLocal("", []LocalRecord{r})
+	return len(z.records) > 0
 }

@@ -143,7 +143,8 @@ textarea.in { height: auto; padding: var(--space-2-5) var(--component-input-padd
 .scrim { position: fixed; inset: 0; background: var(--color-bg-page); opacity: 0.8; }
 .modal { position: relative; background: var(--color-bg-surface); border: var(--border-width-thin) solid var(--color-border-strong); border-radius: var(--radius-xl); padding: var(--space-6); width: min(100%, 38rem); display: flex; flex-direction: column; gap: var(--space-4); }
 .modal h2 { font-size: var(--font-size-xl); }
-.toasts { position: fixed; right: var(--space-6); bottom: var(--space-6); z-index: var(--z-toast); display: flex; flex-direction: column; gap: var(--space-2); }
+.toasts { position: fixed; right: var(--space-6); top: var(--space-5); z-index: var(--z-toast); display: flex; flex-direction: column; gap: var(--space-2); pointer-events: none; }
+.toasts .toast { pointer-events: auto; cursor: pointer; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35); }
 .toast { background: var(--color-bg-surface); border: var(--border-width-thin) solid var(--color-border-strong); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); max-width: 24rem; }
 .toast.bad { border-color: var(--color-status-serious-border); }
 
@@ -413,3 +414,9 @@ details.more > summary { cursor: pointer; color: var(--color-text-secondary); ma
 @media (max-width: 52rem) { .dns-cards { grid-template-columns: minmax(0, 1fr); } }
 .dns-cards > .card { height: 100%; }
 .ch2 .hole { stroke: var(--color-text-muted); stroke-width: 1.5; stroke-dasharray: 1 5; stroke-linecap: round; opacity: .55; }
+
+/* Speed test: add-a-server row and the plan-speed rows keep their boxes on one line. */
+.addrow { display: grid; grid-template-columns: minmax(8rem, 14rem) minmax(0, 1fr) auto; gap: var(--space-3); align-items: end; margin-top: var(--space-3); }
+.payrow { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3) 0; border-top: var(--border-width-thin) solid var(--color-border-subtle, var(--color-border-strong)); }
+.payrow .formgrid { grid-template-columns: repeat(auto-fit, minmax(10rem, 16rem)); }
+@media (max-width: 40rem) { .addrow { grid-template-columns: 1fr; } }

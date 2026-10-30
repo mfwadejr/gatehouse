@@ -253,7 +253,7 @@ export function ToastHost({ children }) {
     <ToastCtx.Provider value={push}>
       {children}
       <DialogHost />
-      <div className="toasts" role="status" aria-live="polite">{items.map((i) => <div key={i.id} className={`toast ${i.tone}`}>{i.text}</div>)}</div>
+      <div className="toasts" role="status" aria-live="polite">{items.map((i) => <div key={i.id} className={`toast ${i.tone}`} onClick={() => setItems((x) => x.filter((t) => t.id !== i.id))} title="Click to dismiss">{i.text}</div>)}</div>
     </ToastCtx.Provider>
   );
 }

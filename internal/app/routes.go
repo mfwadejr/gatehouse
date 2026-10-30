@@ -213,11 +213,16 @@ func (a *App) registerRoutes() {
 			Type  string `json:"type"`
 			Value string `json:"value"`
 			TTL   int    `json:"ttl"`
+			// Problem is set when the resolver cannot use the record (saved by an older version).
+			Problem string `json:"problem,omitempty"`
 		}
 		out := []rec{}
 		for rows.Next() {
 			var x rec
 			rows.Scan(&x.ID, &x.Name, &x.Type, &x.Value, &x.TTL)
+			if !dnssrv.UsableRecord(dnssrv.LocalRecord{Name: x.Name, Type: x.Type, Value: x.Value, TTL: uint32(x.TTL)}) {
+				x.Problem = "Not working: this is not a valid " + x.Type + " value. Remove it and add it again."
+			}
 			out = append(out, x)
 		}
 		api.JSON(w, 200, out)

@@ -180,3 +180,44 @@ func TestImportProfile(t *testing.T) {
 		t.Error("connection block accepted")
 	}
 }
+
+// An ExpressVPN-style profile: old harmless lines must import, not be refused.
+func TestImportProfileLegacyLines(t *testing.T) {
+	p := strings.Replace(goodProfile, "remote-cert-tls server", "ns-cert-type server\nkeysize 256\nkey-method 2\nfast-io\ncomp-lzo\ntls-timeout 5\nhand-window 30\nreplay-window 64 15\nremote-cert-tls server", 1)
+	ip, err := ImportProfile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(ip.Config, "ns-cert-type") || strings.Contains(ip.Config, "keysize") || strings.Contains(ip.Config, "comp-lzo") {
+		t.Errorf("legacy lines were kept:\n%s", ip.Config)
+	}
+	if n := strings.Count(ip.Config, "remote-cert-tls server"); n != 1 {
+		t.Errorf("remote-cert-tls written %d times, want once", n)
+	}
+	for _, kept := range []string{"tls-timeout 5", "hand-window 30", "replay-window 64 15"} {
+		if !strings.Contains(ip.Config, kept) {
+			t.Errorf("lost %q", kept)
+		}
+	}
+	// ns-cert-type alone becomes the modern check.
+	ip, err = ImportProfile(strings.Replace(goodProfile, "remote-cert-tls server", "ns-cert-type server", 1))
+	if err != nil || !strings.Contains(ip.Config, "remote-cert-tls server") || strings.Contains(ip.Config, "ns-cert-type") {
+		t.Errorf("ns-cert-type not translated: %v\n%s", err, ip.Config)
+	}
+}
+
+// Several refused settings are all named in one message.
+func TestImportProfileNamesEveryRefusedLine(t *testing.T) {
+	_, err := ImportProfile(strings.Replace(goodProfile, "verb 3", "up /tmp/x.sh\nplugin /x.so\nup /tmp/y.sh", 1))
+	if err == nil {
+		t.Fatal("accepted")
+	}
+	for _, want := range []string{"2 settings", "up", "plugin"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("message %q lacks %q", err, want)
+		}
+	}
+	if _, err := ImportProfile(strings.Replace(goodProfile, "verb 3", "up /x", 1)); err == nil || !strings.Contains(err.Error(), `"up"`) {
+		t.Errorf("single refusal message changed: %v", err)
+	}
+}

@@ -91,13 +91,12 @@ function Servers({ st, reload }) {
           </div>
         ))}
       </div>
-      <div className="inline" style={{ alignItems: 'flex-end', marginTop: 'var(--space-3)' }}>
+      <div className="addrow">
         <Field label="Name"><Input value={name} onChange={setName} placeholder="My server" /></Field>
-        <Field label="Address" hint="https:// and the same kind of server as Cloudflare's (it answers /__down and /__up).">
-          <Input value={url} onChange={setUrl} className="in mono" placeholder="https://speed.example.com" />
-        </Field>
+        <Field label="Address"><Input value={url} onChange={setUrl} className="in mono" placeholder="https://speed.example.com" /></Field>
         <Button disabled={busy || !url} onClick={add}>Add server</Button>
       </div>
+      <p className="small muted">The address starts with https:// and must be the same kind of server as Cloudflare's (it answers /__down and /__up).</p>
       <p className="small muted">Cloudflare's test is public and needs no account. Its terms for automated daily use are not confirmed, so check them or add your own server if that matters to you. Gatehouse checks that a new server answers before keeping it.</p>
     </Card>
   );
@@ -159,10 +158,12 @@ export default function SpeedTest({ wans, links }) {
             <h3 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)' }}>What you pay for</h3>
             <p className="small muted">Optional. Fill in the speed your plan promises and results show how close you get.</p>
             {rows.map((l) => (
-              <div className="inline" key={l.name} style={{ alignItems: 'flex-end' }}>
-                <b style={{ minWidth: '7rem' }}>{l.name}</b>
-                <Field label="Download (Mbps)"><NumberInput value={form.links[l.name]?.down_mbps || 0} min={0} max={100000} onChange={(v) => setL(l.name, { down_mbps: v })} /></Field>
-                <Field label="Upload (Mbps)"><NumberInput value={form.links[l.name]?.up_mbps || 0} min={0} max={100000} onChange={(v) => setL(l.name, { up_mbps: v })} /></Field>
+              <div className="payrow" key={l.name}>
+                <b>{l.name}</b>
+                <div className="formgrid">
+                  <Field label="Download (Mbps)"><NumberInput value={form.links[l.name]?.down_mbps || 0} min={0} max={100000} onChange={(v) => setL(l.name, { down_mbps: v })} /></Field>
+                  <Field label="Upload (Mbps)"><NumberInput value={form.links[l.name]?.up_mbps || 0} min={0} max={100000} onChange={(v) => setL(l.name, { up_mbps: v })} /></Field>
+                </div>
                 <ToggleRow title="Has a data limit" desc="Short tests only, never scheduled." checked={!!form.links[l.name]?.metered} onChange={(v) => setL(l.name, { metered: v })} />
               </div>
             ))}
