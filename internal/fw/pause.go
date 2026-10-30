@@ -2,6 +2,7 @@ package fw
 
 import (
 	"encoding/json"
+	"net/netip"
 	"strings"
 	"time"
 )
@@ -98,8 +99,41 @@ func (h Hours) Active(now time.Time) bool {
 // PausedDevices lists the devices whose internet is off right now: paused by hand, in a profile
 // that is paused, or inside a profile's hours.
 func PausedDevices(db Queryer, now time.Time) []string {
-	rows, err := db.Query(`SELECT d.mac,d.paused_until,COALESCE(g.paused_until,0),COALESCE(g.hours,'')
-		FROM devices d LEFT JOIN groups g ON g.id=COALESCE(d.group_id,(SELECT id FROM groups WHERE name='Default'))`)
+	type grp struct {
+		paused int64
+		hours  Hours
+	}
+	// The Default profile, and the profile of each network that has one.
+	var def grp
+	var dh string
+	if r, err := db.Query(`SELECT COALESCE(paused_until,0),COALESCE(hours,'') FROM groups WHERE name='Default'`); err == nil {
+		if r.Next() {
+			r.Scan(&def.paused, &dh)
+			def.hours = ParseHours(dh)
+		}
+		r.Close()
+	}
+	type netGrp struct {
+		p netip.Prefix
+		g grp
+	}
+	var nets []netGrp
+	if r, err := db.Query(`SELECT i.ipv4_cidr,COALESCE(g.paused_until,0),COALESCE(g.hours,'') FROM network_profiles np
+		JOIN zones z ON z.name=np.zone JOIN interfaces i ON i.zone_id=z.id JOIN groups g ON g.id=np.group_id WHERE i.ipv4_cidr<>''`); err == nil {
+		for r.Next() {
+			var cidr, h string
+			var g grp
+			if r.Scan(&cidr, &g.paused, &h) == nil {
+				if p, err := netip.ParsePrefix(cidr); err == nil {
+					g.hours = ParseHours(h)
+					nets = append(nets, netGrp{p.Masked(), g})
+				}
+			}
+		}
+		r.Close()
+	}
+	rows, err := db.Query(`SELECT d.mac,d.last_ip,d.paused_until,COALESCE(d.group_id,0),COALESCE(g.paused_until,0),COALESCE(g.hours,'')
+		FROM devices d LEFT JOIN groups g ON g.id=d.group_id`)
 	if err != nil {
 		return nil
 	}
@@ -107,12 +141,24 @@ func PausedDevices(db Queryer, now time.Time) []string {
 	var out []string
 	u := now.Unix()
 	for rows.Next() {
-		var mac, hours string
-		var dp, gp int64
-		if rows.Scan(&mac, &dp, &gp, &hours) != nil {
+		var mac, ip, hours string
+		var dp, gid, gp int64
+		if rows.Scan(&mac, &ip, &dp, &gid, &gp, &hours) != nil {
 			continue
 		}
-		if dp > u || gp > u || ParseHours(hours).Active(now) {
+		g := grp{gp, ParseHours(hours)}
+		if gid == 0 {
+			g = def
+			if a, err := netip.ParseAddr(ip); err == nil {
+				for _, n := range nets {
+					if n.p.Contains(a) {
+						g = n.g
+						break
+					}
+				}
+			}
+		}
+		if dp > u || g.paused > u || g.hours.Active(now) {
 			out = append(out, strings.ToLower(mac))
 		}
 	}

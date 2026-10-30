@@ -8,6 +8,7 @@ import { linkState, linkMeasure } from '../linkstate.js';
 import NatNotice from '../natnotice.jsx';
 import NetTools from './NetTools.jsx';
 import Why from './Why.jsx';
+import { DataUse, IspReport } from './IspReport.jsx';
 import { PROVIDERS } from '../providers.js';
 
 const TYPES = [
@@ -200,6 +201,8 @@ export default function Internet({ me }) {
       {wans.some((w) => w.enabled) && <SpeedTest wans={wans} links={links} />}
       {(!isNew && !!me && me.user?.role === 'admin') && <NetTools />}
       {(!isNew && !!me && me.user?.role === 'admin') && <Why />}
+      {(!isNew && !!me && me.user?.role === 'admin') && <DataUse />}
+      {(!isNew && !!me && me.user?.role === 'admin') && <IspReport />}
 
       {edit && <WanForm initial={edit} wans={wans} ports={ports} found={found} onClose={() => setEdit(null)} onSaved={all} />}
       <ApplyBar kind="net" label="your network settings" status={stat} me={me} onChanged={all} />

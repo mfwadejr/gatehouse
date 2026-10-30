@@ -77,3 +77,55 @@ func TestPauseUntil(t *testing.T) {
 		t.Fatal("pause time")
 	}
 }
+
+func TestNetworkProfileAppliesToDevicesWithoutOwn(t *testing.T) {
+	c, _, _ := siteBox(t, "192.168.1.1/24")
+	a := c.app
+	if a == nil {
+		t.Skip("no app")
+	}
+	list := a.netFilters()
+	if len(list) == 0 {
+		t.Fatal("no networks")
+	}
+	zone := list[0].Zone
+	var cidr string
+	a.Config.QueryRow(`SELECT i.ipv4_cidr FROM interfaces i JOIN zones z ON z.id=i.zone_id WHERE z.name=? AND i.ipv4_cidr<>'' LIMIT 1`, zone).Scan(&cidr)
+	if cidr == "" {
+		t.Skip("network has no address")
+	}
+	rc, m, raw := c.call("PUT", "/api/profiles", map[string]any{"name": "Strict", "level": "off", "safe_search": true,
+		"hours": map[string]any{"on": true, "days": []int{0, 1, 2, 3, 4, 5, 6}, "from": "00:00", "to": "23:59"}})
+	if rc != 200 {
+		t.Fatalf("%d %s", rc, raw)
+	}
+	gid := int64(m["id"].(float64))
+	a.Config.Exec(`INSERT INTO devices(mac,name,last_ip) VALUES('aa:bb:cc:dd:ee:21','pc','192.168.1.77')`)
+	if rc, _, raw = c.call("PUT", "/api/netfilters", map[string]any{"zone": zone, "group_id": gid}); rc != 200 {
+		t.Fatalf("%d %s", rc, raw)
+	}
+	ci := a.Devices.Client("192.168.1.99")
+	if ci.GroupID != gid || !ci.SafeSearch || ci.Filtering {
+		t.Fatalf("unknown device on the network did not get the profile: %+v", ci)
+	}
+	// The all-day window pauses the device that has no profile of its own.
+	if !strings.Contains(a.pausedSig(), "aa:bb:cc:dd:ee:21") {
+		t.Fatalf("hours of the network profile ignored: %q", a.pausedSig())
+	}
+	// A device with its own profile keeps it.
+	a.Config.Exec(`UPDATE devices SET group_id=(SELECT id FROM groups WHERE name='Trusted') WHERE mac='aa:bb:cc:dd:ee:21'`)
+	if strings.Contains(a.pausedSig(), "aa:bb:cc:dd:ee:21") {
+		t.Fatal("a device with its own profile followed the network")
+	}
+	// Removing the choice puts things back; unknown networks and profiles are refused.
+	c.call("PUT", "/api/netfilters", map[string]any{"zone": zone, "group_id": 0})
+	if ci = a.Devices.Client("192.168.1.99"); ci.GroupID == gid {
+		t.Fatal("not removed")
+	}
+	if rc, _, _ = c.call("PUT", "/api/netfilters", map[string]any{"zone": "Nowhere", "group_id": gid}); rc == 200 {
+		t.Fatal("unknown network accepted")
+	}
+	if rc, _, _ = c.call("PUT", "/api/netfilters", map[string]any{"zone": zone, "group_id": 9999}); rc == 200 {
+		t.Fatal("unknown profile accepted")
+	}
+}

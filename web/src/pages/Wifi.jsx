@@ -1,3 +1,4 @@
+import WifiCards from './WifiCards.jsx';
 import React, { useState } from 'react';
 import { del, get, post, put, useData } from '../api.js';
 import ApplyBar from '../ApplyBar.jsx';
@@ -373,6 +374,7 @@ export default function Wifi({ me }) {
         </Modal>
       )}
       {edit && <Setup card={edit} country={data?.country} wans={wd?.wans || []} ifs={ifs || []} onClose={() => setEdit(null)} onSaved={all} />}
+      {me?.user?.role === 'admin' && <WifiCards />}
       <ApplyBar kind="net" label="your network settings" status={st?.status} me={me} onChanged={all} />
     </Page>
   );

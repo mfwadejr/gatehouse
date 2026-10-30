@@ -53,6 +53,8 @@ func DefaultConfig() Config {
 
 // App is the running daemon.
 type App struct {
+	sysout       syslogOut
+	ddns         ddnsState
 	Cfg          Config
 	Config       *store.DB
 	Logs         *store.DB
@@ -170,6 +172,14 @@ func New(cfg Config) (*App, error) {
 	a.registerWhyRoutes()
 	a.registerSecurityRoutes()
 	a.registerChangeRoutes()
+	a.registerWifiCardRoutes()
+	a.registerSummaryRoutes()
+	a.registerISPRoutes()
+	a.registerDNSEncRoutes()
+	a.registerSyslogRoutes()
+	a.registerDDNSRoutes()
+	a.registerNetFilterRoutes()
+	a.loadSyslog()
 	a.prepareSetup()
 
 	if err := a.reloadAll(); err != nil {
@@ -352,6 +362,7 @@ func (a *App) Run(ctx context.Context) error {
 	run(func() { a.forwardSyncLoop(ctx) })
 	run(func() { a.mdnsLoop(ctx) })
 	run(func() { a.alertLoop(ctx) })
+	run(func() { a.ddnsLoop(ctx) })
 	run(func() { a.updateLoop(ctx) })
 	run(func() { a.dynLoop(ctx) })
 	run(func() { a.rogueLoop(ctx) })

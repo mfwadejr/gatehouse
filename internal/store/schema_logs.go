@@ -99,4 +99,12 @@ CREATE TABLE country_traffic(
   down INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY(ts, cc)
 );
+`, `
+-- Times the internet was down, for the provider report. end is 0 while it still is.
+CREATE TABLE outages(
+  id INTEGER PRIMARY KEY,
+  start INTEGER NOT NULL,
+  end INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX idx_outages_start ON outages(start);
 `}

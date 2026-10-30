@@ -344,7 +344,14 @@ func (a *App) pruneTraffic(days int) {
 		days = 30
 	}
 	a.Logs.Exec(`DELETE FROM country_traffic WHERE ts<?`, time.Now().Add(-time.Duration(days)*24*time.Hour).Unix())
-	a.Logs.Exec(`DELETE FROM traffic WHERE ts<?`, time.Now().Add(-time.Duration(days)*24*time.Hour).Unix())
+	// Per-device rows follow the retention the person chose. The whole-connection total is kept at
+	// least 100 days, because a billing period and the provider report need a month and more.
+	a.Logs.Exec(`DELETE FROM traffic WHERE mac<>'' AND ts<?`, time.Now().Add(-time.Duration(days)*24*time.Hour).Unix())
+	total := days
+	if total < 100 {
+		total = 100
+	}
+	a.Logs.Exec(`DELETE FROM traffic WHERE mac='' AND ts<?`, time.Now().Add(-time.Duration(total)*24*time.Hour).Unix())
 }
 
 func (a *App) registerDevTrafficRoutes() {

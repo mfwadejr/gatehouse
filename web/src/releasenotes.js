@@ -1,6 +1,20 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.17',
+    title: 'Cards, reports and remote access',
+    items: [
+      'Wi-Fi join cards: a QR code that joins your Wi-Fi when scanned, and a card to print with the name and password. Works for Wi-Fi from Gatehouse and for any other access point (Wi-Fi page).',
+      'My network: one printable page of your networks, addresses, devices, open ports and how to get back in. It never contains passwords or keys (Settings).',
+      'Provider report card: a month of outages and speed against your plan, ready to print and show your provider. Data use shows this billing period and your heaviest devices, with an optional monthly limit and warnings (Internet page).',
+      'Reach my home from anywhere: a web name that follows your home address (DuckDNS, No-IP and similar), then the VPN, then your phone (VPN page). It warns when your connection is shared by your provider and cannot work.',
+      'Encrypted DNS is one switch: Off, Automatic, Pick a provider or Custom, with Undo (DNS page).',
+      'Filtering per network: give a whole network a profile, such as Enhanced filtering and safe search for Guests (Profiles page).',
+      'Send logs elsewhere: copy events, and optionally firewall decisions, to a syslog server (Settings, Advanced). Off by default.',
+      'Fixed: adding a DNS server with Plain (TCP) always failed. That option is gone, and the usual port is added for you.',
+    ],
+  },
+  {
     version: '0.8.16',
     title: 'Profiles, pause, and finding out why',
     items: [

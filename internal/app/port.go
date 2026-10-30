@@ -166,6 +166,7 @@ func (a *App) event(actor, sev, title, detail string) {
 		a.Bus.Publish("events", map[string]int64{"at": time.Now().Unix()})
 	}
 	go a.alertFromEvent(actor, title, detail)
+	a.syslogSend(sev, title+": "+detail)
 }
 
 // portInUse says what already uses a port, or "" when it is free to choose.

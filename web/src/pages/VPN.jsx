@@ -571,6 +571,8 @@ function Site({ v, reload, setModal }) {
   );
 }
 
+import RemoteAccess from './RemoteAccess.jsx';
+
 export default function VPN() {
   const { data, reload } = useData('/api/vpn', { topics: ['vpn.status'], every: 15000 });
   const [modal, setModal] = useState(null);
@@ -596,6 +598,7 @@ export default function VPN() {
           </Empty>
         </Card>
       )}
+      {data && <RemoteAccess onAddVPN={() => setModal({ t: 'add' })} hasDevice={inn.some((v) => (v.peers || []).length > 0)} />}
       {out.length > 0 && <h2 className="sec">Through a VPN provider</h2>}
       {out.map((v) => <Outbound key={v.dev} v={v} reload={fresh} setModal={setModal} />)}
       {inn.length > 0 && <h2 className="sec">Connect from outside</h2>}

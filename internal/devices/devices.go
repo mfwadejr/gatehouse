@@ -5,6 +5,7 @@ package devices
 import (
 	"errors"
 	"net"
+	"net/netip"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -23,6 +24,22 @@ type view struct {
 	defGrp  int64
 	defFilt bool
 	defSafe bool
+	nets    []netProfile
+}
+
+// netProfile is the profile a network gives to devices on it that have none of their own.
+type netProfile struct {
+	prefix netip.Prefix
+	ci     dnssrv.ClientInfo
+}
+
+func (v *view) forAddr(ip netip.Addr) (dnssrv.ClientInfo, bool) {
+	for _, n := range v.nets {
+		if n.prefix.Contains(ip) {
+			return n.ci, true
+		}
+	}
+	return dnssrv.ClientInfo{}, false
 }
 
 // Directory implements dnssrv.Directory from the devices, groups and lease tables.
@@ -47,16 +64,35 @@ func (d *Directory) Rebuild() {
 	if d.db.QueryRow(`SELECT id,filtering,safe_search FROM groups WHERE name='Default'`).Scan(&gid, &filt, &defSafe) == nil {
 		v.defGrp, v.defFilt, v.defSafe = gid, filt == 1, defSafe == 1
 	}
-	rows, err := d.db.Query(`SELECT d.mac,d.name,COALESCE(d.group_id,0),d.policy,COALESCE(g.filtering,1),COALESCE(g.safe_search,0) FROM devices d LEFT JOIN groups g ON g.id=d.group_id`)
+	if nr, err := d.db.Query(`SELECT i.ipv4_cidr,g.id,g.filtering,g.safe_search FROM network_profiles np
+		JOIN zones z ON z.name=np.zone JOIN interfaces i ON i.zone_id=z.id JOIN groups g ON g.id=np.group_id WHERE i.ipv4_cidr<>''`); err == nil {
+		for nr.Next() {
+			var cidr string
+			var id int64
+			var f, safe int
+			if nr.Scan(&cidr, &id, &f, &safe) == nil {
+				if p, err := netip.ParsePrefix(cidr); err == nil {
+					v.nets = append(v.nets, netProfile{p.Masked(), dnssrv.ClientInfo{GroupID: id, Filtering: f == 1, SafeSearch: safe == 1}})
+				}
+			}
+		}
+		nr.Close()
+	}
+	rows, err := d.db.Query(`SELECT d.mac,d.name,COALESCE(d.group_id,0),d.policy,COALESCE(g.filtering,1),COALESCE(g.safe_search,0),d.last_ip FROM devices d LEFT JOIN groups g ON g.id=d.group_id`)
 	if err == nil {
 		for rows.Next() {
-			var mac, name, policy string
+			var mac, name, policy, lastIP string
 			var g int64
 			var f, safe int
-			rows.Scan(&mac, &name, &g, &policy, &f, &safe)
+			rows.Scan(&mac, &name, &g, &policy, &f, &safe, &lastIP)
 			ci := dnssrv.ClientInfo{Name: name, MAC: strings.ToLower(mac), GroupID: g, Filtering: f == 1 && policy != "unfiltered", SafeSearch: safe == 1}
 			if g == 0 {
 				ci.GroupID, ci.Filtering, ci.SafeSearch = v.defGrp, v.defFilt && policy != "unfiltered", defSafe == 1
+				if a, err := netip.ParseAddr(lastIP); err == nil {
+					if np, ok := v.forAddr(a); ok {
+						ci.GroupID, ci.Filtering, ci.SafeSearch = np.GroupID, np.Filtering && policy != "unfiltered", np.SafeSearch
+					}
+				}
 			}
 			v.byMAC[ci.MAC] = ci
 		}
@@ -81,7 +117,13 @@ func (d *Directory) Client(ip string) dnssrv.ClientInfo {
 	if h, ok := d.dhcp.Lookups().LookupAddr(net.ParseIP(ip)); ok {
 		name = h
 	}
-	return dnssrv.ClientInfo{Name: name, MAC: mac, GroupID: v.defGrp, Filtering: v.defFilt, SafeSearch: v.defSafe}
+	ci := dnssrv.ClientInfo{Name: name, MAC: mac, GroupID: v.defGrp, Filtering: v.defFilt, SafeSearch: v.defSafe}
+	if a, err := netip.ParseAddr(ip); err == nil {
+		if np, ok := v.forAddr(a); ok {
+			ci.GroupID, ci.Filtering, ci.SafeSearch = np.GroupID, np.Filtering, np.SafeSearch
+		}
+	}
+	return ci
 }
 
 // Seen records that a device was active. New devices appear in the list automatically.

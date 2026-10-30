@@ -469,4 +469,19 @@ ALTER TABLE groups ADD COLUMN safe_search INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE groups ADD COLUMN hours TEXT NOT NULL DEFAULT '';
 ALTER TABLE groups ADD COLUMN paused_until INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE devices ADD COLUMN paused_until INTEGER NOT NULL DEFAULT 0;
+`, `
+-- Package 6: Wi-Fi join cards for access points Gatehouse does not run, usage caps, ISP report data.
+CREATE TABLE wifi_cards(
+  id INTEGER PRIMARY KEY,
+  title TEXT NOT NULL,
+  ssid TEXT NOT NULL,
+  psk TEXT NOT NULL DEFAULT '',          -- sealed
+  hidden INTEGER NOT NULL DEFAULT 0
+);
+`, `
+-- A network can carry a profile (a DNS group): devices on it with no profile of their own use it.
+CREATE TABLE network_profiles(
+  zone TEXT PRIMARY KEY,
+  group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE
+);
 `}

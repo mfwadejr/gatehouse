@@ -151,6 +151,7 @@ func (a *App) storeFW(evs []netd.FWEvent) {
 		return
 	}
 	a.Bus.Publish("logs.live", map[string]int{"fw": len(evs)})
+	a.syslogFW(evs)
 }
 
 // collectFW pulls firewall decisions from the helper about once a second.

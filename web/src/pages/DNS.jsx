@@ -1,3 +1,4 @@
+import EncryptedDns from './EncryptedDns.jsx';
 import React, { useState } from 'react';
 import { del, get, patch, post, put, useData, useStream } from '../api.js';
 import { go } from '../App.jsx';
@@ -90,6 +91,7 @@ function Overview() {
           <button type="button" className="link small" onClick={() => go('firewall')}>Change →</button>
         </div>
       </Card>
+      <EncryptedDns onChanged={ru} />
       <Upstreams ups={list} reload={ru} onAdd={() => setAdd(true)} />
       {add && <AddUpstream onClose={() => setAdd(false)} onSaved={ru} />}
     </>
@@ -172,20 +174,22 @@ const PRESETS = [
   { label: 'Quad9 (blocks malware, encrypted)', address: '9.9.9.9:853', proto: 'tls', tlsname: 'dns.quad9.net' },
   { label: 'Google (encrypted)', address: '8.8.8.8:853', proto: 'tls', tlsname: 'dns.google' },
 ];
+// A bare address gets the usual port for its kind, so 8.8.8.8 works without typing :853.
+const withPort = (a, proto) => { const t = (a || '').trim(); return /:\d+$/.test(t) || t.startsWith('[') || t.includes('://') ? t : `${t}:${proto === 'tls' ? 853 : 53}`; };
 function AddUpstream({ onClose, onSaved }) {
   const [f, setF] = useState({ name: '', address: '', proto: 'tls', tlsname: '' });
   const [run, busy] = useAction();
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
   return (
-    <Modal title="Add a DNS server" onClose={onClose} footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy || !f.address} onClick={async () => { if (await run(() => post('/api/dns/upstreams', { ...f, name: f.name || f.address }), 'Added.')) { onSaved(); onClose(); } }}>Add</Button></>}>
+    <Modal title="Add a DNS server" onClose={onClose} footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy || !f.address} onClick={async () => { if (await run(() => post('/api/dns/upstreams', { ...f, name: f.name || f.address, address: withPort(f.address, f.proto) }), 'Added.')) { onSaved(); onClose(); } }}>Add</Button></>}>
       <div className="stack">
         <span className="small muted">Pick a well-known one, or fill in your own.</span>
         <div className="inline">{PRESETS.map((p) => <Button small key={p.label} onClick={() => setF({ name: p.label.split(' (')[0], address: p.address, proto: p.proto, tlsname: p.tlsname })}>{p.label}</Button>)}</div>
       </div>
       <div className="formgrid">
         <Field label="Name"><Input value={f.name} onChange={set('name')} /></Field>
-        <Field label="Address and port" hint="Like 1.1.1.1:53"><Input value={f.address} onChange={set('address')} /></Field>
-        <Field label="Kind"><Select value={f.proto} onChange={set('proto')} options={[{ value: 'tls', label: 'Encrypted (DNS-over-TLS)' }, { value: 'udp', label: 'Plain (UDP)' }, { value: 'tcp', label: 'Plain (TCP)' }]} /></Field>
+        <Field label="Address and port" hint="Like 1.1.1.1. The usual port is added for you."><Input value={f.address} onChange={set('address')} /></Field>
+        <Field label="Kind"><Select value={f.proto} onChange={set('proto')} options={[{ value: 'tls', label: 'Encrypted (DNS-over-TLS)' }, { value: 'udp', label: 'Plain (UDP)' }]} /></Field>
         {f.proto === 'tls' && <Field label="Server name" hint="Used to check its certificate"><Input value={f.tlsname} onChange={set('tlsname')} /></Field>}
       </div>
     </Modal>

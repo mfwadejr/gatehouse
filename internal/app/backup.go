@@ -481,7 +481,7 @@ var restoreTables = []string{
 	"routes", "vpn_routes", "vpn_ovpn_users", "vpn_ovpn", "vpn_wg_peers", "vpn_wg",
 	"wan_group_routes", "wan_group_members", "wan_groups", "wan_links", "wifi_radios",
 	"dhcp_leases", "dhcp_reservations", "dhcp_scopes", "interfaces", "zones",
-	"dns_records", "custom_rules", "dns_upstreams", "group_blocklists", "blocklists", "groups",
+	"dns_records", "custom_rules", "dns_upstreams", "group_blocklists", "blocklists", "network_profiles", "groups", "wifi_cards",
 	"device_group_members", "device_groups", "devices", "device_icons", "fw_revisions",
 }
 

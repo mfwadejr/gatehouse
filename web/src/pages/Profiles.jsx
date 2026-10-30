@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { del, post, put, useData } from '../api.js';
-import { Button, Card, Field, Input, Modal, Note, Page, Pill, Segmented, ToggleRow, confirmBox, useAction } from '../ui.jsx';
+import { Button, Card, Field, Input, Modal, Note, Page, Pill, Segmented, Select, ToggleRow, confirmBox, useAction } from '../ui.jsx';
 
 // Profiles: a name for a kind of person or device (Kids, Guests, Smart home, Work) with how much to
 // filter, safe search, hours when the internet is off, and a Pause button. Devices join a profile on
@@ -76,6 +76,27 @@ function Editor({ init, data, onClose, onSaved }) {
   );
 }
 
+// Filtering per network: a network can carry a profile. Devices on it that have no profile of their
+// own use it, so "Guests get Enhanced filtering and safe search" is one choice.
+function PerNetwork({ profiles }) {
+  const { data, reload } = useData('/api/netfilters');
+  const [run] = useAction();
+  if (!data || data.length === 0) return null;
+  const set = (zone, v) => run(async () => { await put('/api/netfilters', { zone, group_id: Number(v) }); reload(); }, 'Saved.');
+  return (
+    <Card title="Filtering per network" desc="Choose a profile for a whole network. Devices on it that have a profile of their own keep theirs.">
+      <div className="list">
+        {data.map((n) => (
+          <div className="item" key={n.zone}>
+            <div className="name">{n.zone}</div>
+            <div style={{ minWidth: '14rem' }}><Select value={String(n.group_id)} onChange={(v) => set(n.zone, v)} options={[{ value: '0', label: 'No profile (each device uses its own)' }, ...profiles.map((p) => ({ value: String(p.id), label: `${p.name}: ${LEVELS.find((l) => l.value === p.level)?.label} filtering${p.safe_search ? ', safe search' : ''}${p.hours.on ? `, off ${p.hours.from}-${p.hours.to}` : ''}` }))]} /></div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
 export default function Profiles() {
   const { data, reload } = useData('/api/profiles', { every: 15000 });
   const [edit, setEdit] = useState(null);
@@ -109,6 +130,7 @@ export default function Profiles() {
             </div>
           </Card>
         ))}
+        <PerNetwork profiles={data.profiles} />
         <Card title="Add a profile" desc="Start from a preset, then change anything.">
           <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
             {data.presets.filter((s) => !have.has(s.key)).map((s) => <Button key={s.key} onClick={() => setEdit(fromPreset(s))} title={s.descr}>{s.name}</Button>)}

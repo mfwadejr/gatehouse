@@ -3,6 +3,7 @@ package app
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"sort"
 	"strings"
@@ -368,4 +369,67 @@ func (a *App) registerProfileRoutes() {
 	}
 	s.HandleAdmin("POST /api/profiles/{id}/pause", pause("groups"))
 	s.HandleAdmin("POST /api/devices/{id}/pause", pause("devices"))
+}
+
+// ---- filtering per network (H79) ----
+//
+// A network can carry a profile. Devices on it that have no profile of their own use it, so "Guests
+// get Enhanced filtering and safe search" is one choice on the network, not one per device. A device
+// with its own profile always keeps it.
+
+type netFilterOut struct {
+	Zone    string `json:"zone"`
+	Kind    string `json:"kind"`
+	Group   int64  `json:"group_id"` // 0: none, devices use their own or the Default profile
+	Profile string `json:"profile"`
+}
+
+func (a *App) netFilters() []netFilterOut {
+	out := []netFilterOut{}
+	for _, r := range a.table(`SELECT z.name,z.kind,COALESCE(np.group_id,0),COALESCE(g.name,'') FROM zones z
+		LEFT JOIN network_profiles np ON np.zone=z.name LEFT JOIN groups g ON g.id=np.group_id
+		WHERE z.kind NOT IN ('wan','vpn') ORDER BY z.id`) {
+		var id int64
+		fmt.Sscan(r[2], &id)
+		out = append(out, netFilterOut{Zone: r[0], Kind: r[1], Group: id, Profile: r[3]})
+	}
+	return out
+}
+
+func (a *App) registerNetFilterRoutes() {
+	s := a.API
+	s.Handle("GET /api/netfilters", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		api.JSON(w, 200, a.netFilters())
+	})
+	s.HandleAdmin("PUT /api/netfilters", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		var in struct {
+			Zone  string `json:"zone"`
+			Group int64  `json:"group_id"`
+		}
+		if !api.Decode(w, r, &in) {
+			return
+		}
+		var n int
+		a.Config.QueryRow(`SELECT count(*) FROM zones WHERE name=? AND kind NOT IN ('wan','vpn')`, in.Zone).Scan(&n)
+		if n == 0 {
+			fail(w, errors.New("that network was not found"))
+			return
+		}
+		if in.Group == 0 {
+			a.Config.Exec(`DELETE FROM network_profiles WHERE zone=?`, in.Zone)
+		} else {
+			a.Config.QueryRow(`SELECT count(*) FROM groups WHERE id=?`, in.Group).Scan(&n)
+			if n == 0 {
+				fail(w, errors.New("that profile was not found"))
+				return
+			}
+			if _, err := a.Config.Exec(`INSERT INTO network_profiles(zone,group_id) VALUES(?,?) ON CONFLICT(zone) DO UPDATE SET group_id=excluded.group_id`, in.Zone, in.Group); err != nil {
+				fail(w, err)
+				return
+			}
+		}
+		a.Devices.Rebuild()
+		a.fwSync()
+		ok(w)
+	})
 }
