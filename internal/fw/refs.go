@@ -179,6 +179,19 @@ func (m *Model) DynamicSets() []DynSet {
 			}
 		}
 	}
+	for _, f := range m.Forwards {
+		if !f.Enabled {
+			continue
+		}
+		for _, cc := range f.Countries {
+			for _, s := range refSets(Ref{Kind: RefGeo, Val: strings.ToUpper(cc)}, false) {
+				if !seen[s.Name] {
+					seen[s.Name] = true
+					out = append(out, s)
+				}
+			}
+		}
+	}
 	for _, r := range m.Routes {
 		_, _, refs, err := SplitAddrField(r.Dst)
 		if err != nil {

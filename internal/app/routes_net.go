@@ -45,6 +45,7 @@ type NetController interface {
 	WifiHealth(ifaces []string, keepAwake bool) ([]netd.WifiState, error)
 	WifiPowerSave(iface string, keepAwake bool) error
 	WifiReport(iface string) (string, error)
+	Diag(kind, target string) (string, error)
 	SSHApply(p netd.SSHPlan) error
 	SSHLog(since int64) ([]string, error)
 }

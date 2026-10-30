@@ -1,6 +1,18 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.15',
+    title: 'Fewer surprises: tests, alerts and simpler ports',
+    items: [
+      'Test my internet: one button checks the cable, the modem, your provider and website names in turn, and says what to try. Ping, trace and name lookup are on the same page.',
+      'Gatehouse now tells you when your connection is shared by your provider (CGNAT) or sits behind another router, what stops working because of it, and the exact ports to open on the other router.',
+      'One card for UPnP, under Firewall, Open ports. Choose who may use it and through which connection. It cannot be switched on until you have chosen.',
+      'Open a port by picking the app and the device. Plex, Jellyfin, Minecraft and more are built in; add your own. The forward follows the device if its address changes, and can be limited to certain countries or addresses.',
+      'Discovery: let printers, Chromecast, AirPlay and Home Assistant find each other across networks you pair (Firewall, Discovery).',
+      'Alerts by email or ntfy: a new device, the internet going down and back, a watched device going offline, or Gatehouse repairing something itself. Quiet hours hold them until morning, and a test button proves it works (Settings).',
+    ],
+  },
+  {
     version: '0.8.14',
     title: 'Countries, Routes and spare ports',
     items: [

@@ -7,6 +7,10 @@ import { go } from '../App.jsx';
 import { linkState } from '../linkstate.js';
 import ForcedDns from './ForcedDns.jsx';
 import Countries from './Countries.jsx';
+import UPnPCard from './UPnPCard.jsx';
+import Forwards from './Forwards.jsx';
+import Discovery from './Discovery.jsx';
+import NatNotice from '../natnotice.jsx';
 import { GroupsAndLists, Matrix, PairModal, RuleForm, RulesList } from './FirewallRules.jsx';
 import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Problems, Select, Tabs, ToggleRow, useAction, useToast, fmt, confirmBox } from '../ui.jsx';
 
@@ -47,7 +51,7 @@ function ZoneForm({ initial, presets, ifaces, taken, onClose, onSaved }) {
       <ToggleRow title="Gatehouse is the gateway" desc="Off if another router on this network does that job." checked={z.gateway} onChange={set('gateway')} />
       <ToggleRow title="Make devices here use the enforced DNS server" desc="Catches gadgets with a DNS server built in, such as smart TVs and cameras. Turn off for a network that needs its own DNS. A different server for this network, and exceptions for single devices, are under Protection." checked={z.dns_force} onChange={set('dns_force')} />
       <ToggleRow title="Allow remote login (SSH)" checked={z.ssh} onChange={set('ssh')} />
-      <ToggleRow title="Let devices open ports automatically (UPnP)" desc="Convenient for games and cameras, but widens exposure. Off is safer." checked={z.upnp} onChange={set('upnp')} />
+      <p className="small muted">Letting devices open ports by themselves (UPnP) is set in one place: Firewall, Open ports.</p>
     </Modal>
   );
 }
@@ -117,113 +121,6 @@ function Networks({ ov, presets, reload }) {
       )}
       {addNet && <AddNetwork onClose={() => setAddNet(false)} onCreated={(n) => { setAddNet(false); toast(`${n} added. Review and apply it on the Networks page.`); reload(); go('networks'); }} />}
       {edit && <ZoneForm initial={edit} presets={presets} ifaces={ifs || []} taken={taken} onClose={() => setEdit(null)} onSaved={reload} />}
-    </>
-  );
-}
-
-function Forwards({ reload }) {
-  const { data, reload: rf } = useData('/api/fw/forwards');
-  const { data: wans } = useData('/api/net/wans');
-  const [edit, setEdit] = useState(null);
-  const [run, busy] = useAction();
-  const refresh = () => { rf(); reload(); };
-  return (
-    <Card title="Open a port to the internet" desc="Lets something outside reach a device inside, like a game server. Only do this for what you need." actions={<Button small icon="plus" onClick={() => setEdit({ proto: 'tcp', enabled: true, wan: '' })}>Add</Button>}>
-      <div className="list">
-        {(data || []).map((f) => (
-          <div className="item" key={f.id}>
-            <div><div className="name">{f.name} {!f.enabled && <Pill>Off</Pill>}</div><div className="meta">{f.proto.toUpperCase()} port {f.ext_port} → {f.int_addr}:{f.int_port || f.ext_port}{f.wan ? ` via ${f.wan}` : ''}</div></div>
-            <div className="actions"><Button small icon="edit" onClick={() => setEdit(f)}>Edit</Button><Button small kind="danger" icon="trash" onClick={async () => await confirmBox(`Delete "${f.name}"?`) && run(() => del(`/api/fw/forwards/${f.id}`)).then(refresh)}>Delete</Button></div>
-          </div>
-        ))}
-        {!data?.length && <Empty>No ports are open to the internet.</Empty>}
-      </div>
-      {edit && (
-        <Modal title={edit.id ? 'Edit port' : 'Open a port'} onClose={() => setEdit(null)} footer={<><Button onClick={() => setEdit(null)}>Cancel</Button><Button kind="primary" disabled={busy || !edit.name} onClick={async () => { if (await run(() => put('/api/fw/forwards', edit), 'Saved. Apply it to start using it.')) { refresh(); setEdit(null); } }}>Save</Button></>}>
-          <Field label="Name"><Input value={edit.name} onChange={(v) => setEdit({ ...edit, name: v })} placeholder="Game server" /></Field>
-          <div className="formgrid">
-            <Field label="Kind"><Select value={edit.proto} onChange={(v) => setEdit({ ...edit, proto: v })} options={['tcp', 'udp']} /></Field>
-            <Field label="Port from the internet" hint="Or a range like 27000-27010"><Input value={edit.ext_port} onChange={(v) => setEdit({ ...edit, ext_port: v })} /></Field>
-            <Field label="Device inside"><Input value={edit.int_addr} onChange={(v) => setEdit({ ...edit, int_addr: v })} placeholder="192.168.1.50" /></Field>
-            <Field label="Port on the device" hint="Empty to keep the same"><Input value={edit.int_port} onChange={(v) => setEdit({ ...edit, int_port: v })} /></Field>
-            <Field label="Which connection"><Select value={edit.wan || ''} onChange={(v) => setEdit({ ...edit, wan: v })} options={[{ value: '', label: 'All' }, ...(wans?.wans || []).map((w) => w.name)]} /></Field>
-          </div>
-          <ToggleRow title="Turned on" checked={edit.enabled} onChange={(v) => setEdit({ ...edit, enabled: v })} />
-        </Modal>
-      )}
-    </Card>
-  );
-}
-
-function UPnP() {
-  const { data, reload } = useData('/api/upnp', { topics: ['upnp.maps'], every: 10000 });
-  const [run, busy] = useAction();
-  const [mac, setMac] = useState('');
-  const [q, setQ] = useState('');
-  const { data: ch } = useData('/api/vpn/choices');
-  if (!data) return null;
-  const known = new Map((ch?.devices || []).map((d) => [d.mac.toLowerCase(), d]));
-  const listed = new Set(data.allowed.map((a) => a.mac.toLowerCase()));
-  const found = (ch?.devices || []).filter((d) => !listed.has(d.mac.toLowerCase()) && (!q || `${d.name} ${d.ip} ${d.mac}`.toLowerCase().includes(q.toLowerCase())));
-  const addDevice = (d) => save({ allowed: [...data.allowed, { mac: d.mac, note: d.name || '' }] });
-  const save = (patch) => run(() => put('/api/upnp/settings', { restrict: data.restrict, max_lease_hours: data.max_lease_hours, allowed: data.allowed, ...patch })).then(reload);
-  return (
-    <>
-      <Card title="Devices opening ports by themselves (UPnP)" desc="A game console or media app can ask for a port and Gatehouse opens it for that device only, for a limited time.">
-        <Note tone={data.active ? 'good' : ''} title={data.active ? 'On' : 'Off'}>{data.active ? `Listening on ${data.networks.join(', ')}. Internet address ${data.ext_ip}.` : data.why}</Note>
-        {data.active && data.private_ext && <Note tone="warn" title="Your internet connection is behind another router">Ports opened here will not be reachable from the internet until the router in front also forwards them.</Note>}
-        <div className="list">
-          {data.mappings.map((m) => (
-            <div className="item" key={m.id}>
-              <div><div className="name">{m.proto.toUpperCase()} port {m.ext_port} → {m.int_addr}:{m.int_port}</div><div className="meta">{m.desc || 'No description'} · closes {fmt.dt(Math.floor(new Date(m.expires).getTime() / 1000))}</div></div>
-              <div className="actions"><Button small kind="danger" icon="trash" disabled={busy} onClick={() => run(() => del(`/api/upnp/mappings/${m.id}`)).then(reload)}>Close</Button></div>
-            </div>
-          ))}
-          {!data.mappings.length && <Empty>No ports are open right now.</Empty>}
-        </div>
-        {data.mappings.length > 0 && <Button small kind="danger" disabled={busy} onClick={() => run(() => del('/api/upnp/mappings')).then(reload)}>Close all</Button>}
-      </Card>
-      <Card title="Who may use it" desc="Ports below 1024 and the ones Gatehouse itself uses can never be opened this way.">
-        <Field label="Longest a port stays open" hint="Devices renew what they still need."><Select value={String(data.max_lease_hours)} onChange={(v) => save({ max_lease_hours: Number(v) })} options={[{ value: '1', label: '1 hour' }, { value: '6', label: '6 hours' }, { value: '24', label: '1 day' }, { value: '168', label: '7 days' }]} /></Field>
-        <ToggleRow title="Only the devices I list" desc="Everything else is refused. Off means any device on an allowed network may ask." checked={data.restrict} onChange={(v) => save({ restrict: v })} />
-        {data.restrict && (
-          <>
-            <div className="list">
-              {data.allowed.map((a) => {
-                const d = known.get(a.mac.toLowerCase());
-                return (
-                  <div className="item" key={a.mac}><div><div className="name">{d?.name || a.note || a.mac}</div><div className="meta mono">{a.mac}{d?.ip ? ` · ${d.ip}` : ''}</div></div>
-                    <div className="actions"><Button small kind="danger" icon="trash" onClick={() => save({ allowed: data.allowed.filter((x) => x.mac !== a.mac) })}>Remove</Button></div></div>
-                );
-              })}
-              {!data.allowed.length && <Empty>No devices listed, so nothing can open a port.</Empty>}
-            </div>
-            <Field label="Add a device">
-              <Input value={q} onChange={setQ} placeholder="Search by name, address or MAC" aria-label="Search devices" />
-            </Field>
-            <div className="list" style={{ maxHeight: '14rem', overflow: 'auto' }}>
-              {found.slice(0, 50).map((d) => (
-                <div className="item" key={d.mac}>
-                  <div><div className="name"><span className={`dot ${d.online ? '' : 'off'}`} /> {d.name}</div><div className="meta mono">{d.ip || 'not seen yet'} · {d.mac}</div></div>
-                  <div className="actions"><Button small disabled={busy} onClick={() => addDevice(d)}>Allow</Button></div>
-                </div>
-              ))}
-              {ch && !found.length && <Empty>{q ? 'No matching devices.' : 'Every known device is already listed.'}</Empty>}
-            </div>
-            <div className="addrow" style={{ gridTemplateColumns: 'minmax(0, 1fr) auto' }}>
-              <Field label="Or type a device address (MAC)"><Input value={mac} onChange={setMac} placeholder="aa:bb:cc:dd:ee:ff" /></Field>
-              <Button disabled={busy || !mac} onClick={async () => { await save({ allowed: [...data.allowed, { mac, note: '' }] }); setMac(''); }}>Add</Button>
-            </div>
-          </>
-        )}
-      </Card>
-      <Card title="Recent requests" desc="What devices asked for, and what was refused.">
-        <div className="scroll"><table className="table">
-          <thead><tr><th>When</th><th>What</th></tr></thead>
-          <tbody>{[...data.log].reverse().slice(0, 50).map((l, i) => <tr key={i}><td>{fmt.ago(l.at)}</td><td>{l.kind === 'deny' ? <Pill tone="warn">Refused</Pill> : null} {l.msg}</td></tr>)}</tbody></table>
-          {!data.log.length && <Empty>Nothing yet.</Empty>}
-        </div>
-      </Card>
     </>
   );
 }
@@ -341,14 +238,14 @@ export default function Firewall({ me }) {
   return (
     <Page title="Firewall" sub="Decide what each network may reach. Changes only take effect when you apply them.">
       <Protected reload={reload} />
-      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'networks', label: 'Networks' }, { value: 'rules', label: `Rules${(rules || []).filter((r) => !r.countries).length ? ` (${(rules || []).filter((r) => !r.countries).length})` : ''}` }, { value: 'groups', label: 'Groups & lists' }, { value: 'ports', label: 'Open ports' }, { value: 'upnp', label: 'UPnP' }, { value: 'countries', label: 'Countries' }, { value: 'protection', label: 'Protection' }, { value: 'history', label: 'History' }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'networks', label: 'Networks' }, { value: 'rules', label: `Rules${(rules || []).filter((r) => !r.countries).length ? ` (${(rules || []).filter((r) => !r.countries).length})` : ''}` }, { value: 'groups', label: 'Groups & lists' }, { value: 'ports', label: 'Open ports' }, { value: 'countries', label: 'Countries' }, { value: 'discovery', label: 'Discovery' }, { value: 'protection', label: 'Protection' }, { value: 'history', label: 'History' }]} />
       {tab === 'networks' && <><Networks ov={ov} presets={presets} reload={reload} /><Matrix ov={ov} rules={(rules || []).filter((r) => !r.countries)} onPick={(from, to, p) => setPair({ from, to, p })} /></>}
       {tab === 'rules' && <RulesList ov={ov} rules={(rules || []).filter((r) => !r.countries)} countryRules={countryRules} pickers={pickers} reloadPickers={reloadPickers} reload={all} filter={filter} setFilter={setFilter} startNew={(init) => setNewRule(init)} />}
       {tab === 'groups' && <GroupsAndLists pickers={pickers} reloadPickers={reloadPickers} reload={all} />}
-      {tab === 'ports' && <Forwards reload={reload} />}
-      {tab === 'upnp' && <UPnP />}
+      {tab === 'ports' && <><NatNotice compact /><Forwards reload={reload} /><UPnPCard /></>}
       {tab === 'protection' && <Protection ov={ov} reload={reload} pickers={pickers} />}
       {tab === 'countries' && <Countries reload={all} />}
+      {tab === 'discovery' && <Discovery reload={all} />}
       {tab === 'history' && <History />}
       {pair && (
         <PairModal pair={pair} ov={ov} onClose={() => setPair(null)} onChanged={all}

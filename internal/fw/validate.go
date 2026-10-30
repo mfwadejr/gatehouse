@@ -335,8 +335,22 @@ func (m *Model) Validate() error {
 		if ip := net.ParseIP(f.IntAddr); ip == nil {
 			add("forward %q: %q is not an address", f.Name, f.IntAddr)
 		}
-		if f.WAN != "" && ifaceZone[f.WAN] == "" {
-			add("forward %q uses %q which is not an internet connection", f.Name, f.WAN)
+		for _, w := range splitList(f.WAN) {
+			if ifaceZone[w] == "" {
+				add("forward %q uses %q which is not an internet connection", f.Name, w)
+			}
+		}
+		for _, x := range f.Src {
+			if _, err := netip.ParsePrefix(x); err != nil {
+				if _, err2 := netip.ParseAddr(x); err2 != nil {
+					add("forward %q: %q is not an address or network", f.Name, x)
+				}
+			}
+		}
+		for _, cc := range f.Countries {
+			if len(cc) != 2 || strings.ToUpper(cc) != cc || cc < "AA" || cc > "ZZ" {
+				add("forward %q: %q is not a country code", f.Name, cc)
+			}
 		}
 		// Never forward to the router's own console.
 	}

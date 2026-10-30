@@ -254,10 +254,17 @@ type ForwardRow struct {
 	IntAddr string `json:"int_addr"`
 	IntPort string `json:"int_port"`
 	Enabled bool   `json:"enabled"`
+	// Set for forwards made from an app: the group they belong to, the app, the device they follow
+	// and who may connect.
+	Group     string   `json:"group,omitempty"`
+	App       string   `json:"app,omitempty"`
+	MAC       string   `json:"mac,omitempty"`
+	Src       []string `json:"src"`
+	Countries []string `json:"countries"`
 }
 
 func Forwards(db Queryer) ([]ForwardRow, error) {
-	rows, err := db.Query(`SELECT id,name,wan,proto,ext_port,int_addr,int_port,enabled FROM nat_forwards ORDER BY id`)
+	rows, err := db.Query(`SELECT id,name,wan,proto,ext_port,int_addr,int_port,enabled,grp,app,mac,src,countries FROM nat_forwards ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -266,10 +273,18 @@ func Forwards(db Queryer) ([]ForwardRow, error) {
 	for rows.Next() {
 		var f ForwardRow
 		var en int
-		if err := rows.Scan(&f.ID, &f.Name, &f.WAN, &f.Proto, &f.ExtPort, &f.IntAddr, &f.IntPort, &en); err != nil {
+		var src, cc string
+		if err := rows.Scan(&f.ID, &f.Name, &f.WAN, &f.Proto, &f.ExtPort, &f.IntAddr, &f.IntPort, &en, &f.Group, &f.App, &f.MAC, &src, &cc); err != nil {
 			return nil, err
 		}
 		f.Enabled = en == 1
+		f.Src, f.Countries = splitList(src), splitList(cc)
+		if f.Src == nil {
+			f.Src = []string{}
+		}
+		if f.Countries == nil {
+			f.Countries = []string{}
+		}
 		out = append(out, f)
 	}
 	return out, rows.Err()
@@ -278,8 +293,8 @@ func Forwards(db Queryer) ([]ForwardRow, error) {
 func SaveForward(tx *sql.Tx, f ForwardRow) (int64, error) {
 	f.Name = strings.TrimSpace(f.Name)
 	if f.ID == 0 {
-		res, err := tx.Exec(`INSERT INTO nat_forwards(name,wan,proto,ext_port,int_addr,int_port,enabled) VALUES(?,?,?,?,?,?,?)`,
-			f.Name, f.WAN, f.Proto, f.ExtPort, f.IntAddr, f.IntPort, b2i(f.Enabled))
+		res, err := tx.Exec(`INSERT INTO nat_forwards(name,wan,proto,ext_port,int_addr,int_port,enabled,grp,app,mac,src,countries) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`,
+			f.Name, f.WAN, f.Proto, f.ExtPort, f.IntAddr, f.IntPort, b2i(f.Enabled), f.Group, f.App, f.MAC, strings.Join(f.Src, ","), strings.Join(f.Countries, ","))
 		if err != nil {
 			if strings.Contains(err.Error(), "UNIQUE") {
 				return 0, errors.New("a port forward with that name already exists")
@@ -288,8 +303,8 @@ func SaveForward(tx *sql.Tx, f ForwardRow) (int64, error) {
 		}
 		return res.LastInsertId()
 	}
-	_, err := tx.Exec(`UPDATE nat_forwards SET name=?,wan=?,proto=?,ext_port=?,int_addr=?,int_port=?,enabled=? WHERE id=?`,
-		f.Name, f.WAN, f.Proto, f.ExtPort, f.IntAddr, f.IntPort, b2i(f.Enabled), f.ID)
+	_, err := tx.Exec(`UPDATE nat_forwards SET name=?,wan=?,proto=?,ext_port=?,int_addr=?,int_port=?,enabled=?,grp=?,app=?,mac=?,src=?,countries=? WHERE id=?`,
+		f.Name, f.WAN, f.Proto, f.ExtPort, f.IntAddr, f.IntPort, b2i(f.Enabled), f.Group, f.App, f.MAC, strings.Join(f.Src, ","), strings.Join(f.Countries, ","), f.ID)
 	return f.ID, err
 }
 

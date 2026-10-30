@@ -237,6 +237,7 @@ func Load(db Queryer) (*Model, error) {
 	m.Rules = append(m.Rules, CountryRules(m.Zones, CountryPolicyFrom(db))...)
 
 	m.Routes, _ = RouteSpecs(db)
+	m.MDNS = mdnsIfaces(m.Zones, MDNSFrom(db))
 
 	m.Now = time.Now()
 	m.Loc = time.UTC
@@ -290,15 +291,17 @@ func Load(db Queryer) (*Model, error) {
 		e.Close()
 	}
 
-	frows, err := db.Query(`SELECT name,wan,proto,ext_port,int_addr,int_port,enabled FROM nat_forwards ORDER BY id`)
+	frows, err := db.Query(`SELECT name,wan,proto,ext_port,int_addr,int_port,enabled,src,countries FROM nat_forwards ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
 	for frows.Next() {
 		var f Forward
 		var en int
-		frows.Scan(&f.Name, &f.WAN, &f.Proto, &f.ExtPort, &f.IntAddr, &f.IntPort, &en)
+		var src, cc string
+		frows.Scan(&f.Name, &f.WAN, &f.Proto, &f.ExtPort, &f.IntAddr, &f.IntPort, &en, &src, &cc)
 		f.Enabled = en == 1
+		f.Src, f.Countries = splitList(src), splitList(cc)
 		m.Forwards = append(m.Forwards, f)
 	}
 	frows.Close()
@@ -442,4 +445,15 @@ func settingOn(db Queryer, key string) bool {
 		rows.Scan(&v)
 	}
 	return v == "1"
+}
+
+// splitList reads a comma-separated list, dropping empty parts.
+func splitList(s string) []string {
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }

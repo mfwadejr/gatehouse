@@ -64,7 +64,8 @@ func (f *fakeNet) WifiPowerSave(iface string, keepAwake bool) error {
 	return nil
 }
 
-func (f *fakeNet) WifiReport(iface string) (string, error) { return "== Card ==\nsample " + iface, nil }
+func (f *fakeNet) Diag(kind, target string) (string, error) { return kind + " " + target, nil }
+func (f *fakeNet) WifiReport(iface string) (string, error)  { return "== Card ==\nsample " + iface, nil }
 
 func (f *fakeNet) SSHApply(p netd.SSHPlan) error {
 	f.mu.Lock()

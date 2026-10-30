@@ -5,6 +5,8 @@ import WanGroups, { Traffic } from './WanGroups.jsx';
 import SpeedTest from './SpeedTest.jsx';
 import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, ToggleRow, useAction, useToast, fmt, confirmBox } from '../ui.jsx';
 import { linkState, linkMeasure } from '../linkstate.js';
+import NatNotice from '../natnotice.jsx';
+import NetTools from './NetTools.jsx';
 
 const TYPES = [
   { value: 'dhcp', label: 'Automatic' },
@@ -67,7 +69,7 @@ function WanForm({ initial, ports, found, onClose, onSaved, wans }) {
           <Field label="DNS servers" hint="Optional, comma separated"><Input value={w.dns} onChange={set('dns')} /></Field>
         </div>
       )}
-      <ToggleRow title="Let devices open ports on this connection (UPnP)" desc="For games and media apps. Also needs to be switched on for a network under Firewall." checked={!!w.upnp} onChange={set('upnp')} />
+      <p className="small muted">Letting devices open ports on this connection (UPnP) is set in one place: Firewall, Open ports.</p>
       <button className="link small" onClick={() => setAdv(!adv)}>{adv ? 'Hide' : 'Show'} advanced options</button>
       {adv && (
         <div className="formgrid">
@@ -154,6 +156,7 @@ export default function Internet({ me }) {
       {wd && ifs && isNew && <QuickSetup ports={ports} found={found} onDone={all} />}
       {!stat?.helper && stat && <Note tone="warn" title="Network changes are unavailable">The network helper is not running, so connections can be viewed but not changed.</Note>}
 
+      <NatNotice />
       {wans.length > 0 || !isNew ? (
         <Card title="Internet connections" actions={<Button icon="plus" onClick={() => setEdit({})}>Add connection</Button>}
           desc={wans.length > 1 ? 'Choose how these share the work, or send certain devices through specific ones, in Connection groups below.' : undefined}>
@@ -185,6 +188,7 @@ export default function Internet({ me }) {
       <WanGroups wans={wans} links={links} onChanged={all} />
       <Traffic wans={wans} links={links} />
       {wans.some((w) => w.enabled) && <SpeedTest wans={wans} links={links} />}
+      {(!isNew && !!me && me.user?.role === 'admin') && <NetTools />}
 
       {edit && <WanForm initial={edit} wans={wans} ports={ports} found={found} onClose={() => setEdit(null)} onSaved={all} />}
       <ApplyBar kind="net" label="your network settings" status={stat} me={me} onChanged={all} />

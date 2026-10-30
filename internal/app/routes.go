@@ -362,6 +362,8 @@ func (a *App) registerRoutes() {
 	a.registerFWRoutes()
 	a.registerFWObjectRoutes()
 	a.registerCountryRoutes()
+	a.registerNatRoutes()
+	a.registerDiagRoutes()
 	a.registerRouteRoutes()
 	a.registerNetRoutes()
 	a.registerGroupRoutes()

@@ -45,6 +45,7 @@ type NetController interface {
 	WifiHealth(ifaces []string, keepAwake bool) ([]netd.WifiState, error)
 	WifiPowerSave(iface string, keepAwake bool) error
 	WifiReport(iface string) (string, error)
+	Diag(kind, target string) (string, error)
 	SSHApply(p netd.SSHPlan) error
 	SSHLog(since int64) ([]string, error)
 }
@@ -314,6 +315,15 @@ func (s *Server) dispatchNet(r request) (any, error) {
 			return nil, errors.New("bad parameters")
 		}
 		return s.Net.WifiReport(p.Iface)
+	case "diag.run":
+		var p struct {
+			Kind   string `json:"kind"`
+			Target string `json:"target"`
+		}
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return s.Net.Diag(p.Kind, p.Target)
 	case "ssh.apply":
 		var p netd.SSHPlan
 		if err := json.Unmarshal(r.Params, &p); err != nil {
@@ -529,6 +539,13 @@ func (c *Client) WifiPowerSave(iface string, keepAwake bool) error {
 func (c *Client) WifiReport(iface string) (string, error) {
 	var out string
 	err := c.callWithin(time.Minute, "wifi.report", map[string]string{"iface": iface}, &out)
+	return out, err
+}
+
+// Diag runs a ping or traceroute from the machine itself.
+func (c *Client) Diag(kind, target string) (string, error) {
+	var out string
+	err := c.callWithin(time.Minute, "diag.run", map[string]string{"kind": kind, "target": target}, &out)
 	return out, err
 }
 

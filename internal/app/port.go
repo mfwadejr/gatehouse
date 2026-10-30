@@ -165,6 +165,7 @@ func (a *App) event(actor, sev, title, detail string) {
 		a.Logs.Exec(`INSERT INTO events(ts,area,severity,actor,title,detail) VALUES(?,?,?,?,?,?)`, time.Now().Unix(), "system", sev, actor, title, detail)
 		a.Bus.Publish("events", map[string]int64{"at": time.Now().Unix()})
 	}
+	go a.alertFromEvent(actor, title, detail)
 }
 
 // portInUse says what already uses a port, or "" when it is free to choose.

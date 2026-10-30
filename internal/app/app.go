@@ -22,6 +22,7 @@ import (
 	dnssrv "gatehouse/internal/dns"
 	"gatehouse/internal/events"
 	"gatehouse/internal/fw"
+	"gatehouse/internal/mdns"
 	"gatehouse/internal/store"
 )
 
@@ -77,6 +78,8 @@ type App struct {
 	ocache       ocache
 	probeKick    chan struct{}
 	upnp         upnpState
+	mdns         mdns.Reflector
+	alerts       alertState
 	setupMu      sync.Mutex
 	con          consoles
 	upd          updates
@@ -159,6 +162,10 @@ func New(cfg Config) (*App, error) {
 	a.registerSetupRoutes()
 	a.registerChecklistRoutes()
 	a.registerUPnPRoutes()
+	a.registerUPnPCardRoutes()
+	a.registerAppForwardRoutes()
+	a.registerDiscoveryRoutes()
+	a.registerAlertRoutes()
 	a.prepareSetup()
 
 	if err := a.reloadAll(); err != nil {
@@ -338,6 +345,9 @@ func (a *App) Run(ctx context.Context) error {
 	run(func() { a.speedLoop(ctx) })
 	run(func() { a.upstreamProbeLoop(ctx) })
 	run(func() { a.runUPnP(ctx) })
+	run(func() { a.forwardSyncLoop(ctx) })
+	run(func() { a.mdnsLoop(ctx) })
+	run(func() { a.alertLoop(ctx) })
 	run(func() { a.updateLoop(ctx) })
 	run(func() { a.dynLoop(ctx) })
 	run(func() { a.rogueLoop(ctx) })

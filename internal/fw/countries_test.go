@@ -108,3 +108,39 @@ func TestRouteMarksCompile(t *testing.T) {
 		t.Fatalf("nft refused it: %v\n%s", err, out)
 	}
 }
+
+func TestForwardLimitsCompile(t *testing.T) {
+	m := sample()
+	m.Forwards = []Forward{{Name: "Plex", Proto: "tcp", ExtPort: "32400", IntAddr: "192.168.1.20", Enabled: true,
+		Src: []string{"203.0.113.0/24", "198.51.100.7", "2001:db8::/32"}, Countries: []string{"NL", "DE"}}}
+	if err := m.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	script, err := Compile(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`ip saddr { 203.0.113.0/24, 198.51.100.7 } tcp dport 32400`, "ip saddr @gc_nl_4 tcp dport 32400", "ip saddr @gc_de_4 tcp dport 32400", "set gc_nl_4"} {
+		if !strings.Contains(script, want) {
+			t.Errorf("missing %q in:\n%s", want, script)
+		}
+	}
+	if strings.Contains(script, "ip6 saddr") && strings.Contains(script, "dnat ip to 192.168.1.20") && strings.Contains(script, "ip6 saddr { 2001") {
+		t.Error("an IPv6 source was used for an IPv4 target")
+	}
+	// A forward with no limits stays a single plain rule.
+	m.Forwards[0].Src, m.Forwards[0].Countries = nil, nil
+	script, _ = Compile(m)
+	if !strings.Contains(script, "tcp dport 32400 counter dnat ip to 192.168.1.20") || strings.Contains(script, "saddr @gc_") {
+		t.Errorf("unlimited forward changed:\n%s", script)
+	}
+	// Two connections in one forward.
+	m.Forwards[0].WAN = "eth0,eth9"
+	if err := m.Validate(); err == nil {
+		t.Error("an unknown connection must be refused")
+	}
+	m.Forwards[0].Countries = []string{"nl"}
+	if err := m.Validate(); err == nil {
+		t.Error("a lower-case country code must be refused")
+	}
+}

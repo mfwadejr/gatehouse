@@ -451,4 +451,13 @@ CREATE TABLE routes(
   dests TEXT NOT NULL DEFAULT '[]',
   position INTEGER NOT NULL DEFAULT 0
 );
+`, `
+-- Port forwards by app and device: grp ties the several rows of one app together, app names the
+-- service they came from, mac keeps the forward pointing at the same device when its address
+-- changes, and src / countries limit who may connect (comma-separated lists).
+ALTER TABLE nat_forwards ADD COLUMN grp TEXT NOT NULL DEFAULT '';
+ALTER TABLE nat_forwards ADD COLUMN app TEXT NOT NULL DEFAULT '';
+ALTER TABLE nat_forwards ADD COLUMN mac TEXT NOT NULL DEFAULT '';
+ALTER TABLE nat_forwards ADD COLUMN src TEXT NOT NULL DEFAULT '';
+ALTER TABLE nat_forwards ADD COLUMN countries TEXT NOT NULL DEFAULT '';
 `}

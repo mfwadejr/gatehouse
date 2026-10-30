@@ -75,6 +75,10 @@ type Forward struct {
 	IntAddr string
 	IntPort string // empty means same as ExtPort
 	Enabled bool
+	// Only these sources may connect: addresses or networks, and countries (two-letter codes).
+	// Both empty means anyone.
+	Src       []string
+	Countries []string
 }
 
 // VPNPort is a port the router listens on for incoming VPN connections. It is only opened
@@ -107,6 +111,9 @@ type Model struct {
 	// RescueIface is the network port the device was first set up from. It keeps reaching the
 	// console even if every network is edited wrongly. Empty when not known.
 	RescueIface string
+	// MDNS lists the interfaces whose devices announce themselves to the router so that the
+	// discovery reflector can copy the announcements between paired networks.
+	MDNS []string
 	// SSHEnabled is the master switch for remote login. Off, nothing listens for SSH from any
 	// network, whatever each network's own SSH switch says.
 	SSHEnabled bool

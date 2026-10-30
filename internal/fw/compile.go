@@ -285,6 +285,9 @@ func (c *compiler) input() {
 		c.line(2, "iifname %s udp dport 67 accept comment \"dhcp server\"", ifSet(clients))
 		c.line(2, "iifname %s meta l4proto { tcp, udp } th dport 53 accept comment \"dns\"", ifSet(clients))
 	}
+	if len(m.MDNS) > 0 {
+		c.line(2, "iifname %s ip daddr 224.0.0.251 udp dport 5353 accept comment \"discovery between networks\"", ifSet(m.MDNS))
+	}
 	if wan := m.WanIfaces(); len(wan) > 0 {
 		c.line(2, "iifname %s udp sport 67 udp dport 68 accept comment \"wan dhcp client\"", ifSet(wan))
 		c.line(2, "iifname %s udp sport 547 udp dport 546 accept comment \"wan dhcpv6 client\"", ifSet(wan))
@@ -619,7 +622,7 @@ func (c *compiler) nat() {
 		}
 		in := wan
 		if f.WAN != "" {
-			in = []string{f.WAN}
+			in = splitList(f.WAN)
 		}
 		if len(in) == 0 {
 			continue
@@ -638,7 +641,9 @@ func (c *compiler) nat() {
 		default:
 			target = fmt.Sprintf("dnat ip6 to [%s]:%s", ip, f.IntPort)
 		}
-		c.line(2, "iifname %s %s dport %s counter %s comment %s", ifSet(in), f.Proto, f.ExtPort, target, q("forward:"+f.Name))
+		for _, from := range forwardSources(f, ip.To4() != nil) {
+			c.line(2, "iifname %s %s%s dport %s counter %s comment %s", ifSet(in), from, f.Proto, f.ExtPort, target, q("forward:"+f.Name))
+		}
 		// Hairpin: a device inside asking for the router's public address reaches the same
 		// server. Only public destinations that belong to the router qualify.
 		if hp := c.clientIfaces(); len(hp) > 0 && ip.To4() != nil {
@@ -688,4 +693,38 @@ func (c *compiler) marks() {
 	c.line(2, "type route hook output priority mangle; policy accept;")
 	c.line(2, "ct mark != 0 meta mark set ct mark")
 	c.line(1, "}")
+}
+
+// forwardSources gives the source matches a forward needs, one rule each (a connection may come
+// from any of them). Each is empty text, or ends with a space so it can sit before the protocol.
+// A forward with no limits has the single empty match. Addresses and countries of the other
+// family than the target are skipped, since they could never match.
+func forwardSources(f Forward, v4 bool) []string {
+	if len(f.Src) == 0 && len(f.Countries) == 0 {
+		return []string{""}
+	}
+	var out []string
+	var a4, a6 []string
+	for _, x := range f.Src {
+		if strings.Contains(x, ":") {
+			a6 = append(a6, x)
+		} else {
+			a4 = append(a4, x)
+		}
+	}
+	if v4 && len(a4) > 0 {
+		out = append(out, fmt.Sprintf("ip saddr %s ", setLit(a4)))
+	}
+	if !v4 && len(a6) > 0 {
+		out = append(out, fmt.Sprintf("ip6 saddr %s ", setLit(a6)))
+	}
+	for _, cc := range f.Countries {
+		r := Ref{Kind: RefGeo, Val: strings.ToUpper(cc)}
+		if v4 {
+			out = append(out, fmt.Sprintf("ip saddr @%s ", SetNameFor(r, 4)))
+		} else {
+			out = append(out, fmt.Sprintf("ip6 saddr @%s ", SetNameFor(r, 6)))
+		}
+	}
+	return out
 }

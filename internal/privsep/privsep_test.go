@@ -184,6 +184,7 @@ func (f *fakeNetCtl) WifiHealth(ifaces []string, keepAwake bool) ([]netd.WifiSta
 	return []netd.WifiState{{Iface: "wlan0", OK: true}}, nil
 }
 func (f *fakeNetCtl) WifiPowerSave(iface string, keepAwake bool) error { return nil }
+func (f *fakeNetCtl) Diag(kind, target string) (string, error)         { return kind + " " + target, nil }
 func (f *fakeNetCtl) WifiReport(iface string) (string, error)          { return "report " + iface, nil }
 func (f *fakeNetCtl) SSHApply(p netd.SSHPlan) error                    { return nil }
 func (f *fakeNetCtl) SSHLog(since int64) ([]string, error)             { return nil, nil }
