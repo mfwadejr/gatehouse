@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { get, post, put, useData } from '../api.js';
 import ApplyBar from '../ApplyBar.jsx';
+import FailbackPrompt from './FailbackPrompt.jsx';
 import { Button, Card, Field, Input, Note, Pill, Segmented, Select, ToggleRow, useAction, confirmBox } from '../ui.jsx';
 
 // High availability: two Gatehouse machines, one active at a time. The first-time setup is a short
@@ -107,11 +108,12 @@ export default function HighAvailability({ me }) {
   return (
     <Card title="High availability" desc="Two units, one active at a time." actions={data.active ? <Pill tone="good">This unit is active</Pill> : <Pill tone="warn">This unit is the standby</Pill>}>
       <div className="stack">
+        <FailbackPrompt ha={data} onChanged={all} canHide={false} />
         {mism && <Note tone="warn" title="Different versions">This unit runs {data.version} and its partner runs {peer.version}. Update the older one so both match.</Note>}
         {!peer.reachable && <Note tone="bad" title="The partner cannot be reached">If this unit is the standby it will take over by itself when the active one is really down. {peer.error || ''}</Note>}
         {data.error && <Note tone="warn">{data.error}</Note>}
         <div className="list">
-          <div className="item"><div><div className="name">This unit ({data.role === 'primary' ? 'main' : 'backup'}) {data.active ? <Pill tone="good">Active</Pill> : <Pill>Standby</Pill>}</div><div className="meta">{data.own_addr} · version {data.version}</div></div></div>
+          <div className="item"><div><div className="name">This unit ({data.primary ? 'main' : 'backup'}) {data.active ? <Pill tone="good">Active</Pill> : <Pill>Standby</Pill>}</div><div className="meta">{data.own_addr} · version {data.version}</div></div></div>
           <div className="item"><div><div className="name">Partner {peer.reachable ? (peer.active ? <Pill tone="good">Active</Pill> : <Pill>Standby</Pill>) : <Pill tone="bad">Not reachable</Pill>}</div><div className="meta">{data.peer_addr}{peer.version ? ` · version ${peer.version}` : ''}</div></div></div>
           <div className="item"><div><div className="name">Shared addresses</div><div className="meta">{(data.vips || []).map((v) => `${v.cidr} on ${v.iface}`).join(' · ')}</div></div></div>
           <div className="item"><div><div className="name">Settings copied</div><div className="meta">{ago(data.synced_at)}. Changes are made on the active unit and copied across.</div></div></div>
@@ -129,7 +131,7 @@ export default function HighAvailability({ me }) {
           {!data.active && <Button kind="primary" disabled={busy} onClick={async () => { if (await confirmBox('Make this unit the active one? Connections may pause for a few seconds.', { title: 'Switch units', yes: 'Switch' })) run(async () => { await post('/api/ha/failover', { code: '' }); all(); }, 'The active role is moving to this unit.'); }}>Make this unit active</Button>}
           <Button kind="danger" disabled={busy} onClick={async () => { if (await confirmBox('Remove the pair? Both units become ordinary single units. Addresses are not changed back for you.', { title: 'Remove the pair', yes: 'Remove' })) run(async () => { await post('/api/ha/unpair', {}); all(); }, 'Removed.'); }}>Remove the pair</Button>
         </div>
-        <span className="small muted">Failover is automatic. A recovered unit stays standby until you press Make this unit active. The standby keeps its internet ports down until it takes over, so the provider sees one machine; the first moments after a switch include getting the internet address again. VPN tunnels reconnect after a switch.</span>
+        <span className="small muted">Failover is automatic. When the main unit comes back, it stays standby until you choose: fail back to it, or keep the other unit as the main unit. Nothing moves by itself. The standby keeps its internet ports down until it takes over, so the provider sees one machine; the first moments after a switch include getting the internet address again. VPN tunnels reconnect after a switch.</span>
       </div>
     </Card>
   );

@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ApiError, get, post, setCsrf, useData } from './api.js';
-import { Icon, Loading } from './ui.jsx';
+import { Guard, Icon, Loading } from './ui.jsx';
 import { Enrol, Login, Setup } from './pages/Auth.jsx';
 import Overview from './pages/Overview.jsx';
+import FailbackPrompt from './pages/FailbackPrompt.jsx';
 import Internet from './pages/Internet.jsx';
 import Networks from './pages/Networks.jsx';
 import Wifi from './pages/Wifi.jsx';
@@ -57,7 +58,7 @@ function Shell({ me, onSignOut, reloadMe }) {
   const Page = page.el;
   const { data: fw } = useData('/api/fw/overview', { topics: ['fw.status'] });
   const { data: net } = useData('/api/net/status', { topics: ['net.status'] });
-  const { data: ha } = useData('/api/ha', { every: 15000 });
+  const { data: ha, reload: reloadHa } = useData('/api/ha', { every: 15000 });
   const pending = (fw?.status?.pending || net?.status?.pending) ? true : false;
   const dirty = !!(fw?.status?.dirty || net?.status?.dirty);
   const [finding, setFinding] = useState(false);
@@ -91,7 +92,8 @@ function Shell({ me, onSignOut, reloadMe }) {
       </aside>
       <main className="main" id="main">
         {ha?.standby && <div className="note warn" role="status" style={{ margin: 'var(--space-3)' }}><div><strong>This is the standby unit.</strong> Settings are read-only here; make changes on the active unit{ha.peer_addr ? ` (${ha.peer_addr})` : ''}. <a href="#/settings">High availability</a></div></div>}
-        <Page me={me} reloadMe={reloadMe} />
+        <FailbackPrompt ha={ha} onChanged={reloadHa} />
+        <Guard key={page.id} what="This page"><Page me={me} reloadMe={reloadMe} /></Guard>
       </main>
       {finding && <SearchBox onClose={() => setFinding(false)} go={go} />}
       {notes && <ReleaseNotes onClose={() => setNotes(false)} />}

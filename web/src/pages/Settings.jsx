@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { del, get, post, put, useData } from '../api.js';
-import { Button, Card, Empty, Field, Form, Input, Modal, Note, Page, Pill, Segmented, Select, ToggleRow, useAction, fmt, useStepUp, stepReady, StepUp } from '../ui.jsx';
+import { Guard, Button, Card, Empty, Field, Form, Input, Modal, Note, Page, Pill, Segmented, Select, ToggleRow, useAction, fmt, useStepUp, stepReady, StepUp } from '../ui.jsx';
 import { Enrol } from './Auth.jsx';
 import Backups from './Backups.jsx';
 import Changes from './Changes.jsx';
@@ -397,20 +397,20 @@ export default function Settings({ me, reloadMe }) {
   return (
     <Page title="Settings" sub="Your account and how you sign in.">
       <TwoStep me={me} data={data} reload={reload} boot={reloadMe} />
-      {me?.user?.role === 'admin' && <Updates me={me} />}
-      {me?.user?.role === 'admin' && <PowerCard me={me} />}
-      {me?.user?.role === 'admin' && <ConsolePort />}
-      {me?.user?.role === 'admin' && <Alerts />}
-      {me?.user?.role === 'admin' && <RemoteLogin me={me} />}
+      {me?.user?.role === 'admin' && <Guard what="Updates"><Updates me={me} /></Guard>}
+      {me?.user?.role === 'admin' && <Guard what="PowerCard"><PowerCard me={me} /></Guard>}
+      {me?.user?.role === 'admin' && <Guard what="ConsolePort"><ConsolePort /></Guard>}
+      {me?.user?.role === 'admin' && <Guard what="Alerts"><Alerts /></Guard>}
+      {me?.user?.role === 'admin' && <Guard what="RemoteLogin"><RemoteLogin me={me} /></Guard>}
       {me?.user?.role === 'admin' && (
         <Card title="My network" desc="A printable summary for a handover or your records: networks, addresses, devices, open ports and how to get back in. It never contains passwords or keys.">
           <a className="btn" href="/api/summary/print" target="_blank" rel="noreferrer">Open the printable page</a>
         </Card>
       )}
-      {me?.user?.role === 'admin' && <Changes me={me} />}
-      {me?.user?.role === 'admin' && <details className="more"><summary>Advanced</summary><HighAvailability me={me} /><BridgeMode /><TrafficLabels /><Syslog /><GuestPortal /><FlowExport /><Snmp /></details>}
-      {me?.user?.role === 'admin' && <Backups me={me} />}
-      {me?.user?.role === 'admin' && <ResetCard me={me} />}
+      {me?.user?.role === 'admin' && <Guard what="Changes"><Changes me={me} /></Guard>}
+      {me?.user?.role === 'admin' && <details className="more"><summary>Advanced</summary><Guard what="High availability"><HighAvailability me={me} /></Guard><Guard what="Bridge mode"><BridgeMode /></Guard><Guard what="Traffic labels"><TrafficLabels /></Guard><Guard what="Syslog"><Syslog /></Guard><Guard what="Guest sign-in page"><GuestPortal /></Guard><Guard what="Flow export"><FlowExport /></Guard><Guard what="SNMP"><Snmp /></Guard></details>}
+      {me?.user?.role === 'admin' && <Guard what="Backups"><Backups me={me} /></Guard>}
+      {me?.user?.role === 'admin' && <Guard what="ResetCard"><ResetCard me={me} /></Guard>}
       <Password />
       <Sessions />
       <Appearance />

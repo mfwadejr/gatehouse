@@ -81,8 +81,11 @@ type Status struct {
 	Version string `json:"version"`
 	Active  bool   `json:"active"` // holds the shared addresses right now
 	Role    string `json:"role"`   // primary or standby: how it was paired
-	Seq     int64  `json:"seq"`    // newest settings snapshot it has
-	Time    int64  `json:"time"`
+	// Applying is true while this unit is still loading a copy of the settings it was just sent.
+	Applying bool   `json:"applying,omitempty"`
+	Prefer   string `json:"prefer,omitempty"` // which unit (by how it was paired) should be active when both are healthy
+	Seq      int64  `json:"seq"`              // newest settings snapshot it has
+	Time     int64  `json:"time"`
 	// Update is what this unit's updater is doing ("idle" when nothing). ResultTo and Result say
 	// how the last update ended: Result is "ok" or "failed", ResultTo the version it aimed for.
 	Update   string `json:"update,omitempty"`
@@ -107,9 +110,12 @@ type Link struct {
 	Peer func() string
 	// OnJoin records a standby that proved it holds the code.
 	OnJoin     func(fp string, port int) error
-	OnSnapshot func(body []byte, seq int64, version string) error
-	Status     func() Status
-	Overview   func() Overview
+	OnSnapshot func(body []byte, seq int64, version, mapping string) error
+	// OnPrefer records which unit is the Primary (the one that should hold the role when both are
+	// healthy). It comes from the partner only.
+	OnPrefer func(role string) error
+	Status   func() Status
+	Overview func() Overview
 	// OnHandover makes this unit step aside; OnLeave unpairs it. Both come from the partner only.
 	OnHandover func() error
 	OnLeave    func() error
@@ -224,6 +230,17 @@ func (l *Link) Handler() http.Handler {
 		}
 		w.Write([]byte("ok"))
 	})
+	mux.HandleFunc("POST /ha/prefer", func(w http.ResponseWriter, r *http.Request) {
+		if !known(r) || l.OnPrefer == nil {
+			deny(w)
+			return
+		}
+		if err := l.OnPrefer(r.Header.Get("X-GH-Prefer")); err != nil {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		w.Write([]byte("ok"))
+	})
 	mux.HandleFunc("POST /ha/snapshot", func(w http.ResponseWriter, r *http.Request) {
 		if !known(r) {
 			deny(w)
@@ -236,7 +253,7 @@ func (l *Link) Handler() http.Handler {
 		}
 		var seq int64
 		fmt.Sscan(r.Header.Get("X-GH-Seq"), &seq)
-		if err := l.OnSnapshot(body, seq, r.Header.Get("X-GH-Version")); err != nil {
+		if err := l.OnSnapshot(body, seq, r.Header.Get("X-GH-Version"), r.Header.Get("X-GH-Map")); err != nil {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}

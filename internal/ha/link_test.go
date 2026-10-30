@@ -33,7 +33,7 @@ func newLink(t *testing.T) *fixture {
 			f.peer = fp
 			return nil
 		},
-		OnSnapshot: func(b []byte, seq int64, v string) error {
+		OnSnapshot: func(b []byte, seq int64, v, m string) error {
 			f.mu.Lock()
 			defer f.mu.Unlock()
 			f.snapshots = append(f.snapshots, b)

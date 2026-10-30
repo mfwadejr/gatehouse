@@ -1,6 +1,17 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.21',
+    title: 'Fail back when you choose',
+    items: [
+      'When the main unit comes back after the other unit took over, nothing moves by itself. A message appears on every screen: fail back to the main unit, keep the other unit as the main unit, or decide later (it comes back after a day). The network keeps running on the current unit until you choose.',
+      'Failing back first sends the latest settings to the main unit, so changes made while the spare ran are not lost, then steps aside. If the main unit does not take over, the unit that was running the network carries on by itself. Going back is greyed out, with the reason, while the main unit is still copying settings, is on another version, or is updating.',
+      'Keeping the other unit as the main unit swaps the roles on both units without moving anything. The change is refused, and nothing changes, if the other unit cannot be reached.',
+      'Fixed: settings changed on the spare while it ran the network now fit the main unit\'s port names when they are copied back.',
+      'If one part of a screen cannot be drawn, it now shows what went wrong in that spot and the rest of the page keeps working, instead of leaving a blank page. Also fixed a graph with a single point on it.',
+    ],
+  },
+  {
     version: '0.8.20',
     title: 'Safer pair updates, any-port device placement, warm spare',
     items: [

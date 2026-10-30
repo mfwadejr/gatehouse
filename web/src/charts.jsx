@@ -118,7 +118,7 @@ export function Chart({ series, from, to, kind = 'count', unit = '', height = 20
             {holes.map(([a, b], i) => <line key={`h${i}`} x1={X(a)} x2={X(b)} y1="100" y2="100" className="hole" vectorEffect="non-scaling-stroke"><title>Not recorded</title></line>)}
             {paths.map(({ s, segs }) => segs.map((d, i) => (
               <g key={`${s.key}${i}`} style={{ '--c': s.color }}>
-                {filled && series.length <= 2 && <path d={`${d}L${d.split('L').pop().split(',')[0]},${H}L${d.slice(1).split(',')[0]},${H}Z`} className="fill" />}
+                {filled && series.length <= 2 && d.includes('L') && <path d={`${d}L${d.split('L').pop().split(',')[0]},${H}L${d.slice(1).split(',')[0]},${H}Z`} className="fill" />}
                 <path d={d} className="ln" vectorEffect="non-scaling-stroke" />
               </g>
             )))}

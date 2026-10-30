@@ -422,3 +422,21 @@ export function useUndoDelete() {
     return true;
   }, [toast]);
 }
+
+// Shows what went wrong in one part of a screen and leaves the rest working. Without it, one part
+// that cannot draw leaves a blank page.
+export class Guard extends React.Component {
+  constructor(p) { super(p); this.state = { err: null }; }
+  static getDerivedStateFromError(err) { return { err }; }
+  componentDidCatch(err) { try { console.error('Screen part failed:', err); } catch { /* nothing */ } }
+  render() {
+    if (!this.state.err) return this.props.children;
+    return (
+      <div className="note bad" role="alert" style={{ margin: 'var(--space-3) 0' }}>
+        <div>
+          <strong>{this.props.what ? `${this.props.what} could not be shown.` : 'This part of the screen could not be shown.'}</strong> The rest of Gatehouse is working. Reload the page; if it happens again, send this text to support: {String(this.state.err?.message || this.state.err).slice(0, 300)}
+        </div>
+      </div>
+    );
+  }
+}

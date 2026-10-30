@@ -33,6 +33,10 @@ type HAPlan struct {
 	WanMACs   []string `json:"wan_macs,omitempty"`
 	HeartDev  string   `json:"heart_dev,omitempty"`
 	HeartCIDR string   `json:"heart_cidr,omitempty"`
+	// ConfOnly writes the keepalived settings and has the running program re-read them, without
+	// restarting anything. It is used to change which unit is the Primary, which must never move
+	// the shared addresses.
+	ConfOnly bool `json:"conf_only,omitempty"`
 }
 
 const haHeartNet = "etc/systemd/network/05-gatehouse-heart.network"
@@ -104,6 +108,9 @@ func (s *Service) HAApply(p HAPlan) error {
 	}
 	if err := haText("keepalived", p.Keepalived); err != nil {
 		return err
+	}
+	if p.ConfOnly {
+		return s.haConfOnly(ka, p.Keepalived)
 	}
 	if err := haText("conntrackd", p.Conntrackd); err != nil {
 		return err
@@ -184,5 +191,27 @@ func (s *Service) HAApply(p HAPlan) error {
 			return fmt.Errorf("could not start %s: %s", unit, strings.TrimSpace(out))
 		}
 	}
+	return nil
+}
+
+// haConfOnly replaces the keepalived settings and asks the running program to re-read them. A
+// rejected file is put back as it was, and nothing is restarted.
+func (s *Service) haConfOnly(ka, body string) error {
+	old, err := os.ReadFile(ka)
+	if err != nil {
+		return errors.New("high availability is not set up on this unit")
+	}
+	if string(old) == body {
+		return nil
+	}
+	if err := writeFileAtomic(ka, []byte(body), 0o600); err != nil {
+		return err
+	}
+	if out, err := wifiRun(15*time.Second, "keepalived", "--config-test", "-f", ka); err != nil {
+		writeFileAtomic(ka, old, 0o600)
+		return errors.New("the high-availability program rejected its settings: " + strings.TrimSpace(out))
+	}
+	// A reload keeps the unit's current role; a failure here only means the new priority waits for the next start.
+	wifiRun(30*time.Second, "systemctl", "reload", "keepalived.service")
 	return nil
 }

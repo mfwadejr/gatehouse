@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -39,6 +40,7 @@ type haLocal struct {
 	Seq       int64       `json:"seq"`
 	SyncedAt  int64       `json:"synced_at"`
 	LastHash  string      `json:"last_hash"`
+	Prefer    ha.Role     `json:"prefer,omitempty"`    // which unit (by how it was paired) is the Primary; empty means the first one
 	HeartDev  string      `json:"heart_dev,omitempty"` // this unit's port for the optional cable to the partner
 	Activated bool        `json:"activated"`           // the shared-address services are installed
 	Applied   bool        `json:"applied"`             // the first copy of the settings has been applied here
@@ -108,6 +110,22 @@ func mgmtIface(p ha.Pairing) string {
 		}
 	}
 	return ""
+}
+
+// isPreferred says whether this unit is the Primary: the one that takes the higher priority and the
+// one the failback prompt offers to give the role back to.
+func (s *haLocal) isPreferred() bool {
+	if s.Prefer == "" {
+		return s.Role == ha.Primary
+	}
+	return s.Prefer == s.Role
+}
+
+func (s *haLocal) preferRole() ha.Role {
+	if s.Prefer == "" {
+		return ha.Primary
+	}
+	return s.Prefer
 }
 
 func (s *haLocal) ownAddr() string {
@@ -274,7 +292,7 @@ func (a *App) haInstall(s *haLocal) error {
 	if a.Net == nil {
 		return errNoHelper
 	}
-	ka, err := ha.KeepalivedConf(s.local(), s.Role, s.ownAddr())
+	ka, err := ha.KeepalivedConfPrefer(s.local(), s.Role, s.ownAddr(), s.isPreferred())
 	if err != nil {
 		return err
 	}
@@ -332,6 +350,7 @@ func (a *App) haLink() *ha.Link {
 			return nil
 		},
 		OnSnapshot: a.haReceive,
+		OnPrefer:   a.haOnPrefer,
 		OnUpdate:   a.haOnUpdate,
 		Status:     a.haLocalStatus,
 		OnHandover: func() error {
@@ -361,8 +380,13 @@ func (a *App) haLocalStatus() ha.Status {
 			st.Result = "ok"
 		}
 	}
+	if a.haApplyMu.TryLock() {
+		a.haApplyMu.Unlock()
+	} else {
+		st.Applying = true
+	}
 	if s != nil {
-		st.Role, st.Seq, st.Active = string(s.Role), s.Seq, a.haActive(s)
+		st.Role, st.Seq, st.Active, st.Prefer = string(s.Role), s.Seq, a.haActive(s), string(s.preferRole())
 	}
 	return st
 }
@@ -463,8 +487,13 @@ func (a *App) haPush(force bool) error {
 	seq := s.Seq + 1
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	_, err = ha.Call(ctx, s.peerHost(), s.Self, s.PeerFP, "POST", "/ha/snapshot", body,
-		map[string]string{"X-GH-Seq": strconv.FormatInt(seq, 10), "X-GH-Version": a.Cfg.Version}, "")
+	hdr := map[string]string{"X-GH-Seq": strconv.FormatInt(seq, 10), "X-GH-Version": a.Cfg.Version}
+	// A standby that is running the network holds port names of its own. The Primary needs to know
+	// how they map back, so the settings it takes in fit its ports.
+	if s.Role == ha.Standby && len(s.Mapping) > 0 {
+		hdr["X-GH-Map"] = encodeMap(s.Mapping)
+	}
+	_, err = ha.Call(ctx, s.peerHost(), s.Self, s.PeerFP, "POST", "/ha/snapshot", body, hdr, "")
 	if err != nil {
 		a.haUpdate(func(x *haLocal) { x.LastError = "the partner did not take the settings: " + err.Error() })
 		return err
@@ -496,7 +525,7 @@ func (a *App) haSyncLoop(ctx context.Context) {
 }
 
 // haReceive takes a copy of the settings from the partner.
-func (a *App) haReceive(body []byte, seq int64, version string) error {
+func (a *App) haReceive(body []byte, seq int64, version, mapping string) error {
 	s := a.haLoad()
 	if s == nil {
 		return errors.New("this unit is not paired")
@@ -517,7 +546,11 @@ func (a *App) haReceive(body []byte, seq int64, version string) error {
 		a.haUpdate(func(x *haLocal) { x.LastError = "the copied settings were not taken: " + err.Error() })
 		return err
 	}
-	if err := a.haLocalize(s); err != nil {
+	ms := s.Mapping
+	if s.Role == ha.Primary {
+		ms = swapMap(decodeMap(mapping))
+	}
+	if err := a.haLocalize(s, ms); err != nil {
 		return err
 	}
 	a.haUpdate(func(x *haLocal) { x.Seq, x.SyncedAt, x.LastError = seq, time.Now().Unix(), "" })
@@ -527,14 +560,14 @@ func (a *App) haReceive(body []byte, seq int64, version string) error {
 
 // haLocalize makes copied settings fit this unit: its port names, its own address, and the partner
 // rule in the firewall. It runs inside one transaction.
-func (a *App) haLocalize(s *haLocal) error {
+func (a *App) haLocalize(s *haLocal, ms []ha.Match) error {
 	tx, err := a.Config.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if s.Role == ha.Standby && len(s.Mapping) > 0 {
-		if err := remapPorts(tx, s.Mapping); err != nil {
+	if len(ms) > 0 {
+		if err := remapPorts(tx, ms); err != nil {
 			return err
 		}
 	}
@@ -636,4 +669,35 @@ func remapPorts(tx *sql.Tx, ms []ha.Match) error {
 		}
 	}
 	return nil
+}
+
+// encodeMap, decodeMap and swapMap carry the port matching to the Primary, and turn it around.
+// Only the port names travel.
+func encodeMap(ms []ha.Match) string {
+	out := make([]ha.Match, 0, len(ms))
+	for _, m := range ms {
+		out = append(out, ha.Match{Primary: m.Primary, Backup: m.Backup})
+	}
+	b, _ := json.Marshal(out)
+	return base64.RawURLEncoding.EncodeToString(b)
+}
+
+func decodeMap(s string) []ha.Match {
+	b, err := base64.RawURLEncoding.DecodeString(s)
+	if err != nil {
+		return nil
+	}
+	var ms []ha.Match
+	if json.Unmarshal(b, &ms) != nil {
+		return nil
+	}
+	return ms
+}
+
+func swapMap(ms []ha.Match) []ha.Match {
+	out := make([]ha.Match, 0, len(ms))
+	for _, m := range ms {
+		out = append(out, ha.Match{Primary: m.Backup, Backup: m.Primary})
+	}
+	return out
 }

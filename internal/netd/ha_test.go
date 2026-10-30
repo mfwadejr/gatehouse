@@ -104,3 +104,33 @@ func TestHAApplyWarmWritesTheListsAndTheWarmScript(t *testing.T) {
 		t.Fatal("the plain script was replaced by the warm one")
 	}
 }
+
+func TestHAConfOnlyNeverRestartsAndRefusesWithoutAPair(t *testing.T) {
+	s := &Service{Root: t.TempDir()}
+	p := HAPlan{Enabled: true, ConfOnly: true, Keepalived: "# Written by Gatehouse\n"}
+	if err := s.HAApply(p); err == nil {
+		t.Fatal("a priority change on a unit with no high availability set up must be refused")
+	}
+	if _, err := os.Stat(filepath.Join(s.Root, haKeepalived)); err == nil {
+		t.Fatal("nothing may be written when high availability is not set up")
+	}
+	// Not in Gatehouse's own form: refused before anything is touched.
+	p.Keepalived = "vrrp_instance X {}"
+	if err := s.HAApply(p); err == nil {
+		t.Fatal("text that Gatehouse did not write was accepted")
+	}
+	// With the same text already in place there is nothing to do and nothing is restarted.
+	f := filepath.Join(s.Root, haKeepalived)
+	os.MkdirAll(filepath.Dir(f), 0o755)
+	os.WriteFile(f, []byte("# Written by Gatehouse\n"), 0o600)
+	p.Keepalived = "# Written by Gatehouse\n"
+	if err := s.HAApply(p); err != nil {
+		t.Fatal(err)
+	}
+	// Other files are never written by this path.
+	for _, g := range []string{haConntrackd, haWan, strings.TrimPrefix(ha.NotifyPath, "/")} {
+		if _, err := os.Stat(filepath.Join(s.Root, g)); err == nil {
+			t.Errorf("%s was written by a priority-only change", g)
+		}
+	}
+}

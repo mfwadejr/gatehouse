@@ -131,3 +131,31 @@ func TestConntrackd(t *testing.T) {
 		t.Fatal("keepalived must call the notify script")
 	}
 }
+
+func TestPrimaryChoiceDecidesPriorityAndNobodyEverPreempts(t *testing.T) {
+	p := Pairing{V: 1, ID: "pair1", Secret: "0123456789012345678901234", Primary: "192.168.1.2", Standby: "192.168.1.3",
+		VIPs: []VIP{{Iface: "br0", CIDR: "192.168.1.1/24"}}}
+	for _, c := range []struct {
+		role      Role
+		preferred bool
+		prio      string
+	}{{Primary, true, "priority 150"}, {Standby, false, "priority 100"}, {Standby, true, "priority 150"}, {Primary, false, "priority 100"}} {
+		own := p.Primary
+		if c.role == Standby {
+			own = p.Standby
+		}
+		conf, err := KeepalivedConfPrefer(p, c.role, own, c.preferred)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(conf, c.prio) || !strings.Contains(conf, "nopreempt") {
+			t.Errorf("%s preferred=%v: %s", c.role, c.preferred, conf)
+		}
+	}
+	// The plain form is unchanged: the unit paired first is the Primary.
+	a, _ := KeepalivedConf(p, Primary, p.Primary)
+	b, _ := KeepalivedConfPrefer(p, Primary, p.Primary, true)
+	if a != b {
+		t.Fatal("KeepalivedConf must keep its earlier meaning")
+	}
+}

@@ -94,6 +94,10 @@ func (a *App) haStatus() map[string]any {
 	st["joined"] = s.PeerFP != "" && (s.Role == ha.Standby || s.PeerFP != "")
 	st["peer"] = a.haPeerStatus(s)
 	st["warm"] = a.haWarmOn()
+	st["primary"] = s.isPreferred()
+	if fb := a.haFailbackState(s); fb != nil {
+		st["failback"] = fb
+	}
 	if own, peer, ok := s.heart(); ok {
 		st["heart"] = map[string]any{"dev": s.HeartDev, "own": own.Addr().String(), "peer": peer.String(), "connected": heartCarrier(s.HeartDev)}
 	} else {
@@ -113,6 +117,7 @@ func (s *haLocal) pairingForCode() ha.Pairing { return s.Pairing }
 func (a *App) registerHARoutes() {
 	s := a.API
 	s.Gate = a.haGate
+	a.registerFailbackRoutes()
 	s.HandleAdmin("GET /api/ha", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		st := a.haStatus()
 		st["ports"] = a.haPortList()

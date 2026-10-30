@@ -123,13 +123,20 @@ const (
 
 // KeepalivedConf writes the VRRP settings for one unit. Each network gets one VRRP instance that
 // holds that network's shared address. Properties chosen on purpose:
-//   - nopreempt: a recovered unit stays standby until the owner hands the role back, so the pair
-//     never flaps;
+//   - nopreempt: a recovered unit stays standby until the owner chooses to fail back (or to keep
+//     the other unit as the Primary), so the pair never flaps;
 //   - unicast between the units' own addresses, so nothing depends on multicast;
 //   - a fast advertisement (0.1 s) for a failover in about a second;
 //   - the primary starts with the higher priority, the standby lower, both as BACKUP so the first
 //     election decides who is active.
 func KeepalivedConf(p Pairing, role Role, ownAddr string) (string, error) {
+	return KeepalivedConfPrefer(p, role, ownAddr, role == Primary)
+}
+
+// KeepalivedConfPrefer is KeepalivedConf with the choice of which unit is the Primary made
+// separately from how the unit was paired. The Primary takes the higher priority, so if both
+// units start at once it is the one that becomes active. Neither ever takes the role back by itself.
+func KeepalivedConfPrefer(p Pairing, role Role, ownAddr string, preferred bool) (string, error) {
 	if err := p.Validate(); err != nil {
 		return "", err
 	}
@@ -137,9 +144,12 @@ func KeepalivedConf(p Pairing, role Role, ownAddr string) (string, error) {
 		return "", errors.New("unknown role")
 	}
 	peer, own := p.Standby, p.Primary
-	prio := 150
+	prio := 100
+	if preferred {
+		prio = 150
+	}
 	if role == Standby {
-		peer, own, prio = p.Primary, p.Standby, 100
+		peer, own = p.Primary, p.Standby
 	}
 	if ownAddr != "" && ownAddr != own {
 		return "", fmt.Errorf("this unit's address %s does not match the pairing (%s)", ownAddr, own)
