@@ -130,6 +130,7 @@ function Networks({ ov, presets, reload }) {
 function Protected({ reload }) {
   const { data, reload: again } = useData('/api/fw/protected', { topics: ['fw.status'] });
   const [run, busy] = useAction();
+  const toast = useToast();
   const [edit, setEdit] = useState(false);
   const [nets, setNets] = useState([]);
   const [cidrs, setCidrs] = useState('');
@@ -139,6 +140,8 @@ function Protected({ reload }) {
   const toggle = (n) => setNets((x) => (x.includes(n) ? x.filter((y) => y !== n) : [...x, n]));
   const save = async () => {
     const list = cidrs.split(/[\s,]+/).filter(Boolean);
+    const o = data.allow, key = (x) => [...(x || [])].sort().join(',');
+    if (key(nets) === key(o.networks) && key(list) === key(o.cidrs)) { toast('No changes. These are already saved.'); setEdit(false); return; }
     if (await run(() => put('/api/fw/management-access', { networks: nets, cidrs: list }), 'Saved. Apply the firewall to put it into effect.')) { setEdit(false); again(); reload(); }
   };
   const test = async () => { const r = await run(() => post('/api/fw/access-check', {})); if (r) setRes(r); };

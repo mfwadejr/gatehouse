@@ -66,6 +66,19 @@ func clientHealth(in healthIn) (state, msg string) {
 	return "up", "Connected"
 }
 
+// clientProblem says what is wrong with a client tunnel that is not working. What OpenVPN
+// itself reported comes first; without it, a tunnel with no address inside it is described as
+// one the server never finished setting up, since the test result alone says nothing about why.
+func clientProblem(state, msg, addr, reason string) string {
+	switch {
+	case reason != "":
+		return reason
+	case state == "degraded" && addr == "":
+		return "The VPN server has not given this device an address, so the connection never finished. See the messages below"
+	}
+	return msg
+}
+
 func ago(sec int64) string {
 	switch {
 	case sec < 90:
@@ -133,6 +146,7 @@ type VPNView struct {
 	MTU        int        `json:"mtu"` // 0 means automatic
 	Warnings   []string   `json:"warnings,omitempty"`
 	Created    int64      `json:"created"`
+	Log        []string   `json:"log,omitempty"` // a client that is not working: OpenVPN's last messages
 }
 
 type vpnSnapshot struct {
@@ -395,8 +409,9 @@ func (a *App) computeVPN(st netd.VPNStatus) ([]VPNView, error) {
 			v.RTTMs, v.CheckedAt, v.ExitIP = chk.RTTMs, chk.At, chk.ExitIP
 			v.State, v.Message = clientHealth(healthIn{Enabled: o.Enabled, LinkUp: link.Up && os.Active, HasCheck: o.Check != "", CheckOK: haveChk && chk.OK,
 				CheckAt: chk.At, Target: o.Check, Now: now, AppliedAt: applied})
-			if len(os.Clients) == 0 && os.Active {
-				// a client's own byte counters are not exported; the check carries the health
+			if v.State == "degraded" || v.State == "down" {
+				v.Message = clientProblem(v.State, v.Message, link.Addr, os.Reason)
+				v.Log = os.Log
 			}
 			v.Uses = a.usesOf(o.Name, nil)
 		}

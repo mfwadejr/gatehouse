@@ -1,6 +1,15 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.26',
+    title: 'VPN tunnels say what is wrong; Save says what it did',
+    items: [
+      'Provider VPN files (ExpressVPN and others) now keep the certificate check and the packet-format line exactly as the provider wrote them. Gatehouse used to change one and drop the other, which could stop the connection from ever starting.',
+      'A VPN tunnel that is not working now says why in plain words (login refused, no answer from the server, certificate rejected, no address given), and shows the last lines OpenVPN wrote. A line is added to the event log when a tunnel drops or fails.',
+      'Save now tells you what happened: "Saved. Press Review and apply at the bottom of the window to start using it", "No changes. These are already saved", or "No changes. This is already in use".',
+    ],
+  },
+  {
     version: '0.8.25',
     title: 'Settings page fixed',
     items: [

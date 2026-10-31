@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"strconv"
@@ -28,6 +29,12 @@ type applyState struct {
 func (a *App) registerFWRoutes() {
 	s := a.API
 	s.Handle("GET /api/fw/overview", a.fwOverview)
+	// A small answer for a Save: what the firewall and the network would run now, and whether
+	// either is waiting to be applied. The console asks before and after a Save to tell the
+	// person what the Save really did.
+	s.Handle("GET /api/applystate", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		api.JSON(w, 200, map[string]any{"fw": a.fwStatus(), "net": a.netStatus()})
+	})
 	s.Handle("GET /api/fw/presets", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		api.JSON(w, 200, map[string]any{"presets": fw.Presets(), "services": fw.ServiceNames()})
 	})
@@ -253,6 +260,7 @@ func (a *App) fwStatus() map[string]any {
 		st["error"] = err.Error()
 	}
 	st["dirty"] = err == nil && script != a.lastApplied()
+	st["rev"] = fmt.Sprintf("%x", fnvSum([]byte(script)))
 	if a.FW != nil {
 		if tok, dl, ok := a.FW.Pending(); ok {
 			st["pending"] = map[string]any{"token": tok, "deadline": dl.Unix()}

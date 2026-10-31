@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useId, useMemo, useState, useCallback, useRef } from 'react';
-import { refreshAll, useFailing, useData } from './api.js';
+import { get, refreshAll, useFailing, useData } from './api.js';
 
 export const ICONS = {
   overview: 'M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z',
@@ -361,13 +361,39 @@ function DialogHost() {
 }
 
 // Runs an async action, shows its error as a toast, and tracks busy state.
+// A Save that ends with "apply it" says what it really did. The console asks what the firewall
+// and the network would run, before and after, and whether either waits to be applied.
+const NEEDS_APPLY = /\bApply (it|the firewall)\b/;
+async function applyState() {
+  try {
+    const s = await get('/api/applystate');
+    return { rev: `${s.fw?.rev}|${s.net?.rev}`, dirty: !!(s.fw?.dirty || s.net?.dirty) };
+  } catch { return null; }
+}
+export function saveSaid(before, after, fallback) {
+  if (!before || !after) return fallback;
+  if (after.dirty) {
+    return before.rev === after.rev
+      ? 'Saved. Review and apply is already waiting at the bottom of the window.'
+      : 'Saved. Press Review and apply at the bottom of the window to start using it.';
+  }
+  return before.rev === after.rev
+    ? 'Saved. It makes no difference to what is running, so there is nothing to apply.'
+    : 'No changes. This is already in use, so there is nothing to apply.';
+}
+
 export function useAction() {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const run = useCallback(async (fn, okText) => {
     setBusy(true);
-    try { const r = await fn(); if (okText) toast(okText); return r; }
-    catch (e) { toast(e.message || 'Something went wrong.', 'bad'); return undefined; }
+    try {
+      const track = !!okText && NEEDS_APPLY.test(okText);
+      const before = track ? await applyState() : null;
+      const r = await fn();
+      if (okText && r !== false) toast(track ? saveSaid(before, await applyState(), okText) : okText);
+      return r;
+    } catch (e) { toast(e.message || 'Something went wrong.', 'bad'); return undefined; }
     finally { setBusy(false); }
   }, [toast]);
   return [run, busy];

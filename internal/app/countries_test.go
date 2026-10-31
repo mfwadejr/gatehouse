@@ -61,3 +61,37 @@ func TestCountryPageSavesRulesAndWarns(t *testing.T) {
 		t.Error("rules remain after switching off")
 	}
 }
+
+// The console tells a Save apart by asking before and after: the same Save twice must leave the
+// "rev" alone, a real change must move it and leave the firewall waiting to be applied.
+func TestApplyStateTellsWhatASaveDid(t *testing.T) {
+	c, _, _ := siteBox(t, "192.168.1.1/24")
+	state := func() (rev string, dirty bool) {
+		rc, m, raw := c.call("GET", "/api/applystate", nil)
+		if rc != 200 {
+			t.Fatalf("applystate: %d %s", rc, raw)
+		}
+		fw := m["fw"].(map[string]any)
+		rev, _ = fw["rev"].(string)
+		dirty, _ = fw["dirty"].(bool)
+		return
+	}
+	body := map[string]any{"enabled": true, "mode": "block", "dir": "both", "countries": []string{"RU"}}
+	r0, _ := state()
+	if r0 == "" {
+		t.Fatal("no rev")
+	}
+	if rc, _, raw := c.call("PUT", "/api/fw/countries", body); rc != 200 {
+		t.Fatalf("save: %d %s", rc, raw)
+	}
+	r1, d1 := state()
+	if r1 == r0 || !d1 {
+		t.Fatalf("a real change must move the rev and wait to be applied: %s -> %s dirty=%v", r0, r1, d1)
+	}
+	if rc, _, raw := c.call("PUT", "/api/fw/countries", body); rc != 200 {
+		t.Fatalf("save again: %d %s", rc, raw)
+	}
+	if r2, d2 := state(); r2 != r1 || !d2 {
+		t.Fatalf("the same Save again must leave the rev alone: %s -> %s dirty=%v", r1, r2, d2)
+	}
+}

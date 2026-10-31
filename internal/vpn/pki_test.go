@@ -188,8 +188,11 @@ func TestImportProfileLegacyLines(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(ip.Config, "ns-cert-type") || strings.Contains(ip.Config, "keysize") || strings.Contains(ip.Config, "comp-lzo") {
+	if strings.Contains(ip.Config, "keysize") || strings.Contains(ip.Config, "comp-lzo") {
 		t.Errorf("legacy lines were kept:\n%s", ip.Config)
+	}
+	if n := strings.Count(ip.Config, "ns-cert-type server"); n != 1 {
+		t.Errorf("ns-cert-type written %d times, want once as the provider wrote it", n)
 	}
 	if n := strings.Count(ip.Config, "remote-cert-tls server"); n != 1 {
 		t.Errorf("remote-cert-tls written %d times, want once", n)
@@ -199,10 +202,15 @@ func TestImportProfileLegacyLines(t *testing.T) {
 			t.Errorf("lost %q", kept)
 		}
 	}
-	// ns-cert-type alone becomes the modern check.
-	ip, err = ImportProfile(strings.Replace(goodProfile, "remote-cert-tls server", "ns-cert-type server", 1))
-	if err != nil || !strings.Contains(ip.Config, "remote-cert-tls server") || strings.Contains(ip.Config, "ns-cert-type") {
-		t.Errorf("ns-cert-type not translated: %v\n%s", err, ip.Config)
+	// ns-cert-type alone stays as the provider wrote it (turning it into remote-cert-tls made
+	// ExpressVPN's handshake fail); "comp-lzo no" stays too, other comp-lzo values go.
+	ip, err = ImportProfile(strings.Replace(goodProfile, "remote-cert-tls server", "ns-cert-type server\ncomp-lzo no", 1))
+	if err != nil || !strings.Contains(ip.Config, "ns-cert-type server") || strings.Contains(ip.Config, "remote-cert-tls") || !strings.Contains(ip.Config, "comp-lzo no") {
+		t.Errorf("provider lines changed: %v\n%s", err, ip.Config)
+	}
+	ip, err = ImportProfile(strings.Replace(goodProfile, "remote-cert-tls server", "comp-lzo adaptive", 1))
+	if err != nil || strings.Contains(ip.Config, "comp-lzo") {
+		t.Errorf("compression was kept: %v\n%s", err, ip.Config)
 	}
 }
 

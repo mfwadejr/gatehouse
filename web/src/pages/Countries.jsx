@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { post, put, useData } from '../api.js';
 import { CODES, countryName } from '../AddrPicker.jsx';
-import { Button, Card, Input, Note, Pill, Segmented, ToggleRow, useAction, confirmBox } from '../ui.jsx';
+import { Button, Card, Input, Note, Pill, Segmented, ToggleRow, useAction, useToast, confirmBox } from '../ui.jsx';
 
 const flag = (cc) => String.fromCodePoint(...[...cc].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
 const ALL = CODES.map((c) => ({ cc: c, name: countryName(c) })).sort((a, b) => a.name.localeCompare(b.name));
@@ -13,6 +13,7 @@ export default function Countries({ reload }) {
   const [p, setP] = useState(null);
   const [q, setQ] = useState('');
   const [run, busy] = useAction();
+  const toast = useToast();
   useEffect(() => { if (data && !p) setP({ ...data.policy, countries: data.policy.countries || [] }); }, [data, p]);
   const sel = useMemo(() => new Set(p?.countries || []), [p]);
   const shown = useMemo(() => {
@@ -39,7 +40,12 @@ export default function Countries({ reload }) {
       throw e;
     }
   };
-  const doSave = () => run(() => save(false), 'Saved. Apply the firewall to start using it.');
+  const same = () => {
+    const o = data.policy;
+    const list = (x) => [...(x || [])].sort().join(',');
+    return !!p.enabled === !!o.enabled && p.mode === o.mode && p.dir === o.dir && list(p.countries) === list(o.countries);
+  };
+  const doSave = () => (same() ? toast('No changes. These are already saved.') : run(() => save(false), 'Saved. Apply the firewall to start using it.'));
   const preset = () => home && set({ enabled: true, mode: 'allow', dir: 'both', countries: [home] });
   const verb = p.mode === 'allow' ? 'Only these countries are allowed' : 'These countries are blocked';
   const dirText = { both: 'both ways', out: 'for what your devices send out', in: 'for what arrives from the internet' }[p.dir];

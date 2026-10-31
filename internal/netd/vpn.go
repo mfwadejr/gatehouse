@@ -69,6 +69,10 @@ type OVPNClientStatus struct {
 type OVPNStatus struct {
 	Active  bool               `json:"active"`
 	Clients []OVPNClientStatus `json:"clients"`
+	// For a client that is not working: what OpenVPN's own messages say, in plain words, and
+	// its last few lines.
+	Reason string   `json:"reason,omitempty"`
+	Log    []string `json:"log,omitempty"`
 }
 
 type LinkInfo struct {
@@ -107,12 +111,14 @@ type VPN struct {
 	ExitIP    func(dev string) (string, error)
 	Interval  time.Duration
 
-	mu      sync.Mutex // plan and process control
-	rmu     sync.Mutex // check results; never held while waiting on the checks
-	plan    VPNPlan
-	results map[string]CheckResult
-	cancel  context.CancelFunc
-	wg      sync.WaitGroup
+	mu       sync.Mutex // plan and process control
+	rmu      sync.Mutex // check results; never held while waiting on the checks
+	lmu      sync.Mutex // recent OpenVPN messages
+	logCache map[string]logEntry
+	plan     VPNPlan
+	results  map[string]CheckResult
+	cancel   context.CancelFunc
+	wg       sync.WaitGroup
 }
 
 var (
@@ -502,6 +508,17 @@ func (v *VPN) Status() VPNStatus {
 		if i.Role == "server" {
 			if b, err := os.ReadFile(file); err == nil {
 				o.Clients = ParseOVPNStatus(string(b))
+			}
+		} else if v.Systemctl != nil {
+			// A client that has no address in the tunnel, or whose test fails, gets its own
+			// messages read so the console can say why.
+			li, _ := linkInfo(i.Name)
+			if r, ok := res[i.Name]; li.Addr == "" || (ok && !r.OK) {
+				lines := v.recentOVPN(unitFor(i))
+				if len(lines) > 12 {
+					lines = lines[len(lines)-12:]
+				}
+				o.Log, o.Reason = lines, OVPNReason(lines)
 			}
 		}
 		st.OVPN[i.Name] = o

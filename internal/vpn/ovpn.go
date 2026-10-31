@@ -176,7 +176,7 @@ func ImportProfile(text string) (*ImportedProfile, error) {
 	var out strings.Builder
 	ip := &ImportedProfile{}
 	lines := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
-	hasCA, hasRemote, sawCertTLS := false, false, false
+	hasCA, hasRemote, sawCertTLS, sawNS, sawLZO := false, false, false, false, false
 	var refused []string
 	for i := 0; i < len(lines); i++ {
 		line := strings.TrimSpace(lines[i])
@@ -225,11 +225,19 @@ func ImportProfile(text string) (*ImportedProfile, error) {
 			}
 			fmt.Fprintln(&out, strings.Join(f, " "))
 		case d == "ns-cert-type":
-			// The old form of remote-cert-tls. Newer OpenVPN is dropping it, so it is written
-			// the modern way (once).
-			if len(f) > 1 && (strings.EqualFold(f[1], "server") || strings.EqualFold(f[1], "client")) && !sawCertTLS {
-				sawCertTLS = true
-				fmt.Fprintf(&out, "remote-cert-tls %s\n", strings.ToLower(f[1]))
+			// Kept as the provider wrote it. Turning it into remote-cert-tls asks for more of
+			// the server's certificate than some providers' certificates carry, and the
+			// handshake then fails. OpenVPN 2.6 (Debian 13) still accepts it.
+			if len(f) > 1 && (strings.EqualFold(f[1], "server") || strings.EqualFold(f[1], "client")) && !sawNS {
+				sawNS = true
+				fmt.Fprintf(&out, "ns-cert-type %s\n", strings.ToLower(f[1]))
+			}
+		case d == "comp-lzo" && len(f) == 2 && strings.EqualFold(f[1], "no"):
+			// "comp-lzo no" selects the older packet framing some providers' servers still
+			// use, without compressing anything. Dropping it breaks the match.
+			if !sawLZO {
+				sawLZO = true
+				fmt.Fprintln(&out, "comp-lzo no")
 			}
 		case d == "remote-cert-tls":
 			if sawCertTLS {

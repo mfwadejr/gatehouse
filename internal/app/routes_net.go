@@ -270,6 +270,7 @@ func (a *App) netStatus() map[string]any {
 		return st
 	}
 	st["dirty"] = (len(p.Config.Interfaces) > 0 || len(p.Config.WANs) > 0) && fingerprint(p) != a.Config.Setting("net.applied", "")
+	st["rev"] = fingerprint(p)
 	if a.Net != nil {
 		if tok, dl, ok := a.Net.NetPending(); ok {
 			st["pending"] = map[string]any{"token": tok, "deadline": dl.Unix()}

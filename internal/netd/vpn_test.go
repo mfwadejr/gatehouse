@@ -164,3 +164,50 @@ func TestChecks(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 }
+
+func TestOVPNReasonSaysWhatIsWrong(t *testing.T) {
+	cases := []struct {
+		lines []string
+		want  string
+	}{
+		{[]string{"TLS Error: TLS key negotiation failed to occur within 60 seconds (check your network connectivity)", "TLS Error: TLS handshake failed"}, "did not answer"},
+		{[]string{"AUTH: Received control message: AUTH_FAILED"}, "refused the username and password"},
+		{[]string{"VERIFY KU ERROR", "TLS_ERROR: BIO read tls_read_plaintext error"}, "certificate was rejected"},
+		{[]string{"RESOLVE: Cannot resolve host address: nl.example.com:1195 (Name or service not known)"}, "look up the server's name"},
+		{[]string{"Options error: Unrecognized option or missing or extra parameter(s) in x.conf:5: foo (2.6.14)"}, "would not accept a setting"},
+		{[]string{"Initialization Sequence Completed"}, ""},
+		// A failure that is already past is not reported once the tunnel is up.
+		{[]string{"AUTH_FAILED", "Initialization Sequence Completed"}, ""},
+		{[]string{"nothing useful"}, ""},
+	}
+	for _, c := range cases {
+		got := OVPNReason(c.lines)
+		if c.want == "" && got != "" || c.want != "" && !strings.Contains(got, c.want) {
+			t.Errorf("%v: got %q, want it to contain %q", c.lines, got, c.want)
+		}
+	}
+}
+
+func TestStatusReadsOpenVPNMessagesForABrokenClient(t *testing.T) {
+	v, _ := newTestVPN(t)
+	defer v.Stop()
+	old := wifiRun
+	defer func() { wifiRun = old }()
+	var asked string
+	wifiRun = func(_ time.Duration, name string, args ...string) (string, error) {
+		asked = name + " " + strings.Join(args, " ")
+		return "TLS Error: TLS handshake failed\n", nil
+	}
+	cl := OVPNInstance{Name: "tun1", Role: "client", Conf: "dev tun1\n", Files: map[string]string{"auth": "u\np\n"}}
+	if err := v.Apply(VPNPlan{OpenVPN: []OVPNInstance{cl}}); err != nil {
+		t.Fatal(err)
+	}
+	st := v.Status()
+	o := st.OVPN["tun1"]
+	if !strings.Contains(asked, "openvpn-client@gatehouse-tun1.service") {
+		t.Fatalf("journal not asked for the client's unit: %q", asked)
+	}
+	if len(o.Log) != 1 || !strings.Contains(o.Reason, "did not answer") {
+		t.Fatalf("no reason: %+v", o)
+	}
+}

@@ -476,6 +476,12 @@ function Outbound({ v, reload, setModal }) {
         <p className={v.state === 'up' ? 'sec' : ''} style={v.state === 'down' || v.state === 'degraded' ? { color: 'var(--color-status-serious)' } : undefined}>
           {v.message}{v.state === 'up' && v.rtt_ms ? ` · ${v.rtt_ms} ms` : ''}
         </p>
+        {(v.log || []).length > 0 && (
+          <details open={v.state !== 'up'}>
+            <summary className="small muted">What OpenVPN says (last {v.log.length} lines)</summary>
+            <pre className="small" style={{ whiteSpace: 'pre-wrap', margin: 'var(--space-1) 0 0', overflowWrap: 'anywhere' }}>{v.log.join('\n')}</pre>
+          </details>
+        )}
         <div className="grid">
           <Fact label="Internet sees you as">{v.exit_ip || '–'}</Fact>
           <Fact label="Address inside the VPN">{v.address || '–'}</Fact>
