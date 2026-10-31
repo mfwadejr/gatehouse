@@ -1,6 +1,13 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.36',
+    title: 'Build fix',
+    items: [
+      'Fixes the automatic style check added in 0.8.35, which ran before the shared styles were generated on a clean build and wrongly stopped it. Nothing changes in how the console looks or works.',
+    ],
+  },
+  {
     version: '0.8.35',
     title: 'Tidy-up: spacing, colours and automatic checks',
     items: [
