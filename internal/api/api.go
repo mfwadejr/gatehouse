@@ -431,6 +431,25 @@ func (s *Server) revokeOthers(w http.ResponseWriter, r *http.Request, c *Ctx) {
 	JSON(w, 200, map[string]string{"status": "ok"})
 }
 
+// How often a quiet stream gets a keepalive, and how long one write may take. Tests shorten them.
+var (
+	streamKeepalive    = 20 * time.Second
+	streamWriteTimeout = 15 * time.Second
+)
+
+// streamWrite sends one message with a deadline for the write alone. The deadline is cleared again
+// afterwards: over HTTP/2 a deadline that is left to expire resets the whole stream, even when it
+// is idle, so a deadline shorter than the gap between messages would cut every stream.
+func streamWrite(rc *http.ResponseController, w http.ResponseWriter, fl http.Flusher, msg string) (int, error) {
+	rc.SetWriteDeadline(time.Now().Add(streamWriteTimeout))
+	n, err := fmt.Fprint(w, msg)
+	if err == nil {
+		fl.Flush()
+	}
+	rc.SetWriteDeadline(time.Time{})
+	return n, err
+}
+
 // stream serves server-sent events: GET /api/stream?topics=dns.stats,dhcp.leases
 func (s *Server) stream(w http.ResponseWriter, r *http.Request, c *Ctx) {
 	fl, ok := w.(http.Flusher)
@@ -463,7 +482,7 @@ func (s *Server) stream(w http.ResponseWriter, r *http.Request, c *Ctx) {
 	w.WriteHeader(200)
 	fmt.Fprint(w, "retry: 3000\n\n")
 	fl.Flush()
-	keep := time.NewTicker(20 * time.Second)
+	keep := time.NewTicker(streamKeepalive)
 	defer keep.Stop()
 	ctx := r.Context()
 	rc := http.NewResponseController(w)
@@ -475,17 +494,13 @@ func (s *Server) stream(w http.ResponseWriter, r *http.Request, c *Ctx) {
 			if !ok {
 				return
 			}
-			rc.SetWriteDeadline(time.Now().Add(15 * time.Second))
-			if _, err := fmt.Fprintf(w, "event: %s\ndata: %s\n\n", m.Topic, m.Data); err != nil {
+			if _, err := streamWrite(rc, w, fl, fmt.Sprintf("event: %s\ndata: %s\n\n", m.Topic, m.Data)); err != nil {
 				return
 			}
-			fl.Flush()
 		case <-keep.C:
-			rc.SetWriteDeadline(time.Now().Add(15 * time.Second))
-			if _, err := fmt.Fprint(w, ": keepalive\n\n"); err != nil {
+			if _, err := streamWrite(rc, w, fl, ": keepalive\n\n"); err != nil {
 				return
 			}
-			fl.Flush()
 		}
 	}
 }

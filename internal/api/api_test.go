@@ -206,3 +206,47 @@ func TestStream(t *testing.T) {
 		t.Fatalf("stream did not deliver the current value: %q", got)
 	}
 }
+
+// Over HTTP/2 a write deadline that is left to expire resets the whole stream, even an idle one.
+// The keepalive comes later than the deadline here, as it did in production, and the stream must
+// still be open after several of both.
+func TestStreamSurvivesQuietPeriodsOverHTTP2(t *testing.T) {
+	oldK, oldW := streamKeepalive, streamWriteTimeout
+	streamKeepalive, streamWriteTimeout = 400*time.Millisecond, 150*time.Millisecond
+	t.Cleanup(func() { streamKeepalive, streamWriteTimeout = oldK, oldW })
+	e := newEnv(t)
+	e.ts.Close()
+	ts := httptest.NewUnstartedServer(e.srv.Handler())
+	ts.EnableHTTP2 = true
+	ts.StartTLS()
+	t.Cleanup(ts.Close)
+	jar := newJar()
+	cl := ts.Client()
+	cl.Jar = jar
+	lr, err := cl.Post(ts.URL+"/api/auth/login", "application/json", strings.NewReader(`{"username":"admin","password":"correct horse battery"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lr.Body.Close()
+	resp, err := cl.Get(ts.URL + "/api/stream?topics=test.topic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.ProtoMajor != 2 {
+		t.Fatalf("the test needs HTTP/2, got %s", resp.Proto)
+	}
+	got := ""
+	buf := make([]byte, 256)
+	end := time.Now().Add(3 * time.Second)
+	for time.Now().Before(end) && strings.Count(got, "keepalive") < 4 {
+		n, err := resp.Body.Read(buf)
+		got += string(buf[:n])
+		if err != nil {
+			t.Fatalf("the stream was cut after %d keepalives: %v", strings.Count(got, "keepalive"), err)
+		}
+	}
+	if strings.Count(got, "keepalive") < 4 {
+		t.Fatalf("expected several keepalives, got %q", got)
+	}
+}

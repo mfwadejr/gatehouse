@@ -1,6 +1,13 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.24',
+    title: 'Live updates no longer cut off',
+    items: [
+      'Fixed: the live-update connections that keep screens current were being cut by the console about every 15 seconds, so the browser showed a stream of protocol errors and pages kept reconnecting. They now stay open.',
+    ],
+  },
+  {
     version: '0.8.23',
     title: 'Build fix',
     items: [
