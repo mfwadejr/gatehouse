@@ -28,8 +28,8 @@ export default function FailbackPrompt({ ha, onChanged, canHide = true }) {
     <div className="note warn" role="status" style={{ margin: 'var(--space-3)' }}>
       <div>
         <strong>The main unit is back.</strong> The unit at {fb.peer_addr} is online and healthy. This unit ({fb.own_addr}) is still running the network. What would you like to do?
-        {fb.ready !== true && <div className="small" style={{ marginTop: 4 }}>Not yet: {fb.why}</div>}
-        <div className="inline" style={{ marginTop: 8 }}>
+        {fb.ready !== true && <div className="small" style={{ marginTop: 'var(--space-1)' }}>Not yet: {fb.why}</div>}
+        <div className="inline" style={{ marginTop: 'var(--space-2)' }}>
           <Button kind="primary" disabled={busy || fb.ready !== true} onClick={back}>Fail back to the main unit</Button>
           <Button disabled={busy} onClick={keep}>Keep this unit as the main unit</Button>
           {canHide && <Button disabled={busy} onClick={() => { hideFor(24 * 3600 * 1000); again((n) => n + 1); }}>Decide later</Button>}

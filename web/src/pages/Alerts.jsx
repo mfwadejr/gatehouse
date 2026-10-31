@@ -61,7 +61,7 @@ export default function Alerts() {
           <Field label="Devices to watch" hint="Tick the ones you want to hear about, such as a camera or a server.">
             <div className="stack" style={{ maxHeight: '12rem', overflow: 'auto' }}>
               {devices.map((d) => (
-                <label key={d.mac} className="small" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <label key={d.mac} className="small" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
                   <input type="checkbox" checked={watched.has(d.mac.toLowerCase())} onChange={(e) => set('watch', e.target.checked ? [...f.watch, d.mac] : f.watch.filter((m) => m.toLowerCase() !== d.mac.toLowerCase()))} /> {d.name} <span className="muted mono">{d.ip}</span>
                 </label>
               ))}

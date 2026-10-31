@@ -124,6 +124,18 @@
   --color-matrix-limited: rgba(57, 135, 229, 0.12);
   --color-matrix-limited-border: rgba(57, 135, 229, 0.50);
   --color-matrix-deny: #121211;
+  --color-matrix-open-bg: rgba(47, 191, 113, 0.16);
+  --color-matrix-open-border: rgba(47, 191, 113, 0.55);
+  --color-matrix-open-text: #bff0d5;
+  --color-matrix-open-dot: #2fbf71;
+  --color-matrix-block-bg: rgba(229, 96, 77, 0.13);
+  --color-matrix-block-border: rgba(229, 96, 77, 0.45);
+  --color-matrix-block-text: #f3b8ae;
+  --color-matrix-block-dot: #e5604d;
+  --color-matrix-replies-bg: rgba(232, 178, 58, 0.15);
+  --color-matrix-replies-border: rgba(232, 178, 58, 0.55);
+  --color-matrix-replies-text: #f6dc9b;
+  --color-matrix-replies-dot: #e8b23a;
   --color-matrix-deny-border: #383835;
 
   /* color.chart */
@@ -139,6 +151,12 @@
   --color-chart-axis: #383835;
   --color-chart-label: #898781;
   --color-chart-track: #2c2c2a;
+
+  /* color.scrim */
+  --color-scrim: rgba(0, 0, 0, 0.4);
+
+  /* color.qr-bg */
+  --color-qr-bg: #ffffff;
 
   /* font.family */
   --font-family-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -349,6 +367,15 @@
   /* component.table */
   --component-table-row-padding-y: var(--space-3);
   --component-table-cell-gap: var(--space-3);
+
+  /* shadow.toast */
+  --shadow-toast: 0 4px 16px rgba(0, 0, 0, 0.35);
+
+  /* shadow.popover */
+  --shadow-popover: 0 6px 24px rgba(0, 0, 0, 0.18);
+
+  /* shadow.modal */
+  --shadow-modal: 0 12px 40px rgba(0, 0, 0, 0.3);
 }
 
 :root[data-theme="light"] {
@@ -380,5 +407,17 @@
   --color-control-switch-knob: #fcfcfb;
   --color-matrix-deny: #f3f2ee;
   --color-matrix-deny-border: #c3c2b7;
+  --color-matrix-open-bg: rgba(31, 150, 85, 0.13);
+  --color-matrix-open-border: #2a9d62;
+  --color-matrix-open-text: #0f5a33;
+  --color-matrix-open-dot: #1f9655;
+  --color-matrix-block-bg: rgba(205, 70, 50, 0.10);
+  --color-matrix-block-border: #d46a5a;
+  --color-matrix-block-text: #8f2a1c;
+  --color-matrix-block-dot: #cd4632;
+  --color-matrix-replies-bg: rgba(214, 150, 20, 0.15);
+  --color-matrix-replies-border: #c99014;
+  --color-matrix-replies-text: #6b4b00;
+  --color-matrix-replies-dot: #d69614;
   --color-accent-track: #b7d3f6;
 }

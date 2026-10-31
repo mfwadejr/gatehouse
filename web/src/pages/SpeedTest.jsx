@@ -72,7 +72,7 @@ function History({ links }) {
         <Segmented value={days} onChange={setDays} options={[{ value: '30', label: '30 days' }, { value: '90', label: '90 days' }, { value: '365', label: '1 year' }]} /></div>}>
       {!list.length ? <Empty>No speed tests in this time yet. Run one above, or switch on the daily test.</Empty> : (
         <>
-          <div className="small sec inline">{series.map((s) => <span key={s.key}><i style={{ display: 'inline-block', width: '.65rem', height: '.65rem', borderRadius: 3, marginRight: 5, background: s.color }} />{s.name}</span>)}</div>
+          <div className="small sec inline">{series.map((s) => <span key={s.key}><i style={{ display: 'inline-block', width: '.65rem', height: '.65rem', borderRadius: 'var(--radius-xs)', marginRight: 'var(--space-1)', background: s.color }} />{s.name}</span>)}</div>
           <Chart series={series} from={now - Number(days) * 86400} to={now} kind="bits" height={200} dots filled={false} label="Speed test results over time" />
           <div className="scroll">
             <table className="table">

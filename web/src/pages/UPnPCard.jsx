@@ -81,7 +81,7 @@ export default function UPnPCard() {
             <>
               <Note tone="warn">Every device on a ticked network can ask for ports, including ones you have not looked at. A ticked network also covers all of its devices.</Note>
               {data.networks.length === 0 ? <Empty>No networks yet.</Empty> : data.networks.map((n) => (
-                <label key={n.id} className="small" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <label key={n.id} className="small" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
                   <input type="checkbox" checked={n.ticked} disabled={busy} onChange={(e) => tickNet(n.id, e.target.checked)} /> {n.name}
                 </label>
               ))}
@@ -90,7 +90,7 @@ export default function UPnPCard() {
           <Field label="Which internet connection?" hint="Ports are opened on the ticked connections only.">
             <div className="stack">
               {data.connections.length === 0 ? <Empty>No internet connection yet.</Empty> : data.connections.map((c) => (
-                <label key={c.name} className="small" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <label key={c.name} className="small" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
                   <input type="checkbox" checked={c.ticked} disabled={busy} onChange={(e) => tickConn(c.name, e.target.checked)} /> {c.name}
                 </label>
               ))}

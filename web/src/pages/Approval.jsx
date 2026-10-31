@@ -33,16 +33,16 @@ export default function Approval() {
           <div className="list">
             {waiting.map((p) => (
               <div className="item" key={p.id} style={{ display: 'block' }}>
-                <div className="row" style={{ justifyContent: 'space-between', gap: 8 }}>
+                <div className="row" style={{ justifyContent: 'space-between', gap: 'var(--space-2)' }}>
                   <div><div className="name">{p.name || p.vendor || p.mac} <Pill tone={p.state === 'blocked' ? 'bad' : 'warn'}>{p.state === 'blocked' ? 'Blocked' : 'Waiting'}</Pill></div>
                     <div className="meta mono">{p.mac}{p.vendor ? ` · ${p.vendor}` : ''} · first seen {fmt.ago(p.first_seen)}</div></div>
-                  <div className="inline" style={{ gap: 6, flexWrap: 'wrap' }}>
+                  <div className="inline" style={{ gap: 'var(--space-1-5)', flexWrap: 'wrap' }}>
                     <Button small kind="primary" disabled={busy} onClick={() => run(() => post(`/api/approval/${p.id}/allow`, {}), 'Allowed.').then(reload)}>Allow</Button>
                     {p.state !== 'blocked' && <Button small kind="danger" disabled={busy} onClick={() => run(() => post(`/api/approval/${p.id}/block`, {}), 'Blocked.').then(reload)}>Block</Button>}
                   </div>
                 </div>
                 {nets.length > 1 && (
-                  <div className="inline" style={{ gap: 6, marginTop: 6 }}>
+                  <div className="inline" style={{ gap: 'var(--space-1-5)', marginTop: 'var(--space-1-5)' }}>
                     <span className="small muted">Or place it on</span>
                     <Select value={target(p.id)} onChange={(v) => setWhere({ ...where, [p.id]: v })} options={nets.filter((n) => n.iface !== data.holding).map((n) => ({ value: n.iface, label: n.network }))} />
                     <Button small disabled={busy || !target(p.id)} onClick={() => run(() => post(`/api/approval/${p.id}/place`, { network: target(p.id) }), 'Placed.').then(reload)}>Place</Button>

@@ -35,7 +35,7 @@ export default function Recipes({ bare }) {
       <div className="list">
         {RECIPES.map((r) => (
           <div className="item" key={r.id} style={{ display: 'block' }}>
-            <div className="row" style={{ justifyContent: 'space-between', gap: 8 }}>
+            <div className="row" style={{ justifyContent: 'space-between', gap: 'var(--space-2)' }}>
               <div><div className="name">{r.title}</div><div className="meta">{r.what}</div></div>
               <Button small onClick={() => setOpen(open === r.id ? '' : r.id)}>{open === r.id ? 'Hide steps' : 'Show steps'}</Button>
             </div>

@@ -61,7 +61,7 @@ function InternetTest() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="name">{i + 1}. {s.title}</div>
                   <div className="meta">{s.detail}</div>
-                  {s.next && s.state !== 'ok' && <div className="small" style={{ marginTop: 4 }}><strong>What to try: </strong>{s.next}</div>}
+                  {s.next && s.state !== 'ok' && <div className="small" style={{ marginTop: 'var(--space-1)' }}><strong>What to try: </strong>{s.next}</div>}
                 </div>
                 <Pill tone={tone[s.state]}>{word[s.state]}</Pill>
               </div>
@@ -98,7 +98,7 @@ function Tools() {
         </Field>
         {kind === 'dns' && <Field label="Kind of record"><Segmented value={rtype} onChange={setRtype} options={['A', 'AAAA', 'MX', 'TXT', 'NS', 'CNAME'].map((x) => ({ value: x, label: x }))} /></Field>}
         <div><Button kind="primary" onClick={go} disabled={busy || !target.trim()}>{busy ? 'Running…' : 'Run'}</Button></div>
-        {out && <pre className="mono small" style={{ whiteSpace: 'pre-wrap', margin: 0, padding: 12, background: 'var(--color-surface-sunken, rgba(127,127,127,.1))', borderRadius: 8, overflowX: 'auto' }}>{out}</pre>}
+        {out && <pre className="mono small" style={{ whiteSpace: 'pre-wrap', margin: 0, padding: 'var(--space-3)', background: 'var(--color-bg-inset)', borderRadius: 'var(--radius-md)', overflowX: 'auto' }}>{out}</pre>}
       </div>
     </Card>
   );

@@ -48,7 +48,7 @@ export default function Discovery({ reload }) {
               <strong>What to pass across</strong>
               <p className="small muted">Leave all unticked to pass everything. Ticking some passes only those kinds.</p>
               {data.catalog.map((k) => (
-                <label key={k.id} className="small" style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '4px 0' }}>
+                <label key={k.id} className="small" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', margin: '4px 0' }}>
                   <input type="checkbox" checked={kinds.includes(k.id)} onChange={(e) => tick(k.id, e.target.checked)} /> {k.label}
                 </label>
               ))}

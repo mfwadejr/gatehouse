@@ -98,7 +98,7 @@ function EditNetwork({ n, zones, onClose, onSaved }) {
                 const reason = why(p);
                 const on = mem.includes(p.name);
                 return (
-                  <label key={p.name} className="small" style={{ display: 'flex', gap: 8, alignItems: 'center', opacity: reason ? 0.6 : 1 }}>
+                  <label key={p.name} className="small" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', opacity: reason ? 0.6 : 1 }}>
                     <input type="checkbox" checked={on} disabled={!!reason} onChange={(e) => tick(p.name, e.target.checked)} />
                     <span className="mono">{p.name}</span>
                     <span className="muted">{p.wifi ? 'Wi-Fi card' : p.link ? `cable connected${p.speed > 0 ? `, ${p.speed} Mb/s` : ''}` : 'no cable'}{reason ? ` · ${reason}` : on && !first.includes(p.name) ? ' · will join' : ''}</span>
@@ -116,7 +116,7 @@ function EditNetwork({ n, zones, onClose, onSaved }) {
               {((allPorts && allPorts.ports) || []).filter((p) => !p.wifi && p.name !== n.iface.name).map((p) => {
                 const reason = why(p);
                 return (
-                  <label key={p.name} className="small" style={{ display: 'flex', gap: 8, alignItems: 'center', opacity: reason ? 0.6 : 1 }}>
+                  <label key={p.name} className="small" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', opacity: reason ? 0.6 : 1 }}>
                     <input type="checkbox" checked={extra.includes(p.name)} disabled={!!reason} onChange={(e) => tickExtra(p.name, e.target.checked)} />
                     <span className="mono">{p.name}</span>
                     <span className="muted">{p.link ? `cable connected${p.speed > 0 ? `, ${p.speed} Mb/s` : ''}` : 'no cable'}{reason ? ` · ${reason}` : ''}</span>

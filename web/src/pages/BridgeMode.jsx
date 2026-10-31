@@ -103,7 +103,7 @@ export default function BridgeMode() {
             <div className="formgrid">
               <Field label="Port to your other router" hint="Where the internet comes from."><Select value={f.outside} onChange={set('outside')} options={portOpts('Choose a port')} /></Field>
               <Field label="Ports to your devices" hint="Tick every port your own network plugs into.">
-                <div className="stack" style={{ gap: 4 }}>
+                <div className="stack" style={{ gap: 'var(--space-1)' }}>
                   {wired.filter((p) => p.Name !== f.outside && p.Name !== f.oob).map((p) => (
                     <label key={p.Name} className="inline"><input type="checkbox" checked={f.inside.includes(p.Name)} onChange={(e) => set('inside')(e.target.checked ? [...f.inside, p.Name] : f.inside.filter((n) => n !== p.Name))} /> {p.Name}{(data.current || []).includes(p.Name) ? ' (you are connected here)' : ''}</label>
                   ))}

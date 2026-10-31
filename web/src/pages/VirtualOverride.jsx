@@ -25,7 +25,7 @@ export default function VirtualOverride({ d, onSaved }) {
           <p className="small muted">It takes effect when the device next asks for an address. Turn its Wi-Fi off and on, or unplug the cable for a moment, to make it immediate.</p>
         </div>
       ) : (
-        <div className="inline" style={{ gap: 8, flexWrap: 'wrap' }}>
+        <div className="inline" style={{ gap: 'var(--space-2)', flexWrap: 'wrap' }}>
           <Select value={pick} onChange={setPick} options={[{ value: '', label: 'Choose a network' }, ...nets.map((n) => ({ value: n.iface, label: `${n.network} (VLAN ${n.vid})` }))]} />
           <Button small kind="primary" disabled={busy || !pick} onClick={async () => {
             const n = nets.find((x) => x.iface === pick);

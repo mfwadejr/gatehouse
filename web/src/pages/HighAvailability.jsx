@@ -60,7 +60,7 @@ export default function HighAvailability({ me }) {
                               <div><div className="name">{m.label}</div><div className="meta">Main unit port {m.primary}</div></div>
                               <Select value={keep[m.role] || m.backup} onChange={(v) => setKeep({ ...keep, [m.role]: v })} options={look.ports.filter((p) => !p.wifi).map((p) => ({ value: p.name, label: `${p.name}${p.speed > 0 ? ` (${p.speed} Mbps)` : ' (no cable)'}` }))} />
                             </div>
-                            {m.warning && <div className="small" style={{ color: 'var(--warn, #d9a441)' }}>{m.warning}</div>}
+                            {m.warning && <div className="small" style={{ color: 'var(--color-status-warning)' }}>{m.warning}</div>}
                           </div>
                         ))}
                       </div>

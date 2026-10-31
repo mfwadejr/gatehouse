@@ -18,7 +18,7 @@ function NewApp({ onSaved, onCancel }) {
     if (ok) onSaved(name.trim());
   };
   return (
-    <div className="stack" style={{ padding: 12, border: '1px solid var(--color-border, rgba(127,127,127,.3))', borderRadius: 8 }}>
+    <div className="stack" style={{ padding: 'var(--space-3)', border: 'var(--border-width-thin) solid var(--color-border-default)', borderRadius: 'var(--radius-md)' }}>
       <strong>Add a new app</strong>
       <Field label="Name"><Input value={name} onChange={setName} placeholder="Game server" /></Field>
       <Field label="Ports" hint="Protocol and port, separated by commas. For example tcp/32400 or udp/27000-27050. Ports below 1024 are fine here but expose more, so use them only if you must.">
@@ -77,7 +77,7 @@ function ForwardForm({ initial, apps, connections, onClose, onSaved, reloadApps 
         <Field label="Through which internet connection?" hint="Tick every connection this should work on.">
           <div className="stack">
             {connections.length === 0 ? <span className="small muted">No internet connection yet.</span> : connections.map((n) => (
-              <label key={n} className="small" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <label key={n} className="small" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
                 <input type="checkbox" checked={f.connections.includes(n)} onChange={(e) => tick(n, e.target.checked)} /> {n}
               </label>
             ))}
@@ -89,7 +89,7 @@ function ForwardForm({ initial, apps, connections, onClose, onSaved, reloadApps 
             <p className="small muted">With no limits, anyone on the internet can try to connect. Limiting it to a country or a set of addresses is safer.</p>
             <Field label="Only from these countries">
               <div className="stack">
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1-5)' }}>
                   {f.countries.map((c) => <Pill key={c}>{countryName(c)} <button type="button" className="linkbtn" aria-label={`Remove ${countryName(c)}`} onClick={() => setF({ ...f, countries: f.countries.filter((x) => x !== c) })}>×</button></Pill>)}
                 </div>
                 <Select value="" onChange={(v) => v && !f.countries.includes(v) && setF({ ...f, countries: [...f.countries, v] })} options={[{ value: '', label: 'Add a country…' }, ...COUNTRIES]} />

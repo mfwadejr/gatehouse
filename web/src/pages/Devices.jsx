@@ -116,7 +116,7 @@ function Details({ d, groups, onClose, onSaved }) {
           <Field label="Profile" hint="Decides which blocklists apply. Manage profiles on the Profiles page."><Select value={String(f.group_id)} onChange={(v) => setF({ ...f, group_id: Number(v) })} options={[{ value: '0', label: 'Default' }, ...groups.map((g) => ({ value: String(g.id), label: g.name }))]} /></Field>
           <Field label="DNS filtering"><Select value={f.policy} onChange={(v) => setF({ ...f, policy: v })} options={POLICIES} /></Field>
           <Field label="Pause the internet" hint={whenText(det?.paused_until) || 'Cuts this device off from the internet for a while. It comes back by itself.'}>
-            <div className="inline" style={{ gap: 6, flexWrap: 'wrap' }}>
+            <div className="inline" style={{ gap: 'var(--space-1-5)', flexWrap: 'wrap' }}>
               {det?.paused_until * 1000 > Date.now()
                 ? <Button small kind="primary" disabled={busy} onClick={() => run(() => post(`/api/devices/${d.id}/pause`, { minutes: 0 }), 'Resumed.').then(reload)}>Resume now</Button>
                 : pauseChoices().map((c) => <Button key={c.m} small disabled={busy} onClick={() => run(() => post(`/api/devices/${d.id}/pause`, { minutes: c.m }), 'Paused.').then(reload)}>{c.t}</Button>)}

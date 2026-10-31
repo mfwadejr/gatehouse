@@ -1,6 +1,16 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.35',
+    title: 'Tidy-up: spacing, colours and automatic checks',
+    items: [
+      'Cards inside an opened "Advanced" section (Settings and Firewall) no longer touch each other; they have the same gap as cards everywhere else.',
+      'Several small parts of the console used style names that did not exist, so they quietly used a guessed colour instead of your light or dark theme (the pickers, icon buttons, the world map, the file drop area and the QR code backdrop). They now follow the theme. Shadows and the dimmed background behind dialogs became proper shared styles.',
+      'Spacing written directly into screens now uses the shared spacing scale. Nothing moves; the sizes are the same.',
+      'Behind the scenes, three automatic checks now run on every build and stop it if something is wrong: a colour or size written outside the shared styles, a style name that is not defined, and a screen that calls a part of Gatehouse that does not exist.',
+    ],
+  },
+  {
     version: '0.8.34',
     title: 'Logs: shorter rows, details on click',
     items: [

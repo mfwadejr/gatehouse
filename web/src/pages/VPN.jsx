@@ -94,7 +94,7 @@ function DeviceResult({ res, onClose }) {
         <Note tone="warn" title="Shown only once">This contains the device's secret key. Import it now; Gatehouse cannot show it again.</Note>
         {res.qr && (
           <div className="stack" style={{ alignItems: 'center' }}>
-            <img src={res.qr} alt="QR code for the WireGuard app" width="240" height="240" style={{ background: '#fff', padding: 8, borderRadius: 8 }} />
+            <img src={res.qr} alt="QR code for the WireGuard app" width="240" height="240" style={{ background: 'var(--color-qr-bg)', padding: 'var(--space-2)', borderRadius: 'var(--radius-md)' }} />
             <span className="small muted">On a phone: open the WireGuard app, tap +, then Scan from QR code.</span>
           </div>
         )}

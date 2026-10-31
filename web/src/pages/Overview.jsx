@@ -199,7 +199,7 @@ function Hero({ wanList, links, thr, onStamp }) {
         <div className="spread" style={{ flexWrap: 'wrap' }}>
           <div className="inline">
             <Segmented value={dir} onChange={setDir} options={[{ value: 'rx', label: 'Download' }, { value: 'tx', label: 'Upload' }]} />
-            <span className="small sec inline">{enabled.map((w, i) => <span key={w.name}><i className="sw" style={{ background: SERIES[i % 4], display: 'inline-block', width: '.65rem', height: '.65rem', borderRadius: 3, marginRight: 5 }} />{w.name}</span>)}</span>
+            <span className="small sec inline">{enabled.map((w, i) => <span key={w.name}><i className="sw" style={{ background: SERIES[i % 4], display: 'inline-block', width: '.65rem', height: '.65rem', borderRadius: 'var(--radius-xs)', marginRight: 'var(--space-1)' }} />{w.name}</span>)}</span>
           </div>
           <Segmented value={range} onChange={setRange} options={[{ value: '10m', label: '10 min' }, { value: '1h', label: '1 hour' }, { value: '24h', label: '24 hours' }, { value: '30d', label: '30 days' }]} />
         </div>

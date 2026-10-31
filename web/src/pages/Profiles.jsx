@@ -61,7 +61,7 @@ function Editor({ init, data, onClose, onSaved }) {
         <ToggleRow title="Internet off at set hours" desc="For example a bedtime. Devices keep their local network, but cannot reach the internet." checked={p.hours.on} onChange={(v) => setH('on', v)} />
         {p.hours.on && (
           <div className="stack">
-            <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+            <div className="row" style={{ gap: 'var(--space-1-5)', flexWrap: 'wrap' }}>
               {DAYS.map((d, i) => <Button key={d} small kind={p.hours.days.includes(i) ? 'primary' : ''} onClick={() => toggleDay(i)}>{d}</Button>)}
             </div>
             <div className="formgrid">
@@ -116,14 +116,14 @@ export default function Profiles() {
         {data.profiles.map((x) => (
           <Card key={x.id} title={x.name} desc={x.description || levelText[x.level]}
             actions={<><Button small onClick={() => setEdit({ ...x, hours: { ...x.hours } })}>Edit</Button>{x.name !== 'Default' && x.name !== 'Trusted' && <Button small onClick={() => remove(x)}>Delete</Button>}</>}>
-            <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            <div className="row" style={{ gap: 'var(--space-2)', flexWrap: 'wrap' }}>
               <Pill>{x.devices} device{x.devices === 1 ? '' : 's'}</Pill>
               <Pill tone={x.level === 'off' ? '' : 'good'}>{LEVELS.find((l) => l.value === x.level)?.label} filtering</Pill>
               {x.safe_search && <Pill tone="good">Safe search</Pill>}
               {x.hours.on && <Pill>Off {x.hours.from}–{x.hours.to}</Pill>}
               {x.off_now && <Pill tone="warn">{whenText(x.paused_until) || 'Internet off now'}</Pill>}
             </div>
-            <div className="row" style={{ gap: 8, marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
+            <div className="row" style={{ gap: 'var(--space-2)', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
               {x.paused_until * 1000 > Date.now()
                 ? <Button small kind="primary" onClick={() => pause(x.id, 0, `${x.name} resumed.`)}>Resume internet</Button>
                 : pauseChoices().map((c) => <Button key={c.m} small onClick={() => pause(x.id, c.m, `${x.name} paused.`)}>Pause {c.t.toLowerCase()}</Button>)}
@@ -132,7 +132,7 @@ export default function Profiles() {
         ))}
         <PerNetwork profiles={data.profiles} />
         <Card title="Add a profile" desc="Start from a preset, then change anything.">
-          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          <div className="row" style={{ gap: 'var(--space-2)', flexWrap: 'wrap' }}>
             {data.presets.filter((s) => !have.has(s.key)).map((s) => <Button key={s.key} onClick={() => setEdit(fromPreset(s))} title={s.descr}>{s.name}</Button>)}
             <Button kind="primary" onClick={() => setEdit(blank)}>Blank profile</Button>
           </div>
