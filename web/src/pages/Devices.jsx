@@ -41,7 +41,7 @@ const COLUMNS = [
   { id: 'seen', label: 'Seen', show: (d) => (d.online ? 'now' : fmt.ago(d.last_seen)) },
 ];
 const DEFAULT_COLS = ['network', 'conn', 'ip', 'activity'];
-const PAGE_SIZES = [25, 50, 100];
+const PAGE_SIZES = [10, 15, 25, 50, 100];
 
 function Conn({ d }) {
   if (!d.conn) return <span className="muted">–</span>;
@@ -182,7 +182,7 @@ export default function Devices() {
   const [view, setView] = useState('list');
 
   const colIds = cols || prefs?.cols || DEFAULT_COLS;
-  const per = rowsPer || prefs?.rows || 25;
+  const per = rowsPer || prefs?.rows || 15;
   const savePrefs = (c, r) => put('/api/prefs/devices', { cols: c, rows: r }).catch(() => {});
   const all = data?.devices || [];
 

@@ -8,14 +8,50 @@ import { Button, Card, Field, Input, Note, Pill, Segmented, useAction } from '..
 const tone = { ok: 'good', warn: 'warn', bad: 'bad', skip: '' };
 const word = { ok: 'Fine', warn: 'Look at this', bad: 'Problem', skip: 'Skipped' };
 
+// More than one connection: one block each, the way they share the work above them.
+function Multi({ m }) {
+  const roleWord = { main: 'Main connection', backup: 'Backup', shared: 'Shared' };
+  return (
+    <div className="stack">
+      <Note tone={m.state === 'ok' ? 'good' : m.state === 'warn' ? 'warn' : 'bad'}>
+        {m.summary}{m.note ? ` ${m.note}` : ''}
+      </Note>
+      {m.conns.map((c) => (
+        <div className="list" key={c.name}>
+          <div className="item" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 'var(--space-2)' }}>
+            <div className="spread">
+              <div style={{ minWidth: 0 }}>
+                <div className="name">{c.name} <span className="muted small">(port {c.port})</span></div>
+                <div className="meta">{c.headline}</div>
+              </div>
+              <div className="inline">
+                {c.in_use && <Pill tone="good">In use</Pill>}
+                <Pill tone="">{roleWord[c.role]}</Pill>
+                {c.idle ? <Pill tone="">Waiting</Pill> : <Pill tone={tone[c.state]}>{word[c.state]}</Pill>}
+              </div>
+            </div>
+            {c.rows.map((r) => (
+              <div key={r.id} className="spread small">
+                <div style={{ flex: 1, minWidth: 0 }}><strong>{r.title}: </strong><span className="muted">{r.detail}</span></div>
+                <Pill tone={tone[r.state]}>{word[r.state]}</Pill>
+              </div>
+            ))}
+            {c.next && <div className="small"><strong>What to try for {c.name}: </strong>{c.next}</div>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function InternetTest() {
   const [res, setRes] = useState(null);
   const [run, busy] = useAction();
   const go = () => run(async () => { setRes(await post('/api/diag/test')); });
   return (
-    <Card title="Test my internet" desc="Checks the cable, the modem, your provider and website names in turn, and says what to try if something is wrong."
+    <Card title="Test my internet" desc="Checks the cable, the modem, your provider and website names in turn, and says what to try if something is wrong. With more than one connection it checks each one and shows how they share the work."
       actions={<Button kind="primary" onClick={go} disabled={busy}>{busy ? 'Testing…' : res ? 'Test again' : 'Test now'}</Button>}>
-      {!res ? <p className="small muted">Press Test now. It takes a few seconds.</p> : (
+      {!res ? <p className="small muted">Press Test now. It takes a few seconds.</p> : res.multi ? <Multi m={res.multi} /> : (
         <div className="stack">
           <Note tone={res.ok ? 'good' : 'bad'}>{res.ok ? 'No problem found.' : 'Found a problem. The first red step is the one to fix.'}</Note>
           <div className="list">

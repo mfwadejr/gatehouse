@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { del, put, useData } from '../api.js';
-import { Button, Card, Empty, Field, Input, Modal, Page, useAction, confirmBox, useUndoDelete } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Page, Paged, useAction, confirmBox, useUndoDelete } from '../ui.jsx';
 
 // Services: the one place to see what Gatehouse knows by name and to make your own. A service is a
 // name for one or more ports. Rules pick services by searching for the name or a port.
@@ -57,11 +57,11 @@ export default function Services() {
       </Card>
       <Card title="Built in" desc="Gatehouse already knows these by name. They cannot be changed.">
         <div className="list">
-          {known.map((s) => (
+          <Paged items={known}>{(shownKnown) => shownKnown.map((s) => (
             <div className="item" key={s.name}>
               <div><div className="name">{s.name}</div><div className="meta mono">{s.ports.join(', ')}</div></div>
             </div>
-          ))}
+          ))}</Paged>
           {!known.length && <Empty>No built-in service matches.</Empty>}
         </div>
       </Card>

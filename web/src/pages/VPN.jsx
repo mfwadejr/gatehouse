@@ -596,12 +596,7 @@ export default function VPN() {
       {data && !data.helper && <Note tone="warn" title="The network helper is not running">VPN changes cannot be applied until it is.</Note>}
       {!vpns.length && data && (
         <Card>
-          <Empty>
-            <div className="stack" style={{ alignItems: 'center' }}>
-              <span>No VPNs yet.</span>
-              <Button kind="primary" icon="plus" onClick={() => setModal({ t: 'add' })}>Add a VPN</Button>
-            </div>
-          </Empty>
+          <Empty>No VPNs yet. Add one to reach your home from anywhere, or to send chosen devices through a VPN provider.</Empty>
         </Card>
       )}
       {data && <RemoteAccess onAddVPN={() => setModal({ t: 'add' })} hasDevice={inn.some((v) => (v.peers || []).length > 0)} />}

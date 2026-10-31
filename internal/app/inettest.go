@@ -32,6 +32,18 @@ type testLink struct {
 	Cable     bool
 	Have      bool // the monitor has a state for it
 	State     wanmon.State
+	// More than one connection: the device it leaves through, whether it is a backup, the
+	// result of a name lookup sent out through it, and its last speed test.
+	Dev        string
+	Backup     bool
+	ViaTried   bool
+	ViaOK      bool
+	ViaMs      int
+	ViaErr     string
+	SpeedKnown bool
+	SpeedDown  float64 // bits per second
+	SpeedUp    float64
+	SpeedAt    int64
 }
 
 type testInput struct {
@@ -44,6 +56,8 @@ type testInput struct {
 	UpstreamMs int
 	UpstreamBy string
 	UpstreamEr string
+	// Via says the name lookup went out through the one connection being described.
+	Via bool
 }
 
 func ms(d time.Duration) int {
@@ -179,6 +193,9 @@ func buildTest(in testInput) []testStep {
 		switch {
 		case in.DNSOK:
 			d := fmt.Sprintf("Gatehouse looked up a website name in %d ms.", in.DNSMs)
+			if in.Via {
+				d = fmt.Sprintf("A website name was looked up through this connection in %d ms.", in.DNSMs)
+			}
 			add(testStep{ID: "dns", Title: "Names (DNS)", State: "ok", Detail: d})
 		case in.UpstreamOK:
 			add(testStep{ID: "dns", Title: "Names (DNS)", State: "bad", Detail: "The upstream DNS server " + in.UpstreamBy + " answers, but Gatehouse's own lookup failed: " + in.DNSErr + ".",
@@ -216,11 +233,12 @@ func (a *App) gatherTest() testInput {
 	for _, p := range ports() {
 		pl[p["name"].(string)], _ = p["link"].(bool)
 	}
-	if rows, err := a.Config.Query(`SELECT name,iface FROM wan_links WHERE enabled=1 ORDER BY priority,id`); err == nil {
+	devs := a.wanDevices()
+	if rows, err := a.Config.Query(`SELECT name,iface,role FROM wan_links WHERE enabled=1 ORDER BY priority,id`); err == nil {
 		for rows.Next() {
-			var name, iface string
-			rows.Scan(&name, &iface)
-			l := testLink{Name: name, Port: iface}
+			var name, iface, role string
+			rows.Scan(&name, &iface, &role)
+			l := testLink{Name: name, Port: iface, Dev: devs[name], Backup: role == "backup"}
 			l.Cable, l.PortKnown = pl[iface]
 			l.State, l.Have = st[name]
 			in.Links = append(in.Links, l)
@@ -257,7 +275,14 @@ func (a *App) gatherTest() testInput {
 func (a *App) registerDiagRoutes() {
 	s := a.API
 	s.HandleAdmin("POST /api/diag/test", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-		steps := buildTest(a.gatherTest())
+		in := a.gatherTest()
+		if len(in.Links) > 1 {
+			a.fillPerConnection(&in)
+			v := buildMultiTest(multiInput{Links: in.Links, NAT: in.NAT, Mode: a.Config.Setting("wan.mode", "failover")})
+			api.JSON(w, 200, map[string]any{"ok": v.OK, "steps": []testStep{}, "multi": v, "at": time.Now().Unix()})
+			return
+		}
+		steps := buildTest(in)
 		ok := true
 		for _, st := range steps {
 			if st.State == "bad" {

@@ -1,6 +1,15 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.27',
+    title: 'Test my internet with several connections; shorter pages',
+    items: [
+      'Test my internet now checks each connection on its own when you have more than one: cable, modem, provider, a website-name lookup sent out through that connection, and its last speed test. Above the rows it says how the connections share the work (failover or load balancing) and which one is in use. A backup that waits on purpose is shown as waiting, not as a fault, and "What to try" appears only under the connection that has the problem.',
+      'The VPN page no longer shows a second "Add a VPN" button in its empty card; the one at the top right is the way in, like the Routes page.',
+      'Long lists start short. The log, the devices list, firewall rules and the built-in services show 15 (or 10) at first, with a button to show more. The log and device row choices now include 10 and 15.',
+    ],
+  },
+  {
     version: '0.8.26',
     title: 'VPN tunnels say what is wrong; Save says what it did',
     items: [

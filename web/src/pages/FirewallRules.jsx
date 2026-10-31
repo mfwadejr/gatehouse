@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { del, post, put, useData } from '../api.js';
 import { go } from '../App.jsx';
 import { AddrPicker, Chip, NewDevice, ScheduleEditor, ServicePicker, tokens } from '../AddrPicker.jsx';
-import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Pill, Segmented, Select, ToggleRow, useAction, fmt, confirmBox, noticeBox, useUndoDelete } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Paged, Pill, Segmented, Select, ToggleRow, useAction, fmt, confirmBox, noticeBox, useUndoDelete } from '../ui.jsx';
 
 const ACTIONS = [{ value: 'accept', label: 'Allow' }, { value: 'drop', label: 'Block silently' }, { value: 'reject', label: 'Block and tell the sender' }];
 // Only the fields the server stores; it refuses anything else.
@@ -237,7 +237,7 @@ export function RulesList({ ov, rules, countryRules, pickers, reloadPickers, rel
         </div>
       )}
       <div className="list">
-        {visible.map(({ r }, pos) => (
+        <Paged items={visible}>{(shownRules) => shownRules.map(({ r }, pos) => (
           <div className={`item rule ${r.enabled ? '' : 'off'}`} key={r.id}>
             <div className="rulemain">
               <div className="name">{r.matrix ? `Matrix: ${r.from} to ${r.to}` : r.name} {!r.enabled && <Pill>Off</Pill>}{r.matrix && <Pill>From the matrix</Pill>}<Pill tone={r.action === 'accept' ? 'good' : 'bad'}>{actionWord(r.action)}</Pill>{r.when !== 'Always' && <Pill tone="warn">{r.when}</Pill>}</div>
@@ -259,7 +259,7 @@ export function RulesList({ ov, rules, countryRules, pickers, reloadPickers, rel
               <Button small kind="danger" icon="trash" onClick={() => undoDelete(`The rule "${r.name}"`, () => del(`/api/fw/rules/${r.id}`), () => put('/api/fw/rules', ruleBody({ ...r, id: undefined })), reload)}>Delete</Button>
             </div>
           </div>
-        ))}
+        ))}</Paged>
         {!visible.length && <Empty>{filtered ? 'No rules match.' : 'No rules. Network types are all you need for most setups.'}</Empty>}
       </div>
       {edit && <RuleForm initial={{ ...edit, service: edit.service === 'any' ? '' : edit.service, src: edit.src === 'any' ? '' : edit.src, dst: edit.dst === 'any' ? '' : edit.dst }} zoneNames={names} pickers={pickers} reloadPickers={reloadPickers} onClose={() => setEdit(null)} onSaved={reload} />}

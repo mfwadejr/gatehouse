@@ -382,6 +382,24 @@ export function saveSaid(before, after, fallback) {
     : 'No changes. This is already in use, so there is nothing to apply.';
 }
 
+// A long list that starts short. Shows the first few and a button for the rest, so a page does
+// not run on for screens. children receives the items to draw.
+export function Paged({ items, step = 15, children }) {
+  const [count, setCount] = useState(step);
+  const list = items || [];
+  const left = list.length - count;
+  return (
+    <>
+      {children(left > 0 ? list.slice(0, count) : list)}
+      {left > 0 && (
+        <div className="actions">
+          <button type="button" className="btn" onClick={() => setCount((c) => c + step)}>Show {Math.min(step, left)} more ({left} left)</button>
+        </div>
+      )}
+    </>
+  );
+}
+
 export function useAction() {
   const toast = useToast();
   const [busy, setBusy] = useState(false);

@@ -138,7 +138,7 @@ export default function Logs() {
   const [loading, setLoading] = useState(true);
   const [rec, setRec] = useState(false);
   const [cols, setCols] = useState(ALL_COLS.map((c) => c.id));
-  const [pageSize, setPageSize] = useState(100);
+  const [pageSize, setPageSize] = useState(15);
   const [mk, setMk] = useState(null);
   const t = useRef(null);
   const paged = useRef(false);
@@ -250,7 +250,7 @@ export default function Logs() {
             <details className="more"><summary>Columns &amp; rows</summary>
               <div className="stack">
                 <div className="chips">{ALL_COLS.map((c) => <label key={c.id} className="inline small"><input type="checkbox" checked={cols.includes(c.id)} onChange={() => toggleCol(c.id)} />{c.label}</label>)}</div>
-                <Select value={String(pageSize)} onChange={(v) => { setPageSize(Number(v)); savePrefs(cols, Number(v)); }} options={[25, 50, 100, 200, 300].map((n) => ({ value: String(n), label: `${n} rows at a time` }))} aria-label="Rows" />
+                <Select value={String(pageSize)} onChange={(v) => { setPageSize(Number(v)); savePrefs(cols, Number(v)); }} options={[10, 15, 25, 50, 100, 200, 300].map((n) => ({ value: String(n), label: `${n} rows at a time` }))} aria-label="Rows" />
               </div>
             </details>
             <a className="btn small" href={exportUrl()} download>Download as spreadsheet (CSV)</a>
