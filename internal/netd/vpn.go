@@ -74,6 +74,10 @@ type OVPNStatus struct {
 	Reason    string   `json:"reason,omitempty"`
 	Log       []string `json:"log,omitempty"`
 	Connected bool     `json:"connected,omitempty"` // OpenVPN's newest word is "Initialization Sequence Completed"
+	// Connecting is true while OpenVPN is still bringing the tunnel up. ConnectedAt is when it
+	// last finished (unix seconds), so a test that ran before that is not held against it.
+	Connecting  bool  `json:"connecting,omitempty"`
+	ConnectedAt int64 `json:"connected_at,omitempty"`
 }
 
 type LinkInfo struct {
@@ -515,11 +519,13 @@ func (v *VPN) Status() VPNStatus {
 			// messages read so the console can say why.
 			li, _ := linkInfo(i.Name)
 			if r, ok := res[i.Name]; li.Addr == "" || (ok && !r.OK) {
-				lines := v.recentOVPN(unitFor(i))
+				all, times := v.recentOVPN(unitFor(i))
+				o.ConnectedAt = connectedAt(all, times)
+				lines := all
 				if len(lines) > 12 {
 					lines = lines[len(lines)-12:]
 				}
-				o.Log, o.Reason, o.Connected = lines, OVPNReason(lines), OVPNConnected(lines)
+				o.Log, o.Reason, o.Connected, o.Connecting = lines, OVPNReason(all), OVPNConnected(all), OVPNConnecting(all)
 			}
 		}
 		st.OVPN[i.Name] = o

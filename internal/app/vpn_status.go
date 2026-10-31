@@ -81,6 +81,22 @@ func clientProblem(state, msg, addr, reason string, connected bool) string {
 	return msg
 }
 
+// clientSettling decides what to show for a client tunnel that is not passing traffic. While
+// OpenVPN is still starting, or has only just connected and the last test is older than the
+// connection, nothing is wrong yet, so the card says what is happening and shows no messages.
+// Only a tunnel that is genuinely failing gets the reason and the log.
+func clientSettling(state, msg, addr string, os netd.OVPNStatus, checkAt, now int64) (string, string, []string) {
+	if os.Active && os.Reason == "" {
+		if os.Connecting && !os.Connected {
+			return "connecting", "Connecting", nil
+		}
+		if os.Connected && os.ConnectedAt > 0 && checkAt < os.ConnectedAt && now-os.ConnectedAt < 60 {
+			return "connecting", "Connected. Testing the connection", nil
+		}
+	}
+	return state, clientProblem(state, msg, addr, os.Reason, os.Connected), os.Log
+}
+
 func ago(sec int64) string {
 	switch {
 	case sec < 90:
@@ -412,8 +428,7 @@ func (a *App) computeVPN(st netd.VPNStatus) ([]VPNView, error) {
 			v.State, v.Message = clientHealth(healthIn{Enabled: o.Enabled, LinkUp: link.Up && os.Active, HasCheck: o.Check != "", CheckOK: haveChk && chk.OK,
 				CheckAt: chk.At, Target: o.Check, Now: now, AppliedAt: applied})
 			if v.State == "degraded" || v.State == "down" {
-				v.Message = clientProblem(v.State, v.Message, link.Addr, os.Reason, os.Connected)
-				v.Log = os.Log
+				v.State, v.Message, v.Log = clientSettling(v.State, v.Message, link.Addr, os, chk.At, now)
 			}
 			v.Uses = a.usesOf(o.Name, nil)
 		}

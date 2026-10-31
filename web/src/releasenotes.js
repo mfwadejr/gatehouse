@@ -1,6 +1,14 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.29',
+    title: 'Quieter VPN card while connecting',
+    items: [
+      'While OpenVPN is starting or reconnecting, the VPN card now just says "Connecting", and "Connected. Testing the connection" for the moment after it comes up. The old "test failed" message and the long list of OpenVPN lines no longer flash up during a normal connect.',
+      'The OpenVPN messages only appear when the tunnel is really failing, and they sit behind a closed "Show details" line. The reason in plain words stays at the top.',
+    ],
+  },
+  {
     version: '0.8.28',
     title: 'VPN tunnel keeps its address',
     items: [

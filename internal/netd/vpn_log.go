@@ -1,6 +1,8 @@
 package netd
 
 import (
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -53,6 +55,60 @@ func OVPNConnected(lines []string) bool {
 	return false
 }
 
+// OVPNConnecting says whether OpenVPN is still bringing the tunnel up: it has started (or is
+// starting again after a drop) and has not said "Initialization Sequence Completed" since. A
+// failure OVPNReason can name is not "connecting". An empty or unreadable log is not either, so a
+// quiet tunnel that is simply not working is never described as "connecting" for ever.
+func OVPNConnecting(lines []string) bool {
+	for i := len(lines) - 1; i >= 0; i-- {
+		l := strings.ToLower(lines[i])
+		switch {
+		case strings.Contains(l, "initialization sequence completed"):
+			return false
+		case strings.Contains(l, "starting openvpn"), strings.Contains(l, "started openvpn"), strings.Contains(l, "udpv4 link remote"),
+			strings.Contains(l, "tcpv4_client link remote"), strings.Contains(l, "preserving recently used remote"), strings.Contains(l, "sigusr1"),
+			strings.Contains(l, "restart pause"), strings.Contains(l, "peer connection initiated"), strings.Contains(l, "options import"),
+			strings.Contains(l, "tun/tap device"):
+			return OVPNReason(lines) == ""
+		}
+	}
+	return false
+}
+
+var reJournalLine = regexp.MustCompile(`^(\d+)(?:\.\d+)? \S+ [^:]+: ?(.*)$`)
+
+// parseJournal splits "journalctl -o short-unix" output into the message and the time of each
+// line. A line that does not look like that keeps its text and has no time.
+func parseJournal(out string) (msgs []string, at []int64) {
+	for _, l := range strings.Split(out, "\n") {
+		l = strings.TrimSpace(l)
+		if l == "" || strings.HasPrefix(l, "-- ") {
+			continue
+		}
+		var t int64
+		if m := reJournalLine.FindStringSubmatch(l); m != nil {
+			t, _ = strconv.ParseInt(m[1], 10, 64)
+			l = m[2]
+		}
+		msgs = append(msgs, trimLog(l))
+		at = append(at, t)
+	}
+	if len(msgs) > 40 {
+		msgs, at = msgs[len(msgs)-40:], at[len(at)-40:]
+	}
+	return
+}
+
+// connectedAt gives the time of the newest "Initialization Sequence Completed", or 0.
+func connectedAt(msgs []string, at []int64) int64 {
+	for i := len(msgs) - 1; i >= 0; i-- {
+		if strings.Contains(strings.ToLower(msgs[i]), "initialization sequence completed") {
+			return at[i]
+		}
+	}
+	return 0
+}
+
 func trimLog(s string) string {
 	s = strings.TrimSpace(s)
 	if len(s) > 160 {
@@ -61,34 +117,25 @@ func trimLog(s string) string {
 	return s
 }
 
-// recentOVPN returns the last lines OpenVPN wrote for a client, kept for a few seconds so the
-// console's regular polling does not run journalctl each time.
-func (v *VPN) recentOVPN(unit string) []string {
+// recentOVPN returns the last lines OpenVPN wrote for a client and when each was written, kept
+// for a few seconds so the console's regular polling does not run journalctl each time.
+func (v *VPN) recentOVPN(unit string) ([]string, []int64) {
 	v.lmu.Lock()
 	defer v.lmu.Unlock()
 	if c, ok := v.logCache[unit]; ok && time.Since(c.at) < 15*time.Second {
-		return c.lines
+		return c.lines, c.times
 	}
-	out, _ := wifiRun(10*time.Second, "journalctl", "-u", unit, "--no-pager", "-o", "cat", "-n", "40")
-	var lines []string
-	for _, l := range strings.Split(out, "\n") {
-		l = strings.TrimSpace(l)
-		if l == "" || strings.HasPrefix(l, "-- ") {
-			continue
-		}
-		lines = append(lines, trimLog(l))
-	}
-	if len(lines) > 40 {
-		lines = lines[len(lines)-40:]
-	}
+	out, _ := wifiRun(10*time.Second, "journalctl", "-u", unit, "--no-pager", "-o", "short-unix", "-n", "40")
+	lines, times := parseJournal(out)
 	if v.logCache == nil {
 		v.logCache = map[string]logEntry{}
 	}
-	v.logCache[unit] = logEntry{at: time.Now(), lines: lines}
-	return lines
+	v.logCache[unit] = logEntry{at: time.Now(), lines: lines, times: times}
+	return lines, times
 }
 
 type logEntry struct {
 	at    time.Time
 	lines []string
+	times []int64
 }

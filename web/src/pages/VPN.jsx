@@ -477,8 +477,8 @@ function Outbound({ v, reload, setModal }) {
           {v.message}{v.state === 'up' && v.rtt_ms ? ` · ${v.rtt_ms} ms` : ''}
         </p>
         {(v.log || []).length > 0 && (
-          <details open={v.state !== 'up'}>
-            <summary className="small muted">What OpenVPN says (last {v.log.length} lines)</summary>
+          <details>
+            <summary className="small muted">Show details (what OpenVPN says)</summary>
             <pre className="small" style={{ whiteSpace: 'pre-wrap', margin: 'var(--space-1) 0 0', overflowWrap: 'anywhere' }}>{v.log.join('\n')}</pre>
           </details>
         )}
