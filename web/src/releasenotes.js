@@ -1,6 +1,18 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.33',
+    title: 'Device mode: Router or Bridge, with cabling help',
+    items: [
+      'Settings now starts with a Device mode card. It says in one sentence how this box works and which port is which (using the names you gave your ports), with a Change button.',
+      'Change opens a three-step walkthrough. Step 1: choose Router or Bridge. Step 2: plug in the cables and Gatehouse notices each port as it goes in (or pick the port from a list if the cable is already in). For a bridge you plug in the cable from your other router first, then your devices, and you can add a spare port for managing the box. Step 3: a plain cabling summary, then Apply.',
+      'Safety: nothing is saved until the last step and Cancel changes nothing. The port you are connected through is named ("leave this cable plugged in") and can never be chosen as the internet port or the cable to your other router. Applying a bridge, or going back to routing, uses the same 60-second keep-or-undo as before. Moving the internet connection to another port is saved for you to apply from the usual bar, and is refused if that port carries one of your networks.',
+      'Bridge mode keeps addresses (DHCP) with your other router and says so. Settings you had before bridge mode are kept and come back when you return to Router.',
+      'While a box is in a high-availability pair its mode cannot be changed, with a message explaining why. The pair setup is one click away from the card.',
+      'The countdown after a bridge change now appears in the Device mode card; the Bridge mode section under Advanced still holds every detailed setting.',
+    ],
+  },
+  {
     version: '0.8.32',
     title: 'Name lookups go through the VPN too; the Check keeps itself current',
     items: [

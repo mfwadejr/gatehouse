@@ -194,6 +194,7 @@ func New(cfg Config) (*App, error) {
 	a.registerSecurityRoutes()
 	a.registerChangeRoutes()
 	a.registerBridgeRoutes()
+	a.registerModeRoutes()
 	a.registerHARoutes()
 	a.registerNDPIRoutes()
 	a.registerOverrideRoutes()

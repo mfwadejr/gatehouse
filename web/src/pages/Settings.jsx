@@ -9,6 +9,7 @@ import FlowExport from './FlowExport.jsx';
 import Snmp from './Snmp.jsx';
 import GuestPortal from './GuestPortal.jsx';
 import BridgeMode from './BridgeMode.jsx';
+import DeviceMode from './DeviceMode.jsx';
 import HighAvailability from './HighAvailability.jsx';
 import TrafficLabels from './TrafficLabels.jsx';
 import RemoteLogin from './RemoteLogin.jsx';
@@ -396,6 +397,7 @@ export default function Settings({ me, reloadMe }) {
   const { data, reload } = useData('/api/auth/me', { every: 60000 });
   return (
     <Page title="Settings" sub="Your account and how you sign in.">
+      {me?.user?.role === 'admin' && <Guard what="Device mode"><DeviceMode /></Guard>}
       <TwoStep me={me} data={data} reload={reload} boot={reloadMe} />
       {me?.user?.role === 'admin' && <Guard what="Updates"><Updates me={me} /></Guard>}
       {me?.user?.role === 'admin' && <Guard what="PowerCard"><PowerCard me={me} /></Guard>}

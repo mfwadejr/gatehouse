@@ -7,33 +7,21 @@ import { Button, Card, Field, Input, NumberInput, Note, Pill, Problems, Segmente
 // the network files and the firewall both go back by themselves.
 const blank = { enabled: true, outside: '', inside: [], oob: '', oob_addr: '', mode: 'static', addr: '', gateway: '', dns: '', subnets: [], allow: [], open: false };
 
-export default function BridgeMode() {
+// The 60-second countdown after a bridge or router change. If this browser can still reach the
+// console a moment later the change is kept; otherwise everything goes back by itself.
+export function BridgePending({ pending, reload }) {
   const toast = useToast();
-  const { data, reload } = useData('/api/bridge', { topics: ['fw.status', 'net.status'], every: 4000 });
-  const [f, setF] = useState(null);
   const [run, busy] = useAction();
   const [left, setLeft] = useState(null);
-  const [code, setCode] = useState('');
-  const [subnets, setSubnets] = useState('');
   const tried = useRef(0);
   useEffect(() => {
-    if (data && !f) {
-      const c = data.config?.outside || data.config?.enabled === false ? data.config : blank;
-      setF({ ...blank, ...c, inside: c.inside || [], subnets: c.subnets || [], allow: c.allow || [] });
-      setSubnets((c.subnets || []).join(', '));
-    }
-  }, [data, f]);
-  const pending = data?.pending;
-  useEffect(() => {
-    if (!pending) { setLeft(null); return undefined; }
     const tick = () => setLeft(Math.max(0, pending.deadline - Math.floor(Date.now() / 1000)));
     tick();
     const t = setInterval(tick, 500);
     return () => clearInterval(t);
   }, [pending]);
-  // Like the other applies: if this browser can still reach the console a moment later, keep the change.
   useEffect(() => {
-    if (!pending || tried.current === pending.deadline) return undefined;
+    if (tried.current === pending.deadline) return undefined;
     tried.current = pending.deadline;
     let dead = false;
     (async () => {
@@ -52,6 +40,35 @@ export default function BridgeMode() {
     })();
     return () => { dead = true; };
   }, [pending]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="confirmbar countdown" role="alert">
+      <div>
+        <div className="count">{left ?? ''}s</div>
+        <div className="sec">Checking that you can still reach Gatehouse. If you can, the change is kept on its own. If you cannot, the network and the firewall both go back to how they were. After a change of address, open the new address in the browser to keep it.</div>
+      </div>
+      <div className="actions">
+        <Button disabled={busy} onClick={() => run(async () => { await post('/api/bridge/cancel', {}); reload(); }, 'Undone. The previous settings are back.')}>Undo now</Button>
+        <Button kind="primary" disabled={busy} onClick={() => run(async () => { await post('/api/bridge/confirm', {}); reload(); }, 'Kept. The change is now permanent.')}>Keep this change</Button>
+      </div>
+    </div>
+  );
+}
+
+export default function BridgeMode() {
+  const toast = useToast();
+  const { data, reload } = useData('/api/bridge', { topics: ['fw.status', 'net.status'], every: 4000 });
+  const [f, setF] = useState(null);
+  const [run, busy] = useAction();
+  const [code, setCode] = useState('');
+  const [subnets, setSubnets] = useState('');
+  useEffect(() => {
+    if (data && !f) {
+      const c = data.config?.outside || data.config?.enabled === false ? data.config : blank;
+      setF({ ...blank, ...c, inside: c.inside || [], subnets: c.subnets || [], allow: c.allow || [] });
+      setSubnets((c.subnets || []).join(', '));
+    }
+  }, [data, f]);
+  const pending = data?.pending;
   if (!data || !f) return null;
 
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
@@ -71,20 +88,7 @@ export default function BridgeMode() {
   const setAllow = (i, k, v) => setF((x) => ({ ...x, allow: x.allow.map((a, j) => (j === i ? { ...a, [k]: v } : a)) }));
 
   if (pending) {
-    return (
-      <Card title="Bridge mode">
-        <div className="confirmbar countdown" role="alert">
-          <div>
-            <div className="count">{left ?? ''}s</div>
-            <div className="sec">Checking that you can still reach Gatehouse. If you can, the change is kept on its own. If you cannot, the network and the firewall both go back to how they were. After a change of address, open the new address in the browser to keep it.</div>
-          </div>
-          <div className="actions">
-            <Button disabled={busy} onClick={() => run(async () => { await post('/api/bridge/cancel', {}); reload(); }, 'Undone. The previous settings are back.')}>Undo now</Button>
-            <Button kind="primary" disabled={busy} onClick={() => run(async () => { await post('/api/bridge/confirm', {}); reload(); }, 'Kept. Bridge mode is now permanent.')}>Keep this change</Button>
-          </div>
-        </div>
-      </Card>
-    );
+    return <Card title="Bridge mode"><Note tone="warn" title="A change is waiting to be kept">Use the countdown in the Device mode card at the top of Settings.</Note></Card>;
   }
 
   return (

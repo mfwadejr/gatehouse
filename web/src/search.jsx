@@ -31,6 +31,7 @@ const STATIC = [
   ['Encrypted DNS', 'dns', 'One switch for encrypted lookups', 'doh dot private dns cloudflare quad9'],
   ['High availability', 'settings', 'Run two machines as a pair with automatic failover', 'ha failover backup standby keepalived pair redundancy'],
   ['Traffic labels', 'settings', 'Name the app behind each connection by looking at packets', 'ndpi dpi deep packet inspection application youtube zoom bittorrent labels'],
+  ['Device mode', 'settings', 'Choose Router or Bridge and see which cable goes where', 'router bridge mode ports cables internet port change walkthrough'],
   ['Bridge mode', 'settings', 'Filter between another router and your network without routing', 'bridge transparent filtering inline passthrough'],
   ['Send logs elsewhere', 'settings', 'Copy logs to a syslog server', 'syslog export siem'],
   ['Pair: cable between the two units', 'settings', 'Optional cable for the pair to talk over', 'heartbeat ha high availability cable link'],

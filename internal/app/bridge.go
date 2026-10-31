@@ -260,6 +260,10 @@ func (a *App) bridgeApply(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 	if !api.Decode(w, r, &in) {
 		return
 	}
+	if err := a.modeGate(); err != nil {
+		fail(w, err)
+		return
+	}
 	if _, _, pending := a.Net.NetPending(); pending {
 		api.Error(w, http.StatusConflict, netcfg.ErrPending.Error())
 		return
