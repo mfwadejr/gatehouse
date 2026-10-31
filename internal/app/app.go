@@ -93,6 +93,7 @@ type App struct {
 	vpn          vpnState
 	fwn          fwNames
 	traffic      wanTraffic
+	viaNames     viaCache
 	health       healthSampler
 	hist         histState
 	speed        speedRun

@@ -107,4 +107,7 @@ CREATE TABLE outages(
   end INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX idx_outages_start ON outages(start);
+`, `
+-- The port a new connection left through, so the log can say which connection it used.
+ALTER TABLE fw_events ADD COLUMN out_if TEXT NOT NULL DEFAULT '';
 `}

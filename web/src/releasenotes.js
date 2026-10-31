@@ -1,6 +1,15 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.30',
+    title: 'See which connection a device really uses',
+    items: [
+      'The Logs page has a new "Out through" column that names the connection each new connection left by, such as ExpressVPN NL or T-Mobile. Turn it on under Columns & rows if you do not see it yet.',
+      'The Devices page shows "Sent through" for any device you have sent through a VPN, with a warning if that VPN is not working. The column appears on its own when at least one device uses a VPN.',
+      'On a VPN card, each device under "Used by" has a Check link. It looks at that device\'s new connections from the last hour and tells you plainly whether all of them went through the VPN, or lists the ones that went out the normal way.',
+    ],
+  },
+  {
     version: '0.8.29',
     title: 'Quieter VPN card while connecting',
     items: [

@@ -28,9 +28,13 @@ func pairedUnits(t *testing.T) (pc, sc *client, pfn, sfn *fakeNet) {
 		h, _, _ := net.SplitHostPort(addr)
 		switch h {
 		case "192.168.1.2":
-			return P.haBound.Load().(string)
+			if b, ok := P.haBound.Load().(string); ok {
+				return b
+			}
 		case "192.168.1.3":
-			return S.haBound.Load().(string)
+			if b, ok := S.haBound.Load().(string); ok {
+				return b
+			}
 		}
 		return addr
 	}

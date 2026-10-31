@@ -202,7 +202,7 @@ func (a *App) searchFWf(f fwFilter) []LogItem {
 		fetch = 5000 // country is worked out per row, so look at more rows and keep the matches
 	}
 	args = append(args, fetch)
-	rows, err := a.Logs.Query(`SELECT id,ts,action,from_zone,from_addr,to_zone,to_addr,proto,dport,sport,src_name,dst_name,reason,rule FROM fw_events WHERE `+where+` ORDER BY ts DESC,id DESC LIMIT ?`, args...)
+	rows, err := a.Logs.Query(`SELECT id,ts,action,from_zone,from_addr,to_zone,to_addr,proto,dport,sport,src_name,dst_name,reason,rule,out_if FROM fw_events WHERE `+where+` ORDER BY ts DESC,id DESC LIMIT ?`, args...)
 	if err != nil {
 		return nil
 	}
@@ -212,9 +212,9 @@ func (a *App) searchFWf(f fwFilter) []LogItem {
 	var out []LogItem
 	for rows.Next() {
 		var id, ts int64
-		var action, fz, fa, tz, ta, proto, sn, dn, reason, rule string
+		var action, fz, fa, tz, ta, proto, sn, dn, reason, rule, outIf string
 		var dport, sport int
-		if rows.Scan(&id, &ts, &action, &fz, &fa, &tz, &ta, &proto, &dport, &sport, &sn, &dn, &reason, &rule) != nil {
+		if rows.Scan(&id, &ts, &action, &fz, &fa, &tz, &ta, &proto, &dport, &sport, &sn, &dn, &reason, &rule, &outIf) != nil {
 			continue
 		}
 		cc := a.country(ta)
@@ -227,6 +227,7 @@ func (a *App) searchFWf(f fwFilter) []LogItem {
 		it := LogItem{Key: "f" + strconv.FormatInt(id, 10), TS: ts, Kind: "firewall", Verdict: "allowed", Who: sn, Addr: fa, Why: reason,
 			Src: fa, Dst: ta, DstName: dn, Port: dport, Proto: proto, Service: serviceName(proto, dport), Country: cc, FromZone: fz, ToZone: tz,
 			Direction: a.directionOf(fz, tz, wans), Rule: rule}
+		it.Via, it.ViaKind = a.viaOf(outIf)
 		if it.Who == "" {
 			it.Who = fa
 		}

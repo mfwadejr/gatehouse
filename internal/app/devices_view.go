@@ -153,6 +153,8 @@ type deviceRow struct {
 	Override  string   `json:"override"`         // the VLAN network this device is placed on, if any
 	OverNet   string   `json:"override_network"` // that network's name
 	Approval  string   `json:"approval"`         // ok, pending or blocked
+	Via       string   `json:"via,omitempty"`    // the VPN this device is sent through
+	ViaState  string   `json:"via_state,omitempty"`
 }
 
 // zoneByIface maps a port to the name of its firewall network.
@@ -245,6 +247,7 @@ func (a *App) deviceRows() ([]deviceRow, error) {
 		if t, ok := today[mac]; ok {
 			r.TodayUp, r.TodayDown = t[0], t[1]
 		}
+		r.Via, _, r.ViaState = a.tunnelOfIP(d.IP)
 		out = append(out, r)
 	}
 	// People connected by VPN are not devices on a port, but they belong in the list.

@@ -50,9 +50,13 @@ func TestHighAvailabilityPairing(t *testing.T) {
 		h, port, _ := net.SplitHostPort(addr)
 		switch h {
 		case "192.168.1.2":
-			return P.haBound.Load().(string)
+			if b, ok := P.haBound.Load().(string); ok {
+				return b
+			}
 		case "192.168.1.3":
-			return S.haBound.Load().(string)
+			if b, ok := S.haBound.Load().(string); ok {
+				return b
+			}
 		}
 		_ = port
 		return addr
@@ -200,7 +204,9 @@ func TestHARefusesBackupWithFewerPorts(t *testing.T) {
 	S.haOwnsFn = func(a string) bool { return true }
 	ha.DialMap = func(addr string) string {
 		if strings.HasPrefix(addr, "192.168.1.2:") {
-			return P.haBound.Load().(string)
+			if b, ok := P.haBound.Load().(string); ok {
+				return b
+			}
 		}
 		return addr
 	}

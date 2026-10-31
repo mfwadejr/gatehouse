@@ -38,6 +38,7 @@ const COLUMNS = [
   { id: 'today', label: 'Used today', show: (d) => d.today_down || d.today_up ? <span className="small">↓ {bytes(d.today_down)} · ↑ {bytes(d.today_up)}</span> : <span className="muted small">–</span> },
   { id: 'group', label: 'Profile', show: (d) => d.group || 'Default' },
   { id: 'internet', label: 'Internet', show: (d) => <Pill tone={d.internet ? 'good' : 'bad'}>{d.internet ? 'Allowed' : 'Paused'}</Pill> },
+  { id: 'via', label: 'Sent through', show: (d) => d.via ? <span>{d.via}{d.via_state && d.via_state !== 'up' && <Pill tone="warn">VPN not working</Pill>}</span> : <span className="muted">–</span> },
   { id: 'seen', label: 'Seen', show: (d) => (d.online ? 'now' : fmt.ago(d.last_seen)) },
 ];
 const DEFAULT_COLS = ['network', 'conn', 'ip', 'activity'];
@@ -102,7 +103,7 @@ function Details({ d, groups, onClose, onSaved }) {
         <span className="devicon big"><DeviceIcon d={d} size={30} /></span>
         <div>
           <div className="small muted mono">{d.mac}</div>
-          <div className="small">{[d.vendor, d.network, d.conn === 'wifi' ? 'Wi-Fi' : d.conn === 'wired' ? `Wired ${d.port || ''}` : d.conn === 'vpn' ? 'VPN' : ''].filter(Boolean).join(' · ') || 'Not seen on the network yet'}</div>
+          <div className="small">{[d.vendor, d.network, d.via ? `Sent through ${d.via}` : '', d.conn === 'wifi' ? 'Wi-Fi' : d.conn === 'wired' ? `Wired ${d.port || ''}` : d.conn === 'vpn' ? 'VPN' : ''].filter(Boolean).join(' · ') || 'Not seen on the network yet'}</div>
         </div>
         <Pill tone={d.online ? 'good' : ''}>{d.online ? 'Online' : `Seen ${fmt.ago(d.last_seen)}`}</Pill>
       </div>
@@ -181,7 +182,9 @@ export default function Devices() {
   const [pick, setPick] = useState(false);
   const [view, setView] = useState('list');
 
-  const colIds = cols || prefs?.cols || DEFAULT_COLS;
+  const chosen = cols || prefs?.cols;
+  const hasVia = (data?.devices || []).some((d) => d.via);
+  const colIds = chosen || (hasVia ? [...DEFAULT_COLS, 'via'] : DEFAULT_COLS);
   const per = rowsPer || prefs?.rows || 15;
   const savePrefs = (c, r) => put('/api/prefs/devices', { cols: c, rows: r }).catch(() => {});
   const all = data?.devices || [];

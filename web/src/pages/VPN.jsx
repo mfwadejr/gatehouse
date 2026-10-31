@@ -469,6 +469,8 @@ function Header({ v }) {
 function Outbound({ v, reload, setModal }) {
   const [run] = useAction();
   const sources = v.uses || [];
+  const [checked, setChecked] = useState(null);
+  const check = (ip) => get(`/api/vpn/check?ip=${encodeURIComponent(ip)}`).then(setChecked).catch(() => setChecked({ sentence: 'The check could not be run.', verdict: 'none' }));
   return (
     <Card>
       <div className="stack">
@@ -493,7 +495,20 @@ function Outbound({ v, reload, setModal }) {
         <div className="stack" style={{ gap: 'var(--space-1)' }}>
           <span className="small muted">Used by</span>
           {sources.length === 0 ? <span className="muted">Nothing yet. Choose which networks or devices should use this VPN.</span> : (
-            <div className="inline">{sources.map((u) => <Pill key={u.id} tone="">{u.kind === 'network' ? `${u.label} network` : u.label}</Pill>)}</div>
+            <div className="inline">{sources.map((u) => (
+              <span key={u.id} className="inline" style={{ gap: 'var(--space-1)' }}>
+                <Pill tone="">{u.kind === 'network' ? `${u.label} network` : u.label}</Pill>
+                {u.kind === 'device' && (u.ips || []).length > 0 && <button type="button" className="link small" onClick={() => check(u.ips[0].split('/')[0])}>Check</button>}
+              </span>
+            ))}</div>
+          )}
+          {checked && (
+            <div className="stack" style={{ gap: 'var(--space-1)' }}>
+              <span className="small" style={{ color: checked.verdict === 'leak' ? 'var(--color-status-serious)' : undefined }}>{checked.device ? `${checked.device}: ` : ''}{checked.sentence}</span>
+              {checked.others?.length > 0 && <span className="small muted">Went out through: {checked.others.map((o) => `${o.label} (${o.n})`).join(', ')}</span>}
+              {checked.leaked?.map((l, i) => <span key={i} className="small muted mono">{fmt.ago(l.ts)} · {l.what} · {l.via}</span>)}
+              {checked.verdict === 'ok' && <span className="small muted">This looks at the last hour of new connections in the log.</span>}
+            </div>
           )}
           {v.killswitch && sources.length > 0 && v.state !== 'up' && v.state !== 'off' && <span className="small muted">Kill switch is on: these devices have no internet until the VPN is back.</span>}
         </div>

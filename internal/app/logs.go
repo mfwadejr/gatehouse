@@ -46,6 +46,8 @@ type LogItem struct {
 	Rule      string `json:"rule,omitempty"`
 	App       string `json:"app,omitempty"`
 	Category  string `json:"category,omitempty"`
+	Via       string `json:"via,omitempty"`      // the connection it left through
+	ViaKind   string `json:"via_kind,omitempty"` // tunnel or wan
 }
 
 // fwReason turns the comment of the rule that decided a connection into a sentence.
@@ -143,8 +145,8 @@ func (a *App) storeFW(evs []netd.FWEvent) {
 		if dn == "" {
 			dn = a.names.get(e.Dst) // the name a device asked for before connecting
 		}
-		tx.Exec(`INSERT INTO fw_events(ts,action,from_zone,from_addr,to_zone,to_addr,proto,dport,rule,sport,src_name,dst_name,reason) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-			e.TS, e.Verdict, from, e.Src, to, e.Dst, e.Proto, e.DPort, e.Tag, e.SPort, sn, dn, fwReason(e.Verdict, e.Tag, from, to))
+		tx.Exec(`INSERT INTO fw_events(ts,action,from_zone,from_addr,to_zone,to_addr,proto,dport,rule,sport,src_name,dst_name,reason,out_if) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			e.TS, e.Verdict, from, e.Src, to, e.Dst, e.Proto, e.DPort, e.Tag, e.SPort, sn, dn, fwReason(e.Verdict, e.Tag, from, to), e.Out)
 	}
 	if err := tx.Commit(); err != nil {
 		tx.Rollback()

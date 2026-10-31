@@ -17,7 +17,7 @@ const FILTER_NAMES = { device: 'Device', dest: 'Destination', network: 'Network'
 const DIRECTIONS = { outbound: 'Out to the internet', inbound: 'In from the internet', between: 'Between your networks', router: 'To Gatehouse itself' };
 const ALL_COLS = [
   { id: 'time', label: 'Time' }, { id: 'device', label: 'Device' }, { id: 'what', label: 'What' }, { id: 'where', label: 'Networks' },
-  { id: 'result', label: 'Result' }, { id: 'why', label: 'Why' },
+  { id: 'via', label: 'Out through' }, { id: 'result', label: 'Result' }, { id: 'why', label: 'Why' },
 ];
 const regionName = (cc) => { try { return new Intl.DisplayNames(undefined, { type: 'region' }).of(cc); } catch { return cc; } };
 const bytes = (n) => {
@@ -257,7 +257,7 @@ export default function Logs() {
           </div>
           <div className="scroll">
             <table className="table">
-              <thead><tr>{show('time') && <th>Time</th>}{show('device') && <th>Device</th>}{show('what') && <th>What</th>}{show('where') && <th>Networks</th>}{show('result') && <th>Result</th>}{show('why') && <th>Why</th>}<th /></tr></thead>
+              <thead><tr>{show('time') && <th>Time</th>}{show('device') && <th>Device</th>}{show('what') && <th>What</th>}{show('where') && <th>Networks</th>}{show('via') && <th>Out through</th>}{show('result') && <th>Result</th>}{show('why') && <th>Why</th>}<th /></tr></thead>
               <tbody>
                 {rows.map((r) => {
                   const [tone, label] = VERDICT[r.verdict] || ['', r.verdict];
@@ -284,6 +284,7 @@ export default function Logs() {
                         </td>
                       )}
                       {show('where') && <td className="small">{conn ? <>{r.from_zone && <button className="link" onClick={() => pick('network', r.from_zone)}>{r.from_zone}</button>} → {r.to_zone && <button className="link" onClick={() => pick('network', r.to_zone)}>{r.to_zone}</button>}</> : <span className="muted">–</span>}</td>}
+                      {show('via') && <td className="small">{r.via ? <Pill tone={r.via_kind === 'tunnel' ? 'good' : ''}>{r.via}</Pill> : <span className="muted">–</span>}</td>}
                       {show('result') && <td><Pill tone={tone}>{label}</Pill></td>}
                       {show('why') && <td className="small sec">{r.why}{conn && r.rule && <> <button className="link" onClick={() => pick('rule', r.rule)}>Same rule</button></>}</td>}
                       <td className="nowrap">{conn && r.dst && <Button small onClick={() => mkRule(r, r.verdict === 'blocked' ? 'accept' : 'drop')}>{r.verdict === 'blocked' ? 'Allow this' : 'Block this'}</Button>}</td>

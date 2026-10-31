@@ -126,6 +126,7 @@ func (a *App) collectTraffic(ctx context.Context) {
 }
 
 func (a *App) registerTrafficRoutes() {
+	a.registerViaRoutes()
 	a.API.Handle("GET /api/net/throughput", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		api.JSON(w, 200, map[string]any{"interval": int(trafficEvery / time.Second), "links": a.traffic.snapshot()})
 	})
