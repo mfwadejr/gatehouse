@@ -1,6 +1,17 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.34',
+    title: 'Logs: shorter rows, details on click',
+    items: [
+      'Every row in the Logs is now at most two lines: the name of the app or website on top, and the port and service (or the kind of entry) underneath. Long names are cut off with "..." on that one line only; the full name is in the details.',
+      'Near-identical connections or lookups that follow each other, from the same device to the same place with the same result and exit, become one row with a count (for example "accounts.meta.com x6"). The individual times are in the details.',
+      'Click a row (or press Enter on it) to see the rest: why it was allowed or blocked, the rule, the host and address, the country, the networks, and the Block this or Allow this button. Blocking something is now two steps: click the row, then Block.',
+      'The Networks and Why columns are off by default because "Out through" and the details say the same. They are still under Columns and rows. Times no longer wrap onto two lines.',
+      'On a phone each entry is a small card with the same two lines.',
+    ],
+  },
+  {
     version: '0.8.33',
     title: 'Device mode: Router or Bridge, with cabling help',
     items: [

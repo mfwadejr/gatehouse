@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { del, get, getWatched, post, put, setFailing, useData, useStream } from '../api.js';
 import { RuleForm } from './FirewallRules.jsx';
 import { COUNTRIES, MAP_H, MAP_W } from '../worldmap.js';
+import { groupRows, rowTitle } from '../logrows.js';
 import { Button, Card, Empty, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, Switch, Tabs, ToggleRow, Trend, useAction, fmt, confirmBox } from '../ui.jsx';
 
 const KINDS = [
@@ -10,7 +11,6 @@ const KINDS = [
   { value: 'dns', label: 'Names (DNS)' },
   { value: 'event', label: 'Events' },
 ];
-const KIND_NAME = { firewall: 'Connection', dns: 'DNS', event: 'Event' };
 const VERDICT = { allowed: ['good', 'Allowed'], blocked: ['bad', 'Blocked'], warning: ['warn', 'Problem'], info: ['', 'Info'] };
 const RANGES = [{ value: '1', label: '1 h' }, { value: '24', label: '24 h' }, { value: '168', label: '7 d' }, { value: '720', label: '30 d' }, { value: 'custom', label: 'Custom' }];
 const FILTER_NAMES = { device: 'Device', dest: 'Destination', network: 'Network', service: 'Service', port: 'Port', proto: 'Protocol', direction: 'Direction', rule: 'Rule', country: 'Country', app: 'App' };
@@ -19,6 +19,7 @@ const ALL_COLS = [
   { id: 'time', label: 'Time' }, { id: 'device', label: 'Device' }, { id: 'what', label: 'What' }, { id: 'where', label: 'Networks' },
   { id: 'via', label: 'Out through' }, { id: 'result', label: 'Result' }, { id: 'why', label: 'Why' },
 ];
+const DEFAULT_COLS = ['time', 'device', 'what', 'via', 'result'];
 const regionName = (cc) => { try { return new Intl.DisplayNames(undefined, { type: 'region' }).of(cc); } catch { return cc; } };
 const bytes = (n) => {
   if (!n) return '0 B';
@@ -137,7 +138,8 @@ export default function Logs() {
   const [live, setLive] = useState(true);
   const [loading, setLoading] = useState(true);
   const [rec, setRec] = useState(false);
-  const [cols, setCols] = useState(ALL_COLS.map((c) => c.id));
+  const [cols, setCols] = useState(DEFAULT_COLS);
+  const [open, setOpen] = useState({});
   const [pageSize, setPageSize] = useState(15);
   const [mk, setMk] = useState(null);
   const t = useRef(null);
@@ -206,6 +208,7 @@ export default function Logs() {
     service: r.port ? `${r.proto}/${r.port}` : '', action,
   });
 
+  const groups = useMemo(() => groupRows(rows), [rows]);
   const none = !loading && !rows.length;
   const chips = Object.entries(flt).filter(([, v]) => v !== '' && v != null);
   return (
@@ -256,39 +259,49 @@ export default function Logs() {
             <a className="btn small" href={exportUrl()} download>Download as spreadsheet (CSV)</a>
           </div>
           <div className="scroll">
-            <table className="table">
+            <table className="table logtable">
               <thead><tr>{show('time') && <th>Time</th>}{show('device') && <th>Device</th>}{show('what') && <th>What</th>}{show('where') && <th>Networks</th>}{show('via') && <th>Out through</th>}{show('result') && <th>Result</th>}{show('why') && <th>Why</th>}<th /></tr></thead>
               <tbody>
-                {rows.map((r) => {
+                {groups.map((g) => {
+                  const r = g.first;
                   const [tone, label] = VERDICT[r.verdict] || ['', r.verdict];
                   const conn = r.kind === 'firewall';
+                  const { title, sub } = rowTitle(r);
+                  const n = g.items.length;
+                  const isOpen = !!open[g.key];
+                  const toggle = () => setOpen((o) => ({ ...o, [g.key]: !o[g.key] }));
                   return (
-                    <tr key={r.key}>
-                      {show('time') && <td className="mono" title={fmt.dt(r.ts)}>{fmt.time(r.ts)}</td>}
-                      {show('device') && <td>{r.who && r.addr ? <button className="link" title="Show only this device" onClick={() => pick('device', r.addr)}>{r.who}</button> : (r.who || <span className="muted">–</span>)}{r.addr && r.addr !== r.who && <div className="small muted mono">{r.addr}</div>}</td>}
-                      {show('what') && (
-                        <td style={{ wordBreak: 'break-all' }}>
-                          {conn ? (
-                            <>
-                              {r.proto?.toUpperCase()} to{' '}
-                              <button className="link" title="Show only this destination" onClick={() => pick('dest', r.dst_name || r.dst)}>{r.dst_name || r.dst}</button>
-                              {r.port ? <>:<button className="link" title="Show only this port" onClick={() => pick('port', r.port)}>{r.port}</button></> : null}
-                              <div className="small muted">
-                                {r.service && <button className="link" onClick={() => pick('service', r.service)}>{r.service}</button>}
-                                {r.service && ' · '}{r.dst_name && r.dst}
-                                {r.app && <> · <button className="link" title="Show only this app" onClick={() => pick('app', r.app)}>{r.app}</button></>}
-                                {r.country && <> · <button className="link" onClick={() => pick('country', r.country)}>{regionName(r.country)}</button></>}
-                              </div>
-                            </>
-                          ) : <>{r.what}<div className="small muted">{KIND_NAME[r.kind]}{r.detail ? ` · ${r.detail}` : ''}</div></>}
-                        </td>
+                    <React.Fragment key={g.key}>
+                      <tr className={`logrow ${isOpen ? 'open' : ''}`} tabIndex={0} aria-expanded={isOpen} onClick={toggle} onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggle(); } }}>
+                        {show('time') && <td className="mono nowrap" title={fmt.dt(r.ts)}>{fmt.time(r.ts)}</td>}
+                        {show('device') && <td><div className="l1">{r.who || <span className="muted">–</span>}</div>{r.addr && r.addr !== r.who && <div className="l2 small muted mono">{r.addr}</div>}</td>}
+                        {show('what') && (
+                          <td>
+                            <div className="l1" title={title}>{title}{n > 1 && <span className="count"> ×{n}</span>}</div>
+                            <div className="l2 small muted">{sub}</div>
+                          </td>
+                        )}
+                        {show('where') && <td className="small">{conn ? <>{r.from_zone} → {r.to_zone}</> : <span className="muted">–</span>}</td>}
+                        {show('via') && <td className="small">{r.via ? <Pill tone={r.via_kind === 'tunnel' ? 'good' : ''}>{r.via}</Pill> : <span className="muted">–</span>}</td>}
+                        {show('result') && <td className="nowrap"><Pill tone={tone}>{label}</Pill></td>}
+                        {show('why') && <td className="small sec"><div className="l1">{r.why}</div></td>}
+                        <td className="nowrap chev" aria-hidden="true">{isOpen ? '▾' : '▸'}</td>
+                      </tr>
+                      {isOpen && (
+                        <tr className="logdetail">
+                          <td colSpan={cols.length + 1}>
+                            <div className="stack">
+                              {r.why && <div><b>Why:</b> {r.why}{conn && r.rule && <> <button className="link" onClick={() => pick('rule', r.rule)}>Same rule</button></>}</div>}
+                              {conn && <div className="small">{r.dst_name && <>Host <span className="mono">{r.dst_name}</span> · </>}Address <span className="mono">{r.dst}</span>{r.port ? <> · port <button className="link" title="Show only this port" onClick={() => pick('port', r.port)}>{r.port}</button></> : null}{r.country && <> · <button className="link" onClick={() => pick('country', r.country)}>{regionName(r.country)}</button></>}</div>}
+                              {conn && <div className="small">{r.from_zone && <button className="link" onClick={() => pick('network', r.from_zone)}>{r.from_zone}</button>} → {r.to_zone && <button className="link" onClick={() => pick('network', r.to_zone)}>{r.to_zone}</button>}{r.service && <> · <button className="link" onClick={() => pick('service', r.service)}>{r.service}</button></>}{r.app && <> · <button className="link" title="Show only this app" onClick={() => pick('app', r.app)}>{r.app}</button></>}</div>}
+                              {r.who && r.addr && <div className="small"><button className="link" onClick={() => pick('device', r.addr)}>Show only {r.who}</button></div>}
+                              {n > 1 && <div className="small muted">{n} times: {g.items.slice(0, 20).map((x) => fmt.time(x.ts)).join(', ')}{n > 20 ? ', …' : ''}</div>}
+                              {conn && r.dst && <div><Button small onClick={() => mkRule(r, r.verdict === 'blocked' ? 'accept' : 'drop')}>{r.verdict === 'blocked' ? 'Allow this' : 'Block this'}</Button></div>}
+                            </div>
+                          </td>
+                        </tr>
                       )}
-                      {show('where') && <td className="small">{conn ? <>{r.from_zone && <button className="link" onClick={() => pick('network', r.from_zone)}>{r.from_zone}</button>} → {r.to_zone && <button className="link" onClick={() => pick('network', r.to_zone)}>{r.to_zone}</button>}</> : <span className="muted">–</span>}</td>}
-                      {show('via') && <td className="small">{r.via ? <Pill tone={r.via_kind === 'tunnel' ? 'good' : ''}>{r.via}</Pill> : <span className="muted">–</span>}</td>}
-                      {show('result') && <td><Pill tone={tone}>{label}</Pill></td>}
-                      {show('why') && <td className="small sec">{r.why}{conn && r.rule && <> <button className="link" onClick={() => pick('rule', r.rule)}>Same rule</button></>}</td>}
-                      <td className="nowrap">{conn && r.dst && <Button small onClick={() => mkRule(r, r.verdict === 'blocked' ? 'accept' : 'drop')}>{r.verdict === 'blocked' ? 'Allow this' : 'Block this'}</Button>}</td>
-                    </tr>
+                    </React.Fragment>
                   );
                 })}
               </tbody>
