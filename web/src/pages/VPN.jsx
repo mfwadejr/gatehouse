@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { del, get, post, put, useData } from '../api.js';
 import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, ToggleRow, useAction, fmt, Switch, confirmBox, noticeBox } from '../ui.jsx';
 
@@ -469,8 +469,17 @@ function Header({ v }) {
 function Outbound({ v, reload, setModal }) {
   const [run] = useAction();
   const sources = v.uses || [];
+  const [checkMac, setCheckMac] = useState('');
   const [checked, setChecked] = useState(null);
-  const check = (ip) => get(`/api/vpn/check?ip=${encodeURIComponent(ip)}`).then(setChecked).catch(() => setChecked({ sentence: 'The check could not be run.', verdict: 'none' }));
+  // The check stays open and updates itself every few seconds, so what is on screen is never old.
+  useEffect(() => {
+    if (!checkMac) return undefined;
+    let live = true;
+    const run = () => get(`/api/vpn/check?mac=${encodeURIComponent(checkMac)}`).then((r) => { if (live) setChecked(r); }).catch(() => { if (live) setChecked({ sentence: 'The check could not be run.', verdict: 'none' }); });
+    run();
+    const t = setInterval(run, 5000);
+    return () => { live = false; clearInterval(t); };
+  }, [checkMac]);
   return (
     <Card>
       <div className="stack">
@@ -498,16 +507,21 @@ function Outbound({ v, reload, setModal }) {
             <div className="inline">{sources.map((u) => (
               <span key={u.id} className="inline" style={{ gap: 'var(--space-1)' }}>
                 <Pill tone="">{u.kind === 'network' ? `${u.label} network` : u.label}</Pill>
-                {u.kind === 'device' && (u.ips || []).length > 0 && <button type="button" className="link small" onClick={() => check(u.ips[0].split('/')[0])}>Check</button>}
+                {u.kind === 'device' && <button type="button" className="link small" onClick={() => { setChecked(null); setCheckMac(u.value); }}>Check</button>}
               </span>
             ))}</div>
           )}
-          {checked && (
+          {checkMac && (
             <div className="stack" style={{ gap: 'var(--space-1)' }}>
-              <span className="small" style={{ color: checked.verdict === 'leak' ? 'var(--color-status-serious)' : undefined }}>{checked.device ? `${checked.device}: ` : ''}{checked.sentence}</span>
-              {checked.others?.length > 0 && <span className="small muted">Went out through: {checked.others.map((o) => `${o.label} (${o.n})`).join(', ')}</span>}
-              {checked.leaked?.map((l, i) => <span key={i} className="small muted mono">{fmt.ago(l.ts)} · {l.what} · {l.via}</span>)}
-              {checked.verdict === 'ok' && <span className="small muted">This looks at the last hour of new connections in the log.</span>}
+              {!checked ? <span className="small muted">Checking…</span> : (
+                <>
+                  <span className="small" style={{ color: checked.verdict === 'leak' || checked.verdict === 'address' ? 'var(--color-status-serious)' : undefined }}>{checked.device ? `${checked.device}: ` : ''}{checked.sentence}</span>
+                  {checked.others?.length > 0 && <span className="small muted">Went out through: {checked.others.map((o) => `${o.label} (${o.n})`).join(', ')}</span>}
+                  {checked.leaked?.map((l, i) => <span key={i} className="small muted mono">{fmt.ago(l.ts)} · {l.what} · {l.via}</span>)}
+                  {(checked.dns_through > 0 || checked.dns_direct > 0) && <span className="small muted">Name lookups: {checked.dns_through} through the VPN, {checked.dns_direct} the normal way.</span>}
+                  <span className="small muted">{checked.checked_at ? `Checked ${new Date(checked.checked_at * 1000).toLocaleTimeString()}` : ''} · looks at the last {Math.round((checked.window || 900) / 60)} minutes, updates by itself. <button type="button" className="link small" onClick={() => { setCheckMac(''); setChecked(null); }}>Close</button></span>
+                </>
+              )}
             </div>
           )}
           {v.killswitch && sources.length > 0 && v.state !== 'up' && v.state !== 'off' && <span className="small muted">Kill switch is on: these devices have no internet until the VPN is back.</span>}

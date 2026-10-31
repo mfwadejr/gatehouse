@@ -225,6 +225,9 @@ func dnsItem(r dnssrv.Row) LogItem {
 	case "failed":
 		it.Verdict = "warning"
 		it.Why = "No answer came back from the DNS servers."
+		if r.Rule == "kill switch" {
+			it.Why = "Held back: this device's VPN is down and its kill switch is on."
+		}
 	default:
 		it.Why = "Not on any block list. Answered by " + orWord(r.Upstream, "an upstream DNS server") + "."
 	}
@@ -311,7 +314,11 @@ func (a *App) logSearch(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		}
 		if rows, err := a.QLog.Search(f); err == nil {
 			for _, r := range rows {
-				items = append(items, dnsItem(r))
+				it := dnsItem(r)
+				if r.Via != "" {
+					it.Via, it.ViaKind = a.viaOf(r.Via)
+				}
+				items = append(items, it)
 			}
 		}
 	}

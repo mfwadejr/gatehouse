@@ -358,6 +358,9 @@ func (a *App) computeVPN(st netd.VPNStatus) ([]VPNView, error) {
 			v.State, v.Message = clientHealth(healthIn{Enabled: w.Enabled, LinkUp: haveWG || st.Links[w.Name].Up, WG: true, Handshake: hs,
 				HasCheck: w.Check != "", CheckOK: haveChk && chk.OK, CheckAt: chk.At, Target: w.Check, Now: now, AppliedAt: applied})
 			v.Uses = a.usesOf(w.Name, nil)
+			if (v.State == "down" || v.State == "degraded") && !v.KillSwitch && len(v.Uses) > 0 {
+				v.Warnings = append(v.Warnings, "Until this VPN is working again, name lookups from the devices that use it go out the normal way. Turn the kill switch on to stop that.")
+			}
 		}
 		out = append(out, v)
 	}
@@ -431,6 +434,9 @@ func (a *App) computeVPN(st netd.VPNStatus) ([]VPNView, error) {
 				v.State, v.Message, v.Log = clientSettling(v.State, v.Message, link.Addr, os, chk.At, now)
 			}
 			v.Uses = a.usesOf(o.Name, nil)
+			if (v.State == "down" || v.State == "degraded") && !v.KillSwitch && len(v.Uses) > 0 {
+				v.Warnings = append(v.Warnings, "Until this VPN is working again, name lookups from the devices that use it go out the normal way. Turn the kill switch on to stop that.")
+			}
 		}
 		out = append(out, v)
 	}

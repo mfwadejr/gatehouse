@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/miekg/dns"
@@ -192,9 +193,11 @@ type Pool struct {
 	bootstrap []string
 	doh       *http.Client
 	exchange  func(ctx context.Context, u *Upstream, req *dns.Msg) (*dns.Msg, error)
-	ordered   atomic.Bool    // ask the servers in the person's own order instead of fastest first
-	roots     *x509.CertPool // for tests: extra certificate roots
-	dials     atomic.Int64   // how many new encrypted connections were opened (for tests)
+	ordered   atomic.Bool                                            // ask the servers in the person's own order instead of fastest first
+	roots     *x509.CertPool                                         // for tests: extra certificate roots
+	dials     atomic.Int64                                           // how many new encrypted connections were opened (for tests)
+	control   func(network, address string, c syscall.RawConn) error // ties sockets to a device (tunnel pools)
+	gen       atomic.Uint64                                          // counts changes to the list, so tunnel pools know to copy it again
 }
 
 // SetOrdered chooses how the servers are tried. False (the default) asks the fastest first;
@@ -215,14 +218,14 @@ func (p *Pool) newDoHClient() *http.Client {
 	resolver := &net.Resolver{
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, _ string) (net.Conn, error) {
-			d := net.Dialer{Timeout: 2 * time.Second}
+			d := net.Dialer{Timeout: 2 * time.Second, Control: p.control}
 			if len(p.bootstrap) == 0 {
 				return d.DialContext(ctx, network, "1.1.1.1:53")
 			}
 			return d.DialContext(ctx, network, net.JoinHostPort(p.bootstrap[0], "53"))
 		},
 	}
-	dialer := &net.Dialer{Timeout: 3 * time.Second, Resolver: resolver}
+	dialer := &net.Dialer{Timeout: 3 * time.Second, Resolver: resolver, Control: p.control}
 	return &http.Client{
 		Timeout: 4 * time.Second,
 		Transport: &http.Transport{
@@ -259,6 +262,7 @@ func (p *Pool) Set(list []*Upstream) {
 		}
 	}
 	p.ups = list
+	p.gen.Add(1)
 }
 
 // closeIdle drops every kept-open connection.
@@ -338,10 +342,10 @@ func (p *Pool) realExchange(ctx context.Context, u *Upstream, req *dns.Msg) (*dn
 	case "tls":
 		return p.exchangeTLS(ctx, u, req)
 	default:
-		c := &dns.Client{Net: "udp", Timeout: p.timeout, UDPSize: 1232}
+		c := &dns.Client{Net: "udp", Timeout: p.timeout, UDPSize: 1232, Dialer: p.dialer()}
 		resp, _, err := c.ExchangeContext(ctx, req, u.Addr)
 		if err == nil && resp.Truncated {
-			tc := &dns.Client{Net: "tcp", Timeout: p.timeout}
+			tc := &dns.Client{Net: "tcp", Timeout: p.timeout, Dialer: p.dialer()}
 			resp, _, err = tc.ExchangeContext(ctx, req, u.Addr)
 		}
 		return resp, err
@@ -349,7 +353,7 @@ func (p *Pool) realExchange(ctx context.Context, u *Upstream, req *dns.Msg) (*dn
 }
 
 func (p *Pool) tlsClient() *dns.Client {
-	return &dns.Client{Net: "tcp-tls", Timeout: p.timeout}
+	return &dns.Client{Net: "tcp-tls", Timeout: p.timeout, Dialer: p.dialer()}
 }
 
 func (p *Pool) tlsConfig(u *Upstream) *tls.Config {

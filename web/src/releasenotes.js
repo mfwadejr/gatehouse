@@ -1,6 +1,16 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.32',
+    title: 'Name lookups go through the VPN too; the Check keeps itself current',
+    items: [
+      'Devices you send through a VPN now have their website-name lookups sent through it as well, using the DNS server you already chose, with its filtering. Before, the names were looked up over your normal connection even though the sites themselves went through the VPN. These devices also get a DNS memory of their own, so an answer fetched through the VPN is never mixed with one from the normal connection.',
+      'If the VPN goes down and its kill switch is on, those devices\' lookups are held back with the rest of their traffic and never go out the normal way. With the kill switch off, lookups carry on the normal way so DNS keeps working, and the VPN card says so.',
+      'The Logs show the VPN under "Out through" for lookups that went through it.',
+      'The Check beside a device on the VPN card now updates itself every few seconds, shows when it last ran, looks at the last 15 minutes instead of the last hour, counts name lookups as well as connections, and uses the device\'s current address. If the device moved to a new address, it says so and tells you to press Review and apply.',
+    ],
+  },
+  {
     version: '0.8.31',
     title: 'Port names, lists in the firewall box, tidier screens',
     items: [

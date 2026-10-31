@@ -34,6 +34,10 @@ type Server struct {
 	opts  atomic.Pointer[Options]
 	pool  *Pool
 	cache *Cache
+	// Route says how a client's lookups must travel (through a VPN tunnel or the normal connection).
+	// Nil means everyone uses the normal connection.
+	Route func(client string) Path
+	via   viaSet
 	rl    *RateLimiter
 	eng   engineHolder
 	local localHolder
@@ -77,12 +81,14 @@ func (s *Server) Apply(o Options, recs []LocalRecord) {
 	s.rl.Configure(o.RateLimit, o.RateBurst)
 	s.local.p.Store(buildLocal(o.LocalDomain, recs))
 	s.cache.Flush()
+	s.flushVia()
 }
 
 // SetLocalRecords swaps the administrator-defined records.
 func (s *Server) SetLocalRecords(recs []LocalRecord) {
 	s.local.p.Store(buildLocal(s.Options().LocalDomain, recs))
 	s.cache.Flush()
+	s.flushVia()
 }
 
 func clientIP(w dns.ResponseWriter) string {
@@ -227,19 +233,45 @@ func (s *Server) handle(client string, r *dns.Msg, start time.Time, udp bool) *d
 		do = opt.Do()
 	}
 
-	// 5. Cache.
-	if c, ok := s.cache.Get(q, do); ok {
+	// 5. Where this client's lookups travel: a device sent through a VPN has its lookups sent
+	// through it too, with a cache of its own.
+	var path Path
+	if s.Route != nil {
+		path = s.Route(client)
+	}
+	if path.Hold {
+		// The tunnel is down and its kill switch is on: nothing leaves by the normal connection.
+		m := new(dns.Msg)
+		m.SetRcode(r, dns.RcodeServerFailure)
+		entry.Via = path.Dev
+		return finish(m, OutFailed, "kill switch", "")
+	}
+	cache, up := s.cache, s.pool
+	if path.Dev != "" {
+		cache, up = s.viaCache(path.Dev), s.viaPool(path.Dev)
+		entry.Via = path.Dev
+	}
+
+	// 6. Cache.
+	if c, ok := cache.Get(q, do); ok {
 		c.Id = r.Id
 		c.Question = r.Question
 		c.RecursionDesired = r.RecursionDesired
 		return finish(c, OutCached, "", "")
 	}
 
-	// 6. Forward.
+	// 7. Forward.
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
-	up, upName := s.pool, ""
+	upName := ""
 	resp, u, _, err := up.Exchange(ctx, r)
+	if err != nil && path.Dev != "" && !path.Strict {
+		// The tunnel did not answer and the kill switch is off: DNS must keep working, so ask the
+		// normal way. The log shows it went out the normal way.
+		entry.Via = ""
+		cache, up = s.cache, s.pool
+		resp, u, _, err = up.Exchange(ctx, r)
+	}
 	if err != nil {
 		m := new(dns.Msg)
 		m.SetRcode(r, dns.RcodeServerFailure)
@@ -249,7 +281,7 @@ func (s *Server) handle(client string, r *dns.Msg, start time.Time, udp bool) *d
 		upName = u.Name
 	}
 	resp.Id = r.Id
-	s.cache.Put(q, do, resp)
+	cache.Put(q, do, resp)
 	return finish(resp, OutForwarded, "", upName)
 }
 

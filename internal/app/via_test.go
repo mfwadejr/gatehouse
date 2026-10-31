@@ -77,3 +77,63 @@ func TestDevicesShowTheVPNTheyAreSentThrough(t *testing.T) {
 		t.Fatalf("other address: %q", l)
 	}
 }
+
+func TestDNSPathFollowsTheVPNAndItsKillSwitch(t *testing.T) {
+	a := viaTestApp(t, "up")
+	set := func(state string, kill bool) {
+		a.vpn.snap = vpnSnapshot{Views: []VPNView{{Dev: "ex-nl", Label: "ExpressVPN NL", Role: "client", State: state, Enabled: true, KillSwitch: kill,
+			Uses: []UseView{{Kind: "device", Value: "aa:bb:cc:dd:ee:01", IPs: []string{"192.168.50.20/32"}}}}}}
+	}
+	set("up", true)
+	if p := a.dnsPath("192.168.50.20"); p.Dev != "ex-nl" || !p.Strict || p.Hold {
+		t.Fatalf("up, kill switch on: %+v", p)
+	}
+	set("up", false)
+	if p := a.dnsPath("192.168.50.20"); p.Dev != "ex-nl" || p.Strict || p.Hold {
+		t.Fatalf("up, kill switch off: %+v", p)
+	}
+	set("down", true)
+	if p := a.dnsPath("192.168.50.20"); !p.Hold {
+		t.Fatalf("down with kill switch must hold the lookup: %+v", p)
+	}
+	set("down", false)
+	if p := a.dnsPath("192.168.50.20"); p.Dev != "" || p.Hold {
+		t.Fatalf("down without kill switch must use the normal connection: %+v", p)
+	}
+	set("up", true)
+	if p := a.dnsPath("192.168.50.99"); p.Dev != "" || p.Hold {
+		t.Fatalf("a device that does not use the VPN must be untouched: %+v", p)
+	}
+}
+
+func TestCheckCountsNameLookupsAndNoticesAChangedAddress(t *testing.T) {
+	a := viaTestApp(t, "up")
+	if _, err := a.Config.Exec(`INSERT INTO devices(mac,name,last_ip) VALUES('aa:bb:cc:dd:ee:01','macbookpro','192.168.50.106')`); err != nil {
+		t.Fatal(err)
+	}
+	// the routing was set up for .20 but the Mac is at .106 now
+	c := a.viaCheckMAC("aa:bb:cc:dd:ee:01")
+	if c.Verdict != "address" || !strings.Contains(c.Sentence, "192.168.50.106") || !strings.Contains(c.Sentence, "192.168.50.20") {
+		t.Fatalf("a changed address was not noticed: %+v", c)
+	}
+	// now the routing follows the Mac: connections and lookups through the tunnel are counted
+	a.vpn.snap = vpnSnapshot{Views: []VPNView{{Dev: "ex-nl", Label: "ExpressVPN NL", Role: "client", State: "up",
+		Uses: []UseView{{Kind: "device", Value: "aa:bb:cc:dd:ee:01", IPs: []string{"192.168.50.106/32"}}}}}}
+	logConn(t, a, "192.168.50.106", "1.1.1.1", "ex-nl")
+	now := time.Now().Unix()
+	for _, row := range []struct{ out string }{{"ex-nl"}, {"ex-nl"}, {""}} {
+		if _, err := a.Logs.Exec(`INSERT INTO dns_queries(ts,client,client_name,qname,qtype,result,out_if) VALUES(?,?,?,?,?,?,?)`, now, "192.168.50.106", "macbookpro", "example.org", "A", "forwarded", row.out); err != nil {
+			t.Fatal(err)
+		}
+	}
+	c = a.viaCheckMAC("aa:bb:cc:dd:ee:01")
+	if c.Verdict != "leak" || c.DNSThrough != 2 || c.DNSDirect != 1 || c.Through != 1 || c.CheckedAt == 0 || c.Window != 900 {
+		t.Fatalf("%+v", c)
+	}
+	// older lookups are not counted
+	a.Logs.Exec(`UPDATE dns_queries SET ts=ts-3600`)
+	c = a.viaCheckMAC("aa:bb:cc:dd:ee:01")
+	if c.DNSDirect != 0 || c.DNSThrough != 0 || c.Verdict != "ok" {
+		t.Fatalf("old rows counted: %+v", c)
+	}
+}

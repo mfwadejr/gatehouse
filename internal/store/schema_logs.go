@@ -110,4 +110,7 @@ CREATE INDEX idx_outages_start ON outages(start);
 `, `
 -- The port a new connection left through, so the log can say which connection it used.
 ALTER TABLE fw_events ADD COLUMN out_if TEXT NOT NULL DEFAULT '';
+`, `
+-- The tunnel a lookup went out through (empty: the normal connection).
+ALTER TABLE dns_queries ADD COLUMN out_if TEXT NOT NULL DEFAULT '';
 `}

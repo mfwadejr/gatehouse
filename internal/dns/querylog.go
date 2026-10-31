@@ -21,6 +21,7 @@ type LogEntry struct {
 	Upstream   string `json:"upstream"`
 	LatencyUS  int64  `json:"latency_us"`
 	Rule       string `json:"rule"`
+	Via        string `json:"via,omitempty"` // the tunnel device the lookup went out through, if any
 }
 
 // QueryLog batches inserts into logs.db so the resolver never waits on the disk.
@@ -94,13 +95,13 @@ func (q *QueryLog) write(batch []LogEntry) {
 	if err != nil {
 		return
 	}
-	st, err := tx.Prepare(`INSERT INTO dns_queries(ts,client,client_name,qname,qtype,result,rcode,upstream,latency_us,rule) VALUES(?,?,?,?,?,?,?,?,?,?)`)
+	st, err := tx.Prepare(`INSERT INTO dns_queries(ts,client,client_name,qname,qtype,result,rcode,upstream,latency_us,rule,out_if) VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
 	if err != nil {
 		tx.Rollback()
 		return
 	}
 	for _, e := range batch {
-		st.Exec(e.TS, e.Client, e.ClientName, e.QName, e.QType, e.Result, e.RCode, e.Upstream, e.LatencyUS, e.Rule)
+		st.Exec(e.TS, e.Client, e.ClientName, e.QName, e.QType, e.Result, e.RCode, e.Upstream, e.LatencyUS, e.Rule, e.Via)
 	}
 	st.Close()
 	tx.Commit()
@@ -168,7 +169,7 @@ func (q *QueryLog) Search(f Filter) ([]Row, error) {
 		where = append(where, `result<>?`)
 		args = append(args, f.NotResult)
 	}
-	sqlStr := `SELECT id,ts,client,client_name,qname,qtype,result,rcode,upstream,latency_us,rule FROM dns_queries`
+	sqlStr := `SELECT id,ts,client,client_name,qname,qtype,result,rcode,upstream,latency_us,rule,out_if FROM dns_queries`
 	if len(where) > 0 {
 		sqlStr += ` WHERE ` + strings.Join(where, " AND ")
 	}
@@ -182,7 +183,7 @@ func (q *QueryLog) Search(f Filter) ([]Row, error) {
 	var out []Row
 	for rows.Next() {
 		var r Row
-		if err := rows.Scan(&r.ID, &r.TS, &r.Client, &r.ClientName, &r.QName, &r.QType, &r.Result, &r.RCode, &r.Upstream, &r.LatencyUS, &r.Rule); err != nil {
+		if err := rows.Scan(&r.ID, &r.TS, &r.Client, &r.ClientName, &r.QName, &r.QType, &r.Result, &r.RCode, &r.Upstream, &r.LatencyUS, &r.Rule, &r.Via); err != nil {
 			return nil, err
 		}
 		out = append(out, r)
