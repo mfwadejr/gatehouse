@@ -211,3 +211,15 @@ func TestStatusReadsOpenVPNMessagesForABrokenClient(t *testing.T) {
 		t.Fatalf("no reason: %+v", o)
 	}
 }
+
+func TestOVPNConnectedFollowsTheNewestWord(t *testing.T) {
+	if !OVPNConnected([]string{"TLS handshake failed", "Initialization Sequence Completed", "Timers: ping 10"}) {
+		t.Error("connected after a failure was not seen as connected")
+	}
+	if OVPNConnected([]string{"Initialization Sequence Completed", "[x] Inactivity timeout (--ping-restart), restarting", "SIGUSR1[soft,ping-restart] received, process restarting"}) {
+		t.Error("a tunnel that is restarting was seen as connected")
+	}
+	if OVPNConnected([]string{"Starting openvpn-client@gatehouse-tun0.service"}) {
+		t.Error("starting is not connected")
+	}
+}

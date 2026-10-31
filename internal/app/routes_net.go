@@ -223,9 +223,18 @@ func fingerprint(p *netd.Plan) string {
 	q := *p
 	q.Seconds = 0
 	b, _ := json.Marshal(q)
+	// A change in what Gatehouse writes for a tunnel device (not in the settings themselves) must
+	// still show as "waiting to be applied", or an update could never reach a machine that
+	// already has tunnels. Change tunnelFiles when the generated tunnel file changes.
+	if len(p.Config.Tunnels) > 0 {
+		b = append(b, []byte("|tunnel-files:"+tunnelFiles)...)
+	}
 	h := sha256.Sum256(b)
 	return hex.EncodeToString(h[:])
 }
+
+// tunnelFiles names the version of the file written for each tunnel device.
+const tunnelFiles = "2-keep-static"
 
 func (a *App) validatePlan(p *netd.Plan) error {
 	if err := p.Config.Validate(); err != nil {

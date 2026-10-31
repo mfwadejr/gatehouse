@@ -69,10 +69,12 @@ func clientHealth(in healthIn) (state, msg string) {
 // clientProblem says what is wrong with a client tunnel that is not working. What OpenVPN
 // itself reported comes first; without it, a tunnel with no address inside it is described as
 // one the server never finished setting up, since the test result alone says nothing about why.
-func clientProblem(state, msg, addr, reason string) string {
+func clientProblem(state, msg, addr, reason string, connected bool) string {
 	switch {
 	case reason != "":
 		return reason
+	case addr == "" && connected && (state == "degraded" || state == "down"):
+		return "OpenVPN says the tunnel is up, but this device has no address inside it. Something on this machine took it away. See the messages below"
 	case state == "degraded" && addr == "":
 		return "The VPN server has not given this device an address, so the connection never finished. See the messages below"
 	}
@@ -410,7 +412,7 @@ func (a *App) computeVPN(st netd.VPNStatus) ([]VPNView, error) {
 			v.State, v.Message = clientHealth(healthIn{Enabled: o.Enabled, LinkUp: link.Up && os.Active, HasCheck: o.Check != "", CheckOK: haveChk && chk.OK,
 				CheckAt: chk.At, Target: o.Check, Now: now, AppliedAt: applied})
 			if v.State == "degraded" || v.State == "down" {
-				v.Message = clientProblem(v.State, v.Message, link.Addr, os.Reason)
+				v.Message = clientProblem(v.State, v.Message, link.Addr, os.Reason, os.Connected)
 				v.Log = os.Log
 			}
 			v.Uses = a.usesOf(o.Name, nil)

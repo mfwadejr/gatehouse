@@ -1,6 +1,14 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.28',
+    title: 'VPN tunnel keeps its address',
+    items: [
+      'Fixed a likely cause of a provider VPN (such as ExpressVPN) that connected and then carried nothing: Gatehouse now tells the system network service to leave the address and route OpenVPN sets on its tunnel device alone. After updating, the Internet page shows changes waiting to be applied; press Review and apply once so the tunnel file is rewritten.',
+      'When OpenVPN says the tunnel is up but the device has no address inside it, the VPN card now says exactly that, instead of saying the connection never finished.',
+    ],
+  },
+  {
     version: '0.8.27',
     title: 'Test my internet with several connections; shorter pages',
     items: [

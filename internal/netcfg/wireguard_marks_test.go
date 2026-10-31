@@ -23,3 +23,15 @@ func TestTunnelMarksBecomePolicyRules(t *testing.T) {
 		t.Error("a mark outside the route range was accepted")
 	}
 }
+
+// networkd must leave the address and route OpenVPN set on its own tun device alone, or the
+// tunnel connects and then carries nothing.
+func TestTunnelFileKeepsTheProgramsOwnAddress(t *testing.T) {
+	c := Config{Tunnels: []Tunnel{{Name: "tun0", Table: 300, Enabled: true}}}
+	out := &Output{Networkd: map[string]string{}}
+	c.generateTunnels(out)
+	f := out.Networkd["gatehouse-tun0.network"]
+	if !strings.Contains(f, "KeepConfiguration=static") || !strings.Contains(f, "[Match]\nName=tun0") {
+		t.Fatalf("tunnel file:\n%s", f)
+	}
+}

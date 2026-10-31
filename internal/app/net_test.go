@@ -3,6 +3,9 @@ package app
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"net/http"
 	"net/http/cookiejar"
 	"os"
@@ -373,4 +376,22 @@ func (f *fakeNet) Power(action string) error {
 	defer f.mu.Unlock()
 	f.powerCalls = append(f.powerCalls, action)
 	return nil
+}
+
+// A change in the tunnel file Gatehouse writes must show as waiting to be applied on a machine
+// that has tunnels, and must not touch one that has none.
+func TestFingerprintNoticesTunnelFileVersion(t *testing.T) {
+	plain := &netd.Plan{}
+	if a, b := fingerprint(plain), fingerprint(&netd.Plan{}); a != b {
+		t.Fatal("a plan without tunnels must be stable")
+	}
+	with := &netd.Plan{}
+	with.Config.Tunnels = append(with.Config.Tunnels, netcfg.Tunnel{Name: "tun0", Enabled: true})
+	q := *with
+	q.Seconds = 0
+	b, _ := json.Marshal(q)
+	h := sha256.Sum256(b)
+	if hex.EncodeToString(h[:]) == fingerprint(with) {
+		t.Fatal("the tunnel file version is not part of the fingerprint")
+	}
 }

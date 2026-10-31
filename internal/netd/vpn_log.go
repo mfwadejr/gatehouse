@@ -38,6 +38,21 @@ func OVPNReason(lines []string) string {
 	return ""
 }
 
+// OVPNConnected says whether the newest word from OpenVPN is that the tunnel finished coming up.
+func OVPNConnected(lines []string) bool {
+	for i := len(lines) - 1; i >= 0; i-- {
+		l := strings.ToLower(lines[i])
+		switch {
+		case strings.Contains(l, "initialization sequence completed"):
+			return true
+		case strings.Contains(l, "sigusr1"), strings.Contains(l, "sigterm"), strings.Contains(l, "restart pause"),
+			strings.Contains(l, "tls error"), strings.Contains(l, "auth_failed"), strings.Contains(l, "starting openvpn"), strings.Contains(l, "stopped openvpn"):
+			return false
+		}
+	}
+	return false
+}
+
 func trimLog(s string) string {
 	s = strings.TrimSpace(s)
 	if len(s) > 160 {

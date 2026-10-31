@@ -71,8 +71,9 @@ type OVPNStatus struct {
 	Clients []OVPNClientStatus `json:"clients"`
 	// For a client that is not working: what OpenVPN's own messages say, in plain words, and
 	// its last few lines.
-	Reason string   `json:"reason,omitempty"`
-	Log    []string `json:"log,omitempty"`
+	Reason    string   `json:"reason,omitempty"`
+	Log       []string `json:"log,omitempty"`
+	Connected bool     `json:"connected,omitempty"` // OpenVPN's newest word is "Initialization Sequence Completed"
 }
 
 type LinkInfo struct {
@@ -518,7 +519,7 @@ func (v *VPN) Status() VPNStatus {
 				if len(lines) > 12 {
 					lines = lines[len(lines)-12:]
 				}
-				o.Log, o.Reason = lines, OVPNReason(lines)
+				o.Log, o.Reason, o.Connected = lines, OVPNReason(lines), OVPNConnected(lines)
 			}
 		}
 		st.OVPN[i.Name] = o
