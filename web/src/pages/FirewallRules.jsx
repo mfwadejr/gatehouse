@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import { del, post, put, useData } from '../api.js';
-import { go } from '../App.jsx';
 import { AddrPicker, Chip, NewDevice, ScheduleEditor, ServicePicker, tokens } from '../AddrPicker.jsx';
 import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Paged, Pill, Segmented, Select, ToggleRow, useAction, fmt, confirmBox, noticeBox, useUndoDelete } from '../ui.jsx';
 
@@ -315,9 +314,6 @@ export function GroupsAndLists({ pickers, reloadPickers, reload }) {
           ))}
           {!pickers?.groups?.length && <Empty>No groups yet.</Empty>}
         </div>
-      </Card>
-      <Card title="Services and ports" desc="Your own services, like Plex or a game console's ports, now live on the Services page. Everything you saved here is already there.">
-        <button type="button" className="link small" style={{ textAlign: 'left' }} onClick={() => go('services')}>Open Services →</button>
       </Card>
       {eg && <GroupForm initial={eg} pickers={pickers} reloadPickers={reloadPickers} onClose={() => setEg(null)} onSaved={refresh} />}
     </>

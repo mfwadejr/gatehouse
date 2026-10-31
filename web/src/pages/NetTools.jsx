@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { post } from '../api.js';
-import { Button, Card, Field, Input, Note, Pill, Segmented, useAction } from '../ui.jsx';
+import { Button, Card, Field, Input, Note, Pill, Segmented, useAction, usePortNames } from '../ui.jsx';
 
 // "Test my internet" and the small tools (ping, traceroute, name lookup) for a machine that has
 // no command line by default.
@@ -10,6 +10,7 @@ const word = { ok: 'Fine', warn: 'Look at this', bad: 'Problem', skip: 'Skipped'
 
 // More than one connection: one block each, the way they share the work above them.
 function Multi({ m }) {
+  const pn = usePortNames();
   const roleWord = { main: 'Main connection', backup: 'Backup', shared: 'Shared' };
   return (
     <div className="stack">
@@ -21,7 +22,7 @@ function Multi({ m }) {
           <div className="item" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 'var(--space-2)' }}>
             <div className="spread">
               <div style={{ minWidth: 0 }}>
-                <div className="name">{c.name} <span className="muted small">(port {c.port})</span></div>
+                <div className="name">{c.name} <span className="muted small">(port {pn(c.port)})</span></div>
                 <div className="meta">{c.headline}</div>
               </div>
               <div className="inline">

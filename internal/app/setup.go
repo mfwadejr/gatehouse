@@ -213,7 +213,7 @@ func (a *App) registerSetupRoutes() {
 			suggested = chosen.MgmtAddr
 		}
 		api.JSON(w, 200, map[string]any{
-			"pending": a.wizardPending(), "ports": ports(), "here": here, "here_addr": hereAddr,
+			"pending": a.wizardPending(), "ports": a.labelledPorts(), "here": here, "here_addr": hereAddr,
 			"suggested_lan": suggested, "hostname": host, "timezone": currentZone(),
 			"timezones": installer.Timezones(), "country": countryFromZone(currentZone()), "install": install,
 		})

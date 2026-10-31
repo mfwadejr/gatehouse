@@ -1,6 +1,16 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.31',
+    title: 'Port names, lists in the firewall box, tidier screens',
+    items: [
+      'Network ports can have a name you choose. On Networks, press Rename on a port (for example "T-Mobile gateway"). The original port name stays underneath, and the new name shows on the Networks, Internet, Devices, DHCP, Device map and Test my internet pages. Clearing the name puts the original back. Only the label is stored, so nothing about the port itself changes.',
+      'The "What for" box in a firewall rule takes several entries at once. Type or paste tcp/80, tcp/443, udp/1000-2000 (commas or spaces) and each becomes its own entry. Anything that is not a real service or port stays in the box with a note saying which part is wrong. Help text under the box shows the format.',
+      'The "Updated just now" label on Overview is gone. It now appears only when updates stop, as "Reconnecting".',
+      'Removed the "Services and ports" card from the firewall rules page (your own services are on the Services page). On the UPnP card the headings are now "Time" and "Request from a device".',
+    ],
+  },
+  {
     version: '0.8.30',
     title: 'See which connection a device really uses',
     items: [

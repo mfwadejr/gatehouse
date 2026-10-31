@@ -484,3 +484,14 @@ export class Guard extends React.Component {
     );
   }
 }
+
+// usePortNames gives back a function that turns a port name (enp0s20f0) into what the person
+// called it, "T-Mobile gateway (enp0s20f0)", or the plain port name when it has no friendly name.
+export function usePortNames() {
+  const { data } = useData('/api/net/ports', { topics: ['net.status'], every: 30000 });
+  return useMemo(() => {
+    const m = {};
+    (Array.isArray(data) ? data : []).forEach((p) => { if (p.label) m[p.name] = p.label; });
+    return (name) => (name && m[name] ? `${m[name]} (${name})` : name || '');
+  }, [data]);
+}

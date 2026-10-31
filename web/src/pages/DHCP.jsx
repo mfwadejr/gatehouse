@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { del, post, put, useData } from '../api.js';
-import { Bar, Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Select, Tabs, ToggleRow, useAction, fmt, confirmBox } from '../ui.jsx';
+import { Bar, Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Select, Tabs, ToggleRow, useAction, fmt, confirmBox, usePortNames } from '../ui.jsx';
 
 const HOURS = [{ value: 3600, label: '1 hour' }, { value: 14400, label: '4 hours' }, { value: 43200, label: '12 hours' }, { value: 86400, label: '1 day' }, { value: 604800, label: '1 week' }];
 
@@ -43,6 +43,7 @@ export function ScopeForm({ initial, ifaces, onClose, onSaved }) {
 }
 
 function Scopes() {
+  const pn = usePortNames();
   const { data: scopes, reload } = useData('/api/dhcp/scopes', { topics: ['dhcp.leases'] });
   const { data: util } = useData('/api/dhcp/utilisation', { topics: ['dhcp.utilisation'], every: 10000 });
   const { data: ifs } = useData('/api/net/interfaces');
@@ -66,7 +67,7 @@ function Scopes() {
             <div className="item" key={s.id}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="name">{s.name} {!s.enabled && <Pill>Off</Pill>}{s.mode !== 'serve' && <Pill>{s.mode === 'relay' ? 'Relayed' : 'Another device'}</Pill>}</div>
-                <div className="meta">{s.iface} · {s.subnet}{s.mode !== 'off' ? ` · ${s.range_start} – ${s.range_end}` : ''}</div>
+                <div className="meta">{pn(s.iface)} · {s.subnet}{s.mode !== 'off' ? ` · ${s.range_start} – ${s.range_end}` : ''}</div>
                 {result[s.id] && (
                   <Note tone={result[s.id].verdict === 'ok' ? 'good' : 'warn'} title={result[s.id].verdict === 'conflict' ? 'Another device is handing out addresses here' : result[s.id].verdict === 'none' ? 'Nothing is handing out addresses here' : 'No other servers found'}>
                     {result[s.id].verdict === 'conflict' && `Devices may get an address from ${result[s.id].found.map((f) => f.server).join(', ')} instead of Gatehouse. Turn that server's address handing off, or switch this network to "Another device".`}

@@ -365,8 +365,9 @@ func bridgePortsFree(tx *sql.Tx, self int64, members []string) error {
 func (a *App) registerNetRoutes() {
 	s := a.API
 	s.Handle("GET /api/net/ports", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-		api.JSON(w, 200, ports())
+		api.JSON(w, 200, a.labelledPorts())
 	})
+	a.registerPortNameRoutes()
 	s.Handle("GET /api/net/status", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		out := map[string]any{"status": a.netStatus()}
 		if a.Net != nil {

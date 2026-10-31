@@ -53,10 +53,12 @@ func TestHighAvailabilityPairing(t *testing.T) {
 			if b, ok := P.haBound.Load().(string); ok {
 				return b
 			}
+			return "127.0.0.1:1"
 		case "192.168.1.3":
 			if b, ok := S.haBound.Load().(string); ok {
 				return b
 			}
+			return "127.0.0.1:1"
 		}
 		_ = port
 		return addr
@@ -207,6 +209,7 @@ func TestHARefusesBackupWithFewerPorts(t *testing.T) {
 			if b, ok := P.haBound.Load().(string); ok {
 				return b
 			}
+			return "127.0.0.1:1"
 		}
 		return addr
 	}

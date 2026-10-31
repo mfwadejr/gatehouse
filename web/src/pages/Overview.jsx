@@ -14,15 +14,16 @@ const regionName = (cc) => { try { return new Intl.DisplayNames(undefined, { typ
 const SERIES = ['var(--color-chart-series-1)', 'var(--color-chart-series-2)', 'var(--color-chart-series-3)', 'var(--color-chart-series-4)'];
 const EVERY = { '10m': 2000, '1h': 30000, '24h': 300000, '30d': 900000 };
 
-// "Updated just now" while data keeps arriving, and a grey "Reconnecting" when it stops.
+// Says nothing while data keeps arriving, and shows a grey "Reconnecting" when it stops.
 function LiveDot({ stamp }) {
   const [, tick] = useState(0);
   useEffect(() => { const t = setInterval(() => tick((n) => n + 1), 1000); return () => clearInterval(t); }, []);
   const age = stamp ? Math.round((Date.now() - stamp) / 1000) : null;
   const stale = age == null || age > 15;
+  if (!stale) return null; // while data keeps arriving there is nothing to say
   return (
-    <span className={`livedot small ${stale ? 'stale' : ''}`} role="status">
-      <i />{stale ? (age == null ? 'Loading…' : 'Reconnecting…') : age < 3 ? 'Updated just now' : `Updated ${age} s ago`}
+    <span className="livedot small stale" role="status">
+      <i />{age == null ? 'Loading…' : 'Reconnecting…'}
     </span>
   );
 }

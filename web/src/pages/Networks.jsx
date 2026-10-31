@@ -5,10 +5,43 @@ import ApplyBar from '../ApplyBar.jsx';
 import AddNetwork from '../AddNetwork.jsx';
 import { ScopeForm } from './DHCP.jsx';
 import { usePortWatch } from './Internet.jsx';
-import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Select, ToggleRow, useAction, useToast, confirmBox } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Select, ToggleRow, useAction, useToast, confirmBox, usePortNames } from '../ui.jsx';
 
 // The one place for your own networks: what they are, where they plug in, who is on them, and how
 // they get addresses. Adding one is one form. The internet connection itself is on the Internet page.
+
+function PortRow({ p, onSaved }) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(p.label || '');
+  const [run, busy] = useAction();
+  const save = async (v) => {
+    const ok = await run(() => put('/api/net/ports/label', { name: p.name, label: v }), v ? 'Name saved.' : 'Name cleared.');
+    if (ok !== false) { setEditing(false); onSaved && onSaved(); }
+  };
+  return (
+    <div className="item">
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="name">{p.label || p.name} {p.usb && <Pill>USB</Pill>}</div>
+        {p.label && <div className="meta mono">{p.name}</div>}
+        <div className="meta mono">{p.mac}</div>
+        <div className="meta">{p.addrs?.length ? <>Address <span className="mono">{p.addrs.join(', ')}</span></> : 'No address'}</div>
+        {editing && (
+          <div className="inline" style={{ marginTop: 'var(--space-2)' }}>
+            <Input value={name} onChange={setName} placeholder="For example: T-Mobile gateway" aria-label={`Name for ${p.name}`} maxLength={30}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); save(name); } }} />
+            <Button small kind="primary" disabled={busy} onClick={() => save(name)}>Save</Button>
+            {p.label && <Button small disabled={busy} onClick={() => save('')}>Use the original name</Button>}
+            <Button small onClick={() => { setEditing(false); setName(p.label || ''); }}>Cancel</Button>
+          </div>
+        )}
+      </div>
+      <div className="inline">
+        {!editing && <Button small icon="edit" onClick={() => setEditing(true)}>Rename</Button>}
+        <Pill tone={p.link ? 'good' : ''}>{p.wifi ? (p.link ? 'Wi-Fi connected' : 'Wi-Fi not connected') : p.link ? `Connected${p.speed > 0 ? ` · ${p.speed} Mb/s` : ''}` : 'No cable'}</Pill>
+      </div>
+    </div>
+  );
+}
 
 function EditNetwork({ n, zones, onClose, onSaved }) {
   const [f, setF] = useState({ ...n.iface });
@@ -143,7 +176,8 @@ export default function Networks({ me }) {
   const { data: st, reload: rs } = useData('/api/net/status', { topics: ['net.status'], every: 4000 });
   const { data: fwo, reload: rfw } = useData('/api/fw/overview', { topics: ['fw.status'] });
   const { data: alerts } = useData('/api/dhcp/alerts', { topics: ['dhcp.alerts'] });
-  const { ports } = usePortWatch(false);
+  const { ports, reload: rp } = usePortWatch(false);
+  const pn = usePortNames();
   const [adding, setAdding] = useState(false);
   const [edit, setEdit] = useState(null);
   const [dhcp, setDhcp] = useState(null);
@@ -183,7 +217,7 @@ export default function Networks({ me }) {
               <div className="item" key={n.iface.id}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="name">{n.title} {!n.iface.enabled && <Pill>Off</Pill>}{!n.zone && <Pill tone="warn">Not assigned to a firewall network</Pill>}</div>
-                  <div className="meta">{n.iface.ipv4 || 'no address'} · {n.iface.kind === 'vlan' ? `VLAN ${n.iface.vlan} on ${n.iface.parent}` : `port ${n.iface.name}`}</div>
+                  <div className="meta">{n.iface.ipv4 || 'no address'} · {n.iface.kind === 'vlan' ? `VLAN ${n.iface.vlan} on ${n.iface.parent}` : `port ${pn(n.iface.name)}`}</div>
                   <div className="meta">{dhcpText(n.scope)}{n.zone ? ` · ${n.online} device${n.online === 1 ? '' : 's'} online${n.total > n.online ? `, ${n.total} known` : ''}` : ''}</div>
                 </div>
                 <div className="actions">
@@ -197,14 +231,9 @@ export default function Networks({ me }) {
         )}
       </Card>
 
-      <Card title="Network ports on this device" desc="Live status and addresses.">
+      <Card title="Network ports on this device" desc="Live status and addresses. Give a port a name you will recognise, such as your internet gateway or a spare.">
         <div className="list">
-          {ports.map((p) => (
-            <div className="item" key={p.name}>
-              <div><div className="name">{p.name} {p.usb && <Pill>USB</Pill>}</div><div className="meta mono">{p.mac}</div><div className="meta">{p.addrs?.length ? <>Address <span className="mono">{p.addrs.join(', ')}</span></> : 'No address'}</div></div>
-              <Pill tone={p.link ? 'good' : ''}>{p.wifi ? (p.link ? 'Wi-Fi connected' : 'Wi-Fi not connected') : p.link ? `Connected${p.speed > 0 ? ` · ${p.speed} Mb/s` : ''}` : 'No cable'}</Pill>
-            </div>
-          ))}
+          {ports.map((p) => <PortRow key={p.name} p={p} onSaved={rp} />)}
           {!ports.length && <Empty>No network ports found.</Empty>}
         </div>
       </Card>

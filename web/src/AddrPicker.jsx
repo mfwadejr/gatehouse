@@ -138,13 +138,48 @@ export function AddrPicker({ value, onChange, side, pickers, local = true, reloa
 // services, or ports typed by hand (which can be saved as a named service on the spot).
 const rePort = /^(tcp|udp)\/\d{1,5}(-\d{1,5})?$/;
 
+// portOK says whether a typed piece is a real port or range, such as tcp/443 or udp/1000-2000.
+function portOK(t) {
+  if (!rePort.test(t)) return false;
+  const [lo, hi = lo] = t.split('/')[1].split('-').map(Number);
+  return lo >= 1 && hi <= 65535 && lo <= hi;
+}
+
+// splitEntries reads a typed or pasted list. Pieces are separated by commas or spaces; a whole
+// service name that has a space in it (like "Remote Desktop") is kept together when it matches.
+function splitEntries(text, names) {
+  const good = []; const bad = [];
+  const one = (piece) => {
+    const t = piece.trim().replace(/\s*\/\s*/g, '/');
+    if (!t) return;
+    const low = t.toLowerCase();
+    if (portOK(low)) { good.push(low); return; }
+    const hit = names.find((n) => n.name.toLowerCase() === low);
+    if (hit) { good.push(hit.tok); return; }
+    if (/\s/.test(t)) { t.split(/\s+/).forEach((x) => { const l = x.toLowerCase(); if (portOK(l)) good.push(l); else bad.push(x); }); return; }
+    bad.push(t);
+  };
+  text.split(',').forEach(one);
+  return { good, bad };
+}
+
 export function ServicePicker({ value, onChange, pickers, reload }) {
   const toks = tokens(value);
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(null);
+  const [err, setErr] = useState('');
   const has = (t) => toks.some((x) => x.toLowerCase() === t.toLowerCase());
-  const add = (t) => { if (t && !has(t)) onChange([...toks, t].join(',')); setQ(''); };
+  const add = (t) => { if (t && !has(t)) onChange([...toks, t].join(',')); setQ(''); setErr(''); };
+  // addMany takes a list. What is good becomes chips; anything that is not stays in the box with a note.
+  const addMany = (text) => {
+    const { good, bad } = splitEntries(text, [...customs, ...builtins]);
+    const fresh = [...new Set(good)].filter((t) => !has(t));
+    if (fresh.length) onChange([...toks, ...fresh].join(','));
+    setQ(bad.join(', '));
+    setErr(bad.length ? `${bad.length === 1 ? 'This is not a service or port' : 'These are not services or ports'}: ${bad.join(', ')}. Write a port as tcp/443 or udp/1000-2000.` : '');
+    return good.length;
+  };
   const remove = (t) => onChange(toks.filter((x) => x !== t).join(','));
   const label = (t) => (t.startsWith('list:') ? t.slice(5) : t);
   const needle = q.trim().toLowerCase();
@@ -169,9 +204,19 @@ export function ServicePicker({ value, onChange, pickers, reload }) {
         {toks.map((t) => <span className="chip" key={t}>{label(t)}<button type="button" className="chipx" aria-label={`Remove ${label(t)}`} onClick={() => remove(t)}>×</button></span>)}
       </div>
       <div className="pick">
-        <Input value={q} onChange={setQ} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)}
-          placeholder="Search a service or port, or type tcp/8080 or udp/1000-2000" aria-label="Find a service"
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); if (isPort) add(typed); else if (mine.length + known.length === 1) add((mine[0] || known[0]).tok); } }} />
+        <Input value={q} onChange={(v) => {
+          // A comma finishes an entry; so does a space after a complete port. A pasted list is taken at once.
+          const { good, bad } = splitEntries(v, [...customs, ...builtins]);
+          const endsComma = /,\s*$/.test(v);
+          const endsSpace = /\s$/.test(v) && !endsComma;
+          const listed = /[,\s]/.test(v.trim()) && good.length > 1 && !bad.length;
+          if (good.length && (endsComma || listed || (endsSpace && !bad.length && good.every(portOK)))) { addMany(v); return; }
+          setQ(v); setErr('');
+        }} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)}
+          placeholder="Search a service, or type ports like tcp/80, tcp/443, udp/1000-2000" aria-label="Find a service"
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); if (/[,\s]/.test(q.trim()) || isPort) { if (addMany(q)) return; } if (mine.length + known.length === 1) add((mine[0] || known[0]).tok); } }} />
+        <span className="small muted">Separate several with a comma or a space. Use tcp/ or udp/ before the port number. A range looks like tcp/8000-8100.</span>
+        {err && <span className="small" role="alert" style={{ color: 'var(--color-status-serious)' }}>{err}</span>}
         {showList && (
           <div className="pickmenu" role="listbox">
             {isPort && !has(typed) && <button type="button" role="option" onMouseDown={(e) => e.preventDefault()} onClick={() => add(typed)}>Use the port <span className="mono">{typed}</span></button>}

@@ -3,7 +3,7 @@ import { del, put, useData } from '../api.js';
 import ApplyBar from '../ApplyBar.jsx';
 import WanGroups, { Traffic } from './WanGroups.jsx';
 import SpeedTest from './SpeedTest.jsx';
-import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, ToggleRow, useAction, useToast, fmt, confirmBox } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, ToggleRow, useAction, useToast, fmt, confirmBox, usePortNames } from '../ui.jsx';
 import { linkState, linkMeasure } from '../linkstate.js';
 import NatNotice from '../natnotice.jsx';
 import NetTools from './NetTools.jsx';
@@ -19,7 +19,7 @@ const TYPES = [
 
 // Watches the network ports and reports the one whose cable was just plugged in.
 export function usePortWatch(active) {
-  const { data } = useData('/api/net/ports', { every: active ? 1500 : 5000, enabled: true });
+  const { data, reload } = useData('/api/net/ports', { every: active ? 1500 : 5000, enabled: true });
   const base = useRef(null);
   const [found, setFound] = useState('');
   useEffect(() => {
@@ -29,7 +29,7 @@ export function usePortWatch(active) {
     const hit = data.find((p) => p.link && base.current[p.name] === false);
     if (hit) setFound(hit.name);
   }, [data, active]);
-  return { ports: data || [], found };
+  return { ports: data || [], found, reload };
 }
 
 export function PortPicker({ value, onChange, ports, found, exclude = [] }) {
@@ -37,7 +37,7 @@ export function PortPicker({ value, onChange, ports, found, exclude = [] }) {
   if (!options.length) return <Input value={value} onChange={onChange} aria-label="Port name" placeholder="eth0" />;
   return (
     <Select value={value} onChange={onChange}
-      options={[{ value: '', label: 'Choose a port…' }, ...options.map((p) => ({ value: p.name, label: `${p.name} — ${p.wifi ? 'Wi-Fi card' : p.link ? 'cable connected' : 'no cable'}${p.speed && p.speed > 0 ? `, ${p.speed} Mb/s` : ''}${p.usb ? ', USB adapter' : ''}${found === p.name ? ' (just plugged in)' : ''}` }))]} />
+      options={[{ value: '', label: 'Choose a port…' }, ...options.map((p) => ({ value: p.name, label: `${p.label ? `${p.label} (${p.name})` : p.name} — ${p.wifi ? 'Wi-Fi card' : p.link ? 'cable connected' : 'no cable'}${p.speed && p.speed > 0 ? `, ${p.speed} Mb/s` : ''}${p.usb ? ', USB adapter' : ''}${found === p.name ? ' (just plugged in)' : ''}` }))]} />
   );
 }
 
@@ -148,6 +148,7 @@ function QuickSetup({ ports, found, onDone }) {
 
 
 export default function Internet({ me }) {
+  const pn = usePortNames();
   const { data: wd, reload: rw } = useData('/api/net/wans', { topics: ['net.status'] });
   const { data: ifs, reload: ri } = useData('/api/net/interfaces', { topics: ['net.status'] });
   const { data: st, reload: rs } = useData('/api/net/status', { topics: ['net.status'], every: 4000 });
@@ -180,7 +181,7 @@ export default function Internet({ me }) {
                   <div className="item" key={w.id}>
                     <div>
                       <div className="name">{w.name} {!w.enabled && <Pill>Off</Pill>}</div>
-                      <div className="meta">{w.iface}{w.vlan ? ` · VLAN ${w.vlan}` : ''} · {TYPES.find((t) => t.value === w.type)?.label}{links[w.name]?.gateway ? ` · gateway ${links[w.name].gateway}` : ''}{measure ? ` · ${measure}` : ''}</div>
+                      <div className="meta">{pn(w.iface)}{w.vlan ? ` · VLAN ${w.vlan}` : ''} · {TYPES.find((t) => t.value === w.type)?.label}{links[w.name]?.gateway ? ` · gateway ${links[w.name].gateway}` : ''}{measure ? ` · ${measure}` : ''}</div>
                       {ls.detail && ls.tone === 'bad' && <div className="small" style={{ color: 'var(--color-status-serious)' }}>{ls.detail}</div>}
                     </div>
                     <div className="actions">

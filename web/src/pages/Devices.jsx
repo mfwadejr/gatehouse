@@ -7,7 +7,7 @@ import VirtualOverride from './VirtualOverride.jsx';
 import Approval from './Approval.jsx';
 import { pauseChoices, whenText } from './Profiles.jsx';
 import { WhyBody } from './Why.jsx';
-import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, Select, Spark, ToggleRow, useAction, useToast, fmt, confirmBox } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, Select, Spark, ToggleRow, useAction, useToast, fmt, confirmBox, usePortNames } from '../ui.jsx';
 
 const POLICIES = [
   { value: 'filtered', label: 'Allowed, ads and trackers filtered' },
@@ -45,13 +45,14 @@ const DEFAULT_COLS = ['network', 'conn', 'ip', 'activity'];
 const PAGE_SIZES = [10, 15, 25, 50, 100];
 
 function Conn({ d }) {
+  const pn = usePortNames();
   if (!d.conn) return <span className="muted">–</span>;
   if (d.conn === 'wifi') {
     const sig = d.signal ? ` · ${d.signal} dBm` : '';
     return <span>Wi-Fi{d.band ? ` ${d.band} GHz` : ''}{d.channel ? ` ch ${d.channel}` : ''}<span className="muted small">{sig}</span></span>;
   }
   if (d.conn === 'vpn') return <span>VPN</span>;
-  return <span>Wired{d.port ? <span className="muted small"> · {d.port}</span> : ''}</span>;
+  return <span>Wired{d.port ? <span className="muted small"> · {pn(d.port)}</span> : ''}</span>;
 }
 
 function IconPicker({ d, onChanged }) {
@@ -87,6 +88,7 @@ function IconPicker({ d, onChanged }) {
 }
 
 function Details({ d, groups, onClose, onSaved }) {
+  const pn = usePortNames();
   const toast = useToast();
   const [run, busy] = useAction();
   const { data: det, reload } = useData(`/api/devices/${d.id}/details`);
@@ -103,7 +105,7 @@ function Details({ d, groups, onClose, onSaved }) {
         <span className="devicon big"><DeviceIcon d={d} size={30} /></span>
         <div>
           <div className="small muted mono">{d.mac}</div>
-          <div className="small">{[d.vendor, d.network, d.via ? `Sent through ${d.via}` : '', d.conn === 'wifi' ? 'Wi-Fi' : d.conn === 'wired' ? `Wired ${d.port || ''}` : d.conn === 'vpn' ? 'VPN' : ''].filter(Boolean).join(' · ') || 'Not seen on the network yet'}</div>
+          <div className="small">{[d.vendor, d.network, d.via ? `Sent through ${d.via}` : '', d.conn === 'wifi' ? 'Wi-Fi' : d.conn === 'wired' ? `Wired ${pn(d.port)}` : d.conn === 'vpn' ? 'VPN' : ''].filter(Boolean).join(' · ') || 'Not seen on the network yet'}</div>
         </div>
         <Pill tone={d.online ? 'good' : ''}>{d.online ? 'Online' : `Seen ${fmt.ago(d.last_seen)}`}</Pill>
       </div>

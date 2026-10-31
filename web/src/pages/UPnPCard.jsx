@@ -122,7 +122,7 @@ export default function UPnPCard() {
             <Select value={String(st.max_lease_hours)} onChange={(v) => save({ max_lease_hours: Number(v) })} options={[{ value: '1', label: '1 hour' }, { value: '6', label: '6 hours' }, { value: '24', label: '1 day' }, { value: '168', label: '7 days' }]} />
           </Field>
           <div className="scroll"><table className="table">
-            <thead><tr><th>When</th><th>What</th></tr></thead>
+            <thead><tr><th>Time</th><th>Request from a device</th></tr></thead>
             <tbody>{[...st.log].reverse().slice(0, 50).map((l, i) => <tr key={i}><td>{fmt.ago(l.at)}</td><td>{l.kind === 'deny' ? <Pill tone="warn">Refused</Pill> : null} {l.msg}</td></tr>)}</tbody></table>
             {!st.log.length && <Empty>Nothing yet.</Empty>}
           </div>

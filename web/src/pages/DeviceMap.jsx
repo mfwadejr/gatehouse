@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useData } from '../api.js';
 import DeviceIcon from '../DeviceIcon.jsx';
-import { Card, Empty, Pill, ToggleRow } from '../ui.jsx';
+import { Card, Empty, Pill, ToggleRow, usePortNames } from '../ui.jsx';
 import { linkState } from '../linkstate.js';
 
 const CONN = { wired: 'Wired', wifi: 'Wi-Fi', vpn: 'VPN' };
@@ -11,6 +11,7 @@ const SHOW = 18;
 // devices it has seen on each. A device behind a switch or access point that Gatehouse does not
 // manage appears under the port that switch is plugged into.
 function PortGroup({ g, onOpen, showOffline }) {
+  const pn = usePortNames();
   const [all, setAll] = useState(false);
   const list = g.devices.filter((d) => showOffline || d.online);
   const shown = all ? list : list.slice(0, SHOW);
@@ -19,7 +20,7 @@ function PortGroup({ g, onOpen, showOffline }) {
     <div className="dm-port">
       <div className="dm-port-h">
         <div>
-          <b>{g.port || 'Not seen on a port'}</b>
+          <b>{g.port ? pn(g.port) : 'Not seen on a port'}</b>
           {g.nets.size > 0 && <span className="muted"> · {[...g.nets].join(', ')}</span>}
         </div>
         <div className="inline">{g.conn && <Pill>{CONN[g.conn] || g.conn}</Pill>}<span className="small muted">{online} online{g.devices.length > online ? ` · ${g.devices.length - online} away` : ''}</span></div>
