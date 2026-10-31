@@ -1,6 +1,13 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.25',
+    title: 'Settings page fixed',
+    items: [
+      'Fixed: the Settings page would not load. The Updates card drew itself differently once its data arrived, which React refuses, and that took the whole page down. The build now checks every screen for this mistake so it cannot come back.',
+    ],
+  },
+  {
     version: '0.8.24',
     title: 'Live updates no longer cut off',
     items: [

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node ../tokens/build-tokens.mjs ../tokens/tokens.json src/tokens.css && rm -rf dist/assets dist/index.html && vite build",
+    "build": "node check-hooks.mjs && node ../tokens/build-tokens.mjs ../tokens/tokens.json src/tokens.css && rm -rf dist/assets dist/index.html && vite build",
     "lint:tokens": "node ../tokens/check-tokens.mjs src/*.css src/*.jsx src/pages/*.jsx"
   },
   "dependencies": {

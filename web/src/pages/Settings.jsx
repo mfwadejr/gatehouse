@@ -318,12 +318,12 @@ function Updates({ me }) {
     return () => clearInterval(t);
   }, [job, data?.checking, reload]);
 
+  const everyday = useStepUp().everyday; // a hook: it must run on every render, before any early return
   if (!d) return null;
   const go = async () => {
     const r = await run(() => post('/api/system/update/install', { code }));
     if (r) { setAsking(false); setCode(''); setOutcome(null); setJob({ since: Math.floor(Date.now() / 1000) - 5 }); }
   };
-  const everyday = useStepUp().everyday;
   const start = () => { if (everyday) setAsking(true); else go(); };
   const save = (patch) => run(() => put('/api/system/update/settings', patch)).then(reload);
   const l = d.latest;
