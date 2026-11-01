@@ -48,6 +48,7 @@ export function OpenPortModal({ initial, preset, apps, connections, existing, on
   const [clash, setClash] = useState(null);
   const [typed, setTyped] = useState('');
   const [typedUse, setTypedUse] = useState('');
+  const [typedNotes, setTypedNotes] = useState([]);
   const [run, busy] = useAction();
   const toast = useToast();
   const { data: ch } = useData('/api/vpn/choices');
@@ -72,8 +73,9 @@ export function OpenPortModal({ initial, preset, apps, connections, existing, on
     const body = { ...f, ...over, src: srcText.split(/[\s,]+/).filter(Boolean), group: initial?.group || '', name: groupName() };
     if (!body.connections.length && connections.length) body.connections = [connections[0]];
     setClash(null);
+    let saved = null;
     try {
-      await put('/api/fw/appforwards', body);
+      saved = await put('/api/fw/appforwards', body);
     } catch (e) {
       if (e.status === 409 && e.data?.conflict) { setClash(e.data.conflict); setTyped(''); setTypedUse(''); return false; }
       toast(e.message || 'Something went wrong.', 'bad');
@@ -81,7 +83,7 @@ export function OpenPortModal({ initial, preset, apps, connections, existing, on
     }
     const r = await get('/api/fw/appforwards');
     const g = (r?.forwards || []).find((x) => x.group === body.name);
-    setResult(g || { group: body.name, ports: [], device_name: devName, app: f.app });
+    setResult({ ...(g || { group: body.name, ports: [], device_name: devName, app: f.app }), notes: saved?.notes || [] });
     onSaved?.();
     return true;
   };
@@ -96,9 +98,9 @@ export function OpenPortModal({ initial, preset, apps, connections, existing, on
 
   // Live check of a port as it is typed.
   React.useEffect(() => {
-    if (!clash || !typed) { setTypedUse(''); return undefined; }
+    if (!clash || !typed) { setTypedUse(''); setTypedNotes([]); return undefined; }
     const t = setTimeout(async () => {
-      try { const r = await get(`/api/fw/portcheck?proto=${clash.proto}&port=${encodeURIComponent(typed)}&group=${encodeURIComponent(initial?.group || '')}`); setTypedUse(r?.error || (r?.used_by ? `${typed} is already used by ${r.used_by}.` : '')); } catch { setTypedUse(''); }
+      try { const r = await get(`/api/fw/portcheck?proto=${clash.proto}&port=${encodeURIComponent(typed)}&group=${encodeURIComponent(initial?.group || '')}`); setTypedUse(r?.error || (r?.used_by ? `${typed} is already used by ${r.used_by}.` : '')); setTypedNotes(r?.notes || []); } catch { setTypedUse(''); }
     }, 300);
     return () => clearTimeout(t);
   }, [typed, clash, initial?.group]);
@@ -118,6 +120,7 @@ export function OpenPortModal({ initial, preset, apps, connections, existing, on
         <div className="stack">
           <p>{first ? `Port ${first.port} was selected for ${result.app} on ${result.device_name}.` : `${result.app} is open on ${result.device_name}.`}</p>
           <p className="small muted">If this is not the correct port, enter it manually.</p>
+          {(result.notes || []).map((n, i) => <Note key={i} tone="warn">{n}</Note>)}
           <div className="actions" style={{ justifyContent: 'flex-start' }}>
             <Button onClick={() => { setResult(null); setMore(true); tried.current = true; }}>Change port</Button>
             <Button onClick={async () => { await run(() => del(`/api/fw/appforwards/${encodeURIComponent(result.group)}`), 'Undone.'); onSaved?.(); onClose(); }}>Undo</Button>
@@ -140,6 +143,7 @@ export function OpenPortModal({ initial, preset, apps, connections, existing, on
               <Input value={typed} onChange={setTyped} className="in mono" placeholder="Type a port" />
             </Field>
             {typedUse && <span className="small" style={{ color: 'var(--color-status-serious)' }}>{typedUse}</span>}
+            {typedNotes.map((n, i) => <span key={i} className="small muted">{n}</span>)}
             <div className="actions" style={{ justifyContent: 'flex-start' }}>
               <Button small onClick={suggest}>Suggest one</Button>
               <Button kind="primary" onClick={useTyped} disabled={busy || !typed.trim() || !!typedUse}>Open it on this port</Button>

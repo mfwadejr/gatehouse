@@ -20,6 +20,7 @@ import (
 	"gatehouse/internal/netcfg"
 	"gatehouse/internal/netd"
 	"gatehouse/internal/speedtest"
+	"gatehouse/internal/threatcfg"
 	"gatehouse/internal/wanmon"
 )
 
@@ -55,6 +56,13 @@ type NetController interface {
 	FlowAcct(on bool) error
 	ConntrackDump() (string, error)
 	SQMApply(p netd.SQMPlan) (string, error)
+	ThreatStatus() netd.ThreatInfo
+	ThreatInstallPreview() (netd.ThreatPreview, error)
+	ThreatInstallStart() error
+	ThreatRemove() error
+	ThreatApply(p threatcfg.Plan) error
+	ThreatUpdateRules() error
+	ThreatRollback() error
 }
 
 const maxRequest = 16 << 20
@@ -373,6 +381,24 @@ func (s *Server) dispatchNet(r request) (any, error) {
 		return s.Net.ConntrackDump()
 	case "ndpi.installed":
 		return s.Net.NDPIInstalled(), nil
+	case "threat.status":
+		return s.Net.ThreatStatus(), nil
+	case "threat.preview":
+		return s.Net.ThreatInstallPreview()
+	case "threat.install":
+		return nil, s.Net.ThreatInstallStart()
+	case "threat.remove":
+		return nil, s.Net.ThreatRemove()
+	case "threat.apply":
+		var p threatcfg.Plan
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return nil, s.Net.ThreatApply(p)
+	case "threat.update":
+		return nil, s.Net.ThreatUpdateRules()
+	case "threat.rollback":
+		return nil, s.Net.ThreatRollback()
 	case "ssh.log":
 		var p struct {
 			Since int64 `json:"since"`
@@ -629,6 +655,41 @@ func (c *Client) ConntrackDump() (string, error) {
 	var out string
 	err := c.callWithin(time.Minute, "flow.dump", nil, &out)
 	return out, err
+}
+
+// ThreatStatus describes the optional threat-watching engine.
+func (c *Client) ThreatStatus() netd.ThreatInfo {
+	var out netd.ThreatInfo
+	c.call("threat.status", nil, &out)
+	return out
+}
+
+// ThreatInstallPreview says what installing the engine would do.
+func (c *Client) ThreatInstallPreview() (netd.ThreatPreview, error) {
+	var out netd.ThreatPreview
+	err := c.callWithin(4*time.Minute, "threat.preview", nil, &out)
+	return out, err
+}
+
+// ThreatInstallStart installs the engine in the background.
+func (c *Client) ThreatInstallStart() error { return c.call("threat.install", nil, nil) }
+
+// ThreatRemove takes the engine out.
+func (c *Client) ThreatRemove() error { return c.callWithin(15*time.Minute, "threat.remove", nil, nil) }
+
+// ThreatApply runs the engine as planned, or stops it.
+func (c *Client) ThreatApply(p threatcfg.Plan) error {
+	return c.callWithin(15*time.Minute, "threat.apply", p, nil)
+}
+
+// ThreatUpdateRules fetches the newest rules.
+func (c *Client) ThreatUpdateRules() error {
+	return c.callWithin(15*time.Minute, "threat.update", nil, nil)
+}
+
+// ThreatRollback puts the previous rules back.
+func (c *Client) ThreatRollback() error {
+	return c.callWithin(2*time.Minute, "threat.rollback", nil, nil)
 }
 
 // NDPIInstalled reports whether the program is present on this system.

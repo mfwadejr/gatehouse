@@ -26,9 +26,10 @@ import (
 const (
 	updateRepoDefault   = "mfwadejr/gatehouse"
 	updateRepoSetting   = "update.repo"
-	updateModeSetting   = "update.mode"    // off, notify or auto
-	updateWindowSetting = "update.window"  // the hour (0 to 23) automatic updates may start
-	updateAutoAtSetting = "update.auto_at" // when the last automatic attempt began
+	updateModeSetting   = "update.mode"        // off, notify or auto
+	updateWindowSetting = "update.window"      // the hour (0 to 23) automatic updates may start
+	updateEverySetting  = "update.check_hours" // how often to look for a new version, in hours
+	updateAutoAtSetting = "update.auto_at"     // when the last automatic attempt began
 )
 
 type updates struct {
@@ -55,6 +56,16 @@ func (a *App) updateMode() string {
 		return m
 	}
 	return "notify"
+}
+
+// updateEvery is how long to wait between looks for a new version: 12 hours unless the owner
+// chose another, never under 1 hour or over 30 days.
+func (a *App) updateEvery() time.Duration {
+	h, err := strconv.Atoi(a.Config.Setting(updateEverySetting, "12"))
+	if err != nil || h < 1 || h > 720 {
+		h = 12
+	}
+	return time.Duration(h) * time.Hour
 }
 
 func (a *App) updateWindow() int {
@@ -173,7 +184,7 @@ func (a *App) updateTick(ctx context.Context, force bool) {
 		return
 	}
 	a.upd.mu.Lock()
-	stale := time.Since(a.upd.checkedAt) > 12*time.Hour
+	stale := time.Since(a.upd.checkedAt) > a.updateEvery()
 	a.upd.mu.Unlock()
 	if force || stale {
 		a.checkUpdate(ctx)
@@ -258,8 +269,9 @@ type updateView struct {
 	KeySet        bool            `json:"key_set"`
 	Repo          string          `json:"repo"`
 	Helper        bool            `json:"helper"`
-	Mode          string          `json:"mode"`   // off, notify or auto
-	Window        int             `json:"window"` // hour automatic updates may start
+	Mode          string          `json:"mode"`        // off, notify or auto
+	Window        int             `json:"window"`      // hour automatic updates may start
+	CheckHours    int             `json:"check_hours"` // hours between looks for a new version
 	NeedsReboot   bool            `json:"needs_reboot"`
 	RebootComment string          `json:"-"`
 	Pair          *pairView       `json:"pair,omitempty"`
@@ -319,7 +331,7 @@ func (a *App) updateStatus() updateView {
 	a.upd.mu.Unlock()
 	v := updateView{Current: a.currentVersion(), Latest: latest, Error: errText, State: update.ReadState(a.updateState()),
 		Repo: a.Config.Setting(updateRepoSetting, updateRepoDefault), Helper: a.Net != nil,
-		Mode: a.updateMode(), Window: a.updateWindow(), SystemError: sysErr, Checking: checking, Working: working, RunError: runErr}
+		Mode: a.updateMode(), Window: a.updateWindow(), CheckHours: int(a.updateEvery() / time.Hour), SystemError: sysErr, Checking: checking, Working: working, RunError: runErr}
 	if !checked.IsZero() {
 		v.CheckedAt = checked.Unix()
 	}
@@ -374,6 +386,7 @@ func (a *App) registerUpdateRoutes() {
 			Repo   *string `json:"repo"`
 			Mode   *string `json:"mode"`
 			Window *int    `json:"window"`
+			Every  *int    `json:"check_hours"`
 		}
 		if !api.Decode(w, r, &in) {
 			return
@@ -384,6 +397,10 @@ func (a *App) registerUpdateRoutes() {
 		}
 		if in.Window != nil && (*in.Window < 0 || *in.Window > 23) {
 			fail(w, errors.New("the hour must be from 0 to 23"))
+			return
+		}
+		if in.Every != nil && (*in.Every < 1 || *in.Every > 720) {
+			fail(w, errors.New("choose between 1 hour and 30 days (720 hours)"))
 			return
 		}
 		repo := ""
@@ -409,6 +426,9 @@ func (a *App) registerUpdateRoutes() {
 		}
 		if in.Window != nil {
 			a.Config.SetSetting(updateWindowSetting, strconv.Itoa(*in.Window))
+		}
+		if in.Every != nil {
+			a.Config.SetSetting(updateEverySetting, strconv.Itoa(*in.Every))
 		}
 		ok(w)
 	})

@@ -42,16 +42,31 @@ type scopeRule struct {
 }
 
 type scopeCache struct {
-	mu    sync.Mutex
-	rules []scopeRule
-	at    time.Time
-	lists map[string]int64
-	zones sync.Map // ip -> zoneEntry
+	mu      sync.Mutex
+	rules   []scopeRule
+	at      time.Time
+	lists   map[string]int64
+	zones   sync.Map // ip -> zoneEntry
+	mu2     sync.Mutex
+	faultAt time.Time
 }
 
 type zoneEntry struct {
 	zone string
 	at   time.Time
+}
+
+// scopeFault tells the Logs, at most once an hour, that blocking by name let traffic through because
+// something went wrong. The feature fails open, and this is how it says so.
+func (a *App) scopeFault(why string) {
+	a.scope.mu2.Lock()
+	if time.Since(a.scope.faultAt) < time.Hour {
+		a.scope.mu2.Unlock()
+		return
+	}
+	a.scope.faultAt = time.Now()
+	a.scope.mu2.Unlock()
+	a.event("system", "warning", "Blocking by name let traffic through", "Something went wrong ("+why+"), so Gatehouse let it through instead of blocking. Nothing was cut off.")
 }
 
 func (a *App) scopeLoc() *time.Location {
@@ -122,7 +137,8 @@ func (a *App) inForce(r scopeRule, now time.Time) bool {
 		return false
 	}
 	sc, err := fw.ParseSchedule(r.Schedule)
-	if err != nil {
+	if err != nil || (sc != nil && sc.Check(a.scopeLoc()) != nil) {
+		a.scopeFault("the hours on a block could not be read")
 		return false
 	}
 	return sc.Active(a.scopeLoc(), now)
@@ -153,6 +169,12 @@ func (r scopeRule) names(name string, a *App) (string, bool) {
 			return ap.Name, true
 		}
 	case "topic":
+		if cat, ok := strings.CutPrefix(r.Value, "cat:"); ok {
+			if ap, found := appid.Lookup(name); found && ap.Category == cat {
+				return ap.Name, true
+			}
+			return "", false
+		}
 		if id := a.topicList(r.Value); id != 0 {
 			if rule, ok := a.DNS.ListHit(name, id); ok {
 				return rule, true
@@ -213,6 +235,18 @@ func (a *App) scopedBlock(client string, ci dnssrv.ClientInfo, name string) stri
 	return ""
 }
 
+// inspectionState says whether thorough checking could be in force. It is not yet: the labelling
+// program only names connections, and acting on a label is switched on in a later version. A block
+// that asks for thorough checking is kept, and its by-name part works from the start.
+func (a *App) inspectionState() map[string]any {
+	st := a.ndpiStatus()
+	note := "Thorough checking is not switched on yet. A block that asks for it is kept; blocking by name works now."
+	if st["installed"] != true {
+		note += " It also needs the traffic-labelling program, which comes with a fresh install image (Settings, Advanced, Traffic labels)."
+	}
+	return map[string]any{"available": false, "installed": st["installed"], "enabled": st["enabled"], "connected": st["connected"], "note": note}
+}
+
 func scopeWords(r scopeRule, a *App) string {
 	what := r.Value
 	switch r.Kind {
@@ -220,6 +254,11 @@ func scopeWords(r scopeRule, a *App) string {
 		for _, c := range categoryCatalog {
 			if c.Key == r.Value {
 				what = c.Name
+			}
+		}
+		for _, t := range appTopics {
+			if t.Key == r.Value {
+				what = t.Name
 			}
 		}
 	}
@@ -322,8 +361,8 @@ func (a *App) saveScopeRule(in blockIn) error {
 	if in.Method == "" {
 		in.Method = "fast"
 	}
-	if in.Method != "fast" {
-		return errors.New("only the fast way (names) is available so far; thorough checking is not switched on yet")
+	if in.Method != "fast" && in.Method != "thorough" && in.Method != "both" {
+		return errors.New("choose by name, thorough, or both")
 	}
 	sc, err := fw.ParseSchedule(in.Schedule)
 	if err == nil {
@@ -360,7 +399,22 @@ func (a *App) saveScopeRule(in blockIn) error {
 	return err
 }
 
+// appTopics are topics made from the built-in app list, by kind of app. They need no download.
+var appTopics = []struct{ Key, Name, Descr string }{
+	{"cat:Games", "Games", "Known game services and stores."},
+	{"cat:Video", "Video streaming", "YouTube, Netflix and other video apps."},
+	{"cat:Music", "Music streaming", "Spotify and other music apps."},
+	{"cat:Messaging", "Messaging apps", "Chat apps such as WhatsApp and Telegram."},
+	{"cat:Shopping", "Shopping apps", "Known shopping sites and apps."},
+	{"cat:AI", "AI chat tools", "ChatGPT and similar assistants."},
+}
+
 func (a *App) topicKey(k string) string {
+	for _, t := range appTopics {
+		if t.Key == k {
+			return k
+		}
+	}
 	for _, c := range categoryCatalog {
 		if c.Key == k {
 			return k
@@ -372,6 +426,7 @@ func (a *App) topicKey(k string) string {
 func (a *App) registerScopeRoutes() {
 	s := a.API
 	a.DNS.Scoped = a.scopedBlock
+	a.DNS.OnScopedFault = func() { a.scopeFault("an unexpected error") }
 	s.Handle("GET /api/blocks", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		type appOut struct {
 			Name     string `json:"name"`
@@ -397,9 +452,12 @@ func (a *App) registerScopeRoutes() {
 			a.Config.QueryRow(`SELECT id,entries,status FROM blocklists WHERE url=?`, ct.URL).Scan(&t.ListID, &t.Entries, &t.Status)
 			topics = append(topics, t)
 		}
+		for _, t := range appTopics {
+			topics = append(topics, topicOut{Key: t.Key, Name: t.Name, Descr: t.Descr, Status: "built in"})
+		}
 		api.JSON(w, 200, map[string]any{
 			"rules": a.scopeViews(), "apps": apps, "topics": topics,
-			"inspection": map[string]any{"available": false, "note": "Thorough checking is not switched on yet. Blocking by name works now."},
+			"inspection": a.inspectionState(),
 			"fail_open":  "If anything goes wrong, nothing is blocked. A fault never cuts a device off.",
 		})
 	})
@@ -455,6 +513,35 @@ func (a *App) registerScopeRoutes() {
 		a.Config.Exec(`DELETE FROM scope_rules WHERE id=?`, id)
 		a.dropScopeCache()
 		ok(w)
+	})
+	// Which lists blocking uses and how fresh they are, for Settings, Advanced.
+	s.Handle("GET /api/blocks/versions", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		names := appid.Names()
+		domains := 0
+		for _, n := range names {
+			domains += len(appid.Domains(n))
+		}
+		type topicV struct {
+			Name    string `json:"name"`
+			Entries int    `json:"entries"`
+			LastOK  int64  `json:"last_ok"`
+			Status  string `json:"status"`
+		}
+		var topics []topicV
+		for _, ct := range categoryCatalog {
+			var t topicV
+			t.Name, t.Status = ct.Name, "not downloaded yet"
+			a.Config.QueryRow(`SELECT entries,last_ok,status FROM blocklists WHERE url=?`, ct.URL).Scan(&t.Entries, &t.LastOK, &t.Status)
+			topics = append(topics, t)
+		}
+		st := a.ndpiStatus()
+		api.JSON(w, 200, map[string]any{
+			"app_names": map[string]any{"version": a.Cfg.Version, "apps": len(names), "domains": domains,
+				"note": "Built into Gatehouse. It is renewed whenever Gatehouse is updated."},
+			"topics": topics, "app_topics": len(appTopics),
+			"labels": map[string]any{"installed": st["installed"], "enabled": st["enabled"], "connected": st["connected"],
+				"note": "The traffic-labelling program carries its own list of apps. It comes with the install image and is renewed with it."},
+		})
 	})
 	// View the names a list blocks, and let one through.
 	s.Handle("GET /api/dns/lists/{id}/names", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {

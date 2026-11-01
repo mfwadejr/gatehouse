@@ -227,3 +227,36 @@ func TestAutomaticUpdateOnlyInTheWindow(t *testing.T) {
 		t.Fatal("the attempt was not recorded")
 	}
 }
+
+func TestUpdateCheckFrequency(t *testing.T) {
+	c, _, _ := updBox(t, updServer(t, "0.2.0", true), true)
+	_, m, _ := c.call("GET", "/api/system/update", nil)
+	if m["check_hours"] != float64(12) {
+		t.Fatalf("default should be 12 hours: %v", m["check_hours"])
+	}
+	for _, bad := range []int{0, -3, 721, 100000} {
+		if rc, _, _ := c.call("PUT", "/api/system/update/settings", map[string]any{"check_hours": bad}); rc == 200 {
+			t.Fatalf("accepted %d hours", bad)
+		}
+	}
+	for _, good := range []int{1, 6, 24, 168, 720} {
+		if rc, _, _ := c.call("PUT", "/api/system/update/settings", map[string]any{"check_hours": good}); rc != 200 {
+			t.Fatalf("refused %d hours", good)
+		}
+		if _, m, _ := c.call("GET", "/api/system/update", nil); m["check_hours"] != float64(good) {
+			t.Fatalf("%d hours reads back as %v", good, m["check_hours"])
+		}
+	}
+	a := newScopeApp(t)
+	if a.updateEvery() != 12*time.Hour {
+		t.Fatal("default should be 12 hours")
+	}
+	a.Config.SetSetting(updateEverySetting, "6")
+	if a.updateEvery() != 6*time.Hour {
+		t.Fatal("6 hours not used")
+	}
+	a.Config.SetSetting(updateEverySetting, "soon")
+	if a.updateEvery() != 12*time.Hour {
+		t.Fatal("a bad stored value should mean 12 hours")
+	}
+}

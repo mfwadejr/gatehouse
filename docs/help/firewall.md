@@ -25,7 +25,7 @@ Tabs along the top:
 
 4. Open a port in three taps: **Open ports**, **Open a port**, tap the app, tap the device. Gatehouse tells you which port it used. If that is not the right port, choose **Change port** and enter it yourself. A port already in use is never picked for you: Gatehouse asks you for a different one.
 5. See everything the firewall does: **Rules**, turn on **Show system rules**. Your open ports are listed there too.
-6. Watch for infected devices and break-in attempts: **Protection**, **Threat protection**. It watches and tells you in plain words; it does not block yet. If its engine stops, your traffic is not touched. **Allow for this device** quiets a harmless alert; **Advanced** lists what you let through.
+6. Watch for infected devices and break-in attempts, and block apps and topics: this is on its own **Protection** page in the left menu. It watches and tells you in plain words; it does not block threats. If it stops, your traffic is not touched.
 
 ## Example
 Open Plex for your media server: **Open a port**, choose Plex, choose the server, optionally limit it to your own country, **Save**, **Review and apply**.

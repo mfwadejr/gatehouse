@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { del, post, put, useData, useStream } from '../api.js';
 import ApplyBar from '../ApplyBar.jsx';
-import Threats from './Threats.jsx';
 import { confirmRemoval } from '../removal.js';
 import AddNetwork from '../AddNetwork.jsx';
 import { go } from '../App.jsx';
@@ -207,7 +206,7 @@ function Protection({ ov, reload, pickers }) {
       <ToggleRow title="Ask for a code before changing the firewall" desc="Requires your authenticator code to apply network changes." checked={s.step_up} onChange={save('step_up')} />
       <ToggleRow title="Log blocked traffic" desc="Useful when troubleshooting. Uses more disk space." checked={s.log_drops} onChange={save('log_drops')} />
     </Card>
-    <Threats />
+    <Card title="Threat watching, apps and topics" desc="These now have their own page."><p className="small">Block apps and topics, and watch for threats, under <a href="#/protection">Protection</a>.</p></Card>
     </>
   );
 }

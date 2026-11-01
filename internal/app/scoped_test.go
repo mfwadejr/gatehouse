@@ -90,17 +90,83 @@ func TestBlockScopesPauseAndHours(t *testing.T) {
 	}
 }
 
-func TestBlockRefusesBadInputAndThoroughForNow(t *testing.T) {
+func TestBlockRefusesBadInput(t *testing.T) {
 	a := newScopeApp(t)
 	for _, in := range []blockIn{
 		{Kind: "app", Value: "NoSuchApp", Scope: "everyone", Enabled: true},
 		{Kind: "name", Value: "not a domain!", Scope: "everyone", Enabled: true},
 		{Kind: "app", Value: "YouTube", Scope: "device", Enabled: true},
-		{Kind: "app", Value: "YouTube", Scope: "everyone", Method: "thorough", Enabled: true},
+		{Kind: "app", Value: "YouTube", Scope: "everyone", Method: "sometimes", Enabled: true},
 		{Kind: "app", Value: "YouTube", Scope: "everyone", Schedule: `{"mode":"daily","from":"08:00","to":"08:00"}`, Enabled: true},
 	} {
 		if err := a.saveScopeRule(in); err == nil {
 			t.Errorf("accepted %+v", in)
 		}
+	}
+}
+
+func TestBlockATopicMadeFromAppKinds(t *testing.T) {
+	a := newScopeApp(t)
+	kid := dnssrv.ClientInfo{MAC: "aa:aa:aa:aa:aa:01", GroupID: 2, Filtering: true}
+	if err := a.saveScopeRule(blockIn{Kind: "topic", Value: "cat:Video", Scope: "profile", Target: "2", Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.saveScopeRule(blockIn{Kind: "topic", Value: "cat:Nonsense", Scope: "everyone", Enabled: true}); err == nil {
+		t.Fatal("an unknown topic was accepted")
+	}
+	if r := a.scopedBlock("1.1.1.1", kid, "r4.googlevideo.com"); r == "" {
+		t.Fatal("a video app should be blocked by the Video topic")
+	}
+	if r := a.scopedBlock("1.1.1.1", dnssrv.ClientInfo{GroupID: 3, Filtering: true}, "r4.googlevideo.com"); r != "" {
+		t.Fatalf("another profile was blocked: %q", r)
+	}
+	if r := a.scopedBlock("1.1.1.1", kid, "example.com"); r != "" {
+		t.Fatalf("an unknown site was blocked: %q", r)
+	}
+	if got := scopeWords(scopeRule{Kind: "topic", Value: "cat:Video", Scope: "everyone"}, a); got != "Block Video streaming for everyone" {
+		t.Fatalf("words: %q", got)
+	}
+}
+
+func TestThoroughIsKeptButOnlyByNameActsForNow(t *testing.T) {
+	a := newScopeApp(t)
+	c := dnssrv.ClientInfo{MAC: "aa:aa:aa:aa:aa:01", GroupID: 2, Filtering: true}
+	if err := a.saveScopeRule(blockIn{Kind: "app", Value: "YouTube", Scope: "everyone", Method: "thorough", Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	if a.scopedBlock("1.1.1.1", c, "r4.googlevideo.com") != "" {
+		t.Fatal("a thorough-only block must not act through names")
+	}
+	views := a.scopeViews()
+	if len(views) != 1 || views[0].Status != "waiting" {
+		t.Fatalf("status: %+v", views)
+	}
+	if err := a.saveScopeRule(blockIn{Kind: "app", Value: "Netflix", Scope: "everyone", Method: "both", Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	if a.scopedBlock("1.1.1.1", c, "www.netflix.com") == "" {
+		t.Fatal("'both' should block by name now")
+	}
+	st := a.inspectionState()
+	if st["available"] != false || st["note"] == "" {
+		t.Fatalf("inspection state: %v", st)
+	}
+}
+
+func TestABrokenBlockSaysSoInTheLogsOnce(t *testing.T) {
+	a := newScopeApp(t)
+	c := dnssrv.ClientInfo{GroupID: 2, Filtering: true}
+	a.saveScopeRule(blockIn{Kind: "name", Value: "x.example.com", Scope: "everyone", Enabled: true})
+	a.Config.Exec(`UPDATE scope_rules SET schedule='garbage'`)
+	a.dropScopeCache()
+	for i := 0; i < 5; i++ {
+		if a.scopedBlock("1.1.1.1", c, "x.example.com") != "" {
+			t.Fatal("a broken schedule must fail open")
+		}
+	}
+	var n int
+	a.Logs.QueryRow(`SELECT COUNT(*) FROM events WHERE title='Blocking by name let traffic through'`).Scan(&n)
+	if n != 1 {
+		t.Fatalf("expected one log line, got %d", n)
 	}
 }

@@ -34,6 +34,10 @@ var categoryCatalog = []category{
 	{"adult", "Adult content", "Pornography.", "https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/porn-only/hosts", "hosts"},
 	{"gambling", "Gambling", "Betting and casino sites.", "https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/gambling-only/hosts", "hosts"},
 	{"social", "Social media", "Facebook, Instagram, TikTok and the like.", "https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/social-only/hosts", "hosts"},
+	{"scams", "Scams and fraud", "Sites set up to trick people out of money or details.", "https://blocklistproject.github.io/Lists/scam.txt", "hosts"},
+	{"piracy", "Piracy", "Sites that share pirated films, music, games and software.", "https://blocklistproject.github.io/Lists/piracy.txt", "hosts"},
+	{"crypto", "Crypto mining", "Sites that run coin miners in your browser or sell crypto schemes.", "https://blocklistproject.github.io/Lists/crypto.txt", "hosts"},
+	{"drugs", "Drugs", "Sites that sell illegal drugs.", "https://blocklistproject.github.io/Lists/drugs.txt", "hosts"},
 }
 
 type presetDef struct {

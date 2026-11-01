@@ -21,6 +21,7 @@ import (
 	"gatehouse/internal/netcfg"
 	"gatehouse/internal/netd"
 	"gatehouse/internal/speedtest"
+	"gatehouse/internal/threatcfg"
 	"gatehouse/internal/wanmon"
 )
 
@@ -52,6 +53,13 @@ type NetController interface {
 	HAApply(p netd.HAPlan) error
 	NDPIApply(p netd.NDPIPlan) error
 	NDPIInstalled() bool
+	ThreatStatus() netd.ThreatInfo
+	ThreatInstallPreview() (netd.ThreatPreview, error)
+	ThreatInstallStart() error
+	ThreatRemove() error
+	ThreatApply(p threatcfg.Plan) error
+	ThreatUpdateRules() error
+	ThreatRollback() error
 	FlowAcct(on bool) error
 	ConntrackDump() (string, error)
 	SQMApply(p netd.SQMPlan) (string, error)

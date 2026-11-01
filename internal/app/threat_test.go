@@ -17,6 +17,7 @@ func countAlerts(a *App) (n int) {
 
 func TestThreatAlertsAreReadTunedAndFailOpen(t *testing.T) {
 	a := newScopeApp(t)
+	a.Config.SetSetting(threatModeSetting, "watch")
 	now := time.Now()
 	// ignores lines that are not alerts, or are garbage
 	for _, l := range [][]byte{[]byte(`{"event_type":"flow"}`), []byte(`not json`), []byte(`{"event_type":"alert","alert":{}}`)} {

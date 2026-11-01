@@ -37,10 +37,10 @@ type threatState struct {
 }
 
 func (a *App) threatMode() string {
-	if a.Config.Setting(threatModeSetting, "watch") == "off" {
-		return "off"
+	if a.Config.Setting(threatModeSetting, "off") == "watch" {
+		return "watch"
 	}
-	return "watch"
+	return "off"
 }
 
 func (a *App) threatEvePath() string {
@@ -216,91 +216,7 @@ func (a *App) threatEngine() map[string]any {
 
 func (a *App) registerThreatRoutes() {
 	s := a.API
-	s.Handle("GET /api/threat", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-		type alert struct {
-			ID        int64  `json:"id"`
-			TS        int64  `json:"ts"`
-			SID       int64  `json:"sid"`
-			Signature string `json:"signature"`
-			Plain     string `json:"plain"`
-			Device    string `json:"device"`
-			MAC       string `json:"mac"`
-			Src       string `json:"src"`
-			Dst       string `json:"dst"`
-			Severity  int    `json:"severity"`
-		}
-		alerts := []alert{}
-		if rows, err := a.Logs.Query(`SELECT id,ts,sid,signature,plain,device,mac,src,dst,severity FROM threat_alerts ORDER BY id DESC LIMIT 50`); err == nil {
-			for rows.Next() {
-				var x alert
-				rows.Scan(&x.ID, &x.TS, &x.SID, &x.Signature, &x.Plain, &x.Device, &x.MAC, &x.Src, &x.Dst, &x.Severity)
-				alerts = append(alerts, x)
-			}
-			rows.Close()
-		}
-		type allowed struct {
-			ID     int64  `json:"id"`
-			SID    int64  `json:"sid"`
-			MAC    string `json:"mac"`
-			Device string `json:"device"`
-			Until  int64  `json:"until"`
-			Note   string `json:"note"`
-			Auto   bool   `json:"auto"`
-		}
-		al := []allowed{}
-		if rows, err := a.Config.Query(`SELECT id,sid,mac,until,note,auto FROM threat_allowed ORDER BY id DESC`); err == nil {
-			for rows.Next() {
-				var x allowed
-				var au int
-				rows.Scan(&x.ID, &x.SID, &x.MAC, &x.Until, &x.Note, &au)
-				x.Auto = au == 1
-				if x.MAC != "" {
-					x.Device = a.fwdDeviceName(x.MAC, "")
-				}
-				al = append(al, x)
-			}
-			rows.Close()
-		}
-		type trusted struct {
-			MAC    string `json:"mac"`
-			Device string `json:"device"`
-		}
-		tr := []trusted{}
-		if rows, err := a.Config.Query(`SELECT mac FROM threat_trusted ORDER BY mac`); err == nil {
-			for rows.Next() {
-				var m string
-				rows.Scan(&m)
-				tr = append(tr, trusted{m, a.fwdDeviceName(m, "")})
-			}
-			rows.Close()
-		}
-		api.JSON(w, 200, map[string]any{
-			"mode": a.threatMode(), "engine": a.threatEngine(), "eve_path": a.threatEvePath(), "default_eve": defaultEve,
-			"alerts": alerts, "allowed": al, "trusted": tr,
-			"blocking":  "Blocking is not switched on yet. Gatehouse watches and tells you.",
-			"fail_open": "If the engine stops or fails, your traffic is not touched. Gatehouse only reads what the engine notices.",
-		})
-	})
-	s.HandleAdmin("PUT /api/threat/settings", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-		var in struct {
-			Mode string `json:"mode"`
-			Eve  string `json:"eve_path"`
-		}
-		if !api.Decode(w, r, &in) {
-			return
-		}
-		if in.Mode != "off" && in.Mode != "watch" {
-			in.Mode = "watch"
-		}
-		in.Eve = strings.TrimSpace(in.Eve)
-		if in.Eve != "" && (!strings.HasPrefix(in.Eve, "/") || strings.Contains(in.Eve, "..")) {
-			fail(w, errBadPath)
-			return
-		}
-		a.Config.SetSetting(threatModeSetting, in.Mode)
-		a.Config.SetSetting(threatEveSetting, in.Eve)
-		ok(w)
-	})
+	a.registerThreatEngineRoutes()
 	s.HandleAdmin("POST /api/threat/allow", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		var in struct {
 			SID  int64  `json:"sid"`

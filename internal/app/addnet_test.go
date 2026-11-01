@@ -309,3 +309,72 @@ func TestBridgeRefusesPortsInUseElsewhere(t *testing.T) {
 		t.Fatal("ports missing")
 	}
 }
+
+func zoneByName(t *testing.T, c interface {
+	call(method, path string, body any) (int, map[string]any, []byte)
+}, name string) map[string]any {
+	t.Helper()
+	_, _, raw := c.call("GET", "/api/fw/zones", nil)
+	var zs []map[string]any
+	json.Unmarshal(raw, &zs)
+	for _, z := range zs {
+		if z["name"] == name {
+			return z
+		}
+	}
+	t.Fatalf("no network %s in %s", name, raw)
+	return nil
+}
+
+func TestAddNetworkByKindVlanAnywhereAndNoAddress(t *testing.T) {
+	c, _, _ := siteBox(t, "192.168.1.1/24")
+	// A first network of a non-trusted kind still becomes the one that manages the box, so the
+	// person is never locked out.
+	// Guest on a VLAN on a FREE port: allowed, guests kept apart by default.
+	rc, _, raw := c.call("POST", "/api/networks/add", map[string]any{"name": "Visitors", "port": "eth2", "vlan": 30, "kind": "guest", "internet": true, "intra_allow": false})
+	if rc != 200 {
+		t.Fatalf("guest vlan on a free port: %d %s", rc, raw)
+	}
+	z := zoneByName(t, c, "Visitors")
+	if z["intra_allow"] == true {
+		t.Fatalf("guests can see each other by default: %v", z)
+	}
+	_, _, raw = c.call("GET", "/api/net/interfaces", nil)
+	var ifs []map[string]any
+	json.Unmarshal(raw, &ifs)
+	vlan := false
+	for _, i := range ifs {
+		if i["name"] == "eth2.30" {
+			vlan = true
+		}
+	}
+	if !vlan {
+		t.Fatalf("no VLAN made: %s", raw)
+	}
+	// Isolated: no internet, whatever the form says.
+	if rc, _, raw := c.call("POST", "/api/networks/add", map[string]any{"name": "Cams", "port": "eth2", "vlan": 40, "kind": "isolated", "internet": true}); rc != 200 {
+		t.Fatalf("isolated: %d %s", rc, raw)
+	}
+	if z := zoneByName(t, c, "Cams"); z["internet"] == true {
+		t.Fatalf("isolated got the internet: %v", z)
+	}
+	// Custom takes the form's internet switch and the intra switch.
+	if rc, _, raw := c.call("POST", "/api/networks/add", map[string]any{"name": "Lab", "port": "eth2", "vlan": 50, "kind": "custom", "internet": true, "intra_allow": false}); rc != 200 {
+		t.Fatalf("custom: %d %s", rc, raw)
+	}
+	if z := zoneByName(t, c, "Lab"); z["internet"] != true || z["intra_allow"] == true {
+		t.Fatalf("custom: %v", z)
+	}
+	// A VLAN with no address and no DHCP, for a trunk.
+	if rc, _, raw := c.call("POST", "/api/networks/add", map[string]any{"name": "Trunk", "port": "eth2", "vlan": 60, "kind": "isolated", "no_address": true}); rc != 200 {
+		t.Fatalf("no address: %d %s", rc, raw)
+	}
+	_, _, raw = c.call("GET", "/api/dhcp/scopes", nil)
+	if strings.Contains(string(raw), `"Trunk"`) {
+		t.Fatalf("a no-address network got a DHCP scope: %s", raw)
+	}
+	// Bad kind is refused.
+	if rc, _, _ := c.call("POST", "/api/networks/add", map[string]any{"name": "X", "port": "eth2", "vlan": 70, "kind": "wan"}); rc == 200 {
+		t.Fatal("a bad kind was accepted")
+	}
+}

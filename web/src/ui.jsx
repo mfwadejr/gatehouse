@@ -9,6 +9,7 @@ export const ICONS = {
   dns: 'M12 21a9 9 0 100-18 9 9 0 000 18zM3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18',
   dhcp: 'M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01',
   firewall: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z',
+  protection: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM8.5 12l2.5 2.5 4.5-5',
   services: 'M4 6h16M4 12h16M4 18h10M18 16v4M16 18h4',
   vpn: 'M6 11V8a6 6 0 1112 0v3M5 11h14v9H5zM12 15v2',
   devices: 'M3 5h14v10H3zM8 19h4M10 15v4M19 9h2v10h-2z',
@@ -130,8 +131,12 @@ export const inClass = (extra) => ['in', ...String(extra || '').split(/\s+/).fil
 export function Input({ value, onChange, className, ...rest }) {
   return <input value={value ?? ''} onChange={(e) => onChange(e.target.value)} {...rest} className={inClass(className)} />;
 }
-export function NumberInput({ value, onChange, className, ...rest }) {
-  return <input type="number" value={value ?? ''} onChange={(e) => onChange(e.target.value === '' ? 0 : Number(e.target.value))} {...rest} className={inClass(className)} />;
+// Keeps what is typed while it is being typed, so the box can be emptied and a new number entered.
+// The value passed up is 0 for an empty box, as before.
+export function NumberInput({ value, onChange, onBlur, className, ...rest }) {
+  const [text, setText] = useState(null);
+  const shown = text !== null && (text === '' ? 0 : Number(text)) === (value ?? 0) ? text : (value ?? '');
+  return <input type="number" value={shown} onChange={(e) => { setText(e.target.value); onChange(e.target.value === '' ? 0 : Number(e.target.value)); }} onBlur={(e) => { setText(null); onBlur?.(e); }} {...rest} className={inClass(className)} />;
 }
 export function Select({ value, onChange, options, className, ...rest }) {
   return (

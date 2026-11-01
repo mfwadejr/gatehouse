@@ -32,6 +32,13 @@ type addNetIn struct {
 	Isolate  bool   `json:"isolate"`
 	Lease    string `json:"lease"` // 1h, 1d or 1w
 	IPv6     string `json:"ipv6"`  // off or auto
+	// Kind is the firewall's own kind of network: trusted, private, guest, isolated or custom. When
+	// it is empty the older Internet and Isolate switches decide, as before.
+	Kind       string `json:"kind"`
+	IntraAllow *bool  `json:"intra_allow"` // devices here may reach each other; empty uses the kind's own answer
+	// NoAddress makes a network with no address and no DHCP, for a trunk to a switch or access
+	// point that something else addresses.
+	NoAddress bool `json:"no_address"`
 }
 
 var reAddNetPort = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,14}$`)
@@ -168,6 +175,14 @@ func (in *addNetIn) clean() error {
 	if in.VLAN < 0 || in.VLAN > 4094 {
 		return errors.New("a VLAN number must be between 1 and 4094")
 	}
+	switch in.Kind {
+	case "", fw.KindTrusted, fw.KindPrivate, fw.KindGuest, fw.KindIsolated, fw.KindCustom:
+	default:
+		return errors.New("choose what kind of network this is")
+	}
+	if in.NoAddress {
+		in.DHCP, in.Address, in.IPv6 = "off", "", "off"
+	}
 	if in.DHCP == "" {
 		in.DHCP = "server"
 	}
@@ -234,7 +249,9 @@ func (a *App) addNetwork(in addNetIn) (int64, error) {
 
 	used := a.usedNets(tx)
 	var router netip.Prefix
-	if strings.TrimSpace(in.Address) == "" {
+	if in.NoAddress {
+		// nothing to pick
+	} else if strings.TrimSpace(in.Address) == "" {
 		p, ok := suggestPrefix(used)
 		if !ok {
 			return 0, errors.New("no unused address range was found; enter one by hand")
@@ -256,31 +273,51 @@ func (a *App) addNetwork(in addNetIn) (int64, error) {
 			return 0, fmt.Errorf("%s overlaps %s, which is already in use. Leave the address empty to pick a free one", router.Masked(), u)
 		}
 	}
-	subnet := router.Masked()
+	var subnet netip.Prefix
+	if !in.NoAddress {
+		subnet = router.Masked()
+	}
 
 	// The firewall network, with the port assigned.
 	kindZone := fw.KindPrivate
 	if !in.Internet {
 		kindZone = fw.KindIsolated
 	}
+	internet, intra, manage := in.Internet, true, false
+	if in.Kind != "" {
+		kindZone = in.Kind
+		for _, p := range fw.Presets() {
+			if p.Kind == in.Kind {
+				internet, intra, manage = p.Internet, p.IntraAllow, p.Management
+			}
+		}
+		if in.Kind == fw.KindCustom {
+			internet = in.Internet
+		}
+		if in.IntraAllow != nil {
+			intra = *in.IntraAllow
+		}
+	}
 	// The first network on a machine that has none able to manage it is the one you manage it
 	// from: it becomes a trusted network, so the lock-out check is satisfied by what you built
 	// rather than refusing the very first network you add.
-	manage := false
 	if cur, err := fw.Load(tx); err == nil && !hasManagementNetwork(cur) {
 		manage = true
 		kindZone = fw.KindTrusted
 	}
-	zid, err := fw.SaveZone(tx, fw.ZoneRow{Name: in.Name, Kind: kindZone, Ifaces: []string{name}, Internet: in.Internet,
-		Management: manage, IntraAllow: true, Gateway: true, DNSForce: true})
+	zid, err := fw.SaveZone(tx, fw.ZoneRow{Name: in.Name, Kind: kindZone, Ifaces: []string{name}, Internet: internet,
+		Management: manage, IntraAllow: intra, Gateway: true, DNSForce: true})
 	if err != nil {
 		return 0, err
 	}
 	// The port or VLAN itself.
 	_ = zid
 	if _, err := tx.Exec(`UPDATE interfaces SET kind=?,parent=?,vlan_id=?,ipv4_cidr=?,ipv6_pd=?,enabled=1,dhcp=0 WHERE name=?`,
-		kind, map[bool]string{true: in.Port}[in.VLAN > 0], in.VLAN, router.String(), b2iN(in.IPv6 == "auto"), name); err != nil {
+		kind, map[bool]string{true: in.Port}[in.VLAN > 0], in.VLAN, map[bool]string{true: "", false: router.String()}[in.NoAddress], b2iN(in.IPv6 == "auto"), name); err != nil {
 		return 0, err
+	}
+	if in.NoAddress {
+		return a.finishAddNetwork(tx, zid)
 	}
 
 	// DHCP.
@@ -308,8 +345,9 @@ func (a *App) addNetwork(in addNetIn) (int64, error) {
 		return 0, err
 	}
 
-	// Not isolated: the other local networks and this one can reach each other.
-	if !in.Isolate {
+	// Not isolated: the other local networks and this one can reach each other. (A chosen kind
+	// already says how it treats the others, so only the older form needs this.)
+	if in.Kind == "" && !in.Isolate {
 		m, err := fw.Load(tx)
 		if err != nil {
 			return 0, err
@@ -327,6 +365,11 @@ func (a *App) addNetwork(in addNetIn) (int64, error) {
 		}
 	}
 
+	return a.finishAddNetwork(tx, zid)
+}
+
+// finishAddNetwork checks that the whole result is valid together, then saves it.
+func (a *App) finishAddNetwork(tx *sql.Tx, zid int64) (int64, error) {
 	// Both halves must still be valid together.
 	p, err := a.buildPlan(tx)
 	if err != nil {

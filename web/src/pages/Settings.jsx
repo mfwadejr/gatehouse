@@ -12,6 +12,7 @@ import BridgeMode from './BridgeMode.jsx';
 import DeviceMode from './DeviceMode.jsx';
 import HighAvailability from './HighAvailability.jsx';
 import TrafficLabels from './TrafficLabels.jsx';
+import BlockVersions from './BlockVersions.jsx';
 import RemoteLogin from './RemoteLogin.jsx';
 import Alerts from './Alerts.jsx';
 
@@ -281,6 +282,8 @@ function Updates({ me }) {
   const [live, setLive] = useState(null); // fresher status while something is happening
   const [lost, setLost] = useState(false);
   const [repo, setRepo] = useState(null);
+  const [customEvery, setCustomEvery] = useState(false);
+  const [everyText, setEveryText] = useState(null);
   const [outcome, setOutcome] = useState(null);
   const [restart, setRestart] = useState(false);
   const d = live || data;
@@ -369,9 +372,24 @@ function Updates({ me }) {
         )}
         {!working && d.key_set && !d.available && !d.error && !d.system_error && !d.checking && d.checked_at > 0 && <p className="muted">Everything is up to date.</p>}
         {d.needs_reboot && !working && <Note tone="warn" title="A restart is needed">The system was updated and needs a restart to finish. The network is down for about a minute while it restarts; pick a moment that suits you.<div style={{ marginTop: '.5rem' }}><Button onClick={() => setRestart(true)}>Restart now</Button></div></Note>}
-        <Field label="Updating" hint="Off: only when you press Check now. Notify: Gatehouse looks twice a day and tells you when something is ready. Automatic: it installs by itself in the hour you choose below.">
+        <Field label="Updating" hint="Off: only when you press Check now. Notify: Gatehouse looks as often as you choose below and tells you when something is ready. Automatic: it installs by itself in the hour you choose below.">
           <Segmented value={d.mode} onChange={(v) => save({ mode: v })} options={[{ value: 'off', label: 'Off' }, { value: 'notify', label: 'Notify' }, { value: 'auto', label: 'Automatic' }]} />
         </Field>
+        {d.mode !== 'off' && (
+          <Field label="How often to check" hint="Checking more often than every few hours does not help, because releases do not come out that fast. Press Check now any time.">
+            <div className="stack">
+              <Segmented value={[6, 12, 24, 168].includes(d.check_hours) && !customEvery ? String(d.check_hours) : 'custom'}
+                onChange={(v) => { if (v === 'custom') setCustomEvery(true); else { setCustomEvery(false); save({ check_hours: Number(v) }); } }}
+                options={[{ value: '6', label: 'Every 6 hours' }, { value: '12', label: 'Every 12 hours' }, { value: '24', label: 'Once a day' }, { value: '168', label: 'Once a week' }, { value: 'custom', label: 'Custom' }]} />
+              {([6, 12, 24, 168].includes(d.check_hours) ? customEvery : true) && (
+                <Form className="inline" onSubmit={() => run(() => put('/api/system/update/settings', { check_hours: Number(everyText ?? d.check_hours) }), 'Saved.').then(() => { setEveryText(null); reload(); })}>
+                  <Input value={everyText ?? String(d.check_hours)} onChange={setEveryText} inputMode="numeric" aria-label="Hours between checks" style={{ maxWidth: '6rem' }} /> <span className="small muted">hours (1 to 720)</span>
+                  <Button type="submit" disabled={busy || everyText === null}>Save</Button>
+                </Form>
+              )}
+            </div>
+          </Field>
+        )}
         {d.mode === 'auto' && (
           <Field label="Start automatic updates at" hint="Gatehouse restarts for about a minute while it updates, so pick a quiet hour (the machine's own clock).">
             <Select value={String(d.window)} onChange={(v) => save({ window: Number(v) })} options={Array.from({ length: 24 }, (_, h) => ({ value: String(h), label: hourLabel(h) }))} style={{ maxWidth: '10rem' }} />
@@ -465,6 +483,7 @@ export default function Settings({ me, reloadMe }) {
           <div id="set-ha"><Guard what="High availability"><HighAvailability me={me} /></Guard></div>
           <Guard what="Bridge mode"><BridgeMode /></Guard>
           <Guard what="Traffic labels"><TrafficLabels /></Guard>
+          <Guard what="Blocking lists"><BlockVersions /></Guard>
           <Guard what="Guest sign-in page"><GuestPortal /></Guard>
         </>
       )}

@@ -177,3 +177,33 @@ func toStrings(v any) []string {
 	}
 	return out
 }
+
+func TestForwardingAPortTheFirewallUsesWarnsButWorks(t *testing.T) {
+	a := newScopeApp(t)
+	a.Config.SetSetting("console.port", "8443")
+	for _, c := range []struct {
+		proto string
+		lo    int
+		hi    int
+		want  string
+	}{
+		{"tcp", 8443, 8443, "console"},
+		{"tcp", 22, 22, "remote login"},
+		{"udp", 53, 53, "DNS"},
+		{"tcp", 53, 53, "DNS"},
+		{"udp", 67, 68, "DHCP"},
+	} {
+		n := a.routerPortNotes(c.proto, c.lo, c.hi, "the NAS")
+		if len(n) == 0 || !strings.Contains(strings.Join(n, " "), c.want) || !strings.Contains(strings.Join(n, " "), "NAS") && c.want != "DHCP" {
+			t.Errorf("%s %d-%d: %v", c.proto, c.lo, c.hi, n)
+		}
+	}
+	for _, c := range []struct {
+		proto string
+		p     int
+	}{{"tcp", 32400}, {"udp", 22}, {"tcp", 443}, {"tcp", 80}} {
+		if n := a.routerPortNotes(c.proto, c.p, c.p, "x"); len(n) != 0 {
+			t.Errorf("%s %d should have no note: %v", c.proto, c.p, n)
+		}
+	}
+}

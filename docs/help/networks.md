@@ -14,9 +14,10 @@ The picture is an example from a new, empty box; yours will show your own device
 - **Network ports on this device**: live status and addresses of every port. **Rename** gives a port a name you will recognise, such as your internet gateway or a spare.
 
 ## Common tasks
-1. Add a guest network: **Add a network**, choose a port or VLAN, give it an address, **Save**, **Review and apply**.
-2. Name a port: **Rename**, type a name, **Save**. **Use the original name** puts it back.
-3. Give a network more ports: **Edit**, **Add more ports to this network**, tick them, **Save**.
+1. Add a network: **Add a network**, choose what it is for (**Trusted**, **Private**, **Guest**, **Isolated** or **Custom**), choose **The whole port** or **A VLAN on the port**, **Save**, **Review and apply**. A Guest network keeps its devices from seeing each other; turn on **Devices here can talk to each other** only if they need to.
+2. Connect a switch or access point that hands out addresses itself: choose **A VLAN on the port** and turn on **No address, no DHCP**. Gatehouse makes the VLAN and the firewall network and gives out nothing.
+3. Name a port: **Rename**, type a name, **Save**. **Use the original name** puts it back.
+4. Give a network more ports: **Edit**, **Add more ports to this network**, tick them, **Save**.
 
 ## Example
 Make a Cameras network on its own port with the address 192.168.30.1/24, and on the Firewall page let it reach nothing but itself.

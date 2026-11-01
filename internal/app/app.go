@@ -94,6 +94,7 @@ type App struct {
 	fwn          fwNames
 	scope        scopeCache
 	threats      threatState
+	threatW      threatWatch
 	traffic      wanTraffic
 	viaNames     viaCache
 	health       healthSampler
@@ -404,6 +405,7 @@ func (a *App) Run(ctx context.Context) error {
 	run(func() { a.haServe(ctx) })
 	run(func() { a.ndpiLoop(ctx) })
 	run(func() { a.threatLoop(ctx) })
+	run(func() { a.threatWatchLoop(ctx) })
 	run(func() { a.flowLoop(ctx) })
 	run(func() { a.snmpLoop(ctx) })
 	run(func() { a.sqmLoop(ctx) })

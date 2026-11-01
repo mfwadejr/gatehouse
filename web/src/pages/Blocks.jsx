@@ -63,8 +63,11 @@ function BlockForm({ initial, data, onClose, onSaved }) {
         <ToggleRow title="This is an exception" desc="Lets this app, topic or website through for the chosen device, network or profile, even if a block elsewhere says no." checked={f.allow} onChange={(v) => setF({ ...f, allow: v })} />
         <Field label="How">
           <div className="stack">
-            <label className="small" style={{ display: 'flex', gap: 'var(--space-2)' }}><input type="radio" checked readOnly /> <span><strong>Option A: By name (fast)</strong>. Gatehouse refuses the app's website names. No slowdown. It can miss an app that uses its own private DNS, or a call already in progress.</span></label>
-            <label className="small muted" style={{ display: 'flex', gap: 'var(--space-2)' }}><input type="radio" disabled /> <span><strong>Option B: Thorough</strong>. Looks at the traffic itself. Catches more but can be slower. Not switched on yet.</span></label>
+            <label className="small" style={{ display: 'flex', gap: 'var(--space-2)' }}><input type="radio" name="method" checked={f.method === 'fast'} onChange={() => setF({ ...f, method: 'fast' })} /> <span><strong>Option A: By name (fast)</strong>. Gatehouse refuses the app's website names. No slowdown. It can miss an app that uses its own private DNS, or a call already in progress.</span></label>
+            <label className="small" style={{ display: 'flex', gap: 'var(--space-2)' }}><input type="radio" name="method" checked={f.method === 'thorough'} onChange={() => setF({ ...f, method: 'thorough' })} /> <span><strong>Option B: Thorough</strong>. Looks at the traffic itself. Catches more but can be slower.</span></label>
+            <label className="small" style={{ display: 'flex', gap: 'var(--space-2)' }}><input type="radio" name="method" checked={f.method === 'both'} onChange={() => setF({ ...f, method: 'both' })} /> <span><strong>Both</strong>. By name now, and thorough as well once it is on.</span></label>
+            {f.method !== 'fast' && <Note tone="warn">{data?.inspection?.note}</Note>}
+            <p className="small muted">If either way fails, nothing is blocked. A fault never cuts a device off.</p>
           </div>
         </Field>
         <Field label="When">
@@ -105,7 +108,7 @@ export default function Blocks() {
             <div className="item" key={r.id}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="name">{r.text} <Pill tone={tone}>{word}</Pill></div>
-                <div className="meta">{r.when}{r.method === 'thorough' ? ' · thorough' : ' · by name'}</div>
+                <div className="meta">{r.when}{r.method === 'thorough' ? ' · thorough, waiting for it to be switched on' : r.method === 'both' ? ' · by name now, thorough once it is on' : ' · by name'}</div>
               </div>
               <div className="actions">
                 {r.status === 'paused'
@@ -120,7 +123,7 @@ export default function Blocks() {
         })}
         {data && !rules.length && <Empty>Nothing is blocked this way yet.</Empty>}
       </div>
-      <p className="small muted">{data?.inspection?.note}</p>
+      <p className="small muted">{data?.inspection?.note} {data?.fail_open}</p>
       {edit && <BlockForm initial={edit} data={data} onClose={() => setEdit(null)} onSaved={reload} />}
     </Card>
   );

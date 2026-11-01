@@ -1,6 +1,19 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.44',
+    title: 'Protection page, threat watching you install yourself, five kinds of network',
+    items: [
+      'A new Protection page in the left menu. Overview gives a one-line verdict and the Security check; Apps & topics (moved from DNS) blocks apps, topics and websites; Threats is threat watching. Block lists for ads, trackers and adult sites stay under DNS.',
+      'Threat watching is no longer installed behind your back. Press Install threat watching: Gatehouse shows the packages, the download size, the disk space needed and any worry about this machine, and installs only when you agree. Choose Light, Balanced or Strict, set a processor and memory limit, update the rules (and roll back to the previous ones), search and switch off single checks, and save or load your tuning. It only watches and tells you; blocking threats is not available yet. If it stops, nothing changes for your devices, and if it uses all of its processor share for ten minutes Gatehouse switches it off and says why.',
+      'Add a network now offers five kinds: Trusted, Private, Guest, Isolated and Custom. Guest devices cannot see each other unless you turn that on. Choose the whole port or a VLAN on any port, and a VLAN with no address and no DHCP for a link to a switch or access point.',
+      'Opening a port that the firewall itself uses (such as the console) now warns you instead of refusing.',
+      'Choose how often Gatehouse looks for updates: 6 hours, 12 hours (the usual), a day, a week, or your own number of hours.',
+      'More topics to block (scams, piracy, crypto mining, drugs, games, video, music, messaging, shopping, AI). Settings, Advanced shows which version of the lists is in use. Blocking also has a thorough choice, which is saved but does not act yet.',
+      'If a block or threat watching ever goes wrong, your internet is not affected. This is now stated beside the setting, in the Logs when it happens, and in the Protection and Reference chapters.',
+    ],
+  },
+  {
     version: '0.8.43',
     title: 'Open ports made simple, block apps and topics, threat watching',
     items: [

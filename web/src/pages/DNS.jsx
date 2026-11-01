@@ -1,4 +1,3 @@
-import Blocks from './Blocks.jsx';
 import EncryptedDns from './EncryptedDns.jsx';
 import React, { useState } from 'react';
 import { del, get, patch, post, put, useData, useStream } from '../api.js';
@@ -452,11 +451,10 @@ export default function DNS() {
   const [tab, setTab] = useState('overview');
   return (
     <Page title="DNS" sub="Translates names to addresses for every device, and blocks the ones you do not want.">
-      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'overview', label: 'Overview' }, { value: 'lists', label: 'Blocking' }, { value: 'records', label: 'Your names' }, { value: 'blocks', label: 'Apps & topics' }, { value: 'groups', label: 'Profiles' }, { value: 'settings', label: 'Settings' }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'overview', label: 'Overview' }, { value: 'lists', label: 'Blocking' }, { value: 'records', label: 'Your names' }, { value: 'groups', label: 'Profiles' }, { value: 'settings', label: 'Settings' }]} />
       {tab === 'overview' && <Overview />}
-      {tab === 'lists' && <Lists />}
+      {tab === 'lists' && <><Lists /><p className="small muted">Blocking an app or a topic for one device or at set hours is under <a href="#/protection">Protection</a>.</p></>}
       {tab === 'records' && <Records />}
-      {tab === 'blocks' && <Blocks />}
       {tab === 'groups' && <Groups />}
       {tab === 'settings' && <SettingsTab />}
     </Page>

@@ -404,23 +404,54 @@ func cleanList(in []string, upper bool) []string {
 }
 
 func (a *App) saveAppForward(in appForwardIn) error {
+	_, err := a.saveAppForwardNotes(in)
+	return err
+}
+
+// routerPortNotes says, in plain words, when an outside port is one the firewall's own services use
+// on your own networks. It never refuses: from the internet side those services are closed, so the
+// forward is allowed, but the person should know the number is shared and what opening it means.
+func (a *App) routerPortNotes(proto string, lo, hi int, device string) []string {
+	has := func(p int) bool { return p >= lo && p <= hi }
+	var out []string
+	if proto == "tcp" {
+		for _, p := range a.consolePorts() {
+			if has(p) {
+				out = append(out, fmt.Sprintf("Port %d is also where the Gatehouse console answers on your own networks. From the internet it will go to %s. The console itself stays closed to the internet.", p, device))
+				break
+			}
+		}
+		if has(22) {
+			out = append(out, fmt.Sprintf("Port 22 is remote login. From the internet it will go to %s, so anyone on the internet can try to sign in to it. Use strong passwords or keys, and limit it to a country or address.", device))
+		}
+	}
+	if has(53) {
+		out = append(out, fmt.Sprintf("Port 53 is DNS, which Gatehouse also answers on your own networks. From the internet it will go to %s, so anyone could use it. Only go on if you mean to run a public DNS server.", device))
+	}
+	if proto == "udp" && (has(67) || has(68)) {
+		out = append(out, "Ports 67 and 68 are DHCP, which hands out addresses on your own networks. Opening them to the internet is almost never what you want.")
+	}
+	return out
+}
+
+func (a *App) saveAppForwardNotes(in appForwardIn) ([]string, error) {
 	in.Name = strings.TrimSpace(in.Name)
 	if in.Name == "" {
 		in.Name = strings.TrimSpace(in.App)
 	}
 	if len(in.Name) > 24 {
-		return errors.New("use a shorter name, up to 24 characters")
+		return nil, errors.New("use a shorter name, up to 24 characters")
 	}
 	ports, err := a.appPorts(in.App)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	mac := ""
 	ip := strings.TrimSpace(in.IP)
 	if m := strings.TrimSpace(in.MAC); m != "" {
 		hw, err := net.ParseMAC(m)
 		if err != nil || len(hw) != 6 {
-			return errors.New("that is not a valid device address (MAC)")
+			return nil, errors.New("that is not a valid device address (MAC)")
 		}
 		mac = strings.ToLower(hw.String())
 		if cur := a.deviceIP(mac); cur != "" {
@@ -428,17 +459,17 @@ func (a *App) saveAppForward(in appForwardIn) error {
 		}
 	}
 	if ip == "" {
-		return errors.New("Gatehouse has not seen that device yet. Turn it on and connect it, then try again")
+		return nil, errors.New("Gatehouse has not seen that device yet. Turn it on and connect it, then try again")
 	}
 	if net.ParseIP(ip) == nil {
-		return errors.New("choose the device this should go to")
+		return nil, errors.New("choose the device this should go to")
 	}
 	byName, _, _ := a.fwdWanDevices()
 	devs := []string{}
 	for _, c := range in.Connections {
 		d, ok := byName[c]
 		if !ok {
-			return fmt.Errorf("%q is not one of your internet connections", c)
+			return nil, fmt.Errorf("%q is not one of your internet connections", c)
 		}
 		devs = append(devs, d)
 	}
@@ -462,17 +493,17 @@ func (a *App) saveAppForward(in appForwardIn) error {
 		}
 		olo, ohi, err := parsePortSpec(out)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		ilo, ihi, err := parsePortSpec(inn)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if ohi-olo != ihi-ilo {
-			return fmt.Errorf("the outside port %s and the port on the device %s must cover the same number of ports", out, inn)
+			return nil, fmt.Errorf("the outside port %s and the port on the device %s must cover the same number of ports", out, inn)
 		}
 		if why := a.forwardPortUse(p.Proto, olo, ohi, ownGroup); why != "" {
-			return &errPortConflict{Proto: p.Proto, Port: out, UsedBy: why}
+			return nil, &errPortConflict{Proto: p.Proto, Port: out, UsedBy: why}
 		}
 		maps[i] = pm{out, inn}
 	}
@@ -506,14 +537,20 @@ func (a *App) saveAppForward(in appForwardIn) error {
 		return nil
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if len(cc) > 0 {
 		a.geoEnsure()
 	}
 	a.markDirty()
 	a.refreshVPN()
-	return nil
+	var notes []string
+	for i, p := range ports {
+		if lo, hi, err := parsePortSpec(maps[i].out); err == nil {
+			notes = append(notes, a.routerPortNotes(p.Proto, lo, hi, a.fwdDeviceName(mac, ip))...)
+		}
+	}
+	return notes, nil
 }
 
 // syncForwardDevices points forwards that follow a device at its current address.
@@ -574,7 +611,8 @@ func (a *App) registerAppForwardRoutes() {
 		if !api.Decode(w, r, &in) {
 			return
 		}
-		if err := a.saveAppForward(in); err != nil {
+		notes, err := a.saveAppForwardNotes(in)
+		if err != nil {
 			var pc *errPortConflict
 			if errors.As(err, &pc) {
 				api.JSON(w, http.StatusConflict, map[string]any{"error": pc.Error(), "conflict": pc})
@@ -583,7 +621,7 @@ func (a *App) registerAppForwardRoutes() {
 			fail(w, err)
 			return
 		}
-		ok(w)
+		api.JSON(w, 200, map[string]any{"status": "ok", "notes": notes})
 	})
 	// Live check while a port is typed: what uses it, and a free port to offer if asked.
 	s.Handle("GET /api/fw/portcheck", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
@@ -598,7 +636,7 @@ func (a *App) registerAppForwardRoutes() {
 			return
 		}
 		group := r.URL.Query().Get("group")
-		out := map[string]any{"used_by": a.forwardPortUse(proto, lo, hi, group)}
+		out := map[string]any{"used_by": a.forwardPortUse(proto, lo, hi, group), "notes": a.routerPortNotes(proto, lo, hi, "the device")}
 		if r.URL.Query().Get("suggest") == "1" {
 			width := hi - lo
 			for p, tries := lo+1, 0; p+width <= 65535 && tries < 2000; p, tries = p+1, tries+1 {

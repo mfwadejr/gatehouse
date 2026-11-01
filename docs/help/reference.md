@@ -18,9 +18,13 @@ Changes to networks and the firewall are saved first and applied when you press 
 - **Routes:** the first route that matches is used, so put the more specific ones at the top.
 - **VPN routing:** a device sent through a VPN is routed by its address. Its name lookups go through the VPN too.
 
+## When a protection feature fails
+
+Blocking apps and topics, and threat watching, only add protection. If they fail, your internet carries on and the protection is lost; your traffic is never held up. A block that cannot be worked out lets the lookup through, and the Logs say so (once an hour). Threat watching reads copies of the traffic, so if it stops, crashes or is removed nothing changes for your devices; if it uses all of its processor share for ten minutes Gatehouse switches it off and says why. Details are in the Protection chapter.
+
 ## Updates
 
-Gatehouse looks for updates about twice a day. Under **Settings, General, Updates** you choose **Off** (only when you press Check now), **Notify** (it tells you) or **Automatic** (it installs once a day in the hour you choose). Updates are signed; Gatehouse installs only releases signed with its own key. If a new version fails to start, the previous one comes back.
+Gatehouse looks for updates every 12 hours unless you change **How often to check** (6 hours, 12 hours, a day, a week, or your own number of hours from 1 to 720). Under **Settings, General, Updates** you choose **Off** (only when you press Check now), **Notify** (it tells you) or **Automatic** (it installs once a day in the hour you choose). Updates are signed; Gatehouse installs only releases signed with its own key. If a new version fails to start, the previous one comes back.
 
 ## Backups
 

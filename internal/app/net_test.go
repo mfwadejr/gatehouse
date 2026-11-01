@@ -18,6 +18,7 @@ import (
 	"gatehouse/internal/netcfg"
 	"gatehouse/internal/netd"
 	"gatehouse/internal/speedtest"
+	"gatehouse/internal/threatcfg"
 	"gatehouse/internal/wanmon"
 )
 
@@ -43,20 +44,24 @@ type fakeNet struct {
 	speedCalls []speedtest.Params
 	speedErr   error
 
-	wifiStates []netd.WifiState
-	wifiCalls  int
-	powerSave  map[string]bool
-	sshPlans   []netd.SSHPlan
-	sshLines   []string
-	haPlans    []netd.HAPlan
-	ndpiPlans  []netd.NDPIPlan
-	ndpiHave   bool
-	ovPlans    []netd.OverridePlan
-	ovErr      error
-	flowAcct   []bool
-	flowDump   string
-	sqmPlans   []netd.SQMPlan
-	sqmErr     error
+	wifiStates  []netd.WifiState
+	wifiCalls   int
+	powerSave   map[string]bool
+	sshPlans    []netd.SSHPlan
+	sshLines    []string
+	haPlans     []netd.HAPlan
+	ndpiPlans   []netd.NDPIPlan
+	ndpiHave    bool
+	threatInfo  netd.ThreatInfo
+	threatPlans []threatcfg.Plan
+	threatErr   error
+	threatCalls []string
+	ovPlans     []netd.OverridePlan
+	ovErr       error
+	flowAcct    []bool
+	flowDump    string
+	sqmPlans    []netd.SQMPlan
+	sqmErr      error
 }
 
 func (f *fakeNet) WifiHealth(ifaces []string, keepAwake bool) ([]netd.WifiState, error) {
@@ -121,6 +126,46 @@ func (f *fakeNet) SQMApply(p netd.SQMPlan) (string, error) {
 		return "", nil
 	}
 	return "cake", nil
+}
+func (f *fakeNet) ThreatStatus() netd.ThreatInfo {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.threatInfo
+}
+func (f *fakeNet) ThreatInstallPreview() (netd.ThreatPreview, error) {
+	return netd.ThreatPreview{Packages: []string{"suricata", "suricata-update"}, DownloadMB: 21, DiskMB: 88}, nil
+}
+func (f *fakeNet) ThreatInstallStart() error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.threatCalls = append(f.threatCalls, "install")
+	f.threatInfo.State = "installing"
+	return f.threatErr
+}
+func (f *fakeNet) ThreatRemove() error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.threatCalls = append(f.threatCalls, "remove")
+	f.threatInfo.Installed = false
+	return nil
+}
+func (f *fakeNet) ThreatApply(p threatcfg.Plan) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.threatPlans = append(f.threatPlans, p)
+	return f.threatErr
+}
+func (f *fakeNet) ThreatUpdateRules() error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.threatCalls = append(f.threatCalls, "update")
+	return nil
+}
+func (f *fakeNet) ThreatRollback() error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.threatCalls = append(f.threatCalls, "rollback")
+	return nil
 }
 func (f *fakeNet) ConntrackDump() (string, error) {
 	f.mu.Lock()

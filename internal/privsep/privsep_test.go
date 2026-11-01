@@ -11,6 +11,7 @@ import (
 	"gatehouse/internal/fw"
 	"gatehouse/internal/netd"
 	"gatehouse/internal/speedtest"
+	"gatehouse/internal/threatcfg"
 	"gatehouse/internal/wanmon"
 )
 
@@ -107,6 +108,7 @@ type fakeNetCtl struct {
 	systemStarted bool
 	power         string
 	speed         speedtest.Params
+	threat        threatcfg.Plan
 }
 
 func (f *fakeNetCtl) Apply(netd.Plan, time.Duration) (string, time.Time, error) {
@@ -169,6 +171,27 @@ func TestEveryClientCallIsRouted(t *testing.T) {
 	if err != nil || r.Server != "t" || nc.speed.Dev != "eth0" || !nc.speed.Quick {
 		t.Fatalf("speed.run: %+v %v %+v", r, err, nc.speed)
 	}
+	if ti := c.ThreatStatus(); !ti.Installed || ti.State != "idle" {
+		t.Fatalf("threat.status: %+v", ti)
+	}
+	if p, err := c.ThreatInstallPreview(); err != nil || len(p.Packages) != 1 {
+		t.Fatalf("threat.preview: %+v %v", p, err)
+	}
+	if err := c.ThreatInstallStart(); err != nil {
+		t.Fatalf("threat.install: %v", err)
+	}
+	if err := c.ThreatApply(threatcfg.Plan{Enabled: true, Ifaces: []string{"lan0"}, Preset: "light"}); err != nil || nc.threat.Preset != "light" || nc.threat.Ifaces[0] != "lan0" {
+		t.Fatalf("threat.apply: %v %+v", err, nc.threat)
+	}
+	if err := c.ThreatUpdateRules(); err != nil {
+		t.Fatalf("threat.update: %v", err)
+	}
+	if err := c.ThreatRollback(); err != nil {
+		t.Fatalf("threat.rollback: %v", err)
+	}
+	if err := c.ThreatRemove(); err != nil {
+		t.Fatalf("threat.remove: %v", err)
+	}
 	if err := c.call("nope.nothing", nil, nil); err == nil {
 		t.Fatal("a made-up method was accepted")
 	}
@@ -194,4 +217,15 @@ func (f *fakeNetCtl) FlowAcct(on bool) error                           { return 
 func (f *fakeNetCtl) ConntrackDump() (string, error)                   { return "", nil }
 func (f *fakeNetCtl) SQMApply(p netd.SQMPlan) (string, error)          { return "cake", nil }
 func (f *fakeNetCtl) OverrideApply(p netd.OverridePlan) error          { return nil }
-func (f *fakeNetCtl) SSHLog(since int64) ([]string, error)             { return nil, nil }
+func (f *fakeNetCtl) ThreatStatus() netd.ThreatInfo {
+	return netd.ThreatInfo{Installed: true, State: "idle"}
+}
+func (f *fakeNetCtl) ThreatInstallPreview() (netd.ThreatPreview, error) {
+	return netd.ThreatPreview{Packages: []string{"suricata"}}, nil
+}
+func (f *fakeNetCtl) ThreatInstallStart() error            { return nil }
+func (f *fakeNetCtl) ThreatRemove() error                  { return nil }
+func (f *fakeNetCtl) ThreatApply(p threatcfg.Plan) error   { f.threat = p; return nil }
+func (f *fakeNetCtl) ThreatUpdateRules() error             { return nil }
+func (f *fakeNetCtl) ThreatRollback() error                { return nil }
+func (f *fakeNetCtl) SSHLog(since int64) ([]string, error) { return nil, nil }

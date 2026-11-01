@@ -22,7 +22,8 @@ The picture is an example from a new, empty box; yours will show your own device
 
 Each row shows the internet connection or VPN it left through. For a DNS lookup that is the connection Gatehouse itself used to ask the DNS server; a lookup answered from memory shows none.
 
-4. Gatehouse's own health checks are hidden. To see them, turn on **Show Gatehouse's own checks**.
+4. Protection features that failed leave a line here: a block that went wrong (once an hour), threat watching that stopped, or threat watching that Gatehouse switched off for using too much of the machine. Your traffic is not held up in any of these cases.
+5. Gatehouse's own health checks are hidden. To see them, turn on **Show Gatehouse's own checks**.
 
 ## Example
 Search for a game console, set the range to 1 h, and click a blocked row. **Allow this** makes a rule for exactly that traffic.

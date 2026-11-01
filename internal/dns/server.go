@@ -43,6 +43,8 @@ type Server struct {
 	// Scoped answers, for one lookup, the reason it is blocked by a scope rule, or "" if it is not.
 	// Set once before the server starts.
 	Scoped func(client string, ci ClientInfo, name string) string
+	// OnScopedFault is told when the Scoped hook crashed and the lookup was let through.
+	OnScopedFault func()
 	via    viaSet
 	rl     *RateLimiter
 	eng    engineHolder
@@ -431,6 +433,9 @@ func (s *Server) scopedRule(client string, ci ClientInfo, name string) (rule str
 	defer func() {
 		if recover() != nil {
 			rule = ""
+			if s.OnScopedFault != nil {
+				s.OnScopedFault()
+			}
 		}
 	}()
 	return s.Scoped(client, ci, name)
