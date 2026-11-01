@@ -1,6 +1,21 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.42',
+    title: 'DNS lookups show their connection',
+    items: [
+      'In the Logs, a DNS lookup now shows which internet connection it left through (for example T-Mobile), the same way other connections do. A lookup sent through a VPN still shows the VPN. Lookups answered from memory leave nothing, so they stay blank, and lookups logged before this version stay blank too.',
+    ],
+  },
+  {
+    version: '0.8.41',
+    title: 'Internet page in tabs',
+    items: [
+      'The Internet page is split into tabs: Connections (your connections and how they share the work), Speed, Troubleshoot (network tools and "Why can\'t it reach that?") and Usage (data use and the monthly provider report). Warnings stay above the tabs, and the tab you chose is remembered.',
+      'Includes the 0.8.40 build fix for the help chapters.',
+    ],
+  },
+  {
     version: '0.8.40',
     title: 'Build fix',
     items: [

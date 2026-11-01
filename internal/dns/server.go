@@ -37,14 +37,17 @@ type Server struct {
 	// Route says how a client's lookups must travel (through a VPN tunnel or the normal connection).
 	// Nil means everyone uses the normal connection.
 	Route func(client string) Path
-	via   viaSet
-	rl    *RateLimiter
-	eng   engineHolder
-	local localHolder
-	dir   Directory
-	names Names
-	qlog  *QueryLog
-	stats *Stats
+	// Egress names the device the box's own lookups leave through when no tunnel is used, so the
+	// log can show which internet connection carried them. Nil leaves it blank.
+	Egress func() string
+	via    viaSet
+	rl     *RateLimiter
+	eng    engineHolder
+	local  localHolder
+	dir    Directory
+	names  Names
+	qlog   *QueryLog
+	stats  *Stats
 
 	// OnRateLimited is called at most once per client per minute.
 	OnRateLimited func(client string)
@@ -279,6 +282,9 @@ func (s *Server) handle(client string, r *dns.Msg, start time.Time, udp bool) *d
 	}
 	if u != nil {
 		upName = u.Name
+	}
+	if entry.Via == "" && s.Egress != nil {
+		entry.Via = s.Egress()
 	}
 	resp.Id = r.Id
 	cache.Put(q, do, resp)

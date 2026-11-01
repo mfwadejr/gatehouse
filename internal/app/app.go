@@ -153,6 +153,7 @@ func New(cfg Config) (*App, error) {
 	pool := dnssrv.NewPool([]string{"1.1.1.1:53", "9.9.9.9:53"})
 	a.DNS = dnssrv.NewServer(a.dnsOptions(), pool, a.Devices, namesAdapter{a.DHCP}, a.QLog)
 	a.DNS.Route = a.dnsPath
+	a.DNS.Egress = defaultEgress
 	a.Lists = dnssrv.NewManager(a.Config, filepath.Join(cfg.DataDir, "lists"), nil)
 	a.DNS.NewManager(a.Lists)
 	if err := a.Lists.SeedDefaults(); err != nil {

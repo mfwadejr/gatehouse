@@ -313,10 +313,24 @@ func (a *App) logSearch(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 			f.NotResult = "blocked"
 		}
 		if rows, err := a.QLog.Search(f); err == nil {
+			zones := map[string]string{} // a device's network, looked up once per address
 			for _, r := range rows {
 				it := dnsItem(r)
 				if r.Via != "" {
 					it.Via, it.ViaKind = a.viaOf(r.Via)
+				}
+				// Which network asked, and where the lookup went: out to the internet when
+				// Gatehouse had to ask a DNS server, otherwise answered by Gatehouse itself.
+				z, ok := zones[r.Client]
+				if !ok {
+					z = a.deviceZone(r.Client)
+					zones[r.Client] = z
+				}
+				if z != "" {
+					it.FromZone, it.ToZone = z, "Gatehouse"
+					if it.Via != "" {
+						it.ToZone = "Internet"
+					}
 				}
 				items = append(items, it)
 			}

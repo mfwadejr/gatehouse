@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	dnssrv "gatehouse/internal/dns"
 	"gatehouse/internal/netd"
 )
 
@@ -80,5 +81,45 @@ func decode(t *testing.T, r *httptest.ResponseRecorder, v any) {
 	t.Helper()
 	if err := json.Unmarshal(r.Body.Bytes(), v); err != nil {
 		t.Fatalf("%v: %s", err, r.Body.String())
+	}
+}
+
+// A DNS lookup shows the network that asked and the connection it left through, like the other rows.
+func TestDNSRowsShowNetworkAndConnection(t *testing.T) {
+	web, dnsAddr := freeAddr(t), freeAddr(t)
+	a, err := New(Config{DataDir: t.TempDir(), WebAddr: web, DNSAddrs: []string{dnsAddr}, Net: &fakeNet{}, FW: &fakeFW{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	addVLAN(t, a, "eth1.20", "Cameras", 20, "eth1", true)
+	if _, err := a.Config.Exec(`INSERT INTO wan_links(name,iface,type,enabled,priority) VALUES('T-Mobile','eth0','dhcp',1,1)`); err != nil {
+		t.Fatal(err)
+	}
+	stop := make(chan struct{})
+	defer close(stop)
+	go a.QLog.Run(stop)
+	now := time.Now().Unix()
+	a.QLog.Add(dnssrv.LogEntry{TS: now - 2, Client: "192.168.20.107", QName: "play.hulu.com", QType: "A", Result: "forwarded", Upstream: "Cloudflare", Via: "eth0"})
+	a.QLog.Add(dnssrv.LogEntry{TS: now - 1, Client: "192.168.20.107", QName: "cached.example.org", QType: "A", Result: "cached"})
+	var items []LogItem
+	for i := 0; i < 50 && len(items) < 2; i++ {
+		var out struct{ Items []LogItem }
+		rr := newRec()
+		a.logSearch(rr, newReq("/api/logs?kind=dns"), nil)
+		decode(t, rr, &out)
+		if items = out.Items; len(items) < 2 {
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+	if len(items) != 2 {
+		t.Fatalf("rows: %+v", items)
+	}
+	cached, fwd := items[0], items[1]
+	if fwd.Via != "T-Mobile" || fwd.ViaKind != "wan" || fwd.FromZone != "Cameras" || fwd.ToZone != "Internet" {
+		t.Fatalf("forwarded lookup: %+v", fwd)
+	}
+	if cached.Via != "" || cached.FromZone != "Cameras" || cached.ToZone != "Gatehouse" {
+		t.Fatalf("cached lookup: %+v", cached)
 	}
 }

@@ -8,10 +8,12 @@ Where your internet comes from: the cable from your modem, how your provider con
 The picture is an example from a new, empty box; yours will show your own devices and numbers.
 
 ## What is on the page
-- **Internet connections**: one row per connection with its state in words (Working, No link, No internet), its port and its delay. **Add connection** adds a second one.
+Tabs along the top: **Connections**, **Speed**, **Troubleshoot** and **Usage**. Warnings stay above the tabs, and the tab you pick is remembered. **Speed** appears once a connection is switched on; the last two are for administrators.
+
+- **Connections**: **Internet connections**: one row per connection with its state in words (Working, No link, No internet), its port and its delay. **Add connection** adds a second one.
 - **Edit** a connection to change its **Name**, the port the cable is plugged into, and **How does your provider connect you?** (**Automatic**, **Username and password**, or **Fixed address**). **Who is your provider?** fills in the usual settings for known providers. Advanced options include **VLAN number**, **IPv6**, **Check by**, **Order**, **Share of traffic** and **Packet size (MTU)**.
-- **Test my internet** and the speed test show how fast the connection is.
-- **Provider report card** and **Data use and limit** keep a month of outages and speed to show your provider, and an optional monthly limit.
+- **Speed**: **Speed test history**, **Test servers**, and **Keep delay low when the line is busy**, which stops one big download from slowing everything else.
+- **Troubleshoot** holds **Test my internet**, **Tools**, and **Why can't it reach that?**. **Usage**: **Provider report card** and **Data use and limit** keep a month of outages and speed to show your provider, and an optional monthly limit.
 
 ## Common tasks
 1. Add a second connection: **Add connection**, choose the port (Gatehouse notices a cable as you plug it in), choose how your provider connects you, **Save**, then **Review and apply**.

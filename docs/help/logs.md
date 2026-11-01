@@ -20,6 +20,8 @@ The picture is an example from a new, empty box; yours will show your own device
 2. Block a destination: click its row, then **Block this**.
 3. See which devices use a VPN: look at **Out through**.
 
+Each row shows the internet connection or VPN it left through. For a DNS lookup that is the connection Gatehouse itself used to ask the DNS server; a lookup answered from memory shows none.
+
 ## Example
 Search for a game console, set the range to 1 h, and click a blocked row. **Allow this** makes a rule for exactly that traffic.
 

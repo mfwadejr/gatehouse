@@ -281,7 +281,7 @@ export default function Logs() {
                             <div className="l2 small muted">{sub}</div>
                           </td>
                         )}
-                        {show('where') && <td className="small">{conn ? <>{r.from_zone} → {r.to_zone}</> : <span className="muted">–</span>}</td>}
+                        {show('where') && <td className="small">{(conn || r.from_zone) && r.to_zone ? <>{r.from_zone} → {r.to_zone}</> : <span className="muted">–</span>}</td>}
                         {show('via') && <td className="small">{r.via ? <Pill tone={r.via_kind === 'tunnel' ? 'good' : ''}>{r.via}</Pill> : <span className="muted">–</span>}</td>}
                         {show('result') && <td className="nowrap"><Pill tone={tone}>{label}</Pill></td>}
                         {show('why') && <td className="small sec"><div className="l1">{r.why}</div></td>}

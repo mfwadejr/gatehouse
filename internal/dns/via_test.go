@@ -116,3 +116,27 @@ func TestKillSwitchHoldsLookupsAndTheirAbsenceFallsBack(t *testing.T) {
 		t.Fatalf("a strict lookup fell back: rcode=%d normal=%d", a.Rcode, normal.Load())
 	}
 }
+
+func TestEgressIsAskedOnlyForLookupsThatLeaveTheNormalWay(t *testing.T) {
+	addr, _, stop := tunnelResolver(t)
+	defer stop()
+	s, normal, _ := viaServer(t, addr, func(c string) Path {
+		if c == "192.168.1.20" {
+			return Path{Dev: "tun0"}
+		}
+		return Path{}
+	})
+	var asked atomic.Int32
+	s.Egress = func() string { asked.Add(1); return "eth1" }
+	ask := func(client, name string) {
+		q := new(dns.Msg)
+		q.SetQuestion(name, dns.TypeA)
+		s.Resolve(client, q)
+	}
+	ask("192.168.1.30", "one.example.org.") // normal way: the connection is looked up
+	ask("192.168.1.30", "one.example.org.") // from the cache: nothing left, nothing asked
+	ask("192.168.1.20", "two.example.org.") // through the tunnel: the tunnel is the answer
+	if normal.Load() != 1 || asked.Load() != 1 {
+		t.Fatalf("normal=%d egress asked=%d, want 1 and 1", normal.Load(), asked.Load())
+	}
+}

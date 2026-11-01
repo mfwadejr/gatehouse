@@ -3,7 +3,7 @@ import { del, put, useData } from '../api.js';
 import ApplyBar from '../ApplyBar.jsx';
 import WanGroups, { Traffic } from './WanGroups.jsx';
 import SpeedTest from './SpeedTest.jsx';
-import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, ToggleRow, useAction, useToast, fmt, confirmBox, usePortNames } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, Tabs, ToggleRow, useAction, useToast, fmt, confirmBox, usePortNames } from '../ui.jsx';
 import { linkState, linkMeasure } from '../linkstate.js';
 import NatNotice from '../natnotice.jsx';
 import NetTools from './NetTools.jsx';
@@ -147,6 +147,14 @@ function QuickSetup({ ports, found, onDone }) {
 }
 
 
+const TAB_KEY = 'gh.internet.tab';
+const readTab = (tabs) => {
+  const seg = window.location.hash.replace(/^#\/?/, '').split('/')[1];
+  if (tabs.some((t) => t.value === seg)) return seg;
+  try { const v = localStorage.getItem(TAB_KEY); if (tabs.some((t) => t.value === v)) return v; } catch { /* ignore */ }
+  return 'connections';
+};
+
 export default function Internet({ me }) {
   const pn = usePortNames();
   const { data: wd, reload: rw } = useData('/api/net/wans', { topics: ['net.status'] });
@@ -162,6 +170,26 @@ export default function Internet({ me }) {
   const all = () => { rw(); ri(); rs(); };
   const links = st?.links || {};
   const stat = st?.status;
+  const admin = !!me && me.user?.role === 'admin';
+  const tabs = [
+    { value: 'connections', label: 'Connections' },
+    ...(wans.some((w) => w.enabled) ? [{ value: 'speed', label: 'Speed' }] : []),
+    ...(admin ? [{ value: 'troubleshoot', label: 'Troubleshoot' }, { value: 'usage', label: 'Usage' }] : []),
+  ];
+  const [want, setWant] = useState(() => readTab([{ value: 'connections' }, { value: 'speed' }, { value: 'troubleshoot' }, { value: 'usage' }]));
+  // Links can open a tab with #/internet/<tab>; a tab that is not available falls back to Connections.
+  useEffect(() => {
+    const on = () => { if (window.location.hash.replace(/^#\/?/, '').split('/')[0] === 'internet') setWant(readTab([{ value: 'connections' }, { value: 'speed' }, { value: 'troubleshoot' }, { value: 'usage' }])); };
+    window.addEventListener('hashchange', on);
+    return () => window.removeEventListener('hashchange', on);
+  }, []);
+  const tab = tabs.some((t) => t.value === want) ? want : 'connections';
+  const choose = (v) => {
+    setWant(v);
+    try { localStorage.setItem(TAB_KEY, v); } catch { /* ignore */ }
+    window.history.replaceState(null, '', `#/internet/${v}`);
+  };
+  const showTabs = !isNew && tabs.length > 1;
 
   return (
     <Page title="Internet" sub="How this device connects to your internet provider. Your own networks are on the Networks page.">
@@ -169,7 +197,8 @@ export default function Internet({ me }) {
       {!stat?.helper && stat && <Note tone="warn" title="Network changes are unavailable">The network helper is not running, so connections can be viewed but not changed.</Note>}
 
       <NatNotice />
-      {wans.length > 0 || !isNew ? (
+      {showTabs && <Tabs value={tab} onChange={choose} tabs={tabs} />}
+      {(!showTabs || tab === 'connections') && (wans.length > 0 || !isNew) ? (
         <Card title="Internet connections" actions={<Button icon="plus" onClick={() => setEdit({})}>Add connection</Button>}
           desc={wans.length > 1 ? 'Choose how these share the work, or send certain devices through specific ones, in Connection groups below.' : undefined}>
           {wans.length === 0 ? <Empty>No connection yet.</Empty> : (
@@ -197,13 +226,10 @@ export default function Internet({ me }) {
         </Card>
       ) : null}
 
-      <WanGroups wans={wans} links={links} onChanged={all} />
-      <Traffic wans={wans} links={links} />
-      {wans.some((w) => w.enabled) && <SpeedTest wans={wans} links={links} />}
-      {(!isNew && !!me && me.user?.role === 'admin') && <NetTools />}
-      {(!isNew && !!me && me.user?.role === 'admin') && <Why />}
-      {(!isNew && !!me && me.user?.role === 'admin') && <DataUse />}
-      {(!isNew && !!me && me.user?.role === 'admin') && <IspReport />}
+      {(!showTabs || tab === 'connections') && <><WanGroups wans={wans} links={links} onChanged={all} /><Traffic wans={wans} links={links} /></>}
+      {(!showTabs || tab === 'speed') && wans.some((w) => w.enabled) && <SpeedTest wans={wans} links={links} />}
+      {showTabs && tab === 'troubleshoot' && <><NetTools /><Why /></>}
+      {showTabs && tab === 'usage' && <><DataUse /><IspReport /></>}
 
       {edit && <WanForm initial={edit} wans={wans} ports={ports} found={found} onClose={() => setEdit(null)} onSaved={all} />}
       <ApplyBar kind="net" label="your network settings" status={stat} me={me} onChanged={all} />
