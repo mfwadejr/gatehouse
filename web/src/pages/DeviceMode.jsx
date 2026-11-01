@@ -220,7 +220,7 @@ export default function DeviceMode() {
   const { data, reload } = useData('/api/mode', { topics: ['fw.status', 'net.status'], every: 4000 });
   const [open, setOpen] = useState(false);
   if (!data) return null;
-  const pair = () => { const d = document.querySelector('details.more'); if (d) { d.open = true; d.scrollIntoView({ behavior: 'smooth' }); } };
+  const pair = () => { window.location.hash = '#/settings/advanced'; setTimeout(() => document.getElementById('set-ha')?.scrollIntoView({ behavior: 'smooth' }), 200); };
   return (
     <Card title="Device mode" desc="How this box works on your network."
       actions={<Pill tone={data.mode === 'bridge' ? 'info' : 'good'}>{data.mode === 'bridge' ? 'Bridge' : 'Router'}</Pill>}>

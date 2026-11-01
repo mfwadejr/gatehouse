@@ -1,6 +1,15 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.37',
+    title: 'Settings in tabs',
+    items: [
+      'Settings is split into five tabs like the Firewall page: General (Device mode, Updates, Power, Console address, Appearance), Account and sign-in (Two-factor, Password, where you are signed in, Remote login), Alerts and logs (Alerts, syslog, traffic records, SNMP), Backup and recovery (Backups, Changes, printable summary, Reset) and Advanced (High availability, Bridge mode, Traffic labels, Guest sign-in page).',
+      'The page reopens on the tab you used last. Search takes you straight to the right tab, and "Set up a pair" on the Device mode card opens High availability.',
+      'People who are not administrators see only their own sign-in settings and Appearance, with no tabs.',
+    ],
+  },
+  {
     version: '0.8.36',
     title: 'Build fix',
     items: [

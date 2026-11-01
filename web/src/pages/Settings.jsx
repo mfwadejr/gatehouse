@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { del, get, post, put, useData } from '../api.js';
-import { Guard, Button, Card, Empty, Field, Form, Input, Modal, Note, Page, Pill, Segmented, Select, ToggleRow, useAction, fmt, useStepUp, stepReady, StepUp } from '../ui.jsx';
+import { Guard, Button, Card, Empty, Field, Form, Input, Modal, Note, Page, Pill, Segmented, Select, Tabs, ToggleRow, useAction, fmt, useStepUp, stepReady, StepUp } from '../ui.jsx';
 import { Enrol } from './Auth.jsx';
 import Backups from './Backups.jsx';
 import Changes from './Changes.jsx';
@@ -393,29 +393,82 @@ function Updates({ me }) {
   );
 }
 
+const TABS = [
+  { value: 'general', label: 'General' },
+  { value: 'account', label: 'Account & sign-in' },
+  { value: 'alerts', label: 'Alerts & logs' },
+  { value: 'backup', label: 'Backup & recovery' },
+  { value: 'advanced', label: 'Advanced' },
+];
+const TAB_KEY = 'gh.settings.tab';
+const readTab = () => {
+  const seg = window.location.hash.replace(/^#\/?/, '').split('/')[1];
+  if (TABS.some((t) => t.value === seg)) return seg;
+  try { const v = localStorage.getItem(TAB_KEY); if (TABS.some((t) => t.value === v)) return v; } catch { /* ignore */ }
+  return 'general';
+};
+
 export default function Settings({ me, reloadMe }) {
   const { data, reload } = useData('/api/auth/me', { every: 60000 });
+  const admin = me?.user?.role === 'admin';
+  const [tab, setTab] = useState(readTab);
+  // Search and links can open a tab with #/settings/<tab>.
+  useEffect(() => {
+    const on = () => { if (window.location.hash.replace(/^#\/?/, '').split('/')[0] === 'settings') setTab(readTab()); };
+    window.addEventListener('hashchange', on);
+    return () => window.removeEventListener('hashchange', on);
+  }, []);
+  const choose = (v) => {
+    setTab(v);
+    try { localStorage.setItem(TAB_KEY, v); } catch { /* ignore */ }
+    window.history.replaceState(null, '', `#/settings/${v}`);
+  };
   return (
-    <Page title="Settings" sub="Your account and how you sign in.">
-      {me?.user?.role === 'admin' && <Guard what="Device mode"><DeviceMode /></Guard>}
-      <TwoStep me={me} data={data} reload={reload} boot={reloadMe} />
-      {me?.user?.role === 'admin' && <Guard what="Updates"><Updates me={me} /></Guard>}
-      {me?.user?.role === 'admin' && <Guard what="PowerCard"><PowerCard me={me} /></Guard>}
-      {me?.user?.role === 'admin' && <Guard what="ConsolePort"><ConsolePort /></Guard>}
-      {me?.user?.role === 'admin' && <Guard what="Alerts"><Alerts /></Guard>}
-      {me?.user?.role === 'admin' && <Guard what="RemoteLogin"><RemoteLogin me={me} /></Guard>}
-      {me?.user?.role === 'admin' && (
-        <Card title="My network" desc="A printable summary for a handover or your records: networks, addresses, devices, open ports and how to get back in. It never contains passwords or keys.">
-          <a className="btn" href="/api/summary/print" target="_blank" rel="noreferrer">Open the printable page</a>
-        </Card>
+    <Page title="Settings" sub="Your account and how this box is run.">
+      {admin && <Tabs value={tab} onChange={choose} tabs={TABS} />}
+      {admin && tab === 'general' && (
+        <>
+          <Guard what="Device mode"><DeviceMode /></Guard>
+          <Guard what="Updates"><Updates me={me} /></Guard>
+          <Guard what="PowerCard"><PowerCard me={me} /></Guard>
+          <Guard what="ConsolePort"><ConsolePort /></Guard>
+        </>
       )}
-      {me?.user?.role === 'admin' && <Guard what="Changes"><Changes me={me} /></Guard>}
-      {me?.user?.role === 'admin' && <details className="more"><summary>Advanced</summary><Guard what="High availability"><HighAvailability me={me} /></Guard><Guard what="Bridge mode"><BridgeMode /></Guard><Guard what="Traffic labels"><TrafficLabels /></Guard><Guard what="Syslog"><Syslog /></Guard><Guard what="Guest sign-in page"><GuestPortal /></Guard><Guard what="Flow export"><FlowExport /></Guard><Guard what="SNMP"><Snmp /></Guard></details>}
-      {me?.user?.role === 'admin' && <Guard what="Backups"><Backups me={me} /></Guard>}
-      {me?.user?.role === 'admin' && <Guard what="ResetCard"><ResetCard me={me} /></Guard>}
-      <Password />
-      <Sessions />
-      <Appearance />
+      {(!admin || tab === 'account') && (
+        <>
+          <TwoStep me={me} data={data} reload={reload} boot={reloadMe} />
+          <Password />
+          <Sessions />
+          {admin && <Guard what="RemoteLogin"><RemoteLogin me={me} /></Guard>}
+        </>
+      )}
+      {admin && tab === 'alerts' && (
+        <>
+          <Guard what="Alerts"><Alerts /></Guard>
+          <Guard what="Syslog"><Syslog /></Guard>
+          <Guard what="Flow export"><FlowExport /></Guard>
+          <Guard what="SNMP"><Snmp /></Guard>
+        </>
+      )}
+      {admin && tab === 'backup' && (
+        <>
+          <Guard what="Backups"><Backups me={me} /></Guard>
+          <Guard what="Changes"><Changes me={me} /></Guard>
+          <Card title="My network" desc="A printable summary for a handover or your records: networks, addresses, devices, open ports and how to get back in. It never contains passwords or keys.">
+            <a className="btn" href="/api/summary/print" target="_blank" rel="noreferrer">Open the printable page</a>
+          </Card>
+          <Guard what="ResetCard"><ResetCard me={me} /></Guard>
+        </>
+      )}
+      {admin && tab === 'advanced' && (
+        <>
+          <div id="set-ha"><Guard what="High availability"><HighAvailability me={me} /></Guard></div>
+          <Guard what="Bridge mode"><BridgeMode /></Guard>
+          <Guard what="Traffic labels"><TrafficLabels /></Guard>
+          <Guard what="Guest sign-in page"><GuestPortal /></Guard>
+        </>
+      )}
+      {(!admin || tab === 'general') && <Appearance />}
     </Page>
   );
 }
