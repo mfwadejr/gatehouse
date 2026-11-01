@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { del, post, put, useData } from '../api.js';
 import { CODES, countryName } from '../AddrPicker.jsx';
 import { go } from '../App.jsx';
-import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, Select, ToggleRow, useAction, confirmBox } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, Select, ToggleRow, useAction, useUndoDelete } from '../ui.jsx';
 
 const STATE = {
   working: { tone: 'good', label: 'Working' },
@@ -105,6 +105,7 @@ function RouteForm({ initial, targets, onClose, onSaved }) {
 export default function Routes() {
   const { data, reload } = useData('/api/routes', { topics: ['vpn.status', 'net.status'], every: 15000 });
   const [run] = useAction();
+  const undoDelete = useUndoDelete();
   const [edit, setEdit] = useState(null);
   const routes = data?.routes || [];
   const targets = data?.targets || [];
@@ -139,7 +140,7 @@ export default function Routes() {
                   <Button small aria-label="Move down" disabled={i === routes.length - 1} onClick={() => move(i, 1)}>↓</Button>
                   <Button small onClick={() => run(() => put('/api/routes', { ...body(r), enabled: !r.enabled }), r.enabled ? 'Paused.' : 'Turned on.').then(again)}>{r.enabled ? 'Pause' : 'Turn on'}</Button>
                   <Button small icon="edit" onClick={() => setEdit(r)}>Edit</Button>
-                  <Button small kind="danger" icon="trash" onClick={async () => await confirmBox(`Remove "${r.name}"?\nThe traffic goes back to using your normal connection.`) && run(() => del(`/api/routes/${r.id}`), 'Removed.').then(again)}>Remove</Button>
+                  <Button small kind="danger" icon="trash" onClick={() => undoDelete(`The route "${r.name}"`, () => del(`/api/routes/${r.id}`), () => put('/api/routes', { ...body(r), id: undefined }), again)}>Remove</Button>
                 </div>
               </div>
             );

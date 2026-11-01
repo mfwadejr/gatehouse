@@ -482,3 +482,6 @@ ul.notes { margin: 0 0 var(--space-3); padding-left: 1.2rem; display: flex; flex
 
 /* Cards opened inside a "more" section keep the same gap as cards on the page */
 details.more > .card { margin-top: var(--space-3); }
+
+.helplink { color: var(--color-text-muted); text-decoration: none; align-self: center; white-space: nowrap; }
+.helplink:hover { text-decoration: underline; color: var(--color-text-primary); }

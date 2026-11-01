@@ -7,3 +7,4 @@ node_modules/
 web/dist/*
 !web/dist/.gitkeep
 web/src/tokens.css
+web/public/help/

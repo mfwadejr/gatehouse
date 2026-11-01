@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { del, post, put, useData } from '../api.js';
 import { AddrPicker, Chip, NewDevice, ScheduleEditor, ServicePicker, tokens } from '../AddrPicker.jsx';
-import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Paged, Pill, Segmented, Select, ToggleRow, useAction, fmt, confirmBox, noticeBox, useUndoDelete } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Paged, Pill, Segmented, Select, ToggleRow, useAction, fmt, noticeBox, useUndoDelete } from '../ui.jsx';
 
 const ACTIONS = [{ value: 'accept', label: 'Allow' }, { value: 'drop', label: 'Block silently' }, { value: 'reject', label: 'Block and tell the sender' }];
 // Only the fields the server stores; it refuses anything else.
@@ -309,7 +309,7 @@ export function GroupsAndLists({ pickers, reloadPickers, reload }) {
               <div><div className="name">👥 {g.name} {g.reserved_only && <Pill>Reserved addresses only</Pill>}</div>
                 <div className="meta">{g.members.length ? g.members.slice(0, 6).map(deviceName).join(', ') + (g.members.length > 6 ? ` and ${g.members.length - 6} more` : '') : 'No devices yet'}</div></div>
               <div className="actions"><Button small icon="edit" onClick={() => setEg(g)}>Edit</Button>
-                <Button small kind="danger" icon="trash" onClick={async () => await confirmBox(`Delete the group "${g.name}"?`) && run(() => del(`/api/fw/groups/${g.id}`)).then(refresh)}>Delete</Button></div>
+                <Button small kind="danger" icon="trash" onClick={() => undoDelete(`The group "${g.name}"`, () => del(`/api/fw/groups/${g.id}`), () => put('/api/fw/groups', { ...g, id: undefined }), refresh)}>Delete</Button></div>
             </div>
           ))}
           {!pickers?.groups?.length && <Empty>No groups yet.</Empty>}

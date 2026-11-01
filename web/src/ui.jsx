@@ -56,6 +56,12 @@ export function Card({ title, desc, actions, children, className = '', enter = f
   );
 }
 
+const HELP_PAGES = ['overview', 'internet', 'networks', 'wifi', 'dns', 'dhcp', 'firewall', 'services', 'vpn', 'routes', 'profiles', 'devices', 'logs', 'settings'];
+function helpPage() {
+  const id = (window.location.hash.replace(/^#\/?/, '') || 'overview').split('/')[0];
+  return HELP_PAGES.includes(id) ? `${id}.html` : '';
+}
+
 export function Page({ title, sub, actions, children }) {
   const stale = useFailing();
   return (
@@ -65,7 +71,7 @@ export function Page({ title, sub, actions, children }) {
           <h1>{title}</h1>
           {sub && <p className="sub">{sub}</p>}
         </div>
-        {actions && <div className="actions">{actions}</div>}
+        <div className="actions">{actions}<a className="helplink small" href={`/help/${helpPage()}`} target="_blank" rel="noopener">Help with this page</a></div>
       </header>
       {stale && (
         <div className="stalenote small" role="status">

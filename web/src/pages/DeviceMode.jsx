@@ -41,7 +41,7 @@ function PortList({ ports, value, onPick, off = [], pn, here }) {
 
 const sentenceList = (a) => (a.length < 2 ? a.join('') : `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}`);
 
-function Walk({ data, onClose, onApplied }) {
+function Walk({ data, start, onClose, onApplied }) {
   const pn = usePortNames();
   const toast = useToast();
   const [run, busy] = useAction();
@@ -49,8 +49,8 @@ function Walk({ data, onClose, onApplied }) {
   const here = data.current || [];
   const live = data.bridge;
   const draft = data.draft || {};
-  const [step, setStep] = useState(1);
-  const [mode, setMode] = useState(data.mode);
+  const [step, setStep] = useState(start && !data.paired ? 2 : 1);
+  const [mode, setMode] = useState(start || data.mode);
   const [internet, setInternet] = useState('');
   const [outside, setOutside] = useState(live?.enabled ? live.outside : '');
   const [inside, setInside] = useState(live?.enabled ? live.inside : here);
@@ -219,6 +219,14 @@ function Walk({ data, onClose, onApplied }) {
 export default function DeviceMode() {
   const { data, reload } = useData('/api/mode', { topics: ['fw.status', 'net.status'], every: 4000 });
   const [open, setOpen] = useState(false);
+  const [start, setStart] = useState('');
+  // The first-run wizard can send the person here to set up a bridge.
+  useEffect(() => {
+    if (!data) return;
+    let v = '';
+    try { v = sessionStorage.getItem('gh.mode.start') || ''; sessionStorage.removeItem('gh.mode.start'); } catch { /* ignore */ }
+    if (v === 'bridge') { setStart('bridge'); setOpen(true); }
+  }, [!!data]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!data) return null;
   const pair = () => { window.location.hash = '#/settings/advanced'; setTimeout(() => document.getElementById('set-ha')?.scrollIntoView({ behavior: 'smooth' }), 200); };
   return (
@@ -237,7 +245,7 @@ export default function DeviceMode() {
           </>
         )}
       </div>
-      {open && <Walk data={data} onClose={() => setOpen(false)} onApplied={() => { setOpen(false); reload(); }} />}
+      {open && <Walk data={data} start={start} onClose={() => { setOpen(false); setStart(''); }} onApplied={() => { setOpen(false); reload(); }} />}
     </Card>
   );
 }

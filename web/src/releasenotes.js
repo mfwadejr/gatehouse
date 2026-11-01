@@ -1,6 +1,16 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.39',
+    title: 'Built-in help, and undo instead of "Are you sure?"',
+    items: [
+      'Every page now has a "Help with this page" link. The help is built into Gatehouse, so it works with no internet: one chapter per page with a picture, a Getting started guide, a guide for when you are locked out, and a reference. It is also at /help/ on your box.',
+      'Deleting a firewall group or a route no longer asks "Are you sure?". It is removed at once and a message offers Undo for a few seconds, which puts it back exactly as it was.',
+      'The first-run setup now offers Bridge as a third choice next to the router choices, and walks you into the bridge steps.',
+      'A new help chapter, "How easy is it?", lists the everyday jobs and how many steps each takes. Opening a port by hand (6 steps) is the longest and is next to shorten.',
+    ],
+  },
+  {
     version: '0.8.38',
     title: 'Build fix',
     items: [

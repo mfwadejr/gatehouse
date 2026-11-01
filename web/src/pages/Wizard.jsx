@@ -59,6 +59,7 @@ export default function Wizard({ data, me, onDone }) {
   const [found, setFound] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [step, setStep] = useState('mode');
+  const [wantBridge, setWantBridge] = useState(false);
   const [net, setNet] = useState(() => {
     // The installer already asked which port is the internet and which is your network.
     const ins = data.install || {};
@@ -110,16 +111,28 @@ export default function Wizard({ data, me, onDone }) {
       <Frame title="How will Gatehouse be used?" step={sn} of={order.length}>
         <p className="sec">You can change any of this later. Nothing is switched on until you finish.</p>
         <div className="stack">
-          <button type="button" className={`preset ${router ? 'on' : ''}`} aria-pressed={router} onClick={() => setLan('mode')('router')}>
+          <button type="button" className={`preset ${router && !wantBridge ? 'on' : ''}`} aria-pressed={router && !wantBridge} onClick={() => { setWantBridge(false); setLan('mode')('router'); }}>
             <span className="t">Gatehouse is my router</span>
             <span className="d">It hands out addresses to your devices (DHCP), runs DNS, and connects you to the internet.</span>
           </button>
-          <button type="button" className={`preset ${!router ? 'on' : ''}`} aria-pressed={!router} onClick={() => setNet((m) => ({ ...m, lan: { ...m.lan, mode: 'behind' }, wan: null }))}>
+          <button type="button" className={`preset ${!router && !wantBridge ? 'on' : ''}`} aria-pressed={!router && !wantBridge} onClick={() => { setWantBridge(false); setNet((m) => ({ ...m, lan: { ...m.lan, mode: 'behind' }, wan: null })); }}>
             <span className="t">Gatehouse sits behind my existing router</span>
             <span className="d">Another router stays in charge of addresses and the internet. Gatehouse adds DNS filtering and a firewall for devices on this network.</span>
           </button>
+          <button type="button" className={`preset ${wantBridge ? 'on' : ''}`} aria-pressed={wantBridge} onClick={() => setWantBridge(true)}>
+            <span className="t">Gatehouse filters between my router and my devices (bridge)</span>
+            <span className="d">It passes traffic through without routing and filters it. Your other router keeps handing out addresses. You plug in the cables and keep the change in the next screen, with a 60-second way back.</span>
+          </button>
         </div>
-        <div className="actions"><Button onClick={() => finish(true)} disabled={busy}>Skip for now</Button><Button kind="primary" onClick={() => setStep(router ? 'internet' : 'network')}>Next</Button></div>
+        <div className="actions"><Button onClick={() => finish(true)} disabled={busy}>Skip for now</Button><Button kind="primary" disabled={busy} onClick={() => {
+          if (wantBridge) {
+            try { sessionStorage.setItem('gh.mode.start', 'bridge'); } catch { /* ignore */ }
+            window.location.hash = '#/settings/general';
+            finish(true);
+            return;
+          }
+          setStep(router ? 'internet' : 'network');
+        }}>Next</Button></div>
         {err && <Note tone="bad">{err}</Note>}
       </Frame>
     );
