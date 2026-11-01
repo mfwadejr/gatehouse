@@ -80,7 +80,7 @@ func (a *App) setThreatOffSIDs(ids []int) {
 func (a *App) threatPlan() threatcfg.Plan {
 	return threatcfg.Plan{
 		Enabled: a.threatMode() == "watch", Ifaces: a.ndpiIfaces(), Preset: a.threatPreset(),
-		CPUPercent: a.threatInt(threatCPUSetting, 50, 10, 400), MemoryMB: a.threatInt(threatMemSetting, 1024, 256, 16384),
+		CPUPercent: a.threatInt(threatCPUSetting, 50, 10, 400), MemoryMB: a.threatInt(threatMemSetting, 2048, 256, 16384),
 		OffSIDs: a.threatOffSIDs(),
 	}
 }
@@ -250,6 +250,7 @@ type netdThreat = struct {
 	CPUs         int    `json:"cpus"`
 	RulesUpdated int64  `json:"rules_updated"`
 	RulesCount   int    `json:"rules_count"`
+	Why          string `json:"why"`
 	HasPrevious  bool   `json:"has_previous"`
 	CPUNSec      uint64 `json:"cpu_nsec"`
 	MemoryBytes  uint64 `json:"memory_bytes"`
@@ -334,7 +335,7 @@ func (a *App) registerThreatEngineRoutes() {
 		info := a.threatInfo()
 		api.JSON(w, 200, map[string]any{
 			"mode": a.threatMode(), "preset": a.threatPreset(), "presets": ps,
-			"cpu_percent": a.threatInt(threatCPUSetting, 50, 10, 400), "memory_mb": a.threatInt(threatMemSetting, 1024, 256, 16384),
+			"cpu_percent": a.threatInt(threatCPUSetting, 50, 10, 400), "memory_mb": a.threatInt(threatMemSetting, 2048, 256, 16384),
 			"paused_reason": a.Config.Setting(threatWhySetting, ""),
 			"program":       info, "engine": a.threatEngine(), "eve_path": a.threatEvePath(), "default_eve": defaultEve,
 			"ports": a.ndpiIfaces(), "alerts": alerts, "allowed": al, "trusted": tr,
@@ -565,7 +566,7 @@ func (a *App) registerThreatEngineRoutes() {
 			rows.Close()
 		}
 		out, _ := json.MarshalIndent(map[string]any{"gatehouse_threat_tuning": 1, "preset": a.threatPreset(), "cpu_percent": a.threatInt(threatCPUSetting, 50, 10, 400),
-			"memory_mb": a.threatInt(threatMemSetting, 1024, 256, 16384), "off_sids": a.threatOffSIDs(), "allowed": al, "trusted": tr}, "", "  ")
+			"memory_mb": a.threatInt(threatMemSetting, 2048, 256, 16384), "off_sids": a.threatOffSIDs(), "allowed": al, "trusted": tr}, "", "  ")
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Content-Disposition", `attachment; filename="gatehouse-threat-tuning.json"`)
 		w.Write(out)

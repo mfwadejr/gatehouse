@@ -1,12 +1,13 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
-    version: '0.8.46',
+    version: '0.8.47',
     title: 'Protection page, threat watching you install yourself, five kinds of network',
     items: [
       'A new Protection page in the left menu. Overview gives a one-line verdict and the Security check; Apps & topics (moved from DNS) blocks apps, topics and websites; Threats is threat watching. Block lists for ads, trackers and adult sites stay under DNS.',
       'Threat watching is no longer installed behind your back. Press Install threat watching: Gatehouse shows the packages, the download size, the disk space needed and any worry about this machine, and installs only when you agree. Choose Light, Balanced or Strict, set a processor and memory limit, update the rules (and roll back to the previous ones), search and switch off single checks, and save or load your tuning. It only watches and tells you; blocking threats is not available yet. If it stops, nothing changes for your devices, and if it uses all of its processor share for ten minutes Gatehouse switches it off and says why.',
       'Add a network now offers five kinds: Trusted, Private, Guest, Isolated and Custom. Guest devices cannot see each other unless you turn that on. Choose the whole port or a VLAN on any port, and a VLAN with no address and no DHCP for a link to a switch or access point.',
+      'If threat watching is on but the program is not running, the page now says why (for example it ran out of memory). Its default memory limit is now 2 GB, because the full rule set needs more than 1 GB.',
       'The Install window now shows the real download and disk size. The groups of checks sit in columns.',
       'Opening a port that the firewall itself uses (such as the console) now warns you instead of refusing.',
       'Choose how often Gatehouse looks for updates: 6 hours, 12 hours (the usual), a day, a week, or your own number of hours.',

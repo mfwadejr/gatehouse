@@ -50,7 +50,7 @@ func (p *Plan) Check() error {
 		return errors.New("the processor limit must be between 10% and 400% of one core")
 	}
 	if p.MemoryMB == 0 {
-		p.MemoryMB = 1024
+		p.MemoryMB = 2048
 	}
 	if p.MemoryMB < 256 || p.MemoryMB > 16384 {
 		return errors.New("the memory limit must be between 256 MB and 16 GB")

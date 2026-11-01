@@ -201,7 +201,7 @@ export default function Threats() {
       <div className="stack">
         <Segmented value={data.mode} onChange={(v) => run(() => put('/api/threat/settings', { mode: v }), v === 'watch' ? 'Watching is on.' : 'Watching is off.').then(reload)} options={[{ value: 'off', label: 'Off' }, { value: 'watch', label: 'Watch and tell' }, { value: 'protect', label: 'Protect (not yet)', disabled: true }]} disabled={busy || p.state === 'installing' || p.state === 'removing'} />
         {data.paused_reason && !watching && <Note tone="warn" title="Gatehouse switched watching off">{data.paused_reason} Your traffic was never held up.</Note>}
-        {watching && !p.running && <Note tone="warn">The program is not running. Your traffic is not affected. Gatehouse keeps trying to start it.</Note>}
+        {watching && !p.running && <Note tone="warn">The program is not running. {p.why} Your traffic is not affected. Gatehouse keeps trying to start it.</Note>}
         {p.state === 'updating' && <Note>Updating the rules. {p.message}</Note>}
         {p.state === 'failed' && <Note tone="warn">{p.message}</Note>}
         <Note tone={data.engine?.state === 'missing' && watching ? 'warn' : undefined}>{data.engine?.text}</Note>

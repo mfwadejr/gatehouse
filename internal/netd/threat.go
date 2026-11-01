@@ -40,6 +40,7 @@ type ThreatInfo struct {
 	CPUs         int    `json:"cpus"`
 	RulesUpdated int64  `json:"rules_updated"`
 	RulesCount   int    `json:"rules_count"`
+	Why          string `json:"why"` // plain reason it is not running, when it should be
 	HasPrevious  bool   `json:"has_previous"`
 	CPUNSec      uint64 `json:"cpu_nsec"` // processor time used so far
 	MemoryBytes  uint64 `json:"memory_bytes"`
@@ -120,6 +121,9 @@ func (s *Service) ThreatStatus() ThreatInfo {
 				}
 			}
 		}
+	}
+	if !info.Running {
+		info.Why = s.threatWhy()
 	}
 	if st, err := os.Stat(s.rootPath(threatRules)); err == nil {
 		info.RulesUpdated = st.ModTime().Unix()
@@ -346,6 +350,40 @@ func (s *Service) ThreatApply(p threatcfg.Plan) error {
 		return fmt.Errorf("the threat-watching program did not start: %s", strings.TrimSpace(out))
 	}
 	return nil
+}
+
+// threatWhy says in plain words why the engine's service is not running: it ran out of memory, it
+// was never started, or the last thing it complained about. Empty when there is nothing to say.
+func (s *Service) threatWhy() string {
+	out, _ := wifiRun(10*time.Second, "systemctl", "show", "-p", "Result", "-p", "ActiveState", "-p", "LoadState", threatcfg.UnitName)
+	kv := map[string]string{}
+	for _, l := range strings.Split(out, "\n") {
+		k, v, _ := strings.Cut(strings.TrimSpace(l), "=")
+		kv[k] = v
+	}
+	switch {
+	case kv["LoadState"] == "not-found" || kv["LoadState"] == "":
+		return "It has not been started yet."
+	case kv["Result"] == "oom-kill":
+		return "It ran out of memory and was stopped. Raise its memory limit under Settings, or choose Light."
+	case kv["ActiveState"] == "activating":
+		return "It is starting. Loading the rules takes a minute or two."
+	}
+	j, _ := wifiRun(10*time.Second, "journalctl", "-u", threatcfg.UnitName, "-n", "40", "--no-pager", "-o", "cat")
+	last := ""
+	for _, l := range strings.Split(j, "\n") {
+		l = strings.TrimSpace(l)
+		if strings.Contains(l, "<Error>") || strings.Contains(l, "<Critical>") || strings.Contains(l, "rror:") {
+			last = l
+		}
+	}
+	if len(last) > 240 {
+		last = last[:240]
+	}
+	if last != "" {
+		return "It stopped with: " + last
+	}
+	return "It is not running, and it did not say why."
 }
 
 var threatUpdateMu sync.Mutex
