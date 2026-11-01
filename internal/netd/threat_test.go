@@ -139,6 +139,7 @@ func TestThreatInstallShowsSizeThenInstallsWithoutStartingItsOwnService(t *testi
 	if !strings.Contains(strings.Join(*calls, "\n"), "remove suricata suricata-update") {
 		t.Errorf("not removed: %v", *calls)
 	}
+	waitThreatIdle(t, "idle")
 }
 
 func TestThreatInstallFailureIsPlainAndHarmless(t *testing.T) {
@@ -162,6 +163,8 @@ func TestThreatInstallFailureIsPlainAndHarmless(t *testing.T) {
 	if err := s.ThreatInstallStart(); err != nil {
 		t.Fatalf("could not retry: %v", err)
 	}
+	// the retry runs in the background; let it finish before the test folder is removed
+	waitThreatIdle(t, "failed")
 }
 
 func TestThreatInstallRefusedOffDebian13(t *testing.T) {

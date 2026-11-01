@@ -1,7 +1,7 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
-    version: '0.8.44',
+    version: '0.8.45',
     title: 'Protection page, threat watching you install yourself, five kinds of network',
     items: [
       'A new Protection page in the left menu. Overview gives a one-line verdict and the Security check; Apps & topics (moved from DNS) blocks apps, topics and websites; Threats is threat watching. Block lists for ads, trackers and adult sites stay under DNS.',
