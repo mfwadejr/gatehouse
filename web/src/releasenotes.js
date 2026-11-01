@@ -1,6 +1,13 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.40',
+    title: 'Build fix',
+    items: [
+      'Fixes the automatic build for 0.8.39, which stopped because a help chapter shared a name with an older document on case-insensitive disks. The help now lives in its own folder. Nothing changes in how Gatehouse works.'
+    ],
+  },
+  {
     version: '0.8.39',
     title: 'Built-in help, and undo instead of "Are you sure?"',
     items: [
