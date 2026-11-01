@@ -129,8 +129,17 @@ type Filter struct {
 	BeforeTS int64
 	// NotResult leaves out one result, such as "blocked".
 	NotResult string
-	Limit     int
+	// HideHealth leaves out Gatehouse's own health check (the watchdog asking this server for
+	// HealthName from 127.0.0.1), which is noise to a person reading the log.
+	HideHealth bool
+	Limit      int
 }
+
+// HealthName is the made-up name the watchdog looks up to prove DNS is answering. The .invalid
+// ending can never exist on the internet, so it is answered here and never sent anywhere.
+const HealthName = "health.gatehouse.invalid"
+
+const notHealth = `NOT (client IN ('127.0.0.1','::1') AND qname='` + HealthName + `')`
 
 type Row struct {
 	ID int64 `json:"id"`
@@ -168,6 +177,9 @@ func (q *QueryLog) Search(f Filter) ([]Row, error) {
 	if f.NotResult != "" {
 		where = append(where, `result<>?`)
 		args = append(args, f.NotResult)
+	}
+	if f.HideHealth {
+		where = append(where, notHealth)
 	}
 	sqlStr := `SELECT id,ts,client,client_name,qname,qtype,result,rcode,upstream,latency_us,rule,out_if FROM dns_queries`
 	if len(where) > 0 {
@@ -217,12 +229,12 @@ func (q *QueryLog) Count(since int64) int64 {
 
 // TopBlocked ranks blocked domains.
 func (q *QueryLog) TopBlocked(since int64, n int) ([]Top, error) {
-	return q.top(`SELECT qname, '', COUNT(*) c FROM dns_queries WHERE ts>=? AND result='blocked' GROUP BY qname ORDER BY c DESC LIMIT ?`, since, n)
+	return q.top(`SELECT qname, '', COUNT(*) c FROM dns_queries WHERE ts>=? AND result='blocked' AND `+notHealth+` GROUP BY qname ORDER BY c DESC LIMIT ?`, since, n)
 }
 
 // TopDomains ranks all queried domains.
 func (q *QueryLog) TopDomains(since int64, n int) ([]Top, error) {
-	return q.top(`SELECT qname, '', COUNT(*) c FROM dns_queries WHERE ts>=? GROUP BY qname ORDER BY c DESC LIMIT ?`, since, n)
+	return q.top(`SELECT qname, '', COUNT(*) c FROM dns_queries WHERE ts>=? AND `+notHealth+` GROUP BY qname ORDER BY c DESC LIMIT ?`, since, n)
 }
 
 func (q *QueryLog) top(query string, since int64, n int) ([]Top, error) {

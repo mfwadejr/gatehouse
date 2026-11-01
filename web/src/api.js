@@ -6,7 +6,7 @@ let installCode = '';
 export const setInstallCode = (c) => { installCode = c || ''; };
 
 export class ApiError extends Error {
-  constructor(message, status) { super(message); this.status = status; }
+  constructor(message, status, data) { super(message); this.status = status; this.data = data || null; }
 }
 
 export async function api(method, path, body) {
@@ -23,7 +23,7 @@ export async function api(method, path, body) {
   let data = null;
   const text = await res.text();
   if (text) { try { data = JSON.parse(text); } catch { data = null; } }
-  if (!res.ok) throw new ApiError((data && data.error) || `Something went wrong (${res.status}).`, res.status);
+  if (!res.ok) throw new ApiError((data && data.error) || `Something went wrong (${res.status}).`, res.status, data);
   return data;
 }
 

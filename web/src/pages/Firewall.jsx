@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { del, post, put, useData, useStream } from '../api.js';
 import ApplyBar from '../ApplyBar.jsx';
+import Threats from './Threats.jsx';
 import { confirmRemoval } from '../removal.js';
 import AddNetwork from '../AddNetwork.jsx';
 import { go } from '../App.jsx';
@@ -206,6 +207,7 @@ function Protection({ ov, reload, pickers }) {
       <ToggleRow title="Ask for a code before changing the firewall" desc="Requires your authenticator code to apply network changes." checked={s.step_up} onChange={save('step_up')} />
       <ToggleRow title="Log blocked traffic" desc="Useful when troubleshooting. Uses more disk space." checked={s.log_drops} onChange={save('log_drops')} />
     </Card>
+    <Threats />
     </>
   );
 }
@@ -246,7 +248,7 @@ export default function Firewall({ me }) {
       <Protected reload={reload} />
       <Tabs value={tab} onChange={setTab} tabs={[{ value: 'networks', label: 'Networks' }, { value: 'rules', label: `Rules${(rules || []).filter((r) => !r.countries).length ? ` (${(rules || []).filter((r) => !r.countries).length})` : ''}` }, { value: 'groups', label: 'Groups & lists' }, { value: 'ports', label: 'Open ports' }, { value: 'countries', label: 'Countries' }, { value: 'discovery', label: 'Discovery' }, { value: 'protection', label: 'Protection' }, { value: 'history', label: 'History' }]} />
       {tab === 'networks' && <><Networks ov={ov} presets={presets} reload={reload} /><Matrix ov={ov} rules={(rules || []).filter((r) => !r.countries)} onPick={(from, to, p) => setPair({ from, to, p })} /></>}
-      {tab === 'rules' && <RulesList ov={ov} rules={(rules || []).filter((r) => !r.countries)} countryRules={countryRules} pickers={pickers} reloadPickers={reloadPickers} reload={all} filter={filter} setFilter={setFilter} startNew={(init) => setNewRule(init)} />}
+      {tab === 'rules' && <RulesList ov={ov} rules={(rules || []).filter((r) => !r.countries)} countryRules={countryRules} pickers={pickers} reloadPickers={reloadPickers} reload={all} filter={filter} setFilter={setFilter} startNew={(init) => setNewRule(init)} goPorts={() => setTab('ports')} />}
       {tab === 'groups' && <GroupsAndLists pickers={pickers} reloadPickers={reloadPickers} reload={all} />}
       {tab === 'ports' && <><NatNotice compact /><Forwards reload={reload} /><UPnPCard /></>}
       {tab === 'protection' && <Protection ov={ov} reload={reload} pickers={pickers} />}

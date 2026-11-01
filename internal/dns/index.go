@@ -139,6 +139,7 @@ type engine struct {
 	custom   *CustomRules
 	masks    map[int64]uint64 // blocklist bits enabled per group
 	nofilter map[int64]bool   // groups with filtering switched off
+	bits     map[int64]uint64 // the bit each enabled blocklist has in the index
 }
 
 type engineHolder struct{ p atomic.Pointer[engine] }

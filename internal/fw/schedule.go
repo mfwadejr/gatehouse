@@ -180,3 +180,39 @@ func (sc *Schedule) Describe() string {
 	}
 	return "Always"
 }
+
+// Active says whether the schedule is in force at a moment. No schedule means always. A schedule
+// that cannot be read counts as not in force, so a mistake never blocks anyone.
+func (sc *Schedule) Active(loc *time.Location, now time.Time) bool {
+	if sc == nil {
+		return true
+	}
+	if sc.Check(loc) != nil {
+		return false
+	}
+	t := now.In(loc)
+	if sc.Mode == "once" {
+		a, _ := time.ParseInLocation(localMinute, sc.Start, loc)
+		b, _ := time.ParseInLocation(localMinute, sc.End, loc)
+		return !t.Before(a) && t.Before(b)
+	}
+	from, _ := parseHM(sc.From)
+	to, _ := parseHM(sc.To)
+	length := to - from
+	if length <= 0 {
+		length += 24 * 60
+	}
+	cur := int(t.Weekday())*1440 + t.Hour()*60 + t.Minute()
+	days := sc.Days
+	if sc.Mode == "daily" {
+		days = []int{0, 1, 2, 3, 4, 5, 6}
+	}
+	for _, d := range days {
+		st := d*1440 + from
+		off := ((cur-st)%weekMin + weekMin) % weekMin
+		if off < length {
+			return true
+		}
+	}
+	return false
+}

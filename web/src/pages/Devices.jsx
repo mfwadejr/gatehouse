@@ -5,6 +5,8 @@ import { NewDevice } from '../AddrPicker.jsx';
 import DeviceMap from './DeviceMap.jsx';
 import VirtualOverride from './VirtualOverride.jsx';
 import Approval from './Approval.jsx';
+import ApplyBar from '../ApplyBar.jsx';
+import { OpenPortModal } from './Forwards.jsx';
 import { pauseChoices, whenText } from './Profiles.jsx';
 import { WhyBody } from './Why.jsx';
 import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, Select, Spark, ToggleRow, useAction, useToast, fmt, confirmBox, usePortNames } from '../ui.jsx';
@@ -169,11 +171,14 @@ function Filters({ rows, f, setF }) {
   );
 }
 
-export default function Devices() {
+export default function Devices({ me }) {
   const { data, reload } = useData('/api/devices', { topics: ['dhcp.leases'], every: 6000 });
   const { data: groups } = useData('/api/dns/groups');
   const { data: prefs } = useData('/api/prefs/devices');
   const [run] = useAction();
+  const { data: fwov } = useData('/api/fw/overview', { topics: ['fw.status'] });
+  const { data: fwf, reload: reloadFwf } = useData('/api/fw/appforwards');
+  const [opening, setOpening] = useState(null);
   const [q, setQ] = useState('');
   const [f, setF] = useState({ state: '', conn: '', network: '', group: '' });
   const [open, setOpen] = useState(null);
@@ -235,6 +240,7 @@ export default function Devices() {
                     <td className="r" onClick={(e) => e.stopPropagation()}>
                       {d.source !== 'vpn' && (
                         <div className="actions" style={{ justifyContent: 'flex-end' }}>
+                          {d.mac && <Button small onClick={() => setOpening(d)}>Open a port</Button>}
                           <Button small onClick={() => run(() => patch(`/api/devices/${d.id}`, { internet: !d.internet }), d.internet ? 'Paused.' : 'Back online.').then(reload)}>{d.internet ? 'Pause' : 'Resume'}</Button>
                           {!d.online && <Button small kind="danger" icon="trash" onClick={async () => await confirmBox('Forget this device?') && run(() => del(`/api/devices/${d.id}`), 'Forgotten.').then(reload)}>Forget</Button>}
                         </div>
@@ -255,6 +261,8 @@ export default function Devices() {
         </Card>
       </div>
       {open1 && <Details d={open1} groups={groups || []} onClose={() => setOpen(null)} onSaved={reload} />}
+      {opening && <OpenPortModal preset={{ mac: opening.mac, ip: opening.ip, device_name: opening.name || opening.hostname || opening.mac }} apps={fwf?.apps || []} connections={fwf?.connections || []} existing={fwf?.forwards || []} onClose={() => setOpening(null)} onSaved={reloadFwf} reloadApps={reloadFwf} />}
+      <ApplyBar kind="fw" label="the firewall" status={fwov?.status} me={me} onChanged={reloadFwf} />
       {adding && <NewDevice onClose={() => setAdding(false)} onCreated={reload} />}
       {pick && (
         <Modal title="Columns and rows" onClose={() => setPick(false)} footer={<Button kind="primary" onClick={() => setPick(false)}>Done</Button>}>

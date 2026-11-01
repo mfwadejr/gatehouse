@@ -305,7 +305,7 @@ func (a *App) logSearch(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 	}
 	var items []LogItem
 	if kind == "" || kind == "dns" {
-		f := dnssrv.Filter{Text: text, Since: since, BeforeTS: before, Limit: limit}
+		f := dnssrv.Filter{Text: text, Since: since, BeforeTS: before, Limit: limit, HideHealth: q.Get("own") != "1"}
 		switch verdict {
 		case "blocked":
 			f.Result = "blocked"

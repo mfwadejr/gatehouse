@@ -18,6 +18,8 @@ The picture is an example from a new, empty box; yours will show your own device
 2. Rename a device: click it, type the name, press Enter.
 3. Keep a device at the same address: open it, turn on **Fixed address**.
 
+4. Let the internet reach an app on a device: press **Open a port** on its row, tap the app, done. Then **Review and apply** at the bottom.
+
 ## Example
 Pause the games console for two hours at homework time: open it and choose the two-hour pause. It comes back by itself.
 

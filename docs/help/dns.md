@@ -23,6 +23,9 @@ Devices sent through a VPN have their name lookups sent through it as well.
 2. Find out why a site is blocked: **Why is this blocked?**, type the name, **Check**.
 3. Name a device on your network: **Your own names**, enter the name and address, **Add**.
 
+4. Block an app, a topic or a website for everyone, a network, a profile or one device: **Apps & topics**, **Add a block**. Choose when it applies if you want hours. It works by refusing the app's website names, so it is fast, but an app with its own private DNS can slip past. If anything goes wrong, nothing is blocked.
+5. See what a list blocks: **Blocking**, **View names** on the list. Search, and allow a name that should not be blocked.
+
 ## Example
 A shopping site does not load. Type its name under **Why is this blocked?**; it names the list. Add the name to **Always allow or block** as allowed.
 

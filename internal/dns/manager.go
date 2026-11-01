@@ -418,8 +418,10 @@ func (m *Manager) Reload() error {
 	}
 	b := newIndexBuilder()
 	bit := map[int64]int{}
+	bits := map[int64]uint64{}
 	for i, l := range lists {
 		bit[l.id] = i
+		bits[l.id] = 1 << uint(i)
 		b.setName(i, l.name)
 		f, err := os.Open(m.file(l.id))
 		if err != nil {
@@ -485,7 +487,7 @@ func (m *Manager) Reload() error {
 	m.mu2.Lock()
 	m.unique = len(b.ix.block)
 	m.mu2.Unlock()
-	m.eng.p.Store(&engine{ix: b.ix, custom: custom, masks: masks, nofilter: nofilter})
+	m.eng.p.Store(&engine{ix: b.ix, custom: custom, masks: masks, nofilter: nofilter, bits: bits})
 	if m.OnChange != nil {
 		m.OnChange()
 	}
@@ -610,3 +612,50 @@ func (m *Manager) Customs() ([]CustomRule, error) {
 }
 
 var _ = sql.ErrNoRows
+
+// ListHit says whether one blocklist names a domain, whatever profiles use the list. It is how a
+// topic (a list no profile uses) blocks only where a rule asks for it.
+func (s *Server) ListHit(name string, listID int64) (string, bool) {
+	e := s.eng.get()
+	bit, ok := e.bits[listID]
+	if !ok {
+		return "", false
+	}
+	if i, rl, ok := e.ix.Lookup(name, bit); ok {
+		return e.ix.ListName(i) + ": " + rl, true
+	}
+	return "", false
+}
+
+// NameRow is one name a list blocks.
+type NameRow struct {
+	Name string `json:"name"`
+}
+
+// Names reads the names a list blocks, optionally only those containing q, up to limit. total is
+// how many names the list blocks in all (matching or not).
+func (m *Manager) Names(id int64, q string, limit int) (rows []NameRow, total int, err error) {
+	var format string
+	if err = m.db.QueryRow(`SELECT format FROM blocklists WHERE id=?`, id).Scan(&format); err != nil {
+		return nil, 0, err
+	}
+	f, err := os.Open(m.file(id))
+	if err != nil {
+		return nil, 0, nil // not downloaded yet
+	}
+	defer f.Close()
+	q = strings.ToLower(strings.TrimSpace(q))
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+	Parse(f, format, func(r Rule) {
+		if r.Allow {
+			return
+		}
+		total++
+		if len(rows) < limit && (q == "" || strings.Contains(strings.ToLower(r.Domain), q)) {
+			rows = append(rows, NameRow{r.Domain})
+		}
+	})
+	return rows, total, nil
+}

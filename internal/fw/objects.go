@@ -264,6 +264,7 @@ func SavePortList(tx *sql.Tx, p PortListRow) (int64, error) {
 		return 0, uniqueErr(err, "a list or address group")
 	}
 	if old != p.Name {
+		renameForwardsOfApp(tx, old, p.Name)
 		rows, _ := tx.Query(`SELECT id,service FROM fw_rules`)
 		type upd struct {
 			id  int64
@@ -295,6 +296,50 @@ func SavePortList(tx *sql.Tx, p PortListRow) (int64, error) {
 	return p.ID, nil
 }
 
+// renameForwardsOfApp makes the open ports made from an app follow the app's new name: the app
+// name always, and the group and port names too when they carried the old name and the new name
+// is free.
+func renameForwardsOfApp(tx *sql.Tx, old, name string) {
+	tx.Exec(`UPDATE nat_forwards SET app=? WHERE app=?`, name, old)
+	var clash int
+	tx.QueryRow(`SELECT COUNT(*) FROM nat_forwards WHERE grp=? OR name=? OR name LIKE ?`, name, name, name+" %").Scan(&clash)
+	if clash > 0 {
+		return
+	}
+	type row struct {
+		id   int64
+		name string
+	}
+	var rows []row
+	if rs, err := tx.Query(`SELECT id,name FROM nat_forwards WHERE app=? AND (grp=? OR name=? OR name LIKE ?)`, name, old, old, old+" %"); err == nil {
+		for rs.Next() {
+			var r row
+			rs.Scan(&r.id, &r.name)
+			rows = append(rows, r)
+		}
+		rs.Close()
+	}
+	for _, r := range rows {
+		tx.Exec(`UPDATE nat_forwards SET grp=CASE WHEN grp=? THEN ? ELSE grp END, name=? WHERE id=?`, old, name, name+strings.TrimPrefix(r.name, old), r.id)
+	}
+}
+
+// ForwardsUsingApp names the open ports (by group) made from an app or saved list.
+func ForwardsUsingApp(db Queryer, app string) []string {
+	rows, err := db.Query(`SELECT DISTINCT CASE WHEN grp<>'' THEN grp ELSE name END FROM nat_forwards WHERE app=? ORDER BY 1`, app)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var g string
+		rows.Scan(&g)
+		out = append(out, g)
+	}
+	return out
+}
+
 func DeletePortList(tx *sql.Tx, id int64) error {
 	var name string
 	if tx.QueryRow(`SELECT name FROM fw_objects WHERE id=? AND kind='ports'`, id).Scan(&name) != nil {
@@ -314,6 +359,9 @@ func DeletePortList(tx *sql.Tx, id int64) error {
 	}
 	if rows != nil {
 		rows.Close()
+	}
+	for _, g := range ForwardsUsingApp(tx, name) {
+		used = append(used, "open port "+g)
 	}
 	if err := inUse("The list "+name, used); err != nil {
 		return err

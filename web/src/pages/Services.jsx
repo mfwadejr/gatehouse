@@ -13,7 +13,7 @@ function ServiceForm({ initial, onClose, onSaved }) {
   return (
     <Modal title={initial?.id ? `Edit ${initial.name}` : 'New service'} onClose={onClose}
       footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy || !name.trim() || !ports.length} onClick={async () => { if (await run(() => put('/api/fw/portlists', { id: initial?.id || 0, name: name.trim(), ports }), 'Saved.')) { onSaved(); onClose(); } }}>Save</Button></>}>
-      <Field label="Name" hint="What you will search for when you make a rule."><Input value={name} onChange={setName} placeholder="Plex" /></Field>
+      <Field label="Name" hint="What you will search for when you make a rule. If you rename it, open ports and rules that use it follow the new name."><Input value={name} onChange={setName} placeholder="Plex" /></Field>
       <Field label="Ports" hint="One per line, like tcp/32400 or udp/27000-27050. A built-in name such as https also works.">
         <textarea className="in mono" rows={6} value={text} onChange={(e) => setText(e.target.value)} spellCheck={false} placeholder={'tcp/32400\nudp/1900'} />
       </Field>
@@ -44,7 +44,7 @@ export default function Services() {
               <div>
                 <div className="name">{s.name}</div>
                 <div className="meta mono">{s.ports.join(', ')}</div>
-                <div className="meta">{s.used_by.length ? <>Used by {s.used_by.length === 1 ? 'the rule' : 'the rules'} {s.used_by.join(', ')}</> : 'Not used by any rule yet'}</div>
+                <div className="meta">{s.used_by.length ? <>Used by {s.used_by.join(', ')}</> : 'Not used yet'}</div>
               </div>
               <div className="actions">
                 <Button small icon="edit" onClick={() => setEdit(s)}>Edit</Button>
@@ -55,6 +55,13 @@ export default function Services() {
           {!mine.length && <Empty>{needle ? 'None of your services match.' : 'No services of your own yet. Choose New service to make one.'}</Empty>}
         </div>
       </Card>
+      {(data?.open_ports || []).length > 0 && (
+        <Card title="Open ports" desc="Apps you have opened to the internet. Change them on the Firewall page, Open ports tab.">
+          <div className="list">
+            {data.open_ports.map((g) => <div className="item" key={g.group}><div><div className="name">{g.group}</div><div className="meta">{g.text}</div></div></div>)}
+          </div>
+        </Card>
+      )}
       <Card title="Built in" desc="Gatehouse already knows these by name. They cannot be changed.">
         <div className="list">
           <Paged items={known}>{(shownKnown) => shownKnown.map((s) => (

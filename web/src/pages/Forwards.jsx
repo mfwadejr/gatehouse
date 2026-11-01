@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { del, post, put, useData } from '../api.js';
+import { del, get, post, put, useData } from '../api.js';
 import { CODES, countryName } from '../AddrPicker.jsx';
 import { Button, Card, Empty, Field, Input, Modal, Note, Pill, Select, ToggleRow, useAction, useToast, confirmBox } from '../ui.jsx';
 
@@ -29,65 +29,178 @@ function NewApp({ onSaved, onCancel }) {
   );
 }
 
-function ForwardForm({ initial, apps, connections, onClose, onSaved, reloadApps }) {
-  const [f, setF] = useState({ enabled: true, connections: [], src: [], countries: [], mac: '', ...initial });
+const keyOf = (p) => `${p.proto}/${p.std || p.port}`;
+
+// Open a port: tap the app, tap the device, done. Nothing is chosen for you except the app's
+// usual port, and the screen says so and lets you change it.
+export function OpenPortModal({ initial, preset, apps, connections, existing, onClose, onSaved, reloadApps }) {
+  const editing = !!initial?.group;
+  const [f, setF] = useState(() => {
+    const o = {}; const i = {};
+    (initial?.ports || []).forEach((p) => { o[keyOf(p)] = p.port; i[keyOf(p)] = p.inside || p.std || p.port; });
+    return { enabled: true, connections: [], src: [], countries: [], mac: '', outside: o, inside: i, ...preset, ...initial };
+  });
   const [adding, setAdding] = useState(false);
+  const [more, setMore] = useState(editing);
   const [q, setQ] = useState('');
   const [srcText, setSrcText] = useState((initial?.src || []).join(', '));
+  const [result, setResult] = useState(null);
+  const [clash, setClash] = useState(null);
+  const [typed, setTyped] = useState('');
+  const [typedUse, setTypedUse] = useState('');
   const [run, busy] = useAction();
+  const toast = useToast();
   const { data: ch } = useData('/api/vpn/choices');
   const devices = ch?.devices || [];
   const picked = devices.find((d) => d.mac.toLowerCase() === (f.mac || '').toLowerCase());
+  const devName = picked?.name || f.device_name || preset?.device_name || f.mac;
   const found = devices.filter((d) => !q || `${d.name} ${d.ip} ${d.mac}`.toLowerCase().includes(q.toLowerCase()));
   const app = apps.find((a) => a.name === f.app);
   const tick = (n, v) => setF((x) => ({ ...x, connections: v ? [...x.connections, n] : x.connections.filter((c) => c !== n) }));
-  const ready = f.app && f.mac && f.connections.length > 0;
-  const save = async () => {
-    const src = srcText.split(/[\s,]+/).filter(Boolean);
-    const ok = await run(() => put('/api/fw/appforwards', { ...f, src, group: initial?.group || '' }), 'Saved. Apply the firewall to start using it.');
-    if (ok) onSaved();
+  const tried = React.useRef(false);
+
+  const groupName = () => {
+    if (editing) return initial.group;
+    const nm = (f.name || '').trim();
+    if (nm) return nm;
+    const taken = new Set((existing || []).map((g) => g.group.toLowerCase()));
+    if (!taken.has(f.app.toLowerCase())) return f.app;
+    return `${f.app} (${devName})`.slice(0, 24);
   };
+
+  const submit = async (over) => {
+    const body = { ...f, ...over, src: srcText.split(/[\s,]+/).filter(Boolean), group: initial?.group || '', name: groupName() };
+    if (!body.connections.length && connections.length) body.connections = [connections[0]];
+    setClash(null);
+    try {
+      await put('/api/fw/appforwards', body);
+    } catch (e) {
+      if (e.status === 409 && e.data?.conflict) { setClash(e.data.conflict); setTyped(''); setTypedUse(''); return false; }
+      toast(e.message || 'Something went wrong.', 'bad');
+      return false;
+    }
+    const r = await get('/api/fw/appforwards');
+    const g = (r?.forwards || []).find((x) => x.group === body.name);
+    setResult(g || { group: body.name, ports: [], device_name: devName, app: f.app });
+    onSaved?.();
+    return true;
+  };
+
+  // With the app and device both chosen, open it straight away unless More options is open.
+  React.useEffect(() => {
+    if (editing || more || tried.current || !f.app || !f.mac || !connections.length) return;
+    tried.current = true;
+    submit({});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [f.app, f.mac, more]);
+
+  // Live check of a port as it is typed.
+  React.useEffect(() => {
+    if (!clash || !typed) { setTypedUse(''); return undefined; }
+    const t = setTimeout(async () => {
+      try { const r = await get(`/api/fw/portcheck?proto=${clash.proto}&port=${encodeURIComponent(typed)}&group=${encodeURIComponent(initial?.group || '')}`); setTypedUse(r?.error || (r?.used_by ? `${typed} is already used by ${r.used_by}.` : '')); } catch { setTypedUse(''); }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [typed, clash, initial?.group]);
+
+  const suggest = async () => {
+    try { const r = await get(`/api/fw/portcheck?proto=${clash.proto}&port=${encodeURIComponent(clash.port)}&suggest=1`); if (r?.suggest) setTyped(r.suggest); } catch { /* leave it empty */ }
+  };
+  const useTyped = () => submit({ outside: { ...f.outside, [`${clash.proto}/${clash.port}`]: typed.trim() } });
+
+  const setPort = (kind, k, v) => setF((x) => ({ ...x, [kind]: { ...x[kind], [k]: v } }));
+  const ports = editing ? (initial.ports || []) : (app?.ports || []).map((p) => { const [proto, port] = String(p).split('/'); return { proto, port, std: `${port}` }; });
+
+  if (result) {
+    const first = result.ports?.[0];
+    return (
+      <Modal title="Port open" onClose={onClose} footer={<Button kind="primary" onClick={onClose}>Done</Button>}>
+        <div className="stack">
+          <p>{first ? `Port ${first.port} was selected for ${result.app} on ${result.device_name}.` : `${result.app} is open on ${result.device_name}.`}</p>
+          <p className="small muted">If this is not the correct port, enter it manually.</p>
+          <div className="actions" style={{ justifyContent: 'flex-start' }}>
+            <Button onClick={() => { setResult(null); setMore(true); tried.current = true; }}>Change port</Button>
+            <Button onClick={async () => { await run(() => del(`/api/fw/appforwards/${encodeURIComponent(result.group)}`), 'Undone.'); onSaved?.(); onClose(); }}>Undo</Button>
+          </div>
+          <p className="small muted">Apply the firewall (bar at the bottom) to start using it.</p>
+        </div>
+      </Modal>
+    );
+  }
+
+  const ready = f.app && f.mac && (f.connections.length > 0 || connections.length > 0);
   return (
-    <Modal title={initial?.group ? `Edit ${initial.group}` : 'Open a port for an app'} onClose={onClose}
-      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" onClick={save} disabled={busy || !ready}>Save</Button></>}>
+    <Modal title={editing ? `Edit ${initial.group}` : 'Open a port'} onClose={onClose}
+      footer={<><Button onClick={onClose}>Cancel</Button>{(more || editing) && !clash && <Button kind="primary" onClick={() => submit({})} disabled={busy || !ready}>Save</Button>}</>}>
       <div className="stack">
-        <Field label="App" hint={app ? `Opens ${app.ports.join(', ')}.` : 'Choose what you want to reach from outside.'}>
-          <Select value={f.app || ''} onChange={(v) => v === '__new' ? setAdding(true) : setF({ ...f, app: v })}
-            options={[{ value: '', label: 'Choose an app…' }, ...apps.map((a) => ({ value: a.name, label: a.custom ? `${a.name} (yours)` : a.name })), { value: '__new', label: 'Add a new app…' }]} />
-        </Field>
+        {clash && (
+          <div className="stack" style={{ padding: 'var(--space-3)', border: 'var(--border-width-thin) solid var(--color-status-serious)', borderRadius: 'var(--radius-md)' }}>
+            <strong>{clash.port} is already used by {clash.used_by}.</strong>
+            <Field label="Enter the outside port for this one">
+              <Input value={typed} onChange={setTyped} className="in mono" placeholder="Type a port" />
+            </Field>
+            {typedUse && <span className="small" style={{ color: 'var(--color-status-serious)' }}>{typedUse}</span>}
+            <div className="actions" style={{ justifyContent: 'flex-start' }}>
+              <Button small onClick={suggest}>Suggest one</Button>
+              <Button kind="primary" onClick={useTyped} disabled={busy || !typed.trim() || !!typedUse}>Open it on this port</Button>
+            </div>
+          </div>
+        )}
+        {!f.app ? (
+          <Field label="What do you want to reach from outside?">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+              {apps.map((a) => <Button key={a.name} onClick={() => setF({ ...f, app: a.name })}>{a.name}{a.custom ? ' (yours)' : ''}</Button>)}
+              <Button onClick={() => setAdding(true)}>Other…</Button>
+            </div>
+          </Field>
+        ) : (
+          <div className="item"><div><div className="name">{f.app}</div><div className="meta">{app ? `Usual port${app.ports.length > 1 ? 's' : ''}: ${app.ports.join(', ')}` : ''}</div></div>{!editing && <div className="actions"><Button small onClick={() => { tried.current = false; setF({ ...f, app: '' }); }}>Change</Button></div>}</div>
+        )}
         {adding && <NewApp onCancel={() => setAdding(false)} onSaved={async (n) => { await reloadApps(); setF((x) => ({ ...x, app: n })); setAdding(false); }} />}
-        <Field label="Device" hint="Gatehouse follows the device by its hardware address, so this keeps working if its address changes.">
-          {picked || f.mac ? (
-            <div className="item"><div><div className="name">{picked?.name || initial?.device_name || f.mac}</div><div className="meta mono">{picked?.ip || initial?.ip || ''} · {f.mac}</div></div><div className="actions"><Button small onClick={() => setF({ ...f, mac: '' })}>Change</Button></div></div>
-          ) : (
+        {f.app && (picked || f.mac ? (
+          <div className="item"><div><div className="name">{devName}</div><div className="meta mono">{picked?.ip || f.ip || ''}</div></div>{!editing && !preset?.mac && <div className="actions"><Button small onClick={() => { tried.current = false; setF({ ...f, mac: '' }); }}>Change</Button></div>}</div>
+        ) : (
+          <Field label="Which device?">
             <div className="stack">
-              <Input value={q} onChange={setQ} placeholder="Search by name, address or MAC" aria-label="Search devices" />
+              <Input value={q} onChange={setQ} placeholder="Search by name or address" aria-label="Search devices" />
               <div className="list" style={{ maxHeight: '11rem', overflow: 'auto' }}>
                 {found.slice(0, 40).map((d) => (
                   <div className="item" key={d.mac}>
-                    <div><div className="name"><span className={`dot ${d.online ? '' : 'off'}`} /> {d.name}</div><div className="meta mono">{d.ip || 'not seen yet'} · {d.mac}</div></div>
+                    <div><div className="name"><span className={`dot ${d.online ? '' : 'off'}`} /> {d.name}</div><div className="meta mono">{d.ip || 'not seen yet'}</div></div>
                     <div className="actions"><Button small onClick={() => setF({ ...f, mac: d.mac })}>Choose</Button></div>
                   </div>
                 ))}
                 {ch && !found.length && <Empty>No matching devices.</Empty>}
               </div>
             </div>
-          )}
-        </Field>
-        <Field label="Through which internet connection?" hint="Tick every connection this should work on.">
+          </Field>
+        ))}
+        {f.app && f.mac && !editing && !more && !clash && <p className="small muted">Opening…</p>}
+        {f.app && f.mac && !more && !editing && <button type="button" className="link small" onClick={() => { setMore(true); tried.current = true; }}>More options</button>}
+        {(more || editing) && f.app && f.mac && (
           <div className="stack">
-            {connections.length === 0 ? <span className="small muted">No internet connection yet.</span> : connections.map((n) => (
-              <label key={n} className="small" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-                <input type="checkbox" checked={f.connections.includes(n)} onChange={(e) => tick(n, e.target.checked)} /> {n}
-              </label>
-            ))}
-          </div>
-        </Field>
-        <details className="more">
-          <summary>Limits (optional): only some people may connect</summary>
-          <div className="stack">
-            <p className="small muted">With no limits, anyone on the internet can try to connect. Limiting it to a country or a set of addresses is safer.</p>
-            <Field label="Only from these countries">
+            {connections.length > 1 && (
+              <Field label="Through which internet connection?">
+                <div className="stack">
+                  {connections.map((n) => (
+                    <label key={n} className="small" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+                      <input type="checkbox" checked={(f.connections.length ? f.connections : [connections[0]]).includes(n)} onChange={(e) => tick(n, e.target.checked)} /> {n}
+                    </label>
+                  ))}
+                </div>
+              </Field>
+            )}
+            {ports.map((p) => {
+              const k = keyOf(p);
+              return (
+                <div className="formgrid" key={k}>
+                  <Field label={`Outside port (${p.proto})`} hint={`Usual: ${p.std || p.port}`}><Input value={f.outside[k] ?? (editing ? p.port : '')} onChange={(v) => setPort('outside', k, v)} className="in mono" placeholder={String(p.std || p.port)} /></Field>
+                  <Field label="Port on the device" hint="Leave as is unless the app listens elsewhere."><Input value={f.inside[k] ?? (editing ? (p.inside || p.std || p.port) : '')} onChange={(v) => setPort('inside', k, v)} className="in mono" placeholder={String(p.std || p.port)} /></Field>
+                </div>
+              );
+            })}
+            <p className="small muted">If a port you type is already used by something else, you will be asked for a different one.</p>
+            <Field label="Only from these countries (optional)">
               <div className="stack">
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1-5)' }}>
                   {f.countries.map((c) => <Pill key={c}>{countryName(c)} <button type="button" className="linkbtn" aria-label={`Remove ${countryName(c)}`} onClick={() => setF({ ...f, countries: f.countries.filter((x) => x !== c) })}>×</button></Pill>)}
@@ -95,13 +208,13 @@ function ForwardForm({ initial, apps, connections, onClose, onSaved, reloadApps 
                 <Select value="" onChange={(v) => v && !f.countries.includes(v) && setF({ ...f, countries: [...f.countries, v] })} options={[{ value: '', label: 'Add a country…' }, ...COUNTRIES]} />
               </div>
             </Field>
-            <Field label="Or only from these addresses" hint="Addresses or networks separated by commas, such as 203.0.113.7 or 198.51.100.0/24.">
+            <Field label="Or only from these addresses (optional)" hint="Such as 203.0.113.7 or 198.51.100.0/24. With no limits, anyone on the internet can try to connect.">
               <Input value={srcText} onChange={setSrcText} className="in mono" />
             </Field>
+            <Field label="Name" hint="Optional. Up to 24 characters."><Input value={f.name ?? (editing ? initial.group : '')} onChange={(v) => setF({ ...f, name: v })} /></Field>
+            <ToggleRow title="Turned on" checked={f.enabled} onChange={(v) => setF({ ...f, enabled: v })} />
           </div>
-        </details>
-        <Field label="Name" hint="Optional. Leave empty to use the app's name."><Input value={f.name ?? initial?.group ?? ''} onChange={(v) => setF({ ...f, name: v })} /></Field>
-        <ToggleRow title="Turned on" checked={f.enabled} onChange={(v) => setF({ ...f, enabled: v })} />
+        )}
       </div>
     </Modal>
   );
@@ -138,19 +251,20 @@ export default function Forwards({ reload }) {
   const items = data?.forwards || [];
   const fix = (g) => run(() => post('/api/dhcp/reservations', { scope_id: g.reserve_scope, mac: g.mac, ip: g.ip, hostname: g.device_name }), `${g.device_name} will keep the address ${g.ip}.`).then(rf);
   return (
-    <Card title="Open a port to the internet" desc="Lets something outside reach an app on one of your devices, like Plex or a game server. Only open what you need." actions={<Button small icon="plus" onClick={() => setEdit({})}>Open a port</Button>}>
+    <Card title="Open a port to the internet" desc="Let the internet reach an app on one of your devices." actions={<Button small icon="plus" onClick={() => setEdit({})}>Open a port</Button>}>
       <div className="list">
         {items.map((g) => (
           <div className="item" key={`${g.group}-${g.id || ''}`}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className="name">{g.text} {!g.enabled && <Pill>Off</Pill>}</div>
+              {g.ports?.some((p) => p.inside) && <div className="small muted">{g.ports.map((p) => `${p.proto} ${p.port} → ${p.inside || p.std || p.port}`).join(', ')}</div>}
               <div className="meta">{g.countries.length > 0 ? `Only from ${g.countries.map(countryName).join(', ')}. ` : ''}{g.src.length > 0 ? `Only from ${g.src.join(', ')}. ` : ''}{!g.countries.length && !g.src.length ? 'Anyone on the internet can try to connect.' : ''}</div>
               {g.blocked && <div className="small" style={{ color: 'var(--color-status-serious)' }}>{g.blocked}</div>}
               {!g.legacy && g.mac && !g.reserved && g.reserve_scope > 0 && <div className="small">If {g.device_name} gets a different address, this follows it. <button type="button" className="link small" disabled={busy} onClick={() => fix(g)}>Give it a fixed address</button> so it never changes.</div>}
             </div>
             <div className="actions">
               {!g.legacy && <Button small disabled={busy} onClick={() => run(() => post('/api/fw/appforwards/enable', { group: g.group, enabled: !g.enabled }), 'Saved. Apply the firewall to start using it.').then(refresh)}>{g.enabled ? 'Turn off' : 'Turn on'}</Button>}
-              <Button small icon="edit" onClick={() => g.legacy ? setOld((legacy || []).find((l) => l.id === g.id)) : setEdit({ group: g.group, name: g.group, app: g.app, mac: g.mac, device_name: g.device_name, ip: g.ip, connections: g.connections, src: g.src, countries: g.countries, enabled: g.enabled })}>Edit</Button>
+              <Button small icon="edit" onClick={() => g.legacy ? setOld((legacy || []).find((l) => l.id === g.id)) : setEdit({ group: g.group, name: g.group, ports: g.ports, app: g.app, mac: g.mac, device_name: g.device_name, ip: g.ip, connections: g.connections, src: g.src, countries: g.countries, enabled: g.enabled })}>Edit</Button>
               <Button small kind="danger" icon="trash" onClick={async () => await confirmBox(`Delete "${g.group}"?`) && run(() => g.legacy ? del(`/api/fw/forwards/${g.id}`) : del(`/api/fw/appforwards/${encodeURIComponent(g.group)}`)).then(refresh)}>Delete</Button>
             </div>
           </div>
@@ -158,7 +272,7 @@ export default function Forwards({ reload }) {
         {data && !items.length && <Empty>No ports are open to the internet.</Empty>}
       </div>
       {data && data.connections.length === 0 && <Note tone="warn">Add an internet connection first, on the Internet page.</Note>}
-      {edit && <ForwardForm initial={edit} apps={data?.apps || []} connections={data?.connections || []} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); refresh(); }} reloadApps={rf} />}
+      {edit && <OpenPortModal initial={edit.group ? edit : null} apps={data?.apps || []} connections={data?.connections || []} existing={items} onClose={() => setEdit(null)} onSaved={refresh} reloadApps={rf} />}
       {old && <LegacyForm f={old} wans={wans?.wans} onClose={() => setOld(null)} onSaved={() => { setOld(null); refresh(); }} />}
     </Card>
   );

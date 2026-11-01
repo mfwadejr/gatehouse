@@ -113,4 +113,22 @@ ALTER TABLE fw_events ADD COLUMN out_if TEXT NOT NULL DEFAULT '';
 `, `
 -- The tunnel a lookup went out through (empty: the normal connection).
 ALTER TABLE dns_queries ADD COLUMN out_if TEXT NOT NULL DEFAULT '';
+`, `
+-- Threat protection alerts, one row per alert the engine raised that was not let through.
+CREATE TABLE threat_alerts(
+  id INTEGER PRIMARY KEY,
+  ts INTEGER NOT NULL,
+  sid INTEGER NOT NULL,
+  signature TEXT NOT NULL,
+  plain TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT '',
+  severity INTEGER NOT NULL DEFAULT 3,
+  src TEXT NOT NULL DEFAULT '',
+  dst TEXT NOT NULL DEFAULT '',
+  dport INTEGER NOT NULL DEFAULT 0,
+  proto TEXT NOT NULL DEFAULT '',
+  mac TEXT NOT NULL DEFAULT '',
+  device TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX idx_threat_ts ON threat_alerts(ts);
 `}

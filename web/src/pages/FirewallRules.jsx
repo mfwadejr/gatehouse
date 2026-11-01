@@ -189,7 +189,7 @@ function RuleSide({ chips, pickers }) {
   );
 }
 
-export function RulesList({ ov, rules, countryRules, pickers, reloadPickers, reload, filter, setFilter, startNew }) {
+export function RulesList({ ov, rules, countryRules, pickers, reloadPickers, reload, filter, setFilter, startNew, goPorts }) {
   const [edit, setEdit] = useState(null);
   const [q, setQ] = useState('');
   const [act, setAct] = useState('');
@@ -197,6 +197,7 @@ export function RulesList({ ov, rules, countryRules, pickers, reloadPickers, rel
   const [run] = useAction();
   const undoDelete = useUndoDelete();
   const { data: prot } = useData('/api/fw/protected');
+  const { data: opened } = useData('/api/fw/appforwards');
   const names = (ov?.matrix_zones || []).map((z) => z.name);
   const fromNames = names;
   const needle = q.trim().toLowerCase();
@@ -230,6 +231,9 @@ export function RulesList({ ov, rules, countryRules, pickers, reloadPickers, rel
             <div className="item" key={r.title}><div><div className="name">🔒 {r.title}</div><div className="meta">{r.text}</div></div><Pill tone={r.active ? 'good' : ''}>{r.active ? 'Always on' : 'Standing by'}</Pill></div>
           ))}
           <p className="small muted">Built in, always above your rules, and cannot be changed or removed.</p>
+          {(opened?.forwards || []).map((g) => (
+            <div className="item" key={`p${g.group}`}><div><div className="name">🚪 Open port: {g.group} {!g.enabled && <Pill>Off</Pill>}</div><div className="meta">{g.text}</div></div><Button small onClick={goPorts}>Set on the Open ports tab</Button></div>
+          ))}
           {(countryRules || []).map((r, i) => (
             <div className="item" key={`c${i}`}><div><div className="name">🏳 {r.name}: {r.from} → {r.to === 'self' ? 'Gatehouse' : r.to} <Pill tone="bad">{actionWord(r.action)}</Pill></div><div className="meta">{r.descr}</div></div><Pill>Set on the Countries tab</Pill></div>
           ))}

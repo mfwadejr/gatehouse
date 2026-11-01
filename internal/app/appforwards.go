@@ -33,9 +33,14 @@ var forwardApps = map[string][]string{
 	"WireGuard server":    {"udp/51820"},
 }
 
+// appPort is one port of an app. Port is the port people connect to from the internet (the outside
+// port); Inside is the port on the device when that differs; Std is the app's own standard port,
+// which is the key the outside and inside overrides are given by.
 type appPort struct {
-	Proto string `json:"proto"`
-	Port  string `json:"port"`
+	Proto  string `json:"proto"`
+	Port   string `json:"port"`
+	Inside string `json:"inside,omitempty"`
+	Std    string `json:"std,omitempty"`
 }
 
 type appChoice struct {
@@ -85,6 +90,92 @@ func (a *App) appPorts(name string) ([]appPort, error) {
 		return nil, fmt.Errorf("%q has no TCP or UDP ports to open", name)
 	}
 	return out, nil
+}
+
+// insideOf is the port on the device when it differs from the outside port, otherwise "".
+func insideOf(ext, int string) string {
+	if int == "" || int == ext {
+		return ""
+	}
+	return int
+}
+
+// parsePortSpec reads "32400" or "27000-27050" into its two ends.
+func parsePortSpec(t string) (lo, hi int, err error) {
+	t = strings.TrimSpace(t)
+	a, b, isRange := strings.Cut(t, "-")
+	if lo, err = strconv.Atoi(strings.TrimSpace(a)); err != nil {
+		return 0, 0, fmt.Errorf("%q is not a port number", t)
+	}
+	hi = lo
+	if isRange {
+		if hi, err = strconv.Atoi(strings.TrimSpace(b)); err != nil {
+			return 0, 0, fmt.Errorf("%q is not a port number", t)
+		}
+	}
+	if lo < 1 || hi > 65535 || hi < lo {
+		return 0, 0, fmt.Errorf("%q is not a valid port. Use a number from 1 to 65535", t)
+	}
+	return lo, hi, nil
+}
+
+// errPortConflict is returned when an outside port is already used. The screen shows it as a
+// question ("which port should this one use?"), never as a silent change.
+type errPortConflict struct {
+	Proto  string `json:"proto"`
+	Port   string `json:"port"`
+	UsedBy string `json:"used_by"`
+}
+
+func (e *errPortConflict) Error() string {
+	return fmt.Sprintf("%s port %s is already used by %s. Enter a different outside port for this one", strings.ToUpper(e.Proto), e.Port, e.UsedBy)
+}
+
+// forwardPortUse says what already uses an outside port range, or "" when it is free. Ports used by
+// the group being edited do not count. It looks at the VPN servers and every other forward.
+func (a *App) forwardPortUse(proto string, lo, hi int, ownGroup string) string {
+	// The console, DNS, DHCP and remote login only answer on your own networks, never on the internet
+	// side, so a forward from the internet may use the same numbers. A VPN server does listen on the
+	// internet side, so its port is taken.
+	for _, q := range []string{`SELECT listen_port FROM vpn_wg`, `SELECT port FROM vpn_ovpn`} {
+		if rows, err := a.Config.Query(q); err == nil {
+			for rows.Next() {
+				var n int
+				rows.Scan(&n)
+				if n >= lo && n <= hi {
+					rows.Close()
+					return "a VPN"
+				}
+			}
+			rows.Close()
+		}
+	}
+	rows, err := a.Config.Query(`SELECT name,grp,app,mac,int_addr,ext_port FROM nat_forwards WHERE proto=?`, proto)
+	if err != nil {
+		return ""
+	}
+	type used struct{ name, grp, app, mac, addr, ext string }
+	var all []used
+	for rows.Next() {
+		var u used
+		rows.Scan(&u.name, &u.grp, &u.app, &u.mac, &u.addr, &u.ext)
+		all = append(all, u)
+	}
+	rows.Close()
+	for _, u := range all {
+		if ownGroup != "" && u.grp == ownGroup {
+			continue
+		}
+		l, h, err := parsePortSpec(u.ext)
+		if err != nil || h < lo || l > hi {
+			continue
+		}
+		if u.grp == "" {
+			return "the port forward " + u.name
+		}
+		return fmt.Sprintf("%s on %s", orWord(u.app, u.grp), a.fwdDeviceName(u.mac, u.addr))
+	}
+	return ""
 }
 
 func (a *App) appChoices() []appChoice {
@@ -212,7 +303,7 @@ func (a *App) forwardViews() []forwardView {
 	}
 	for _, f := range rows {
 		if f.Group == "" {
-			v := forwardView{Group: f.Name, ID: f.ID, Legacy: true, Ports: []appPort{{f.Proto, f.ExtPort}}, IP: f.IntAddr, Connections: conns(f.WAN),
+			v := forwardView{Group: f.Name, ID: f.ID, Legacy: true, Ports: []appPort{{Proto: f.Proto, Port: f.ExtPort, Inside: insideOf(f.ExtPort, f.IntPort)}}, IP: f.IntAddr, Connections: conns(f.WAN),
 				Src: f.Src, Countries: f.Countries, Enabled: f.Enabled}
 			v.Text = fmt.Sprintf("%s: %s port %s goes to %s%s.", f.Name, strings.ToUpper(f.Proto), f.ExtPort, f.IntAddr, orWord(map[bool]string{true: ":" + f.IntPort}[f.IntPort != "" && f.IntPort != f.ExtPort], ""))
 			v.Blocked = blocked(v.Connections)
@@ -225,7 +316,7 @@ func (a *App) forwardViews() []forwardView {
 			groups[f.Group] = g
 			order = append(order, f.Group)
 		}
-		g.Ports = append(g.Ports, appPort{f.Proto, f.ExtPort})
+		g.Ports = append(g.Ports, appPort{Proto: f.Proto, Port: f.ExtPort, Inside: insideOf(f.ExtPort, f.IntPort)})
 	}
 	for _, k := range order {
 		g := groups[k]
@@ -234,9 +325,19 @@ func (a *App) forwardViews() []forwardView {
 		if len(g.Connections) > 0 {
 			through = strings.Join(g.Connections, " and ")
 		}
+		// The app's own standard ports, so the screen can key the outside and inside overrides.
+		if std, err := a.appPorts(g.App); err == nil && len(std) == len(g.Ports) {
+			for i := range g.Ports {
+				g.Ports[i].Std = std[i].Proto + "/" + std[i].Port
+			}
+		}
 		var ps []string
 		for _, p := range g.Ports {
-			ps = append(ps, p.Port)
+			if p.Inside != "" {
+				ps = append(ps, p.Port+" (to port "+p.Inside+" on the device)")
+			} else {
+				ps = append(ps, p.Port)
+			}
 		}
 		g.Text = fmt.Sprintf("%s on %s is open on port %s through %s.", orWord(g.App, g.Group), g.DeviceName, strings.Join(ps, ", "), through)
 		if !g.Enabled {
@@ -279,6 +380,11 @@ type appForwardIn struct {
 	Src         []string `json:"src"`
 	Countries   []string `json:"countries"`
 	Enabled     bool     `json:"enabled"`
+	// Outside and Inside change a port from the app's standard one. They are keyed by the standard
+	// port, such as "tcp/32400": Outside is the port people connect to from the internet, Inside is
+	// the port on the device. Nothing is chosen for the person; a port in use is refused.
+	Outside map[string]string `json:"outside"`
+	Inside  map[string]string `json:"inside"`
 }
 
 func cleanList(in []string, upper bool) []string {
@@ -338,6 +444,38 @@ func (a *App) saveAppForward(in appForwardIn) error {
 	}
 	wan := strings.Join(devs, ",")
 	src, cc := cleanList(in.Src, false), cleanList(in.Countries, true)
+	// Work out the outside and inside port of every port of the app, and make sure nothing clashes.
+	type pm struct{ out, in string }
+	maps := make([]pm, len(ports))
+	ownGroup := in.Group
+	if ownGroup == "" {
+		ownGroup = in.Name
+	}
+	for i, p := range ports {
+		std := p.Proto + "/" + p.Port
+		out, inn := p.Port, p.Port
+		if v := strings.TrimSpace(in.Outside[std]); v != "" {
+			out = v
+		}
+		if v := strings.TrimSpace(in.Inside[std]); v != "" {
+			inn = v
+		}
+		olo, ohi, err := parsePortSpec(out)
+		if err != nil {
+			return err
+		}
+		ilo, ihi, err := parsePortSpec(inn)
+		if err != nil {
+			return err
+		}
+		if ohi-olo != ihi-ilo {
+			return fmt.Errorf("the outside port %s and the port on the device %s must cover the same number of ports", out, inn)
+		}
+		if why := a.forwardPortUse(p.Proto, olo, ohi, ownGroup); why != "" {
+			return &errPortConflict{Proto: p.Proto, Port: out, UsedBy: why}
+		}
+		maps[i] = pm{out, inn}
+	}
 	err = fw.Mutate(a.Config, func(tx *sql.Tx) error {
 		old := in.Group
 		if old == "" {
@@ -356,7 +494,11 @@ func (a *App) saveAppForward(in appForwardIn) error {
 			if i > 0 {
 				name = fmt.Sprintf("%s %d", in.Name, i+1)
 			}
-			if _, err := fw.SaveForward(tx, fw.ForwardRow{Name: name, WAN: wan, Proto: p.Proto, ExtPort: p.Port, IntAddr: ip, Enabled: in.Enabled,
+			intPort := ""
+			if maps[i].in != maps[i].out {
+				intPort = maps[i].in
+			}
+			if _, err := fw.SaveForward(tx, fw.ForwardRow{Name: name, WAN: wan, Proto: p.Proto, ExtPort: maps[i].out, IntPort: intPort, IntAddr: ip, Enabled: in.Enabled,
 				Group: in.Name, App: in.App, MAC: mac, Src: src, Countries: cc}); err != nil {
 				return err
 			}
@@ -433,10 +575,40 @@ func (a *App) registerAppForwardRoutes() {
 			return
 		}
 		if err := a.saveAppForward(in); err != nil {
+			var pc *errPortConflict
+			if errors.As(err, &pc) {
+				api.JSON(w, http.StatusConflict, map[string]any{"error": pc.Error(), "conflict": pc})
+				return
+			}
 			fail(w, err)
 			return
 		}
 		ok(w)
+	})
+	// Live check while a port is typed: what uses it, and a free port to offer if asked.
+	s.Handle("GET /api/fw/portcheck", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		proto := r.URL.Query().Get("proto")
+		if proto != "tcp" && proto != "udp" {
+			fail(w, errors.New("choose tcp or udp"))
+			return
+		}
+		lo, hi, err := parsePortSpec(r.URL.Query().Get("port"))
+		if err != nil {
+			api.JSON(w, 200, map[string]any{"used_by": "", "error": err.Error()})
+			return
+		}
+		group := r.URL.Query().Get("group")
+		out := map[string]any{"used_by": a.forwardPortUse(proto, lo, hi, group)}
+		if r.URL.Query().Get("suggest") == "1" {
+			width := hi - lo
+			for p, tries := lo+1, 0; p+width <= 65535 && tries < 2000; p, tries = p+1, tries+1 {
+				if a.forwardPortUse(proto, p, p+width, group) == "" {
+					out["suggest"] = strconv.Itoa(p)
+					break
+				}
+			}
+		}
+		api.JSON(w, 200, out)
 	})
 	s.HandleAdmin("POST /api/fw/appforwards/enable", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		var in struct {

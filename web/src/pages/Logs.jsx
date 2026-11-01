@@ -136,6 +136,8 @@ export default function Logs() {
   const [more, setMore] = useState(false);
   const [meta, setMeta] = useState({ record_allowed: true, record_blocked: true });
   const [live, setLive] = useState(true);
+  const [own, setOwn] = useState(() => { try { return localStorage.getItem('gh.logs.own') === '1'; } catch { return false; } });
+  const chooseOwn = (v) => { setOwn(v); try { localStorage.setItem('gh.logs.own', v ? '1' : '0'); } catch { /* ignore */ } };
   const [loading, setLoading] = useState(true);
   const [rec, setRec] = useState(false);
   const [cols, setCols] = useState(DEFAULT_COLS);
@@ -163,10 +165,11 @@ export default function Logs() {
     if (q) p.set('q', q);
     if (kind) p.set('kind', kind);
     if (verdict) p.set('verdict', verdict);
+    if (own) p.set('own', '1');
     Object.entries(flt).forEach(([k, v]) => v !== '' && v != null && p.set(k, String(v)));
     if (before) p.set('before', String(before));
     return p;
-  }, [q, kind, verdict, hours, custom, flt, pageSize]);
+  }, [q, kind, verdict, hours, custom, flt, pageSize, own]);
 
   const load = useCallback(async () => {
     try {
@@ -235,6 +238,7 @@ export default function Logs() {
             </div>
           )}
           {tab === 'log' && <Segmented value={kind} onChange={setKind} options={KINDS} />}
+          {tab === 'log' && <label className="inline small" title="Gatehouse checks that its own DNS is answering every few seconds. These checks are hidden unless you tick this."><input type="checkbox" checked={own} onChange={(e) => chooseOwn(e.target.checked)} /> Show Gatehouse's own checks</label>}
           {chips.length > 0 && (
             <div className="chips">
               {chips.map(([k, v]) => (

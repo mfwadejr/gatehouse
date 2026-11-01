@@ -72,3 +72,108 @@ func TestAppForwardFollowsDeviceAndLimits(t *testing.T) {
 		t.Fatalf("%v", m["forwards"])
 	}
 }
+
+// Three Plex servers need three different outside ports. Nothing picks a port for the person: a
+// clash is refused as a question, a chosen port is used as typed, and a rename of the saved app
+// carries through to the open ports.
+func TestCustomOutsidePortsAndRenameCarryThrough(t *testing.T) {
+	c, _, _ := siteBox(t, "192.168.1.1/24")
+	a := c.app
+	a.Config.Exec(`INSERT INTO dhcp_scopes(name,iface,subnet) VALUES('Home','eth1','192.168.1.0/24')`)
+	for i, ip := range []string{"192.168.1.50", "192.168.1.51", "192.168.1.52"} {
+		a.Config.Exec(`INSERT INTO dhcp_leases(scope_id,ip,mac,hostname,start,expires) VALUES(1,?,?,?,0,9999999999)`, ip, "aa:bb:cc:dd:ee:0"+string(rune('1'+i)), "server"+string(rune('1'+i)))
+	}
+	put := func(body map[string]any) (int, map[string]any) {
+		rc, m, _ := c.call("PUT", "/api/fw/appforwards", body)
+		return rc, m
+	}
+	// The first Plex takes the standard port.
+	if rc, m := put(map[string]any{"app": "Plex", "name": "Plex 1", "mac": "aa:bb:cc:dd:ee:01", "enabled": true}); rc != 200 {
+		t.Fatalf("first: %d %v", rc, m)
+	}
+	// The second one clashes. It is refused as a question that names who has the port; nothing is saved.
+	rc, m := put(map[string]any{"app": "Plex", "name": "Plex 2", "mac": "aa:bb:cc:dd:ee:02", "enabled": true})
+	cf, _ := m["conflict"].(map[string]any)
+	if rc != 409 || cf == nil || cf["port"] != "32400" || !strings.Contains(cf["used_by"].(string), "Plex on server1") {
+		t.Fatalf("clash: %d %v", rc, m)
+	}
+	_, list, _ := c.call("GET", "/api/fw/appforwards", nil)
+	if len(list["forwards"].([]any)) != 1 {
+		t.Fatalf("a refused port must save nothing: %v", list["forwards"])
+	}
+	// The person chooses non-sequential outside ports; the device keeps its own port 32400.
+	if rc, m = put(map[string]any{"app": "Plex", "name": "Plex 2", "mac": "aa:bb:cc:dd:ee:02", "enabled": true, "outside": map[string]string{"tcp/32400": "41234"}}); rc != 200 {
+		t.Fatalf("second: %d %v", rc, m)
+	}
+	if rc, m = put(map[string]any{"app": "Plex", "name": "Plex 3", "mac": "aa:bb:cc:dd:ee:03", "enabled": true, "outside": map[string]string{"tcp/32400": "50111"}}); rc != 200 {
+		t.Fatalf("third: %d %v", rc, m)
+	}
+	var ext, in string
+	a.Config.QueryRow(`SELECT ext_port,int_port FROM nat_forwards WHERE grp='Plex 2'`).Scan(&ext, &in)
+	if ext != "41234" || in != "32400" {
+		t.Fatalf("ports stored as %s -> %s", ext, in)
+	}
+	_, list, _ = c.call("GET", "/api/fw/appforwards", nil)
+	fs := list["forwards"].([]any)
+	if len(fs) != 3 || !strings.Contains(fs[1].(map[string]any)["text"].(string), "41234 (to port 32400 on the device)") {
+		t.Fatalf("%v", fs)
+	}
+	// Editing a group does not clash with itself.
+	if rc, m = put(map[string]any{"group": "Plex 2", "app": "Plex", "name": "Plex 2", "mac": "aa:bb:cc:dd:ee:02", "enabled": true, "outside": map[string]string{"tcp/32400": "41234"}}); rc != 200 {
+		t.Fatalf("edit: %d %v", rc, m)
+	}
+	// A bad number and a port range that clashes are refused with a reason. The console, DNS and
+	// DHCP numbers are allowed: those only answer on your own networks, not from the internet.
+	for outside, want := range map[string]string{"0": "not a valid port", "70000": "not a valid port", "32400": "already used"} {
+		rc, m := put(map[string]any{"app": "Plex", "name": "Plex 4", "mac": "aa:bb:cc:dd:ee:03", "enabled": true, "outside": map[string]string{"tcp/32400": outside}})
+		if rc == 200 || !strings.Contains(m["error"].(string), want) {
+			t.Fatalf("outside %s: %d %v", outside, rc, m)
+		}
+	}
+	// The live check names what uses a port, and only offers a free one when asked.
+	_, chk, _ := c.call("GET", "/api/fw/portcheck?proto=tcp&port=32400&suggest=1", nil)
+	if !strings.Contains(chk["used_by"].(string), "Plex") || chk["suggest"] != "32401" {
+		t.Fatalf("portcheck: %v", chk)
+	}
+	_, chk, _ = c.call("GET", "/api/fw/portcheck?proto=tcp&port=45000", nil)
+	if chk["used_by"] != "" || chk["suggest"] != nil {
+		t.Fatalf("a free port: %v", chk)
+	}
+
+	// Renaming a saved app carries through to the open ports made from it, and Services shows them.
+	if rc, _, raw := c.call("PUT", "/api/fw/portlists", map[string]any{"name": "My game", "ports": []string{"udp/27000-27010"}}); rc != 200 {
+		t.Fatalf("%d %s", rc, raw)
+	}
+	if rc, m = put(map[string]any{"app": "My game", "mac": "aa:bb:cc:dd:ee:01", "enabled": true}); rc != 200 {
+		t.Fatalf("game: %d %v", rc, m)
+	}
+	_, svc, _ := c.call("GET", "/api/fw/services", nil)
+	cust := svc["custom"].([]any)
+	if len(cust) != 1 || !strings.Contains(strings.Join(toStrings(cust[0].(map[string]any)["used_by"]), ","), "Open port: My game") {
+		t.Fatalf("used by: %v", cust)
+	}
+	if len(svc["open_ports"].([]any)) != 4 {
+		t.Fatalf("services should list every open port: %v", svc["open_ports"])
+	}
+	id := cust[0].(map[string]any)["id"]
+	if rc, _, raw := c.call("PUT", "/api/fw/portlists", map[string]any{"id": id, "name": "Arena", "ports": []string{"udp/27000-27010"}}); rc != 200 {
+		t.Fatalf("rename: %d %s", rc, raw)
+	}
+	var g, app string
+	a.Config.QueryRow(`SELECT grp,app FROM nat_forwards WHERE proto='udp'`).Scan(&g, &app)
+	if g != "Arena" || app != "Arena" {
+		t.Fatalf("rename did not carry through: group %q app %q", g, app)
+	}
+	// A saved app that still has open ports cannot be deleted.
+	if rc, _, raw := c.call("DELETE", "/api/fw/portlists/"+itoa(int64(id.(float64))), nil); rc == 200 || !strings.Contains(string(raw), "open port Arena") {
+		t.Fatalf("delete: %d %s", rc, raw)
+	}
+}
+
+func toStrings(v any) []string {
+	var out []string
+	for _, x := range v.([]any) {
+		out = append(out, x.(string))
+	}
+	return out
+}

@@ -23,6 +23,10 @@ Tabs along the top:
 2. Stop a network reaching the internet: **Networks**, turn off **Can reach the internet** for it.
 3. Allow one device to reach another network: **Rules**, add a rule, choose the device and the service.
 
+4. Open a port in three taps: **Open ports**, **Open a port**, tap the app, tap the device. Gatehouse tells you which port it used. If that is not the right port, choose **Change port** and enter it yourself. A port already in use is never picked for you: Gatehouse asks you for a different one.
+5. See everything the firewall does: **Rules**, turn on **Show system rules**. Your open ports are listed there too.
+6. Watch for infected devices and break-in attempts: **Protection**, **Threat protection**. It watches and tells you in plain words; it does not block yet. If its engine stops, your traffic is not touched. **Allow for this device** quiets a harmless alert; **Advanced** lists what you let through.
+
 ## Example
 Open Plex for your media server: **Open a port**, choose Plex, choose the server, optionally limit it to your own country, **Save**, **Review and apply**.
 

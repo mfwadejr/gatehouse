@@ -1,6 +1,18 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.43',
+    title: 'Open ports made simple, block apps and topics, threat watching',
+    items: [
+      'Open a port in three taps: pick the app, pick the device. Gatehouse says which port it used and lets you change it. It never picks a port for you; if one is taken it asks which one to use. Each device row also has an Open a port button. Open ports now show in the Rules list (under Show system rules) and in Services.',
+      'You can give an app a different outside port and a different port on the device, which suits several copies of the same app. Renaming a service renames everything that uses it.',
+      'Block an app, a topic (adult, gambling, social media, ads, malware) or a website for everyone, a network, a profile or one device, always or at set hours, with an exception for a device and a pause button. It blocks by name. Thorough checking of the traffic itself is shown but is not switched on yet. If anything goes wrong nothing is blocked.',
+      'Each blocklist has View names, with a search and an Allow button.',
+      'Threat protection (Firewall, Protection): reads what a detection engine notices and shows it in plain words in the Logs, with Allow for this device, Allow for all, Never check this device, and an Advanced tab. It watches and tells; it does not block. The engine itself is not installed by this version, so until it is the page says so.',
+      'The Logs hide Gatehouse\'s own health checks. A checkbox shows them again.',
+    ],
+  },
+  {
     version: '0.8.42',
     title: 'DNS lookups show their connection',
     items: [

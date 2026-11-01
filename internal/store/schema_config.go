@@ -492,4 +492,36 @@ ALTER TABLE devices ADD COLUMN approval TEXT NOT NULL DEFAULT 'ok';
 `, `
 -- Package 9: the port a placed device is really plugged into, when that is not its VLAN's port.
 ALTER TABLE devices ADD COLUMN override_home TEXT NOT NULL DEFAULT '';
+`, `
+-- Blocks by scope (v0.8.43): block an app, a topic or a name for everyone, a network, a profile or one
+-- device. allow=1 makes an exception for that scope. method is fast (names), thorough (inspection) or
+-- both. schedule is the same JSON the firewall uses; empty means always. A topic is one of the
+-- category blocklists; a topic rule blocks its names only where the rule says.
+CREATE TABLE scope_rules(
+  id INTEGER PRIMARY KEY,
+  kind TEXT NOT NULL,                  -- app, topic or name
+  value TEXT NOT NULL,
+  scope TEXT NOT NULL DEFAULT 'everyone', -- everyone, network, profile, device
+  target TEXT NOT NULL DEFAULT '',     -- network name, profile id or device MAC
+  allow INTEGER NOT NULL DEFAULT 0,
+  method TEXT NOT NULL DEFAULT 'fast',
+  schedule TEXT NOT NULL DEFAULT '',
+  enabled INTEGER NOT NULL DEFAULT 1,
+  paused_until INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL DEFAULT 0
+);
+`, `
+-- Threat protection tuning (v0.8.43): checks the person has let through (for one device or all,
+-- optionally until a time) and devices that are never checked.
+CREATE TABLE threat_allowed(
+  id INTEGER PRIMARY KEY,
+  sid INTEGER NOT NULL,
+  mac TEXT NOT NULL DEFAULT '',
+  until INTEGER NOT NULL DEFAULT 0,
+  note TEXT NOT NULL DEFAULT '',
+  auto INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE threat_trusted(
+  mac TEXT PRIMARY KEY
+);
 `}

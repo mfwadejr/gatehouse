@@ -57,7 +57,7 @@ func healthy(webPort int, tlsOn bool, dnsAddr string) bool {
 	}}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	_, err = r.LookupHost(ctx, "health.gatehouse.invalid")
+	_, err = r.LookupHost(ctx, "health.gatehouse.invalid") // keep in step with dns.HealthName
 	return err == nil || !strings.Contains(err.Error(), "refused")
 }
 

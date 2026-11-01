@@ -92,6 +92,8 @@ type App struct {
 	apply        applyState
 	vpn          vpnState
 	fwn          fwNames
+	scope        scopeCache
+	threats      threatState
 	traffic      wanTraffic
 	viaNames     viaCache
 	health       healthSampler
@@ -188,6 +190,8 @@ func New(cfg Config) (*App, error) {
 	a.registerUPnPRoutes()
 	a.registerUPnPCardRoutes()
 	a.registerAppForwardRoutes()
+	a.registerScopeRoutes()
+	a.registerThreatRoutes()
 	a.registerDiscoveryRoutes()
 	a.registerAlertRoutes()
 	a.registerProfileRoutes()
@@ -399,6 +403,7 @@ func (a *App) Run(ctx context.Context) error {
 	run(func() { a.ddnsLoop(ctx) })
 	run(func() { a.haServe(ctx) })
 	run(func() { a.ndpiLoop(ctx) })
+	run(func() { a.threatLoop(ctx) })
 	run(func() { a.flowLoop(ctx) })
 	run(func() { a.snmpLoop(ctx) })
 	run(func() { a.sqmLoop(ctx) })

@@ -367,12 +367,15 @@ func (a *App) registerFWObjectRoutes() {
 		out := make([]custom, 0, len(lists))
 		for _, l := range lists {
 			used := fw.RulesUsingService(a.Config, l.Name)
+			for _, g := range fw.ForwardsUsingApp(a.Config, l.Name) {
+				used = append(used, "Open port: "+g)
+			}
 			if used == nil {
 				used = []string{}
 			}
 			out = append(out, custom{l, used})
 		}
-		api.JSON(w, 200, map[string]any{"builtin": fw.BuiltinServices(), "custom": out})
+		api.JSON(w, 200, map[string]any{"builtin": fw.BuiltinServices(), "custom": out, "open_ports": a.forwardViews()})
 	})
 	s.Handle("GET /api/fw/portlists", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		l, err := fw.PortLists(a.Config)

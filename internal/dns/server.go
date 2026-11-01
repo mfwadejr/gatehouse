@@ -40,6 +40,9 @@ type Server struct {
 	// Egress names the device the box's own lookups leave through when no tunnel is used, so the
 	// log can show which internet connection carried them. Nil leaves it blank.
 	Egress func() string
+	// Scoped answers, for one lookup, the reason it is blocked by a scope rule, or "" if it is not.
+	// Set once before the server starts.
+	Scoped func(client string, ci ClientInfo, name string) string
 	via    viaSet
 	rl     *RateLimiter
 	eng    engineHolder
@@ -202,6 +205,14 @@ func (s *Server) handle(client string, r *dns.Msg, start time.Time, udp bool) *d
 		m.Rcode = rc
 		m.Answer = rrs
 		return finish(m, OutLocal, "", "")
+	}
+
+	// 3b. Blocks by scope (apps, topics, names for a device, network or profile). It runs inside a
+	// recover and answers "not blocked" on any trouble, so a fault here never stops lookups.
+	if s.Scoped != nil {
+		if rule := s.scopedRule(client, ci, strings.TrimSuffix(q.Name, ".")); rule != "" {
+			return finish(s.blockedReply(r, q, o), OutBlocked, rule, "")
+		}
 	}
 
 	// 4. Filtering.
@@ -413,4 +424,14 @@ func (s *Server) Run(ctx context.Context, publish func(Snapshot)) {
 			}
 		}
 	}
+}
+
+// scopedRule calls the Scoped hook and treats any panic as "not blocked": this feature fails open.
+func (s *Server) scopedRule(client string, ci ClientInfo, name string) (rule string) {
+	defer func() {
+		if recover() != nil {
+			rule = ""
+		}
+	}()
+	return s.Scoped(client, ci, name)
 }

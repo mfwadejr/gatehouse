@@ -102,6 +102,7 @@ func TestDNSRowsShowNetworkAndConnection(t *testing.T) {
 	now := time.Now().Unix()
 	a.QLog.Add(dnssrv.LogEntry{TS: now - 2, Client: "192.168.20.107", QName: "play.hulu.com", QType: "A", Result: "forwarded", Upstream: "Cloudflare", Via: "eth0"})
 	a.QLog.Add(dnssrv.LogEntry{TS: now - 1, Client: "192.168.20.107", QName: "cached.example.org", QType: "A", Result: "cached"})
+	a.QLog.Add(dnssrv.LogEntry{TS: now, Client: "127.0.0.1", QName: dnssrv.HealthName, QType: "A", Result: "cached"})
 	var items []LogItem
 	for i := 0; i < 50 && len(items) < 2; i++ {
 		var out struct{ Items []LogItem }
@@ -114,6 +115,22 @@ func TestDNSRowsShowNetworkAndConnection(t *testing.T) {
 	}
 	if len(items) != 2 {
 		t.Fatalf("rows: %+v", items)
+	}
+	// Gatehouse's own health check is hidden unless asked for.
+	time.Sleep(700 * time.Millisecond)
+	var own struct{ Items []LogItem }
+	rr := newRec()
+	a.logSearch(rr, newReq("/api/logs?kind=dns&own=1"), nil)
+	decode(t, rr, &own)
+	if len(own.Items) != 3 {
+		t.Fatalf("with own=1 want 3 rows, got %d", len(own.Items))
+	}
+	rr = newRec()
+	a.logSearch(rr, newReq("/api/logs?kind=dns"), nil)
+	var def struct{ Items []LogItem }
+	decode(t, rr, &def)
+	if len(def.Items) != 2 {
+		t.Fatalf("by default want 2 rows (health check hidden), got %d", len(def.Items))
 	}
 	cached, fwd := items[0], items[1]
 	if fwd.Via != "T-Mobile" || fwd.ViaKind != "wan" || fwd.FromZone != "Cameras" || fwd.ToZone != "Internet" {

@@ -1,3 +1,4 @@
+import Blocks from './Blocks.jsx';
 import EncryptedDns from './EncryptedDns.jsx';
 import React, { useState } from 'react';
 import { del, get, patch, post, put, useData, useStream } from '../api.js';
@@ -226,6 +227,7 @@ function Lists() {
   const [rule, setRule] = useState({ domain: '', action: 'block', note: '' });
   const [q, setQ] = useState('');
   const [why, setWhy] = useState(null);
+  const [names, setNames] = useState(null);
   return (
     <>
       <Card title="Blocklists" desc="Lists of ad, tracker and malware names. Blocked names get no answer." actions={<Button small icon="plus" onClick={() => setAdd(true)}>Add list</Button>}>
@@ -238,6 +240,7 @@ function Lists() {
                 <ListMeta l={l} />
               </div>
               <div className="actions">
+                <Button small onClick={() => setNames(l)}>View names</Button>
                 {!l.local && <Button small icon="refresh" onClick={() => run(() => post(`/api/dns/lists/${l.id}/refresh`), 'Updated.').then(reload)}>Update</Button>}
                 <Button small kind="danger" icon="trash" onClick={async () => await confirmBox(`Delete ${l.name}?`) && run(() => del(`/api/dns/lists/${l.id}`)).then(reload)}>Delete</Button>
                 <button role="switch" aria-checked={l.enabled} aria-label={`Use ${l.name}`} className="switch" onClick={() => run(() => patch(`/api/dns/lists/${l.id}`, { enabled: !l.enabled })).then(reload)} />
@@ -275,7 +278,37 @@ function Lists() {
         )}
       </Card>
       {add && <AddList onClose={() => setAdd(false)} onSaved={reload} />}
+      {names && <ListNames l={names} onClose={() => setNames(null)} onAllowed={rr} />}
     </>
+  );
+}
+
+function ListNames({ l, onClose, onAllowed }) {
+  const [q, setQ] = useState('');
+  const [d, setD] = useState(null);
+  const [run] = useAction();
+  const [done, setDone] = useState([]);
+  React.useEffect(() => {
+    const t = setTimeout(() => { get(`/api/dns/lists/${l.id}/names?q=${encodeURIComponent(q)}`).then(setD).catch(() => setD({ names: [], total: 0 })); }, 250);
+    return () => clearTimeout(t);
+  }, [q, l.id]);
+  return (
+    <Modal title={l.name} onClose={onClose} footer={<Button kind="primary" onClick={onClose}>Done</Button>}>
+      <div className="stack">
+        <p className="small muted">{d ? `${fmt.n(d.total)} names blocked. ` : ''}{d?.updated ? `Last updated ${fmt.ago(d.updated)}.` : 'Not downloaded yet.'}</p>
+        <Input value={q} onChange={setQ} placeholder="Search names" aria-label="Search names" />
+        <div className="list" style={{ maxHeight: '18rem', overflow: 'auto' }}>
+          {(d?.names || []).map((n) => (
+            <div className="item" key={n.name}>
+              <span className="name mono">{n.name}</span>
+              {done.includes(n.name) ? <Pill tone="good">Allowed</Pill> : <Button small onClick={async () => { if (await run(() => post('/api/dns/rules', { domain: n.name, action: 'allow', note: '' }), 'Allowed.')) { setDone([...done, n.name]); onAllowed?.(); } }}>Allow</Button>}
+            </div>
+          ))}
+          {d && !d.names.length && <Empty>{q ? 'No name matches.' : 'Nothing to show.'}</Empty>}
+        </div>
+        {d && d.total > 100 && !q && <p className="small muted">Showing the first 100. Search to find a name.</p>}
+      </div>
+    </Modal>
   );
 }
 
@@ -419,10 +452,11 @@ export default function DNS() {
   const [tab, setTab] = useState('overview');
   return (
     <Page title="DNS" sub="Translates names to addresses for every device, and blocks the ones you do not want.">
-      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'overview', label: 'Overview' }, { value: 'lists', label: 'Blocking' }, { value: 'records', label: 'Your names' }, { value: 'groups', label: 'Profiles' }, { value: 'settings', label: 'Settings' }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'overview', label: 'Overview' }, { value: 'lists', label: 'Blocking' }, { value: 'records', label: 'Your names' }, { value: 'blocks', label: 'Apps & topics' }, { value: 'groups', label: 'Profiles' }, { value: 'settings', label: 'Settings' }]} />
       {tab === 'overview' && <Overview />}
       {tab === 'lists' && <Lists />}
       {tab === 'records' && <Records />}
+      {tab === 'blocks' && <Blocks />}
       {tab === 'groups' && <Groups />}
       {tab === 'settings' && <SettingsTab />}
     </Page>

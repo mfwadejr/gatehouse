@@ -17,6 +17,8 @@ The picture is an example from a new, empty box; yours will show your own device
 2. Use it: in any rule or open port, type its name in the "What for" box. Several can go in one box, separated by commas or spaces.
 3. Find a built-in one: type its name in **Search services**.
 
+4. Rename a service you made: **Edit**, change the **Name**, **Save**. Rules and open ports that use it follow the new name. A service used by an open port cannot be deleted until the port is removed.
+
 ## Example
 Make "console-game" with udp/3074 and tcp/3074, then use it in a rule for your console.
 
