@@ -1,6 +1,13 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.38',
+    title: 'Build fix',
+    items: [
+      'Fixes an automatic test that failed only in the first hour of a new month (the monthly provider report test looked at a time that had not happened yet). Nothing changes in how Gatehouse works.',
+    ],
+  },
+  {
     version: '0.8.37',
     title: 'Settings in tabs',
     items: [

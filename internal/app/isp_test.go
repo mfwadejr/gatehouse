@@ -24,7 +24,11 @@ func TestISPReportOutagesAndSpeed(t *testing.T) {
 	if a == nil {
 		t.Skip("no app")
 	}
-	from, _, label, _ := a.ispMonth("")
+	// Use last month, which is complete: the first hour of the current month may not have happened
+	// yet when this runs just after midnight on the 1st.
+	n := time.Now()
+	prev := time.Date(n.Year(), n.Month()-1, 1, 12, 0, 0, 0, n.Location())
+	from, _, label, _ := a.ispMonth(prev.Format("2006-01"))
 	base := from.Unix() + 3600
 	a.Logs.Exec(`INSERT INTO outages(start,end) VALUES(?,?)`, base, base+1800)      // 30 minutes
 	a.Logs.Exec(`INSERT INTO outages(start,end) VALUES(?,?)`, base+7200, base+7230) // a blip, ignored
