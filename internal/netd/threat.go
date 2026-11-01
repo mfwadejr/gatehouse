@@ -152,6 +152,37 @@ func countRules(path string) int {
 var reAfter = regexp.MustCompile(`After this operation, ([\d.,]+) ([kMG])B of additional disk space`)
 var reNeed = regexp.MustCompile(`Need to get ([\d.,]+) ([kMG])B`)
 
+// sumURISizes adds up the sizes in "apt-get --print-uris" lines: 'url' file size hash.
+func sumURISizes(out []byte) float64 {
+	var total float64
+	for _, l := range strings.Split(string(out), "\n") {
+		l = strings.TrimSpace(l)
+		if !strings.HasPrefix(l, "'") {
+			continue
+		}
+		f := strings.Fields(l)
+		if len(f) >= 3 {
+			if n, err := strconv.ParseFloat(f[2], 64); err == nil {
+				total += n
+			}
+		}
+	}
+	return total / (1024 * 1024)
+}
+
+// sumInstalledSize adds up the "Installed-Size" (in kB) of the packages "apt-cache show" describes.
+func sumInstalledSize(out []byte) float64 {
+	var total float64
+	for _, l := range strings.Split(string(out), "\n") {
+		if v, ok := strings.CutPrefix(l, "Installed-Size:"); ok {
+			if n, err := strconv.ParseFloat(strings.TrimSpace(v), 64); err == nil {
+				total += n
+			}
+		}
+	}
+	return total / 1024
+}
+
 func toMB(num, unit string) float64 {
 	v, _ := strconv.ParseFloat(strings.ReplaceAll(num, ",", ""), 64)
 	switch unit {
@@ -182,6 +213,20 @@ func (s *Service) ThreatInstallPreview() (ThreatPreview, error) {
 	}
 	if m := reNeed.FindSubmatch(b); m != nil {
 		p.DownloadMB = toMB(string(m[1]), string(m[2]))
+	}
+	// Debian's simulation does not always print the totals, so work them out from the package list.
+	if p.DownloadMB == 0 || p.DiskMB == 0 {
+		names := append(parseInst(b), p.Packages...)
+		if p.DownloadMB == 0 {
+			if u, err := aptRun(2*time.Minute, "apt-get", aptArgs("install", "--no-install-recommends", "--print-uris", "-qq", strings.Join(p.Packages, " "))...); err == nil || len(u) > 0 {
+				p.DownloadMB = sumURISizes(u)
+			}
+		}
+		if p.DiskMB == 0 {
+			if o, err := aptRun(time.Minute, "apt-cache", append([]string{"show", "--no-all-versions"}, names...)...); err == nil {
+				p.DiskMB = sumInstalledSize(o)
+			}
+		}
 	}
 	p.Note = "Installed from Debian's own package source. It needs the internet for a minute or two."
 	return p, nil

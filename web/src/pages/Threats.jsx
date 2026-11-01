@@ -30,7 +30,7 @@ function InstallPrompt({ data, reload }) {
         <Modal title="Install threat watching" onClose={() => setPre(null)} footer={<><Button onClick={() => setPre(null)}>Cancel</Button><Button kind="primary" disabled={busy} onClick={async () => { if (await run(() => post('/api/threat/install'), 'Installing. This can take a few minutes.')) { setPre(null); reload(); } }}>Install</Button></>}>
           <div className="stack">
             <p className="small">Gatehouse will download and install: <strong>{(pre.preview.packages || []).join(', ')}</strong>.</p>
-            <p className="small">Download about {mb(pre.preview.download_mb || 0)}. Disk space about {mb(pre.preview.disk_mb || 0)}. This machine has {mb(pre.disk_free_mb || 0)} free, {mb(pre.memory_mb || 0)} of memory and {pre.cpus || '?'} processor core{pre.cpus === 1 ? '' : 's'}.</p>
+            <p className="small">{pre.preview.download_mb > 0 || pre.preview.disk_mb > 0 ? `Download about ${mb(Math.ceil(pre.preview.download_mb || 0))}. Disk space about ${mb(Math.ceil(pre.preview.disk_mb || 0))}.` : 'Debian did not say how big this is; it is usually under 100 MB.'} This machine has {mb(pre.disk_free_mb || 0)} free, {mb(pre.memory_mb || 0)} of memory and {pre.cpus || '?'} processor core{pre.cpus === 1 ? '' : 's'}.</p>
             {(pre.warnings || []).map((w) => <Note key={w} tone="warn">{w}</Note>)}
             {!(pre.warnings || []).length && <Note>This machine has enough room.</Note>}
             <p className="small muted">Installing does not turn watching on. You do that next, and can switch it off or remove it at any time.</p>
@@ -112,7 +112,7 @@ function Rules({ data, reload }) {
         {!p.has_previous && <p className="small muted">There is no earlier set to go back to yet.</p>}
       </Card>
       <Card title="Groups of checks" desc={groups.data?.note}>
-        <div className="list">
+        <div className="list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 17rem), 1fr))', columnGap: 'var(--space-4)' }}>
           {(groups.data?.groups || []).map((g) => <div className="item" key={g.name}><div><div className="name">{g.name}</div><div className="meta">{g.text}</div></div><Pill tone={g.on ? 'good' : ''}>{g.on ? 'On' : 'Off'}</Pill></div>)}
         </div>
       </Card>

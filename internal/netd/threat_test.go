@@ -222,3 +222,22 @@ func TestThreatRulesRollBackAndKeepOldOnFailure(t *testing.T) {
 		t.Fatalf("status: %+v", info)
 	}
 }
+
+// Debian's simulated install may print no totals; the sizes then come from the package list.
+func TestThreatPreviewWorksOutSizesWhenAptPrintsNoTotals(t *testing.T) {
+	s, _ := fakeThreatBox(t)
+	aptRun = func(_ time.Duration, name string, args ...string) ([]byte, error) {
+		c := name + " " + strings.Join(args, " ")
+		switch {
+		case strings.Contains(c, "--print-uris"):
+			return []byte("'http://deb.debian.org/debian/pool/main/s/suricata/suricata_7.deb' suricata_7.deb 10485760 SHA256:aa\n'http://deb.debian.org/debian/pool/main/s/suricata-update/su.deb' su.deb 5242880 SHA256:bb\n"), nil
+		case strings.HasPrefix(c, "apt-cache show"):
+			return []byte("Package: suricata\nInstalled-Size: 51200\n\nPackage: suricata-update\nInstalled-Size: 10240\n"), nil
+		}
+		return []byte("Inst suricata (7 Debian:13/stable [amd64])\n"), nil
+	}
+	p, err := s.ThreatInstallPreview()
+	if err != nil || p.DownloadMB != 15 || p.DiskMB != 60 {
+		t.Fatalf("%+v %v", p, err)
+	}
+}
