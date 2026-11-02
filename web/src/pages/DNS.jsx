@@ -430,7 +430,7 @@ function SettingsTab() {
   if (!v) return null;
   const set = (k) => (x) => setF({ ...v, [k]: x });
   return (
-    <Card title="DNS settings">
+    <Card title="DNS settings" desc="Where names are looked up when this device does not already know the answer, and how answers are kept.">
       <Field label="What to do with blocked names">
         <Select value={v.block_mode} onChange={set('block_mode')} options={[{ value: 'null', label: 'Answer with an empty address (fastest to fail)' }, { value: 'nxdomain', label: 'Say the name does not exist' }, { value: 'refused', label: 'Refuse' }]} />
       </Field>

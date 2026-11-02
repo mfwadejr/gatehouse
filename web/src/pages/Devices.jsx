@@ -261,7 +261,7 @@ export default function Devices({ me }) {
       {open1 && <Details d={open1} groups={groups || []} onClose={() => setOpen(null)} onSaved={reload} />}
       {opening && <OpenPortModal preset={{ mac: opening.mac, ip: opening.ip, device_name: opening.name || opening.hostname || opening.mac }} apps={fwf?.apps || []} connections={fwf?.connections || []} existing={fwf?.forwards || []} onClose={() => setOpening(null)} onSaved={reloadFwf} reloadApps={reloadFwf} />}
       <ApplyBar kind="fw" label="the firewall" status={fwov?.status} me={me} onChanged={reloadFwf} />
-      {adding && <NewDevice onClose={() => setAdding(false)} onCreated={reload} />}
+      {adding && <NewDevice onClose={() => setAdding(false)} onCreated={reload} seen={all.filter((d) => d.mac && !d.name)} />}
       {pick && (
         <Modal title="Columns and rows" onClose={() => setPick(false)} footer={<Button kind="primary" onClick={() => setPick(false)}>Done</Button>}>
           <div className="stack">

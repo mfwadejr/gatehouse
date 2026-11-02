@@ -32,3 +32,6 @@ Open Plex for your media server: **Open a port**, choose Plex, choose the server
 
 ## If something goes wrong
 Gatehouse refuses a change that would leave you no way to manage it, and always keeps safe starting rules above everything you can edit. If a change breaks something, the 60-second way back puts it right.
+
+## Letting devices open ports (UPnP)
+**Let devices open ports by themselves (UPnP)** lets a game console or media app ask for a port instead of you opening it by hand. It opens that port for that device only, and it is off until you switch it on. Turn it off if you want every open port to be your own choice.

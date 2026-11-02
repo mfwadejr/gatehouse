@@ -40,25 +40,6 @@ func (a *App) dnsSummary(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 	})
 }
 
-func (a *App) dnsLog(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-	q := r.URL.Query()
-	f := dnssrv.Filter{Text: q.Get("q"), Result: q.Get("result")}
-	f.Limit, _ = strconv.Atoi(q.Get("limit"))
-	f.Before, _ = strconv.ParseInt(q.Get("before"), 10, 64)
-	if h, err := strconv.Atoi(q.Get("hours")); err == nil && h > 0 {
-		f.Since = time.Now().Add(-time.Duration(h) * time.Hour).Unix()
-	}
-	rows, err := a.QLog.Search(f)
-	if err != nil {
-		fail(w, err)
-		return
-	}
-	if rows == nil {
-		rows = []dnssrv.Row{}
-	}
-	api.JSON(w, 200, rows)
-}
-
 func (a *App) dnsTop(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 	hours := 24
 	if h, err := strconv.Atoi(r.URL.Query().Get("hours")); err == nil && h > 0 && h <= 24*30 {

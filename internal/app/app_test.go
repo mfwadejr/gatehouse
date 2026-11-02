@@ -152,7 +152,7 @@ func TestDaemonEndToEnd(t *testing.T) {
 
 	// The query log picks the queries up.
 	time.Sleep(1200 * time.Millisecond)
-	_, _, body = c.call("GET", "/api/dns/log?limit=10", nil)
+	_, _, body = c.call("GET", "/api/dns/top?hours=24", nil)
 	if !bytes.Contains(body, []byte("bad.example")) {
 		t.Fatalf("log: %s", body)
 	}

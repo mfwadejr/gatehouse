@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { post, put } from './api.js';
+import { patch, post, put } from './api.js';
 import { Button, Field, Input, Modal, Select, useAction } from './ui.jsx';
 
 // Pieces used by the firewall rule form: choosing who or what a rule covers, which ports, and when.
@@ -48,18 +48,25 @@ export function Chip({ tok, pickers, onRemove, warn }) {
   );
 }
 
-export function NewDevice({ initialMac, onClose, onCreated }) {
+export function NewDevice({ initialMac, onClose, onCreated, seen = [] }) {
   const [mac, setMac] = useState(initialMac || '');
   const [name, setName] = useState('');
   const [run, busy] = useAction();
   const save = async () => {
-    const ok = await run(() => post('/api/devices', { mac: mac.trim().toLowerCase(), name }));
+    const have = seen.find((d) => d.mac === mac.trim().toLowerCase() && d.id);
+    const ok = await run(() => (have ? patch(`/api/devices/${have.id}`, { name }) : post('/api/devices', { mac: mac.trim().toLowerCase(), name })));
     if (ok) { onCreated(mac.trim().toLowerCase()); onClose(); }
   };
   return (
     <Modal title="Add a device" onClose={onClose}
       footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy || !reMAC.test(mac.trim()) || !name.trim()} onClick={save}>Add</Button></>}>
-      <p className="small muted">For a device that has not connected yet. Its address is on a label on the device, or in its network settings.</p>
+      {seen.length > 0 && (
+        <Field label="Pick one that has already connected" hint="Fills in the address for you. Or type one below for a device that has not connected yet.">
+          <Select value={seen.some((d) => d.mac === mac) ? mac : ''} onChange={(v) => { const d = seen.find((x) => x.mac === v); if (d) { setMac(d.mac); if (!name.trim()) setName(d.hostname || d.vendor || ''); } }}
+            options={[{ value: '', label: 'Choose a device…' }, ...seen.map((d) => ({ value: d.mac, label: `${d.hostname || d.vendor || 'Unknown device'} · ${d.ip || d.mac}` }))]} />
+        </Field>
+      )}
+      <p className="small muted">For a device that has not connected yet, its address is on a label on the device, or in its network settings.</p>
       <Field label="Name"><Input value={name} onChange={setName} placeholder="Kitchen TV" /></Field>
       <Field label="Device address (MAC)" hint="Looks like aa:bb:cc:dd:ee:ff"><Input value={mac} onChange={setMac} placeholder="aa:bb:cc:dd:ee:ff" /></Field>
     </Modal>

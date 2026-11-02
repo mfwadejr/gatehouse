@@ -200,7 +200,7 @@ export default function Internet({ me }) {
       {showTabs && <Tabs value={tab} onChange={choose} tabs={tabs} />}
       {(!showTabs || tab === 'connections') && (wans.length > 0 || !isNew) ? (
         <Card title="Internet connections" actions={<Button icon="plus" onClick={() => setEdit({})}>Add connection</Button>}
-          desc={wans.length > 1 ? 'Choose how these share the work, or send certain devices through specific ones, in Connection groups below.' : undefined}>
+          desc={wans.length > 1 ? 'Choose how these share the work, or send certain devices through specific ones, in Connection groups below.' : 'The links that connect this firewall to the internet.'}>
           {wans.length === 0 ? <Empty>No connection yet.</Empty> : (
             <div className="list">
               {wans.map((w) => {

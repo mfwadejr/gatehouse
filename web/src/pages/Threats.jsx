@@ -1,7 +1,7 @@
 import { useHashTab } from '../hashtab.js';
 import React, { useState } from 'react';
 import { del, post, put, get, useData } from '../api.js';
-import { Button, Card, Empty, Field, Input, Modal, Note, NumberInput, Pill, Segmented, Switch, Tabs, useAction, fmt } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, NumberInput, Pill, Segmented, Switch, Tabs, Limited, useAction, fmt } from '../ui.jsx';
 
 // Threat watching. An engine (Suricata) is installed only when the owner asks. It watches copies of
 // the traffic and Gatehouse says what it noticed in plain words. It never holds traffic up, so a
@@ -64,6 +64,26 @@ function AlertRow({ x, days, busy, run, reload }) {
   );
 }
 
+// Rows with the same title sit together, with one line saying how many devices and times.
+function AlertGroups({ rows, ...p }) {
+  const groups = [];
+  const by = new Map();
+  rows.forEach((x) => { if (!by.has(x.title)) { const g = { title: x.title, rows: [] }; by.set(x.title, g); groups.push(g); } by.get(x.title).rows.push(x); });
+  return (
+    <Limited items={groups} n={10} noun="kinds of alert" render={(g) => {
+      if (g.rows.length === 1) return <AlertRow key={g.rows[0].key} x={g.rows[0]} {...p} />;
+      const devs = new Set(g.rows.map((x) => x.mac || x.device)).size;
+      const times = g.rows.reduce((a, x) => a + (x.count || 1), 0);
+      return (
+        <div key={g.title}>
+          <div className="small muted" style={{ marginTop: 'var(--space-2)' }}>{g.title}: {fmt.n(times)} times, {devs} device{devs === 1 ? '' : 's'}</div>
+          {g.rows.map((x) => <AlertRow key={x.key} x={x} {...p} />)}
+        </div>
+      );
+    }} />
+  );
+}
+
 function Alerts({ data, reload }) {
   const [run, busy] = useAction();
   const [days, setDays] = useState('0');
@@ -73,13 +93,13 @@ function Alerts({ data, reload }) {
   const quiet = all.filter((x) => x.quiet);
   return (
     <div className="list">
-      {loud.map((x) => <AlertRow key={x.key} x={x} days={days} busy={busy} run={run} reload={reload} />)}
+      <AlertGroups rows={loud} days={days} busy={busy} run={run} reload={reload} />
       {!loud.length && <Empty>Nothing suspicious has been seen.</Empty>}
       {quiet.length > 0 && (
         <div>
           <button className="link" onClick={() => setShowQuiet(!showQuiet)}>{showQuiet ? 'Hide' : 'Show'} odd network behaviour and usually harmless traffic ({quiet.length})</button>
           <p className="small muted">The engine noticed unusual packets. This is common and almost never a threat, so it is kept out of the way.</p>
-          {showQuiet && quiet.map((x) => <AlertRow key={x.key} x={x} days={days} busy={busy} run={run} reload={reload} />)}
+          {showQuiet && <AlertGroups rows={quiet} days={days} busy={busy} run={run} reload={reload} />}
         </div>
       )}
       <Field label="Allowing lasts"><Segmented value={days} onChange={setDays} options={[{ value: '0', label: 'Until I remove it' }, { value: '7', label: '7 days' }, { value: '1', label: '1 day' }]} /></Field>

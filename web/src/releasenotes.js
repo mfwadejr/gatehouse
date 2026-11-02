@@ -1,6 +1,19 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.54',
+    title: 'Tidier layout and clearer wording',
+    items: [
+      'The sidebar is now in groups: Network (Internet, Networks, DNS, DHCP, Routes), Security (Firewall, Protection, Services, VPN), People and devices, and System. Every page keeps its address, so saved links still work.',
+      'Backups: the setting that said Keep the newest now says Keep this many backups, and a line under it says it counts copies, not days.',
+      'Cards that had no explanation now have one (Reserved addresses, DNS settings, Internet connections, Services search, Where you are signed in, Appearance).',
+      'Threat alerts are grouped by kind, with how many times and on how many devices, and long lists show the first few with a Show all button.',
+      'Add a device now lets you pick one that has already connected instead of typing its address.',
+      'Help now explains sending logs elsewhere, traffic records, SNMP, high availability, bridge mode and UPnP.',
+      'Behind the scenes: unused styles, colors and four unused routes were removed, and the build now fails if unused ones come back.',
+    ],
+  },
+  {
     version: '0.8.53',
     title: 'Wireless removed: Gatehouse is wired only',
     items: [

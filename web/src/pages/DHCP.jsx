@@ -147,7 +147,7 @@ function Reservations() {
   const [add, setAdd] = useState(false);
   const [run] = useAction();
   return (
-    <Card title="Reserved addresses" actions={<Button small icon="plus" onClick={() => setAdd(true)}>Add reservation</Button>}>
+    <Card title="Reserved addresses" desc="Devices that always get the same address from DHCP, so you can find them or point rules at them." actions={<Button small icon="plus" onClick={() => setAdd(true)}>Add reservation</Button>}>
       <div className="list">
         {(data || []).map((r) => <div className="item" key={r.id}><div><div className="name">{r.hostname || r.mac}</div><div className="meta mono">{r.ip} · {r.mac}</div></div><Button small kind="danger" icon="trash" onClick={() => run(() => del(`/api/dhcp/reservations/${r.id}`)).then(reload)}>Remove</Button></div>)}
         {!data?.length && <Empty>No reservations.</Empty>}

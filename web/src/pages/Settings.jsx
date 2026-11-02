@@ -38,7 +38,7 @@ function Sessions() {
   const { data, reload } = useData('/api/auth/sessions');
   const [run] = useAction();
   return (
-    <Card title="Where you are signed in" actions={<Button small onClick={() => run(() => post('/api/auth/sessions/revoke-others'), 'Signed out everywhere else.').then(reload)}>Sign out everywhere else</Button>}>
+    <Card title="Where you are signed in" desc="Browsers and devices currently signed in to this console." actions={<Button small onClick={() => run(() => post('/api/auth/sessions/revoke-others'), 'Signed out everywhere else.').then(reload)}>Sign out everywhere else</Button>}>
       <div className="list">
         {(data || []).map((s) => (
           <div className="item" key={s.id}>
@@ -56,7 +56,7 @@ function Appearance() {
   const [theme, setTheme] = useState(() => { try { return localStorage.getItem('gh.theme') || 'dark'; } catch { return 'dark'; } });
   useEffect(() => { document.documentElement.dataset.theme = theme; try { localStorage.setItem('gh.theme', theme); } catch { /* ignore */ } }, [theme]);
   return (
-    <Card title="Appearance">
+    <Card title="Appearance" desc="How the console looks on this browser.">
       <Segmented value={theme} onChange={setTheme} options={[{ value: 'dark', label: 'Dark' }, { value: 'light', label: 'Light' }]} />
     </Card>
   );

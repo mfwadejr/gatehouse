@@ -113,6 +113,18 @@ export function ToggleRow({ title, desc, checked, onChange, disabled }) {
   );
 }
 
+// Long-list pattern: show the first n rows, with a button for the rest.
+export function Limited({ items, n = 20, render, noun = 'rows' }) {
+  const [all, setAll] = useState(false);
+  const shown = all ? items : items.slice(0, n);
+  return (
+    <>
+      {shown.map(render)}
+      {items.length > n && <button type="button" className="link small" onClick={() => setAll(!all)}>{all ? 'Show fewer' : `Show all ${items.length} ${noun}`}</button>}
+    </>
+  );
+}
+
 export function Field({ label, hint, children }) {
   const id = useId();
   const child = React.isValidElement(children) && !children.props.id ? React.cloneElement(children, { id }) : children;

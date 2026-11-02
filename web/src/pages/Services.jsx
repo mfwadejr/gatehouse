@@ -34,7 +34,7 @@ export default function Services() {
   return (
     <Page title="Services" sub="Names for ports. Make your own, then pick them by name when you make a firewall rule."
       actions={<Button kind="primary" icon="plus" onClick={() => setEdit({})}>New service</Button>}>
-      <Card title="Search">
+      <Card title="Search" desc="Find a service by name to see which ports it uses.">
         <Input value={q} onChange={setQ} placeholder="Search by name or port number" aria-label="Search services" />
       </Card>
       <Card title="Your services" desc="Made by you. Used in rules by name.">

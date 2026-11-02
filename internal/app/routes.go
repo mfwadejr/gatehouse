@@ -73,7 +73,6 @@ func (a *App) registerRoutes() {
 	})
 	// DNS
 	s.Handle("GET /api/dns/summary", a.dnsSummary)
-	s.Handle("GET /api/dns/log", a.dnsLog)
 	s.Handle("GET /api/dns/top", a.dnsTop)
 	s.Handle("GET /api/dns/lists", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		l, err := a.Lists.Lists()
@@ -300,10 +299,6 @@ func (a *App) registerRoutes() {
 	s.HandleAdmin("PUT /api/dns/settings", a.dnsSaveSettings)
 	s.HandleAdmin("POST /api/dns/cache/flush", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		a.DNS.Cache().Flush()
-		ok(w)
-	})
-	s.HandleAdmin("DELETE /api/dns/log", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-		a.QLog.Clear()
 		ok(w)
 	})
 

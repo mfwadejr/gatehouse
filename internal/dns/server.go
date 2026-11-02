@@ -45,14 +45,14 @@ type Server struct {
 	Scoped func(client string, ci ClientInfo, name string) string
 	// OnScopedFault is told when the Scoped hook crashed and the lookup was let through.
 	OnScopedFault func()
-	via    viaSet
-	rl     *RateLimiter
-	eng    engineHolder
-	local  localHolder
-	dir    Directory
-	names  Names
-	qlog   *QueryLog
-	stats  *Stats
+	via           viaSet
+	rl            *RateLimiter
+	eng           engineHolder
+	local         localHolder
+	dir           Directory
+	names         Names
+	qlog          *QueryLog
+	stats         *Stats
 
 	// OnRateLimited is called at most once per client per minute.
 	OnRateLimited func(client string)

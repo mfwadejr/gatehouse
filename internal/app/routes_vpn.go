@@ -57,24 +57,6 @@ func (a *App) registerVPNRoutes() {
 			"helper": a.Net != nil})
 	})
 	s.Handle("GET /api/vpn/choices", a.vpnChoices)
-	s.HandleAdmin("PUT /api/vpn/settings", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-		var in struct {
-			Endpoint string `json:"endpoint"`
-		}
-		if !api.Decode(w, r, &in) {
-			return
-		}
-		in.Endpoint = strings.TrimSpace(in.Endpoint)
-		if in.Endpoint != "" {
-			if err := validHost(in.Endpoint); err != nil {
-				fail(w, err)
-				return
-			}
-		}
-		a.Config.SetSetting(vpnEndpointSetting, in.Endpoint)
-		a.refreshVPN()
-		ok(w)
-	})
 
 	s.HandleAdmin("POST /api/vpn/wireguard/server", a.vpnNewWGServer)
 	s.HandleAdmin("POST /api/vpn/wireguard/client", a.vpnNewWGClient)

@@ -34,6 +34,8 @@ code, .mono { font-family: var(--font-family-mono); font-size: var(--font-size-s
   border-radius: var(--radius-md); text-decoration: none;
   color: var(--color-text-secondary);
 }
+.navgroup { margin: var(--space-3) var(--space-3) var(--space-1); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: .06em; color: var(--color-text-secondary); }
+@media (max-width: 52rem) { .navgroup { display: none; } }
 .nav a:hover { background: var(--color-state-hover); }
 .nav a.on { background: var(--color-accent-selected-bg); color: var(--color-text-primary); }
 .nav .badge-dot { margin-left: auto; }
@@ -61,7 +63,6 @@ code, .mono { font-family: var(--font-family-mono); font-size: var(--font-size-s
 .card h2 { font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); }
 .card .desc { color: var(--color-text-muted); font-size: var(--font-size-base); margin-top: calc(var(--space-1) * -1); }
 .grid { display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }
-.grid.wide { grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr)); }
 .row { display: flex; flex-wrap: wrap; gap: var(--space-4); }
 .row > .grow { flex: 1 1 22rem; min-width: 0; }
 .stack { display: flex; flex-direction: column; gap: var(--space-3); }
@@ -189,8 +190,6 @@ textarea.in { height: auto; padding: var(--space-2-5) var(--component-input-padd
 .spark path.line { vector-effect: non-scaling-stroke; }
 .spark path.line { fill: none; stroke: var(--color-chart-series-1); stroke-width: var(--chart-line-width); stroke-linecap: round; stroke-linejoin: round; }
 .spark path.area { fill: var(--color-chart-series-1); opacity: var(--chart-area-opacity); stroke: none; }
-.spark.s2 path.line { stroke: var(--color-chart-series-3); }
-.spark.s2 path.area { fill: var(--color-chart-series-3); }
 .spark .gridline { stroke: var(--color-chart-grid); stroke-width: var(--border-width-thin); }
 .skeleton { height: var(--space-6); border-radius: var(--radius-sm); background: var(--color-chart-track); }
 @media (max-width: 52rem) {
@@ -214,8 +213,6 @@ textarea.in { height: auto; padding: var(--space-2-5) var(--component-input-padd
 .portrow .pstat { display: flex; align-items: center; gap: var(--space-2); color: var(--color-text-secondary); font-size: var(--font-size-sm); }
 @media (max-width: 40rem) { .portrow { grid-template-columns: 1fr; } }
 
-.tile.trend { grid-column: 1 / -1; }
-.tile.trend .line { justify-content: space-between; align-items: baseline; }
 
 .spark.idle path.line { stroke: var(--color-text-muted); stroke-dasharray: 4 4; }
 .spark.idle path.area { display: none; }

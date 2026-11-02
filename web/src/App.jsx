@@ -26,20 +26,20 @@ import { ReleaseNotes } from './whatsnew.jsx';
 
 export const PAGES = [
   { id: 'overview', label: 'Overview', icon: 'overview', el: Overview },
-  { id: 'internet', label: 'Internet', icon: 'internet', el: Internet },
-  { id: 'networks', label: 'Networks', icon: 'networks', el: Networks },
-  { id: 'dns', label: 'DNS', icon: 'dns', el: DNS },
-  { id: 'dhcp', label: 'DHCP', icon: 'dhcp', el: DHCP },
-  { id: 'firewall', label: 'Firewall', icon: 'firewall', el: Firewall },
-  { id: 'protection', label: 'Protection', icon: 'protection', el: Protection },
-  { id: 'services', label: 'Services', icon: 'services', el: Services },
-  { id: 'vpn', label: 'VPN', icon: 'vpn', el: VPN },
-  { id: 'routes', label: 'Routes', icon: 'routes', el: Routes },
-  { id: 'profiles', label: 'Profiles', icon: 'devices', el: Profiles },
-  { id: 'devices', label: 'Devices & access', icon: 'devices', el: Devices },
-  { id: 'logs', label: 'Logs', icon: 'logs', el: Logs },
-  { id: 'diagnostics', label: 'Diagnostics', icon: 'diagnostics', el: Diagnostics },
-  { id: 'settings', label: 'Settings', icon: 'settings', el: Settings },
+  { id: 'internet', label: 'Internet', icon: 'internet', el: Internet, group: 'Network' },
+  { id: 'networks', label: 'Networks', icon: 'networks', el: Networks, group: 'Network' },
+  { id: 'dns', label: 'DNS', icon: 'dns', el: DNS, group: 'Network' },
+  { id: 'dhcp', label: 'DHCP', icon: 'dhcp', el: DHCP, group: 'Network' },
+  { id: 'routes', label: 'Routes', icon: 'routes', el: Routes, group: 'Network' },
+  { id: 'firewall', label: 'Firewall', icon: 'firewall', el: Firewall, group: 'Security' },
+  { id: 'protection', label: 'Protection', icon: 'protection', el: Protection, group: 'Security' },
+  { id: 'services', label: 'Services', icon: 'services', el: Services, group: 'Security' },
+  { id: 'vpn', label: 'VPN', icon: 'vpn', el: VPN, group: 'Security' },
+  { id: 'profiles', label: 'Profiles', icon: 'devices', el: Profiles, group: 'People and devices' },
+  { id: 'devices', label: 'Devices & access', icon: 'devices', el: Devices, group: 'People and devices' },
+  { id: 'logs', label: 'Logs', icon: 'logs', el: Logs, group: 'System' },
+  { id: 'diagnostics', label: 'Diagnostics', icon: 'diagnostics', el: Diagnostics, group: 'System' },
+  { id: 'settings', label: 'Settings', icon: 'settings', el: Settings, group: 'System' },
 ];
 
 function useRoute() {
@@ -76,14 +76,17 @@ function Shell({ me, onSignOut, reloadMe }) {
         <div className="brand"><Icon name="logo" size={24} /><span>Gatehouse</span></div>
         <button type="button" className="srchbtn" onClick={() => setFinding(true)} aria-label="Search"><Icon name="search" /><span>Search</span><kbd>/</kbd></button>
         <nav className="nav" aria-label="Primary">
-          {PAGES.map((p) => (
-            <a key={p.id} href={`#/${p.id}`} className={p.id === page.id ? 'on' : ''} aria-current={p.id === page.id ? 'page' : undefined}>
+          {PAGES.map((p, i) => (
+            <React.Fragment key={p.id}>
+            {p.group && p.group !== PAGES[i - 1]?.group && <span className="navgroup">{p.group}</span>}
+            <a href={`#/${p.id}`} className={p.id === page.id ? 'on' : ''} aria-current={p.id === page.id ? 'page' : undefined}>
               <Icon name={p.icon} />
               <span>{p.label}</span>
               {(p.id === 'firewall' || p.id === 'internet' || p.id === 'networks') && (dirty || pending)
                 ? <span className={`dot ${pending ? 'bad' : 'warn'} badge-dot`} title={pending ? 'A change is waiting for your confirmation' : 'Changes not applied yet'} />
                 : attn.byPage[p.id] && <span className={`navdot ${attn.byPage[p.id]}`} role="img" aria-label={`${levelText[attn.byPage[p.id]]}: ${attn.items.filter((x) => x.to === p.id).map((x) => x.t).join('. ')}`} title={attn.items.filter((x) => x.to === p.id).map((x) => x.t).join('\n')} />}
             </a>
+            </React.Fragment>
           ))}
         </nav>
         <div className="me">

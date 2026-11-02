@@ -143,7 +143,7 @@ export default function Backups({ me }) {
         <div className="inline" style={{ alignItems: 'flex-end' }}>
           <Field label="Make a backup"><Select value={c.schedule} onChange={(v) => save({ schedule: v })} options={[{ value: 'daily', label: 'Every day' }, { value: 'weekly', label: 'Every week' }, { value: 'off', label: 'Only when I ask' }]} /></Field>
           {c.schedule !== 'off' && <Field label="At"><Select value={String(c.hour)} onChange={(v) => save({ hour: Number(v) })} options={HOURS} /></Field>}
-          <Field label="Keep the newest"><Select value={String(c.keep)} onChange={(v) => save({ keep: Number(v) })} options={[3, 5, 7, 10, 14, 30, 60].map((n) => ({ value: String(n), label: String(n) }))} /></Field>
+          <Field label="Keep this many backups" hint="Backup copies, not days. Older ones are deleted."><Select value={String(c.keep)} onChange={(v) => save({ keep: Number(v) })} options={[3, 5, 7, 10, 14, 30, 60].map((n) => ({ value: String(n), label: String(n) }))} /></Field>
         </div>
         {!lastGood && <Note tone="warn" title="No good backup yet">Press Back up now to make one.</Note>}
         {lastGood && stale && <Note tone="" title="Try a restore check">No backup has been checked by hand in the last 90 days. Open Check on a backup, look at what is inside, and confirm it. That is how you know it will work on the day you need it.</Note>}

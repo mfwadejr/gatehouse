@@ -659,22 +659,4 @@ func (a *App) registerOverviewRoutes() {
 		}))
 	})
 	a.registerHomeAndHappened()
-	s.Handle("GET /api/overview/events", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-		type ev struct {
-			TS       int64  `json:"ts"`
-			Area     string `json:"area"`
-			Severity string `json:"severity"`
-			Title    string `json:"title"`
-		}
-		out := []ev{}
-		if rows, err := a.Logs.Query(`SELECT ts,area,severity,title FROM events ORDER BY ts DESC,id DESC LIMIT 8`); err == nil {
-			for rows.Next() {
-				var e ev
-				rows.Scan(&e.TS, &e.Area, &e.Severity, &e.Title)
-				out = append(out, e)
-			}
-			rows.Close()
-		}
-		api.JSON(w, 200, out)
-	})
 }
