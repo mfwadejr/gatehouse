@@ -1,6 +1,13 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.49',
+    title: 'Build fixes for 0.8.48',
+    items: [
+      'Fixes the automatic tests that stopped 0.8.48 from building. The terminal now also starts on machines where the home folder cannot be entered, and naming a port no longer depends on the real network cards of the computer running the tests. Everything in 0.8.48 is included.',
+    ],
+  },
+  {
     version: '0.8.48',
     title: 'Diagnostics page, terminal, Suricata reasons, SSH fix',
     items: [

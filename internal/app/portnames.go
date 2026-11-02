@@ -48,7 +48,7 @@ func (a *App) registerPortNameRoutes() {
 			return
 		}
 		found := false
-		for _, p := range ports() {
+		for _, p := range portsLister() {
 			if n, _ := p["name"].(string); n == in.Name {
 				found = true
 			}

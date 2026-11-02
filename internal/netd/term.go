@@ -115,15 +115,24 @@ func (s *Service) TermOpen(rows, cols int) (string, error) {
 	}
 	rows, cols = clampSize(rows, cols)
 	setWinsize(m, rows, cols)
-	cmd := exec.Command(termShell[0], termShell[1:]...)
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = sl, sl, sl
-	cmd.Env = []string{"TERM=xterm-256color", "HOME=/root", "USER=root", "LANG=C.UTF-8", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
-	cmd.Dir = "/root"
-	if _, e := os.Stat("/root"); e != nil {
-		cmd.Dir = "/"
+	start := func(dir string, ctty bool) (*exec.Cmd, error) {
+		cmd := exec.Command(termShell[0], termShell[1:]...)
+		cmd.Stdin, cmd.Stdout, cmd.Stderr = sl, sl, sl
+		cmd.Env = []string{"TERM=xterm-256color", "HOME=/root", "USER=root", "LANG=C.UTF-8", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
+		cmd.Dir = dir
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: ctty, Ctty: 0}
+		return cmd, cmd.Start()
 	}
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true, Ctty: 0}
-	if err := cmd.Start(); err != nil {
+	// Try the home folder first, then the root folder, then without taking
+	// the terminal as controlling (some locked-down hosts refuse that).
+	cmd, err := start("/root", true)
+	if err != nil {
+		cmd, err = start("/", true)
+	}
+	if err != nil {
+		cmd, err = start("/", false)
+	}
+	if err != nil {
 		m.Close()
 		sl.Close()
 		return "", errors.New("could not start the shell: " + err.Error())
