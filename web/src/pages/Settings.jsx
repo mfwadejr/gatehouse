@@ -9,6 +9,7 @@ import Changes from './Changes.jsx';
 import Syslog from './Syslog.jsx';
 import FlowExport from './FlowExport.jsx';
 import Snmp from './Snmp.jsx';
+import Storage from './Storage.jsx';
 import GuestPortal from './GuestPortal.jsx';
 import BridgeMode from './BridgeMode.jsx';
 import DeviceMode from './DeviceMode.jsx';
@@ -470,6 +471,7 @@ export default function Settings({ me, reloadMe }) {
           <Guard what="Syslog"><Syslog /></Guard>
           <Guard what="Flow export"><FlowExport /></Guard>
           <Guard what="SNMP"><Snmp /></Guard>
+          <Guard what="Storage"><Storage /></Guard>
         </>
       )}
       {admin && tab === 'backup' && (

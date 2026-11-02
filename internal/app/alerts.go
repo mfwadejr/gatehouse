@@ -66,7 +66,7 @@ var alertKinds = []struct {
 	{"internet", "The internet goes down or comes back", "Sent after the connection has been down for a minute."},
 	{"device_offline", "A device I choose goes offline", "Pick the devices below. Sent when one has been gone for 10 minutes."},
 	{"usage", "I am close to my data limit", "Only if you set a monthly limit (Overview, Data use). Sent at the levels you choose."},
-	{"repaired", "Gatehouse repaired or updated something", "For example it restarted the Wi-Fi or installed an update."},
+	{"repaired", "Gatehouse repaired or updated something", "For example it restarted a stuck service or installed an update."},
 }
 
 func defaultAlerts() alertCfg {

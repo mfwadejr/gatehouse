@@ -57,6 +57,7 @@ func DefaultConfig() Config {
 
 // App is the running daemon.
 type App struct {
+	startedAt  time.Time // when this process started, for the self-health summary
 	sysout     syslogOut
 	flow       flowOut
 	snmp       snmpState
@@ -136,7 +137,7 @@ func New(cfg Config) (*App, error) {
 	if err := os.MkdirAll(cfg.DataDir, 0o750); err != nil {
 		return nil, err
 	}
-	a := &App{Cfg: cfg, Bus: events.NewBus(), dyn: newFWDyn(), probeKick: make(chan struct{}, 1), rogue: rogueState{alerts: map[int64]rogueAlert{}, kick: make(chan struct{}, 1)}}
+	a := &App{startedAt: time.Now(), Cfg: cfg, Bus: events.NewBus(), dyn: newFWDyn(), probeKick: make(chan struct{}, 1), rogue: rogueState{alerts: map[int64]rogueAlert{}, kick: make(chan struct{}, 1)}}
 	var err error
 	if a.Config, err = store.OpenConfig(filepath.Join(cfg.DataDir, "config.db")); err != nil {
 		return nil, fmt.Errorf("config database: %w", err)
@@ -180,6 +181,7 @@ func New(cfg Config) (*App, error) {
 
 	a.API = api.New(a.Auth, a.Bus)
 	a.API.Static = cfg.Static
+	a.API.Audit = func(actor, sev, title, detail string) { a.auditEvent(actor, sev, title, detail) }
 	a.API.Secure = cfg.TLSCert != ""
 	a.API.Topic("dns.stats", "dns.live", "dns.upstreams", "dns.lists", "dhcp.leases", "dhcp.utilisation", "fw.status", "net.status", "vpn.status", "logs.live", "upnp.maps", "dhcp.alerts", "speedtest", "events")
 	a.FW = cfg.FW
@@ -457,6 +459,8 @@ func (a *App) housekeeping(ctx context.Context) {
 			a.pruneFWLog(days)
 			a.pruneTraffic(int(a.settingFloat("logs.retention_days", 30)))
 			a.pruneSpeed()
+			a.pruneLong()
+			a.enforceLogCap()
 			a.Config.SetSetting("logs.last_prune", strconv.FormatInt(time.Now().Unix(), 10))
 			a.Auth.PurgeExpired()
 			a.backupTick(time.Now())

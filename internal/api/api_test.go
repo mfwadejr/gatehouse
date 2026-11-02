@@ -270,3 +270,23 @@ func TestOnlyTheTerminalPageMayBeFramedOrWriteInlineStyles(t *testing.T) {
 		t.Fatal("scripts must stay strict")
 	}
 }
+
+func TestStreamRecordKeepsWhyAClosed(t *testing.T) {
+	s := &Server{}
+	l := &s.streams
+	l.opened("10.0.0.2", []string{"a"})
+	l.closed("10.0.0.2", []string{"a"}, time.Now().Add(-3*time.Second), "the browser went away")
+	l.opened("10.0.0.2", []string{"a"})
+	l.closed("10.0.0.2", []string{"a"}, time.Now(), "a write failed or timed out")
+	st := s.StreamStats()
+	if st["open"].(int) != 0 || st["opened"].(int64) != 2 || st["closed"].(int64) != 2 {
+		t.Fatalf("counts: %v", st)
+	}
+	rec := st["recent"].([]StreamEntry)
+	if len(rec) != 4 || rec[0].Why != "a write failed or timed out" {
+		t.Fatalf("newest first expected: %+v", rec)
+	}
+	if st["by_reason"].(map[string]int64)["a write failed or timed out"] != 1 {
+		t.Fatalf("by reason: %v", st["by_reason"])
+	}
+}

@@ -92,7 +92,7 @@ func ResetLogs(db *DB) error {
 		return err
 	}
 	defer tx.Rollback()
-	for _, t := range []string{"dns_queries", "dns_daily", "fw_events", "events", "metrics", "traffic", "speedtests"} {
+	for _, t := range []string{"dns_queries", "fw_events", "events", "metrics", "traffic", "speedtests"} {
 		if _, err := tx.Exec("DELETE FROM " + t); err != nil {
 			return err
 		}

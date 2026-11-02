@@ -1,18 +1,21 @@
 # Diagnostics
 
 ## What it is for
-Shows how each part of Gatehouse is doing, lets you read its log, test the connection, and, if you switch it on, open a command line on the firewall. It is for the day something is not working and there is no screen or keyboard on the machine.
+Answers one question: is Gatehouse itself working? It shows how each part is doing, lets you read the system log, test the connection, and, if you switch it on, open a command line on the firewall. It is for the day something is not working and there is no screen or keyboard on the machine.
 
 ## What is on the page
 Tabs along the top:
-- **Services**: each part of the system with a state: Running, Starting, Failing or Off. A failing one says why in plain words, such as the last thing it complained about. **Show log** opens its log and **Restart** restarts it. **Save a support bundle** saves a text file with the machine, the network, every service's state and recent log lines. Anything that looks like a password or key is hidden in it. Send it when asking for help.
+- **Health & services**: the top card, **Is Gatehouse itself working?**, gives one sentence (**Everything is working.** or how many things need a look), with problems first and a **Look** button that opens the right place. Under it are facts: how long Gatehouse and the machine have been running (a restart you did not expect stands out), when the firewall was last applied, disk and log space, whether the clock is set, and warnings in the last hour. Then **Services**: each part of the system with a state: Running, Starting, Failing or Off. A failing one says why in plain words, such as the last thing it complained about. **Show log** opens its log and **Restart** restarts it. **Save a support bundle** saves a text file with the machine, the network, every service's state and recent log lines. Anything that looks like a password or key is hidden in it. Send it when asking for help.
+- **System log**: messages from Gatehouse and the machine. Only warnings and errors show until you tick **Everything**. Choose **From** (everything, or one service), **Time**, and **Search**: every word must appear, the box looks through up to 5000 lines, and the words are highlighted. **Follow** refreshes every 5 seconds. Known messages get a plain explanation next to them.
 - **Network tools**: the connection tests, ping, traceroute and name lookups.
 - **Terminal**: a command line on the firewall. See below.
+
+**Console connections**, under Services, records the live connection your browser keeps open: when each opened and closed, from which address, and why it closed. A failed write usually means the network between you and the box dropped it.
 
 The **Log** card under Services has **Show the log of** (one service, or **Warnings from everything**), **How many lines**, **Only lines containing** and **Refresh**.
 
 ## Common tasks
-1. Find out why a service is not working: **Services**, read the reason, press **Show log**.
+1. Find out why a service is not working: **Health & services**, read the reason, press **Show log**.
 2. Restart a service that is stuck: **Restart**.
 3. Get help: **Save a support bundle**, and send the file.
 4. Run a command by hand: **Terminal**, **Switch the terminal on**, enter your password or code, then **Open a terminal**.

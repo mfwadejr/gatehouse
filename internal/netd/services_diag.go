@@ -126,17 +126,20 @@ func redact(s string) string {
 	return reSecret.ReplaceAllString(s, "$1 [hidden]")
 }
 
-// DiagLog returns the last lines of one service's log (or "system" for warnings from everything).
+// DiagLog returns the last lines of one service's log ("system" for warnings from everything,
+// "system-all" for every level).
 func (s *Service) DiagLog(unit string, lines int) (string, error) {
 	if lines < 10 {
 		lines = 10
 	}
-	if lines > 500 {
-		lines = 500
+	if lines > 5000 {
+		lines = 5000
 	}
 	args := []string{"-n", strconv.Itoa(lines), "--no-pager", "-o", "short-iso"}
 	if unit == "system" {
 		args = append(args, "-p", "warning")
+	} else if unit == "system-all" {
+		// everything, every level
 	} else {
 		if _, ok := diagUnit(unit); !ok {
 			return "", errors.New("that service cannot be shown")

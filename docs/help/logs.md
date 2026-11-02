@@ -8,7 +8,9 @@ What happened on your network and why: connections the firewall allowed or block
 The picture is an example from a new, empty box; yours will show your own devices and numbers.
 
 ## What is on the page
-- Tabs: **Log**, **Summary & map** and **Activity**.
+- Tabs: **Log**, **Summary & map**, **Activity** and, for administrators, **Admin activity**.
+- **Admin activity** answers who did what to Gatehouse: sign-ins and failed attempts, and the changes people made, each with who, what, when and from which address. Search with several words (every word must match a person, an action or an address) and choose a time range; the count says how many match and how far back it searched.
+- Three places hold three kinds of log. **Logs** is what your network did. **Diagnostics** is how Gatehouse itself is running (its system log). **Admin activity** is who changed what.
 - The search box and filters: **Allowed and blocked**, a time range (1 h, 24 h, 7 d, 30 d, or custom) and **Everything**, **Connections**, **Names (DNS)** or **Events**. Live updates can be turned off.
 - Every row is at most two lines: the app or website on top, the port and service below. **Out through** shows which connection or VPN it left by. Identical neighbouring entries become one row with a count.
 - Click a row (or press Enter) for the rest: why, the rule, the host and address, the country, the networks, the times, and **Block this** or **Allow this**.

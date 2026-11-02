@@ -1,4 +1,5 @@
 import { useHashTab } from '../hashtab.js';
+import AdminActivity from './AdminActivity.jsx';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { del, get, getWatched, post, put, setFailing, useData, useStream } from '../api.js';
 import { RuleForm } from './FirewallRules.jsx';
@@ -122,11 +123,12 @@ function TopList({ title, items, field, onPick, render }) {
 
 // ---------------------------------------------------------------- the log
 
-export default function Logs() {
+export default function Logs({ me }) {
+  const admin = me?.user?.role === 'admin';
   const preset = useRef(null);
   if (preset.current === null) preset.current = takePreset();
   useEffect(() => { try { sessionStorage.removeItem(PRESET_KEY); } catch { /* ignore */ } }, []);
-  const [tab, setTab] = useHashTab('logs', ['log','summary','activity'], 'log');
+  const [tab, setTab] = useHashTab('logs', ['log','summary','activity','admin'], 'log');
   const [q, setQ] = useState('');
   const [kind, setKind] = useState('');
   const [verdict, setVerdict] = useState(preset.current.verdict || '');
@@ -216,7 +218,7 @@ export default function Logs() {
   const none = !loading && !rows.length;
   const chips = Object.entries(flt).filter(([, v]) => v !== '' && v != null);
   return (
-    <Page title="Logs" sub="What happened on your network and why: connections the firewall allowed or blocked, names your devices looked up, and changes."
+    <Page title="Logs" sub="What your network did: connections allowed and blocked, names looked up, devices joining or leaving, and threat alerts. Looking for how Gatehouse itself is running? Open Diagnostics."
       actions={<><label className="inline small"><Switch checked={live} onChange={setLive} label="Live updates" />Live</label><Button small onClick={() => setRec(true)}>Recording &amp; storage</Button></>}>
       {(!meta.record_allowed || !meta.record_blocked) && (
         <Note tone="warn" title="Some connections are not being recorded">
@@ -224,7 +226,8 @@ export default function Logs() {
           <button className="link" onClick={() => setRec(true)}>Change this</button>
         </Note>
       )}
-      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'log', label: 'Log' }, { value: 'summary', label: 'Summary & map' }, { value: 'activity', label: 'Activity' }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'log', label: 'Log' }, { value: 'summary', label: 'Summary & map' }, { value: 'activity', label: 'Activity' }, ...(admin ? [{ value: 'admin', label: 'Admin activity' }] : [])]} />
+      {tab === 'admin' ? <AdminActivity /> : (
       <Card>
         <div className="stack">
           <div className="inline">
@@ -251,6 +254,7 @@ export default function Logs() {
           )}
         </div>
       </Card>
+      )}
 
       {tab === 'log' && (
         <Card>

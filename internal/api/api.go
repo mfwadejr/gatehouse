@@ -27,10 +27,12 @@ const (
 
 // Server holds what every handler needs.
 type Server struct {
-	Auth   *auth.Service
-	Bus    *events.Bus
-	Static http.Handler // the embedded console; nil in tests
-	Issuer string       // shown in authenticator apps
+	streams streamLog
+	Audit   func(actor, severity, title, detail string) // who signed in or out, from where; nil in tests
+	Auth    *auth.Service
+	Bus     *events.Bus
+	Static  http.Handler // the embedded console; nil in tests
+	Issuer  string       // shown in authenticator apps
 	// Secure marks cookies Secure; true whenever the console is served over TLS.
 	Secure bool
 	// Gate, when set, may refuse a signed-in request before it runs. It is how the standby unit of a
@@ -277,10 +279,12 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	}
 	res, err := s.Auth.Login(in.Username, in.Password, clientIP(r), r.UserAgent())
 	if err != nil {
+		s.audit(in.Username, "warning", "Sign-in failed", "From "+clientIP(r)+": "+err.Error()+".")
 		authErr(w, err)
 		return
 	}
 	if res.Session != nil {
+		s.audit(in.Username, "info", "Signed in", "From "+clientIP(r)+".")
 		s.setCookie(w, res.Session)
 		status := "ok"
 		if res.Session.NeedsEnrol {
@@ -308,14 +312,23 @@ func (s *Server) mfa(w http.ResponseWriter, r *http.Request) {
 	}
 	sess, err := s.Auth.VerifyMFA(in.Ticket, in.Code, clientIP(r), r.UserAgent())
 	if err != nil {
+		s.audit("", "warning", "Two-step code failed", "From "+clientIP(r)+".")
 		authErr(w, err)
 		return
 	}
+	s.audit("", "info", "Signed in with a two-step code", "From "+clientIP(r)+".")
 	s.setCookie(w, sess)
 	JSON(w, 200, map[string]any{"status": "ok", "csrf": sess.CSRF})
 }
 
+func (s *Server) audit(actor, sev, title, detail string) {
+	if s.Audit != nil {
+		s.Audit(actor, sev, title, detail)
+	}
+}
+
 func (s *Server) logout(w http.ResponseWriter, r *http.Request, c *Ctx) {
+	s.audit(c.User.Username, "info", "Signed out", "From "+clientIP(r)+".")
 	s.Auth.Logout(c.Token)
 	s.clearCookie(w)
 	JSON(w, 200, map[string]string{"status": "ok"})
@@ -484,6 +497,11 @@ func (s *Server) stream(w http.ResponseWriter, r *http.Request, c *Ctx) {
 	}
 	ch, cancel := s.Bus.Subscribe(topics...)
 	defer cancel()
+	addr := clientIP(r)
+	opened := time.Now()
+	why := "the browser went away"
+	s.streams.opened(addr, topics)
+	defer func() { s.streams.closed(addr, topics, opened, why) }()
 	h := w.Header()
 	h.Set("Content-Type", "text/event-stream")
 	h.Set("Cache-Control", "no-store")
@@ -501,13 +519,16 @@ func (s *Server) stream(w http.ResponseWriter, r *http.Request, c *Ctx) {
 			return
 		case m, ok := <-ch:
 			if !ok {
+				why = "the server closed it"
 				return
 			}
 			if _, err := streamWrite(rc, w, fl, fmt.Sprintf("event: %s\ndata: %s\n\n", m.Topic, m.Data)); err != nil {
+				why = "a write failed or timed out"
 				return
 			}
 		case <-keep.C:
 			if _, err := streamWrite(rc, w, fl, ": keepalive\n\n"); err != nil {
+				why = "a write failed or timed out"
 				return
 			}
 		}

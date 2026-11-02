@@ -512,3 +512,8 @@ details.more > .card { margin-top: var(--space-3); }
 .srch-hit { outline: var(--border-width-thick, 2px) solid var(--color-accent-selected-border); outline-offset: var(--space-1); border-radius: var(--radius-md); animation: srchhit 2.8s ease-out; }
 @keyframes srchhit { 0% { background: var(--color-accent-selected-bg); } 100% { background: transparent; } }
 @media (prefers-reduced-motion: reduce) { .srch-hit { animation: none; } }
+
+mark { background: color-mix(in srgb, var(--color-status-warning) 35%, transparent); color: inherit; border-radius: 2px; padding: 0 1px; }
+.facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: var(--space-3); margin: 0; }
+.facts dd { margin: 0; }
+.facts dt { margin: 0; }

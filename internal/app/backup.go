@@ -419,7 +419,7 @@ func (a *App) verifyBackup(path, password string) (*BackupReport, error) {
 	} else {
 		add("The firewall settings are valid", true, "They pass the same checks as applying them.")
 	}
-	// Saved passwords (Wi-Fi, PPPoE) can only be read with the key that sealed them.
+	// Saved passwords (PPPoE) can only be read with the key that sealed them.
 	key := o.key
 	if key == nil {
 		key, _ = os.ReadFile(a.keyPath())
@@ -446,7 +446,7 @@ func (a *App) verifyBackup(path, password string) (*BackupReport, error) {
 		case bad > 0:
 			add("Saved passwords can be read", false, fmt.Sprintf("%d of %d saved passwords cannot be unlocked with the key in this backup.", bad, tried))
 		case tried == 0:
-			add("Saved passwords can be read", true, "No Wi-Fi or internet passwords are saved.")
+			add("Saved passwords can be read", true, "No internet (PPPoE) passwords are saved.")
 		default:
 			add("Saved passwords can be read", true, fmt.Sprintf("All %d saved passwords unlock.", tried))
 		}

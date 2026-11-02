@@ -110,13 +110,54 @@ func (a *App) registerDiagnosticsRoutes() {
 			fail(w, errNoHelper)
 			return
 		}
-		n, _ := strconv.Atoi(r.URL.Query().Get("lines"))
-		out, err := a.Net.DiagLog(r.URL.Query().Get("unit"), n)
+		q := r.URL.Query()
+		n, _ := strconv.Atoi(q.Get("lines"))
+		if n < 10 {
+			n = 200
+		}
+		hours, _ := strconv.Atoi(q.Get("hours"))
+		words := strings.Fields(strings.ToLower(q.Get("q")))
+		// With a search or a time window the box looks through a long stretch of its log, not only
+		// the lines the console would have shown.
+		fetch := n
+		if len(words) > 0 || hours > 0 {
+			fetch = 5000
+		}
+		out, err := a.Net.DiagLog(q.Get("unit"), fetch)
 		if err != nil {
 			fail(w, err)
 			return
 		}
-		api.JSON(w, 200, map[string]any{"log": out})
+		lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+		scanned := len(lines)
+		kept := lines[:0:0]
+		var cut time.Time
+		if hours > 0 {
+			cut = time.Now().Add(-time.Duration(hours) * time.Hour)
+		}
+		for _, l := range lines {
+			if !cut.IsZero() && len(l) > 24 {
+				if t, e := time.Parse("2006-01-02T15:04:05-0700", l[:24]); e == nil && t.Before(cut) {
+					continue
+				}
+			}
+			low := strings.ToLower(l)
+			okAll := true
+			for _, wd := range words {
+				if !strings.Contains(low, wd) {
+					okAll = false
+					break
+				}
+			}
+			if okAll {
+				kept = append(kept, l)
+			}
+		}
+		matched := len(kept)
+		if len(kept) > n {
+			kept = kept[len(kept)-n:]
+		}
+		api.JSON(w, 200, map[string]any{"log": strings.Join(kept, "\n"), "scanned": scanned, "matched": matched})
 	})
 	s.HandleAdmin("POST /api/diag/restart", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		var in struct {

@@ -368,6 +368,8 @@ func (a *App) registerRoutes() {
 	a.registerSpeedRoutes()
 	a.registerDevTrafficRoutes()
 	a.registerLogExtraRoutes()
+	a.registerStorageRoutes()
+	a.registerSelfHealthRoutes()
 	a.registerAppRoutes()
 	a.registerDeviceViewRoutes()
 }

@@ -1,6 +1,19 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.56',
+    title: 'Storage, and three clear kinds of log',
+    items: [
+      'Storage (Settings, Alerts & logs): a table of everything Gatehouse keeps, with entries, estimated size, the oldest entry and the rule that removes it. Every table that grows now has a rule: threat alerts and internet outages go after 365 days (you can change it), firewall change copies keep the newest 200 (you can change that too), and the total size limit now also trims the smaller histories if it is still exceeded. The limit is now applied every hour, not only when you pressed Clean up.',
+      'An unused table that was never filled in was removed.',
+      'Logs has a new Admin activity tab (administrators only): sign-ins, failed sign-ins and the changes people made, with who, what, when and from where. Search takes several words and a time range, and the count says how many match.',
+      'Diagnostics now starts with Is Gatehouse itself working? One sentence, problems first, each with a Look button, then facts: how long Gatehouse and the machine have been up, when the firewall was last applied, disk and log space, the clock, and warnings in the last hour.',
+      'Diagnostics has a System log tab: warnings and errors by default, Everything on request, search across up to 5000 lines with the words highlighted, a time range, and Follow. Known messages get a plain explanation.',
+      'Console connections records every live connection your browser opens to Gatehouse: when, from where, how long, and why it closed, so the idle connection-error bursts can be told apart as the box or the network. Unusual endings also go to the system log.',
+      'Logs and Diagnostics now open with one line saying what each is for, and point to the other.',
+    ],
+  },
+  {
     version: '0.8.55',
     title: 'Faster console and a better Overview',
     items: [

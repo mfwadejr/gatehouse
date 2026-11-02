@@ -473,19 +473,24 @@ func (a *App) enforceLogCap() {
 	if capMB <= 0 {
 		return
 	}
-	for i := 0; i < 20; i++ {
+	over := func() bool {
 		var pages, free, size int64
 		a.Logs.QueryRow(`PRAGMA page_count`).Scan(&pages)
 		a.Logs.QueryRow(`PRAGMA freelist_count`).Scan(&free)
 		a.Logs.QueryRow(`PRAGMA page_size`).Scan(&size)
-		if (pages-free)*size <= capMB<<20 {
-			return
-		}
-		// Remove the oldest tenth of the connection and lookup history, then look again.
-		for _, t := range []string{"fw_events", "dns_queries"} {
-			a.Logs.Exec(`DELETE FROM ` + t + ` WHERE id IN (SELECT id FROM ` + t + ` ORDER BY id LIMIT MAX(1000,(SELECT COUNT(*)/10 FROM ` + t + `)))`)
+		return (pages-free)*size > capMB<<20
+	}
+	// Remove the oldest tenth, then look again. The two big ones go first; the smaller histories
+	// are touched only if that was not enough, so the limit always holds.
+	trim := func(tables []string, rounds int) {
+		for i := 0; i < rounds && over(); i++ {
+			for _, t := range tables {
+				a.Logs.Exec(`DELETE FROM ` + t + ` WHERE rowid IN (SELECT rowid FROM ` + t + ` ORDER BY rowid LIMIT MAX(1000,(SELECT COUNT(*)/10 FROM ` + t + `)))`)
+			}
 		}
 	}
+	trim([]string{"fw_events", "dns_queries"}, 20)
+	trim([]string{"events", "traffic", "country_traffic", "threat_alerts"}, 10)
 }
 
 func (a *App) registerLogExtraRoutes() {
@@ -524,6 +529,7 @@ func (a *App) registerLogExtraRoutes() {
 		a.QLog.Prune(days)
 		a.pruneFWLog(days)
 		a.pruneTraffic(days)
+		a.pruneLong()
 		a.enforceLogCap()
 		removed := before - count()
 		if removed < 0 {
