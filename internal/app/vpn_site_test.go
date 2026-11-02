@@ -18,32 +18,63 @@ func siteBox(t *testing.T, lan string) (*client, *fakeNet, *fakeFW) {
 
 func siteBoxWith(t *testing.T, lan string, tune func(*Config)) (*client, *fakeNet, *fakeFW) {
 	t.Helper()
-	web, dnsAddr := freeAddr(t), freeAddr(t)
 	fn, ff := &fakeNet{}, &fakeFW{}
-	cfg := Config{DataDir: t.TempDir(), WebAddr: web, DNSAddrs: []string{dnsAddr}, Net: fn, FW: ff}
-	if tune != nil {
-		tune(&cfg)
-	}
-	a, err := New(cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { a.Close() })
-	a.Auth.CreateUser("admin", "correct horse battery", "admin")
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan error, 1)
-	go func() { done <- a.Run(ctx) }()
-	t.Cleanup(func() { cancel(); <-done })
-	jar, _ := cookiejar.New(nil)
-	c := &client{t: t, base: "http://" + web, hc: &http.Client{Jar: jar}, app: a}
-	// A busy machine (CI runs many packages at once) can take a few seconds to start listening.
-	for i := 0; i < 300; i++ {
-		if resp, err := c.hc.Get(c.base + "/api/health"); err == nil {
-			resp.Body.Close()
+	var (
+		a    *App
+		c    *client
+		done chan error
+		stop context.CancelFunc
+	)
+	// A port picked a moment ago can be taken by another test package before the console binds
+	// it; when the program stops straight away, start again on new ports.
+	for attempt := 0; attempt < 4; attempt++ {
+		web, dnsAddr := freeAddr(t), freeAddr(t)
+		cfg := Config{DataDir: t.TempDir(), WebAddr: web, DNSAddrs: []string{dnsAddr}, Net: fn, FW: ff}
+		if tune != nil {
+			tune(&cfg)
+		}
+		var err error
+		a, err = New(cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		a.Auth.CreateUser("admin", "correct horse battery", "admin")
+		var ctx context.Context
+		ctx, stop = context.WithCancel(context.Background())
+		done = make(chan error, 1)
+		go func() { done <- a.Run(ctx) }()
+		jar, _ := cookiejar.New(nil)
+		c = &client{t: t, base: "http://" + web, hc: &http.Client{Jar: jar}, app: a}
+		up, exited := false, false
+		// A busy machine (CI runs many packages at once) can take a few seconds to start listening.
+		for i := 0; i < 300 && !up && !exited; i++ {
+			select {
+			case <-done:
+				exited = true
+				continue
+			default:
+			}
+			if resp, err := c.hc.Get(c.base + "/api/health"); err == nil {
+				resp.Body.Close()
+				up = true
+				break
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+		if up {
 			break
 		}
-		time.Sleep(50 * time.Millisecond)
+		if !exited {
+			stop()
+			<-done
+		}
+		a.Close()
+		if attempt == 3 {
+			t.Fatal("the test console did not start")
+		}
 	}
+	t.Cleanup(func() { a.Close() })
+	t.Cleanup(func() { stop(); <-done })
 	_, m, _ := c.call("POST", "/api/auth/login", map[string]string{"username": "admin", "password": "correct horse battery"})
 	c.csrf = m["csrf"].(string)
 	rc, m, raw := c.call("PUT", "/api/fw/zones", map[string]any{"name": "Home", "kind": "trusted", "ifaces": []string{"eth1"}, "management": true, "internet": true, "gateway": true, "intra_allow": true})

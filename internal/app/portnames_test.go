@@ -5,7 +5,7 @@ import "testing"
 func TestPortNamesStoreOnlyALabel(t *testing.T) {
 	fakePorts(t)
 	c, _, _ := siteBox(t, "192.168.1.1/24")
-	list := ports()
+	list := portsLister()
 	if len(list) == 0 {
 		t.Fatal("the test setup has no ports")
 	}
@@ -25,7 +25,7 @@ func TestPortNamesStoreOnlyALabel(t *testing.T) {
 	if !found {
 		t.Fatal("the port list does not carry the label")
 	}
-	if n, _ := ports()[0]["name"].(string); n != name {
+	if n, _ := portsLister()[0]["name"].(string); n != name {
 		t.Fatal("the port name changed")
 	}
 	// too long and unknown ports are refused; an empty name puts the original back

@@ -28,7 +28,7 @@ func (a *App) portLabels() map[string]string {
 
 // labelledPorts is the port list with each port's friendly name, if it has one.
 func (a *App) labelledPorts() []map[string]any {
-	ps := ports()
+	ps := portsLister()
 	labels := a.portLabels()
 	for _, p := range ps {
 		if n, _ := p["name"].(string); labels[n] != "" {
