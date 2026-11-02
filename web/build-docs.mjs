@@ -9,8 +9,8 @@ if (!existsSync('../docs/help')) { console.log('docs build skipped: the docs fol
 export const ORDER = [
   ['getting-started', 'Getting started'], ['recovery', 'If you are locked out'],
   ['overview', 'Overview'], ['internet', 'Internet'], ['networks', 'Networks'], ['wifi', 'Wi-Fi'], ['dns', 'DNS'], ['dhcp', 'DHCP'],
-  ['firewall', 'Firewall'], ['services', 'Services'], ['vpn', 'VPN'], ['routes', 'Routes'], ['profiles', 'Profiles'],
-  ['devices', 'Devices & access'], ['logs', 'Logs'], ['settings', 'Settings'], ['reference', 'Reference'], ['ease-of-use', 'How easy is it?'],
+  ['firewall', 'Firewall'], ['protection', 'Protection'], ['services', 'Services'], ['vpn', 'VPN'], ['routes', 'Routes'], ['profiles', 'Profiles'],
+  ['devices', 'Devices & access'], ['logs', 'Logs'], ['diagnostics', 'Diagnostics'], ['settings', 'Settings'], ['reference', 'Reference'], ['ease-of-use', 'How easy is it?'],
 ];
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const inline = (s) => esc(s)

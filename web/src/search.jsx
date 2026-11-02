@@ -23,14 +23,14 @@ const ROWS = [
   ['Why is this blocked?', 'dns/lists', 'Check whether a name is on a blocklist', 'blocked domain lookup allow', 'Why is this blocked?'],
   ['Your own names', 'dns/records', 'Give devices names like nas.lan', 'records hostname firewall.lan local'],
   ['Filtering per network', 'dns/groups', 'Choose how much each network filters', 'profiles groups filtering level'],
-  ['Encrypted DNS', 'dns/settings', 'One switch for encrypted lookups', 'doh dot private dns cloudflare quad9', 'Encrypted DNS'],
-  ['Upstream DNS servers', 'dns/settings', 'Where Gatehouse asks when it does not know the answer', 'upstream resolver cloudflare google quad9 provider', 'Upstream DNS servers'],
-  ['Forced DNS', 'dns/settings', 'Make devices use this DNS even if they try another', 'force redirect port 53 hardcoded dns', 'Forced DNS'],
+  ['Encrypted DNS', 'dns/overview', 'One switch for encrypted lookups', 'doh dot private dns cloudflare quad9', 'Encrypted DNS'],
+  ['Upstream DNS servers', 'dns/overview', 'Where Gatehouse asks when it does not know the answer', 'upstream resolver cloudflare google quad9 provider', 'Upstream DNS servers'],
+  ['Forced DNS', 'dns/overview', 'Make devices use this DNS even if they try another', 'force redirect port 53 hardcoded dns', 'Forced DNS'],
   ['DHCP', 'dhcp/scopes', 'Address pools', 'address pool lease range', 'Address pools'],
   ['Devices with an address', 'dhcp/leases', 'Every device that has been given an address', 'leases clients hostname mac ip', 'Devices with an address'],
   ['Reserve an address', 'dhcp/resv', 'Keep the same address for a device', 'reservation static ip', 'Reserved addresses'],
   ['Firewall', 'firewall/networks', 'Networks, rules and protection', 'rules allow block zone', 'Your networks'],
-  ['Who can reach whom', 'firewall/rules', 'Rules between your networks', 'rules allow deny zone lan guest iot', 'Who can reach whom'],
+  ['Who can reach whom', 'firewall/networks', 'Rules between your networks', 'rules allow deny zone lan guest iot', 'Who can reach whom'],
   ['Device groups', 'firewall/groups', 'Name a set of devices to use in rules', 'groups lists aliases', 'Device groups'],
   ['Block or allow countries', 'firewall/countries', 'Stop traffic to or from whole countries', 'country region geo block russia china', 'Block or allow countries'],
   ['Devices finding each other', 'firewall/discovery', 'Let printers, Chromecast and AirPlay work across networks', 'mdns bonjour airplay chromecast printer discovery avahi reflector', "Let networks see each other's devices"],
@@ -84,7 +84,7 @@ const ROWS = [
   ['Terminal', 'diagnostics/terminal', 'A command line on the firewall, if you switch it on', 'shell console command line ssh root', 'Terminal'],
   ['Support bundle', 'diagnostics/services', 'Save the logs and state to send when asking for help', 'logs report troubleshoot help bundle'],
 ];
-export const STATIC = ROWS.map(([label, page, hint, words, find]) => ({ label, page, hint, words: words || '', find: find || '', kind: page.includes('/') || find ? 'Setting' : 'Page' }));
+export const STATIC = ROWS.map(([label, page, hint, words, find]) => ({ label, page, hint, words: words || '', find: find || '', kind: page.includes('/') ? 'Setting' : 'Page' }));
 
 // After a result opens its page, scroll to the card it named and flash it so the eye lands there.
 function flash(find) {

@@ -21,7 +21,7 @@ function Services() {
       <Card title="Services" desc={`Gatehouse ${data.version || ''}. Each part of the system, and how it is doing.`}
         actions={<Button small onClick={() => run(async () => { const r = await fetch('/api/diag/bundle', { credentials: 'same-origin' }); if (!r.ok) throw new Error('The bundle could not be made.'); const u = URL.createObjectURL(await r.blob()); const a = document.createElement('a'); a.href = u; a.download = 'gatehouse-support-bundle.txt'; a.click(); URL.revokeObjectURL(u); }, 'Saved. Passwords and keys are hidden in it.')} disabled={busy}>Save a support bundle</Button>}>
         <div className="list">
-          {data.services.filter((s) => s.state !== 'missing').map((s) => (
+          {(data.services || []).filter((s) => s.state !== 'missing').map((s) => (
             <div className="item" key={s.unit}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="name">{s.title} <Pill tone={tone[s.state]}>{word[s.state]}</Pill></div>
@@ -33,7 +33,7 @@ function Services() {
               </div>
             </div>
           ))}
-          {!data.services.length && <Empty>No services to show.</Empty>}
+          {!(data.services || []).length && <Empty>No services to show.</Empty>}
         </div>
         <p className="small muted">Services that are not installed on this machine are left out. A support bundle is a text file with the machine, network and service logs, with passwords and keys hidden. Send it when asking for help.</p>
       </Card>

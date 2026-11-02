@@ -20,6 +20,14 @@ for (const id of ids) {
     if (!code.includes(t)) fail(`${id}.md mentions **${m[1]}**, which is not on any screen`);
   }
 }
+// Every page's "Help with this page" link must open a chapter that is built and listed.
+const order = [...readFileSync('build-docs.mjs', 'utf8').matchAll(/\['([a-z-]+)', '[^']+'\]/g)].map((m) => m[1]);
+const helpPages = [...readFileSync('src/ui.jsx', 'utf8').match(/const HELP_PAGES = \[([^\]]*)\]/)[1].matchAll(/'([a-z-]+)'/g)].map((m) => m[1]);
+for (const id of ids) {
+  if (!order.includes(id)) fail(`the ${id} chapter is not in the list in build-docs.mjs, so it is never built`);
+  if (!helpPages.includes(id)) fail(`the ${id} page's Help link has no chapter in HELP_PAGES (src/ui.jsx)`);
+}
+for (const h of helpPages) if (!ids.includes(h)) fail(`HELP_PAGES names ${h}, which is not a page`);
 for (const f of ['getting-started', 'recovery', 'reference']) if (!existsSync(`../docs/help/${f}.md`)) fail(`missing docs/${f}.md`);
 if (bad) { console.error(`docs check: ${bad} problem(s)`); process.exit(1); }
 console.log(`docs check ok (${ids.length} chapters)`);

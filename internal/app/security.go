@@ -50,7 +50,7 @@ func (a *App) securityCheck() secReport {
 	} else {
 		add(secItem{ID: "twostep", Level: "bad", Title: "Anyone with your password can sign in",
 			Text: "Two-factor sign-in asks for a code from an app on your phone as well, so a stolen password is not enough.",
-			Fix:  &whyFix{Label: "Turn on two-factor", Kind: "goto", Page: "settings"}})
+			Fix:  &whyFix{Label: "Turn on two-factor", Kind: "goto", Page: "settings/account"}})
 	}
 
 	m, err := fw.Load(a.Config)
@@ -61,7 +61,9 @@ func (a *App) securityCheck() secReport {
 				continue
 			}
 			untrusted := z.Kind == fw.KindGuest || z.Kind == fw.KindIsolated || z.Kind == fw.KindCustom
-			if z.SSH {
+			// A network allowed to use SSH opens nothing while remote login is off: the door only
+			// opens when both are true.
+			if z.SSH && a.sshOn() {
 				ssh = append(ssh, z.Name)
 				if untrusted {
 					sshBad = append(sshBad, z.Name)
@@ -81,30 +83,30 @@ func (a *App) securityCheck() secReport {
 		case len(mgmtBad) > 0:
 			add(secItem{ID: "console", Level: "bad", Title: "Guests can reach this console",
 				Text: names(mgmtBad) + " is allowed to open the Gatehouse console. Anyone on it can try to sign in.",
-				Fix:  &whyFix{Label: "Open Networks", Kind: "goto", Page: "networks"}})
+				Fix:  &whyFix{Label: "Open network settings", Kind: "goto", Page: "firewall/networks"}})
 		default:
 			add(secItem{ID: "console", Level: "ok", Title: "The console is only open to your own networks", Text: "Guest and isolated networks cannot reach it."})
 		}
 		switch {
 		case len(sshBad) > 0:
 			add(secItem{ID: "ssh", Level: "bad", Title: "Remote command-line access is open to the wrong network",
-				Text: "SSH is allowed from " + names(sshBad) + ".", Fix: &whyFix{Label: "Open Networks", Kind: "goto", Page: "networks"}})
+				Text: "SSH is allowed from " + names(sshBad) + ".", Fix: &whyFix{Label: "Open network settings", Kind: "goto", Page: "firewall/networks"}})
 		case len(ssh) > 0:
 			add(secItem{ID: "ssh", Level: "warn", Title: "SSH is on for " + names(ssh),
-				Text: "Fine if you use it, but turn it off if you do not. It is a way in that needs a key or password to be strong.",
-				Fix:  &whyFix{Label: "Open Networks", Kind: "goto", Page: "networks"}})
+				Text: "Fine if you use it, but turn it off if you do not. It is a way in that needs a key or password to be strong. To turn it off, press Edit beside the network and switch off Allow remote login (SSH).",
+				Fix:  &whyFix{Label: "Open network settings", Kind: "goto", Page: "firewall/networks"}})
 		default:
-			add(secItem{ID: "ssh", Level: "ok", Title: "SSH is off", Text: "There is no command-line way in over the network."})
+			add(secItem{ID: "ssh", Level: "ok", Title: "SSH is off", Text: "Remote login is switched off, so there is no command-line way in over the network."})
 		}
 		switch {
 		case len(upnpBad) > 0:
 			add(secItem{ID: "upnp", Level: "bad", Title: "Devices on a guest network can open ports to the internet",
 				Text: names(upnpBad) + " allows UPnP, so any device there can make your router accept connections from outside.",
-				Fix:  &whyFix{Label: "Open Networks", Kind: "goto", Page: "networks"}})
+				Fix:  &whyFix{Label: "Open network settings", Kind: "goto", Page: "firewall/networks"}})
 		case len(upnp) > 0:
 			add(secItem{ID: "upnp", Level: "warn", Title: "UPnP is on for " + names(upnp),
 				Text: "Games and apps there can open ports to the internet by themselves. Handy, but anything on that network can do it. You can limit it to chosen devices.",
-				Fix:  &whyFix{Label: "Review UPnP", Kind: "goto", Page: "firewall"}})
+				Fix:  &whyFix{Label: "Review UPnP", Kind: "goto", Page: "firewall/ports"}})
 		default:
 			add(secItem{ID: "upnp", Level: "ok", Title: "UPnP is off", Text: "Nothing can open ports to the internet without you."})
 		}
@@ -117,21 +119,21 @@ func (a *App) securityCheck() secReport {
 		if len(open) > 0 {
 			add(secItem{ID: "forwards", Level: "warn", Title: "Open ports have no limit on who can use them",
 				Text: names(open) + " can be reached from anywhere in the world. Limit them to your own country or to the addresses that need them.",
-				Fix:  &whyFix{Label: "Open the Forwards list", Kind: "goto", Page: "firewall"}})
+				Fix:  &whyFix{Label: "Open the Forwards list", Kind: "goto", Page: "firewall/ports"}})
 		} else {
 			add(secItem{ID: "forwards", Level: "ok", Title: "No open ports are wide open", Text: "Every forwarded port is limited, or you have none."})
 		}
 		if !m.BlockDoT {
 			add(secItem{ID: "dot", Level: "warn", Title: "Devices can bypass your DNS filtering",
 				Text: "Encrypted DNS to other servers is not blocked, so a device can skip your filters.",
-				Fix:  &whyFix{Label: "Open Protection", Kind: "goto", Page: "firewall"}})
+				Fix:  &whyFix{Label: "Open Protection", Kind: "goto", Page: "firewall/protection"}})
 		}
 	}
 
 	if u := a.updateStatus(); u.Available {
 		add(secItem{ID: "updates", Level: "warn", Title: "Updates are waiting",
 			Text: "There is a newer Gatehouse or there are system security updates to install.",
-			Fix:  &whyFix{Label: "Open updates", Kind: "goto", Page: "settings"}})
+			Fix:  &whyFix{Label: "Open updates", Kind: "goto", Page: "settings/general"}})
 	} else {
 		add(secItem{ID: "updates", Level: "ok", Title: "Up to date", Text: "No updates are waiting."})
 	}
@@ -145,7 +147,7 @@ func (a *App) securityCheck() secReport {
 	if newest == 0 || time.Since(time.Unix(newest, 0)) > 30*24*time.Hour {
 		add(secItem{ID: "backup", Level: "warn", Title: "There is no recent backup",
 			Text: "A backup lets you get everything back after a failed disk. The last one is more than a month old, or there is none.",
-			Fix:  &whyFix{Label: "Open Backups", Kind: "goto", Page: "settings"}})
+			Fix:  &whyFix{Label: "Open Backups", Kind: "goto", Page: "settings/backup"}})
 	} else {
 		add(secItem{ID: "backup", Level: "ok", Title: "A recent backup exists", Text: "Made " + time.Since(time.Unix(newest, 0)).Round(time.Hour).String() + " ago."})
 	}
@@ -153,7 +155,7 @@ func (a *App) securityCheck() secReport {
 	if cfg := a.alertConfig(); !cfg.Email.Enabled && !cfg.Ntfy.Enabled {
 		add(secItem{ID: "alerts", Level: "warn", Title: "Nothing will tell you if something goes wrong",
 			Text: "Set up an email or a push message so you hear about outages and updates.",
-			Fix:  &whyFix{Label: "Set up alerts", Kind: "goto", Page: "settings"}})
+			Fix:  &whyFix{Label: "Set up alerts", Kind: "goto", Page: "settings/alerts"}})
 	} else {
 		add(secItem{ID: "alerts", Level: "ok", Title: "Alerts are set up", Text: "Gatehouse can reach you."})
 	}

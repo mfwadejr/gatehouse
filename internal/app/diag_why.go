@@ -265,7 +265,7 @@ func (a *App) whyCannotReach(deviceID int64, target string, port int, proto stri
 			} else {
 				add(whyFinding{Stage: "firewall", State: "blocks", Title: "A firewall rule blocks it: " + r.Name,
 					Text: "This rule (" + r.Action + ") is the first that matches. " + r.Descr,
-					Fix:  &whyFix{Label: "Open the Rules tab", Kind: "goto", Page: "firewall"}})
+					Fix:  &whyFix{Label: "Open the Rules tab", Kind: "goto", Page: "firewall/rules"}})
 				blocked = orWord(blocked, "firewall")
 			}
 			decided = true
@@ -278,7 +278,7 @@ func (a *App) whyCannotReach(deviceID int64, target string, port int, proto stri
 			} else {
 				add(whyFinding{Stage: "firewall", State: "blocks", Title: "The network type does not allow internet access",
 					Text: zone + " is not set to reach the internet, and no rule makes an exception for this device.",
-					Fix:  &whyFix{Label: "Open Networks", Kind: "goto", Page: "networks"}})
+					Fix:  &whyFix{Label: "Open network settings", Kind: "goto", Page: "firewall/networks"}})
 				blocked = orWord(blocked, "firewall")
 			}
 		}

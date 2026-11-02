@@ -1,6 +1,17 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.52',
+    title: 'Every link checked: Security check, search and Help',
+    items: [
+      'Every search result was opened in a real browser and checked: it lands on the right page and tab and finds its card. Four were wrong and are fixed (the DNS server settings and Who can reach whom). Search now lists top-level pages under Pages.',
+      'The Help with this page link on Protection and Diagnostics opened nothing useful, because those two chapters were never built into the help. They are now, and a build check stops this happening again. All 110 help search results and every link inside the help pages were checked.',
+      'The Diagnostics page could fail to draw when no services were listed. It now shows an empty list instead.',
+      'The Security check no longer warns "SSH is on for Home" while remote login is switched off. Allowing a network to use SSH opens nothing until remote login itself is on, so the warning now appears only when both are true.',
+      'The fix buttons in the Security check now open the exact tab that has the setting. SSH, console and UPnP warnings open Firewall, Networks (press Edit beside the network); the encrypted DNS warning opens Firewall, Protection; open ports open Firewall, Open ports; two-factor, backups, updates and alerts open the right Settings tab. The connection tester\'s buttons do the same. A test now checks every one of these.',
+    ],
+  },
+  {
     version: '0.8.51',
     title: 'A livelier Overview, threat alerts you can read, search that works everywhere',
     items: [

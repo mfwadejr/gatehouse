@@ -58,7 +58,7 @@ export function Card({ title, desc, actions, children, className = '', enter = f
   );
 }
 
-const HELP_PAGES = ['overview', 'internet', 'networks', 'wifi', 'dns', 'dhcp', 'firewall', 'services', 'vpn', 'routes', 'profiles', 'devices', 'logs', 'settings'];
+const HELP_PAGES = ['overview', 'internet', 'networks', 'wifi', 'dns', 'dhcp', 'firewall', 'services', 'vpn', 'routes', 'profiles', 'devices', 'logs', 'protection', 'diagnostics', 'settings'];
 function helpPage() {
   const id = (window.location.hash.replace(/^#\/?/, '') || 'overview').split('/')[0];
   return HELP_PAGES.includes(id) ? `${id}.html` : '';
