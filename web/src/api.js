@@ -9,7 +9,19 @@ export class ApiError extends Error {
   constructor(message, status, data) { super(message); this.status = status; this.data = data || null; }
 }
 
-export async function api(method, path, body) {
+// Several cards asking for the same thing at the same moment share one request.
+const inflight = new Map();
+export function api(method, path, body) {
+  if (method !== 'GET') return apiCall(method, path, body);
+  if (inflight.has(path)) return inflight.get(path).then((d) => (d && typeof d === 'object' ? structuredClone(d) : d));
+  const p = apiCall(method, path, body);
+  inflight.set(path, p);
+  const done = () => inflight.delete(path);
+  p.then(done, done);
+  return p;
+}
+
+async function apiCall(method, path, body) {
   const opts = { method, credentials: 'same-origin', headers: {} };
   if (csrf) opts.headers['X-CSRF-Token'] = csrf;
   if (installCode) opts.headers['X-Install-Code'] = installCode;
@@ -114,20 +126,87 @@ export function useData(path, { topics = [], every = 0, enabled = true } = {}) {
 }
 
 // Subscribe to server-sent events. The handler receives (topic, payload).
+// One live connection for the whole console. Every part of the page that wants live updates
+// registers its topics here, and a single EventSource carries the union of them. Browsers allow
+// only a handful of connections to one address, so one stream per card starves ordinary requests.
+const subs = new Map(); // topic -> Set of handlers
+let source = null;
+let sourceKey = '';
+let rebuildTimer = null;
+
+function rebuildStream() {
+  rebuildTimer = null;
+  const topics = [...subs.keys()].filter((t) => subs.get(t).size).sort();
+  const key = topics.join(',');
+  if (key === sourceKey) return;
+  if (source) { source.close(); source = null; }
+  sourceKey = key;
+  if (!key) return;
+  const es = new EventSource(`/api/stream?topics=${encodeURIComponent(key)}`);
+  topics.forEach((t) => {
+    es.addEventListener(t, (ev) => {
+      let p = null;
+      try { p = JSON.parse(ev.data); } catch { p = null; }
+      [...(subs.get(t) || [])].forEach((fn) => fn(t, p));
+    });
+  });
+  source = es;
+}
+
 export function useStream(topics, handler) {
   const h = useRef(handler);
   h.current = handler;
   const key = topics.join(',');
   useEffect(() => {
     if (!key) return undefined;
-    const es = new EventSource(`/api/stream?topics=${encodeURIComponent(key)}`);
-    key.split(',').forEach((t) => {
-      es.addEventListener(t, (ev) => {
-        let p = null;
-        try { p = JSON.parse(ev.data); } catch { p = null; }
-        h.current(t, p);
-      });
-    });
-    return () => es.close();
+    const mine = key.split(',');
+    const fn = (t, p) => h.current(t, p);
+    mine.forEach((t) => { if (!subs.has(t)) subs.set(t, new Set()); subs.get(t).add(fn); });
+    if (!rebuildTimer) rebuildTimer = setTimeout(rebuildStream, 80);
+    return () => {
+      mine.forEach((t) => { const set = subs.get(t); if (set) { set.delete(fn); if (!set.size) subs.delete(t); } });
+      if (!rebuildTimer) rebuildTimer = setTimeout(rebuildStream, 80);
+    };
   }, [key]);
+}
+
+// The traffic feed for the internet connections. The first request brings the last ten minutes;
+// after that each poll asks for only the newest few samples and adds what is new, so a poll every
+// second costs a few hundred bytes instead of a full ten minutes.
+export function useThroughput(every = 1000) {
+  const [state, setState] = useState({ data: null, updatedAt: 0 });
+  const held = useRef(null);
+  useEffect(() => {
+    let alive = true;
+    const TAIL = 20;
+    const load = async () => {
+      if (document.hidden) return;
+      try {
+        const cur = held.current;
+        const r = await get(cur ? `/api/net/throughput?tail=${TAIL}` : '/api/net/throughput');
+        if (!alive) return;
+        let next = r;
+        if (cur) {
+          const fresh = r.seq - cur.seq;
+          const names = Object.keys(r.links || {});
+          const same = names.length === Object.keys(cur.links).length && names.every((n) => cur.links[n]);
+          if (fresh < 0 || fresh > TAIL || !same) { held.current = null; return load(); }
+          const links = {};
+          names.forEach((n) => {
+            const grow = (a, b) => (fresh > 0 ? [...a, ...b.slice(-fresh)].slice(-900) : a);
+            links[n] = { ...r.links[n], rx: grow(cur.links[n].rx || [], r.links[n].rx || []), tx: grow(cur.links[n].tx || [], r.links[n].tx || []) };
+          });
+          next = { ...r, links };
+        }
+        held.current = next;
+        setState({ data: next, updatedAt: Date.now() });
+      } catch { /* the next poll tries again */ }
+    };
+    load();
+    const t = setInterval(load, every);
+    const vis = () => { if (!document.hidden) load(); };
+    document.addEventListener('visibilitychange', vis);
+    return () => { alive = false; clearInterval(t); document.removeEventListener('visibilitychange', vis); };
+  }, [every]);
+  return state;
 }

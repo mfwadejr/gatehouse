@@ -96,6 +96,7 @@ type App struct {
 	threats    threatState
 	threatW    threatWatch
 	traffic    wanTraffic
+	netTraffic wanTraffic // each network's own speed, summed over its ports
 	viaNames   viaCache
 	health     healthSampler
 	hist       histState

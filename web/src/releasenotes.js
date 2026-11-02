@@ -1,6 +1,19 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.55',
+    title: 'Faster console and a better Overview',
+    items: [
+      'The console loads much less up front: its main file is about a third of the size, and each page loads when you first open it.',
+      'All live updates now share one connection instead of one per card. That frees the browser for ordinary requests and is the likely fix for the bursts of connection errors seen while the console sits idle.',
+      'The speed feed that updates every second now sends only what is new after the first load, and cards that ask for the same thing at the same moment share one request.',
+      'Overview speed chart windows: 5 minutes, 15 minutes, 1 hour, 24 hours, 7 days and 30 days.',
+      'Your networks on the Overview is now a table showing each network\'s download and upload speed, updated every second, with its last-hour chart.',
+      'The world map shows what was blocked in red, more strongly the larger the blocked share of a country; the hover note shows blocked and allowed counts for both directions.',
+      'Your place on the map: you can now type latitude and longitude. The placement is within about a degree.',
+    ],
+  },
+  {
     version: '0.8.54',
     title: 'Tidier layout and clearer wording',
     items: [

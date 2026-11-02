@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useData, useStream, put, post, get } from '../api.js';
+import { useData, useStream, useThroughput, put, post, get } from '../api.js';
 import { Button, Card, Empty, Icon, Note, Page, Pill, Segmented, fmt, Bar, useAction } from '../ui.jsx';
 import { go } from '../App.jsx';
 import { COUNTRIES, MAP_H, MAP_W } from '../worldmap.js';
@@ -12,7 +12,9 @@ import { useAttention } from '../attention.jsx';
 
 const regionName = (cc) => { try { return new Intl.DisplayNames(undefined, { type: 'region' }).of(cc); } catch { return cc; } };
 const SERIES = ['var(--color-chart-series-1)', 'var(--color-chart-series-2)', 'var(--color-chart-series-3)', 'var(--color-chart-series-4)'];
-const EVERY = { '10m': 2000, '1h': 30000, '24h': 300000, '30d': 900000 };
+const EVERY = { '1h': 30000, '24h': 300000, '7d': 600000, '30d': 900000 };
+// The short windows come from the live feed, which keeps the last fifteen minutes.
+const LIVE = { '5m': 300, '15m': 900 };
 
 // A number that counts up once when it first appears, then simply follows the value. It does not
 // move for people who ask their browser for less motion.
@@ -71,7 +73,7 @@ function lastOf(arr, n = 2) {
 function Hero({ wanList, links, thr, onStamp }) {
   const [dir, setDir] = useState('rx');
   const [range, setRange] = useState('1h');
-  const { data: hist } = useData(`/api/overview/history?range=${range === '10m' ? '1h' : range}`, { every: EVERY[range] === 2000 ? 30000 : EVERY[range], enabled: range !== '10m' });
+  const { data: hist } = useData(`/api/overview/history?range=${LIVE[range] ? '1h' : range}`, { every: EVERY[LIVE[range] ? '1h' : range], enabled: !LIVE[range] });
   const enabled = wanList.filter((w) => w.enabled);
   const states = enabled.map((w) => ({ w, l: links[w.name], s: linkState(links[w.name]) }));
   const working = states.filter((x) => x.s.health === 'working');
@@ -90,10 +92,10 @@ function Hero({ wanList, links, thr, onStamp }) {
   const now = Math.floor(Date.now() / 1000);
   const key = dir;
   const build = () => {
-    if (range === '10m') {
-      const iv = thr?.interval || 2;
-      return { from: now - 600, to: now, series: enabled.map((w, i) => {
-        const arr = thr?.links?.[w.name]?.[key] || [];
+    if (LIVE[range]) {
+      const iv = thr?.interval || 1;
+      return { from: now - LIVE[range], to: now, series: enabled.map((w, i) => {
+        const arr = (thr?.links?.[w.name]?.[key] || []).slice(-LIVE[range] / iv);
         return { key: w.name, name: w.name, color: SERIES[i % 4], pts: arr.map((v, j) => [now - (arr.length - 1 - j) * iv, v]) };
       }) };
     }
@@ -103,7 +105,7 @@ function Hero({ wanList, links, thr, onStamp }) {
   const ch = build();
   // A connection that was up and went down in this range gets a marker.
   const marks = [];
-  if (range !== '10m' && hist) {
+  if (!LIVE[range] && hist) {
     enabled.forEach((w) => {
       const up = hist.series?.[`wan.${w.name}.up`] || [];
       for (let i = up.length - 1; i > 0; i -= 1) if (up[i - 1][1] >= 0.5 && up[i][1] < 0.5) { marks.push({ t: up[i][0], label: `${w.name} went down` }); break; }
@@ -111,10 +113,10 @@ function Hero({ wanList, links, thr, onStamp }) {
   }
   const sum = (k) => enabled.reduce((a, w) => a + lastOf(thr?.links?.[w.name]?.[k]), 0);
   // Average and busiest over the range that is shown, so the big "now" number and the chart agree.
-  const seriesOf = (w, k) => (range === '10m' ? (thr?.links?.[w.name]?.[k] || []) : (hist?.series?.[`wan.${w.name}.${k}`] || []).map((p) => p[1]));
+  const seriesOf = (w, k) => (LIVE[range] ? (thr?.links?.[w.name]?.[k] || []).slice(-LIVE[range] / (thr?.interval || 1)) : (hist?.series?.[`wan.${w.name}.${k}`] || []).map((p) => p[1]));
   const avgOf = (k) => enabled.reduce((a, w) => { const v = seriesOf(w, k); return a + (v.length ? v.reduce((x, y) => x + y, 0) / v.length : 0); }, 0);
   const peakOf = (k) => enabled.reduce((a, w) => Math.max(a, ...seriesOf(w, k), 0), 0);
-  const RANGE_WORDS = { '10m': 'the last 10 minutes', '1h': 'the last hour', '24h': 'the last 24 hours', '30d': 'the last 30 days' };
+  const RANGE_WORDS = { '5m': 'the last 5 minutes', '15m': 'the last 15 minutes', '1h': 'the last hour', '24h': 'the last 24 hours', '7d': 'the last 7 days', '30d': 'the last 30 days' };
   const tone = head.tone;
   return (
     <Card className="ov-hero">
@@ -148,7 +150,7 @@ function Hero({ wanList, links, thr, onStamp }) {
             <Segmented value={dir} onChange={setDir} options={[{ value: 'rx', label: 'Download' }, { value: 'tx', label: 'Upload' }]} />
             <span className="small sec inline">{enabled.map((w, i) => <span key={w.name}><i className="sw" style={{ background: SERIES[i % 4], display: 'inline-block', width: '.65rem', height: '.65rem', borderRadius: 'var(--radius-xs)', marginRight: 'var(--space-1)' }} />{w.name}</span>)}</span>
           </div>
-          <Segmented value={range} onChange={setRange} options={[{ value: '10m', label: '10 min' }, { value: '1h', label: '1 hour' }, { value: '24h', label: '24 hours' }, { value: '30d', label: '30 days' }]} />
+          <Segmented value={range} onChange={setRange} options={[{ value: '5m', label: '5 min' }, { value: '15m', label: '15 min' }, { value: '1h', label: '1 hour' }, { value: '24h', label: '24 hours' }, { value: '7d', label: '7 days' }, { value: '30d', label: '30 days' }]} />
         </div>
         <Chart series={ch.series} from={ch.from} to={ch.to} kind="bits" height={220} marks={marks} label={`${dir === 'rx' ? 'Download' : 'Upload'} speed of each internet connection`} />
       </div>
@@ -246,7 +248,12 @@ function SecurityTile({ sec, fw, h }) {
 
 // Colour for a country: grey for none, then blue, then green for the busiest going out; amber then
 // orange for what comes in. The square root keeps one huge country from hiding all the others.
-function mapFill(dir, t) {
+function mapFill(dir, t, share = 0) {
+  const base = mapBase(dir, t);
+  // Red for what was blocked: the larger the blocked share of a country, the redder it is.
+  return share > 0 ? `color-mix(in srgb, var(--color-status-blocked) ${Math.round(Math.max(35, share * 100))}%, ${base})` : base;
+}
+function mapBase(dir, t) {
   const pct = (x) => Math.round(Math.max(0, Math.min(1, x)) * 100);
   if (dir === 'out') {
     return t < 0.5
@@ -306,7 +313,7 @@ function WorldCard() {
             {Object.entries(COUNTRIES).filter(([cc]) => cc !== 'AQ').map(([cc, c]) => {
               const n = by[cc]?.n || 0;
               const t = n ? Math.sqrt(n / Math.max(1, top)) : 0;
-              const style = n ? { fill: mapFill(dir, t) } : undefined;
+              const style = n ? { fill: mapFill(dir, t, (by[cc].blocked || 0) / n) } : undefined;
               return <path key={cc} d={c.d} className={`${n ? 'hit' : ''} ${t > 0.45 ? `hot ${dir}` : ''}`} style={style} onMouseEnter={() => setHover(cc)} onClick={n ? () => open(cc) : undefined} />;
             })}
             {home && arcs.map(({ c, to }, i) => {
@@ -331,7 +338,7 @@ function WorldCard() {
             <div className="ov-maptip small">
               <b>{regionName(hover)}</b><br />
               {fmt.n(tip.n)} {word}{tip.up + tip.down > 0 ? <><br />{fmtBytes(tip.up)} sent · {fmtBytes(tip.down)} received</> : null}
-              {dir === 'in' && <><br />{fmt.n(tip.blocked)} blocked · {fmt.n(tip.allowed)} allowed</>}
+              <><br />{fmt.n(tip.blocked || 0)} blocked · {fmt.n(tip.allowed || 0)} allowed</>
               <br /><span className="muted">Click to see them</span>
             </div>
           )}
@@ -339,6 +346,7 @@ function WorldCard() {
         {!homePt?.set && <p className="small muted" style={{ margin: 0 }}>Lines start from {home ? 'the middle of your country' : 'you'}. {home ? 'To place yourself exactly, ' : 'To show where you are, '}<button type="button" className="link" onClick={() => go('settings')}>set your location in Settings</button>.</p>}
         <div className="ov-scale small muted">
           <span>None</span><i style={{ background: mapLegend(dir) }} /><span>{fmt.n(top)} {word}</span>
+          <span><i className="sw" style={{ background: 'var(--color-status-blocked)', display: 'inline-block', width: '.65rem', height: '.65rem', borderRadius: 'var(--radius-full)' }} /> Red: blocked</span>
           <span className="grow" />
           <span>The country is approximate for CDN, cloud and VPN traffic.</span>
         </div>
@@ -363,6 +371,7 @@ function WorldCard() {
 // ---------------------------------------------------------------- lower cards
 
 function NetworksCard({ fw, wanList, links, devs, h24 }) {
+  const { data: speed } = useData('/api/net/zone-speed', { every: 1000 });
   const order = (fw?.matrix_zones || []).map((z) => z.name);
   const stored = (fw?.zones || []).filter((z) => z.kind !== 'wan');
   const zones = [...stored].sort((a, b) => (order.indexOf(a.name) < 0 ? 999 : order.indexOf(a.name)) - (order.indexOf(b.name) < 0 ? 999 : order.indexOf(b.name)));
@@ -370,20 +379,29 @@ function NetworksCard({ fw, wanList, links, devs, h24 }) {
   const states = enabled.map((w) => linkState(links[w.name]));
   const ok = states.filter((s) => s.health === 'working').length;
   return (
-    <Card title="Your networks" desc="Same order as Who can reach whom. Download speed, last hour.">
-      <div className="ov-nets">
-        {zones.map((z) => (
-          <div className="ov-net" key={z.id}>
-            <div className="spread"><b>{z.name}</b><span className="num small">{devs?.by_network?.[z.name] ?? 0} devices</span></div>
-            <div className="small muted">{z.ifaces?.length ? z.ifaces.join(', ') : 'no ports yet'}</div>
-            <Chart series={miniSeries(h24, `net.${z.name}.down`)} from={h24?.from || 0} to={h24?.to || 1} kind="bits" height={30} compact label={`Download speed of ${z.name}, last hour`} />
-          </div>
-        ))}
-        <div className="ov-net">
+    <Card title="Your networks" desc="Same order as Who can reach whom. Speeds update every second; the chart is download speed over the last hour.">
+      <div className="scroll"><table className="table">
+          <thead><tr><th>Network</th><th>Ports</th><th className="num">Devices</th><th className="num">Download now</th><th className="num">Upload now</th><th>Last hour</th></tr></thead>
+          <tbody>
+            {zones.map((z) => {
+              const sp = speed?.zones?.[z.name];
+              return (
+                <tr key={z.id}>
+                  <td><b>{z.name}</b></td>
+                  <td className="small muted">{z.ifaces?.length ? z.ifaces.join(', ') : 'no ports yet'}</td>
+                  <td className="num">{devs?.by_network?.[z.name] ?? 0}</td>
+                  <td className="num">{sp ? fmtBits(sp.down) : '–'}</td>
+                  <td className="num">{sp ? fmtBits(sp.up) : '–'}</td>
+                  <td style={{ minWidth: '9rem' }}><Chart series={miniSeries(h24, `net.${z.name}.down`)} from={h24?.from || 0} to={h24?.to || 1} kind="bits" height={30} compact label={`Download speed of ${z.name}, last hour`} /></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table></div>
+      <div className="ov-net" style={{ marginTop: 'var(--space-3)' }}>
           <div className="spread"><b>Internet</b>{enabled.length ? <Pill tone={ok ? 'good' : states.every((s) => s.health === 'unknown' || s.health === 'none') ? '' : 'bad'}>{ok ? (enabled.length > 1 ? `${ok} of ${enabled.length} working` : 'Connected') : states.every((s) => s.health === 'unknown' || s.health === 'none') ? 'Checking…' : 'Down'}</Pill> : <Pill>Not set up</Pill>}</div>
           <div className="small muted">{enabled.map((w) => w.iface).join(', ') || 'no port yet'} · managed automatically</div>
         </div>
-      </div>
       <button type="button" className="link small" style={{ textAlign: 'left' }} onClick={() => go('networks')}>Open networks →</button>
     </Card>
   );
@@ -478,7 +496,7 @@ export default function Overview() {
   useStream(['dns.stats'], (t, p) => p && setDns((d) => (d ? { ...d, stats: p } : d)));
   const { data: net, updatedAt: netAt } = useData('/api/net/status', { topics: ['net.status'], every: 5000 });
   const { data: wans } = useData('/api/net/wans', { topics: ['net.status'] });
-  const { data: thr, updatedAt: thrAt } = useData('/api/net/throughput', { every: 1000 });
+  const { data: thr, updatedAt: thrAt } = useThroughput(1000);
   const { data: util } = useData('/api/dhcp/utilisation', { topics: ['dhcp.utilisation', 'dhcp.leases'], every: 10000 });
   const { data: devs } = useData('/api/overview/devices', { topics: ['dhcp.leases'], every: 10000 });
   const { data: fw } = useData('/api/fw/overview', { topics: ['fw.status'] });

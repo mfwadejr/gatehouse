@@ -1,28 +1,29 @@
 import { AttentionProvider, useAttention, levelText } from './attention.jsx';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { ApiError, get, post, setCsrf, useData } from './api.js';
 import { Guard, Icon, Loading } from './ui.jsx';
 import { Enrol, Login, Setup } from './pages/Auth.jsx';
-import Overview from './pages/Overview.jsx';
 import FailbackPrompt from './pages/FailbackPrompt.jsx';
-import Internet from './pages/Internet.jsx';
-import Networks from './pages/Networks.jsx';
-import DNS from './pages/DNS.jsx';
-import DHCP from './pages/DHCP.jsx';
-import VPN from './pages/VPN.jsx';
-import Routes from './pages/Routes.jsx';
-import Firewall from './pages/Firewall.jsx';
-import Protection from './pages/Protection.jsx';
-import Diagnostics from './pages/Diagnostics.jsx';
-import Services from './pages/Services.jsx';
-import Devices from './pages/Devices.jsx';
-import Profiles from './pages/Profiles.jsx';
-import Logs from './pages/Logs.jsx';
-import Settings from './pages/Settings.jsx';
 import Installer from './pages/Installer.jsx';
 import Wizard from './pages/Wizard.jsx';
 import { SearchBox, useSearchShortcut } from './search.jsx';
 import { ReleaseNotes } from './whatsnew.jsx';
+
+const Overview = lazy(() => import('./pages/Overview.jsx'));
+const Internet = lazy(() => import('./pages/Internet.jsx'));
+const Networks = lazy(() => import('./pages/Networks.jsx'));
+const DNS = lazy(() => import('./pages/DNS.jsx'));
+const DHCP = lazy(() => import('./pages/DHCP.jsx'));
+const VPN = lazy(() => import('./pages/VPN.jsx'));
+const Routes = lazy(() => import('./pages/Routes.jsx'));
+const Firewall = lazy(() => import('./pages/Firewall.jsx'));
+const Protection = lazy(() => import('./pages/Protection.jsx'));
+const Diagnostics = lazy(() => import('./pages/Diagnostics.jsx'));
+const Services = lazy(() => import('./pages/Services.jsx'));
+const Devices = lazy(() => import('./pages/Devices.jsx'));
+const Profiles = lazy(() => import('./pages/Profiles.jsx'));
+const Logs = lazy(() => import('./pages/Logs.jsx'));
+const Settings = lazy(() => import('./pages/Settings.jsx'));
 
 export const PAGES = [
   { id: 'overview', label: 'Overview', icon: 'overview', el: Overview },
@@ -102,7 +103,7 @@ function Shell({ me, onSignOut, reloadMe }) {
       <main className="main" id="main">
         {ha?.standby && <div className="note warn" role="status" style={{ margin: 'var(--space-3)' }}><div><strong>This is the standby unit.</strong> Settings are read-only here; make changes on the active unit{ha.peer_addr ? ` (${ha.peer_addr})` : ''}. <a href="#/settings">High availability</a></div></div>}
         <FailbackPrompt ha={ha} onChanged={reloadHa} />
-        <Guard key={page.id} what="This page"><Page me={me} reloadMe={reloadMe} /></Guard>
+        <Guard key={page.id} what="This page"><Suspense fallback={<Loading />}><Page me={me} reloadMe={reloadMe} /></Suspense></Guard>
       </main>
       {finding && <SearchBox onClose={() => setFinding(false)} go={go} />}
       {notes && <ReleaseNotes onClose={() => setNotes(false)} />}

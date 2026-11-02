@@ -18,7 +18,7 @@ import (
 
 const (
 	trafficEvery   = time.Second
-	trafficSamples = 600 // ten minutes
+	trafficSamples = 900 // fifteen minutes
 )
 
 type trafficSeries struct {
@@ -33,6 +33,7 @@ type trafficSeries struct {
 type wanTraffic struct {
 	mu     sync.Mutex
 	series map[string]*trafficSeries
+	seq    uint64 // samples taken so far; lets a caller ask for only what is new
 }
 
 func readCounter(dev, name string) (uint64, bool) {
@@ -56,6 +57,7 @@ func push(s []float64, v float64) []float64 {
 func (t *wanTraffic) sample(devs map[string]string, now time.Time, read func(dev, name string) (uint64, bool)) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	t.seq++
 	if t.series == nil {
 		t.series = map[string]*trafficSeries{}
 	}
@@ -87,14 +89,24 @@ func (t *wanTraffic) sample(devs map[string]string, now time.Time, read func(dev
 	}
 }
 
-func (t *wanTraffic) snapshot() map[string]trafficSeries {
+func (t *wanTraffic) snapshot() map[string]trafficSeries { l, _ := t.tail(0); return l }
+
+// tail returns the newest n samples of each connection (all of them when n is 0) and the running
+// sample count, so a console that already holds the older ones asks for only a few.
+func (t *wanTraffic) tail(n int) (map[string]trafficSeries, uint64) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	out := map[string]trafficSeries{}
-	for n, s := range t.series {
-		out[n] = trafficSeries{Dev: s.Dev, Rx: append([]float64{}, s.Rx...), Tx: append([]float64{}, s.Tx...)}
+	cut := func(v []float64) []float64 {
+		if n > 0 && len(v) > n {
+			v = v[len(v)-n:]
+		}
+		return append([]float64{}, v...)
 	}
-	return out
+	out := map[string]trafficSeries{}
+	for name, s := range t.series {
+		out[name] = trafficSeries{Dev: s.Dev, Rx: cut(s.Rx), Tx: cut(s.Tx)}
+	}
+	return out, t.seq
 }
 
 func (a *App) wanDevices() map[string]string {
@@ -121,13 +133,59 @@ func (a *App) collectTraffic(ctx context.Context) {
 			return
 		case now := <-t.C:
 			a.traffic.sample(a.wanDevices(), now, readCounter)
+			a.sampleNetworks(now)
 		}
 	}
 }
 
+// sampleNetworks records the speed of each network (all its ports added together), once a second.
+func (a *App) sampleNetworks(now time.Time) {
+	ports := map[string][]string{}
+	for iface, zone := range a.zoneByIface() {
+		ports[zone] = append(ports[zone], iface)
+	}
+	devs := map[string]string{}
+	for zone := range ports {
+		devs[zone] = zone
+	}
+	a.netTraffic.sample(devs, now, func(zone, name string) (uint64, bool) {
+		var sum uint64
+		ok := false
+		for _, p := range ports[zone] {
+			if n, good := readCounter(p, name); good {
+				sum, ok = sum+n, true
+			}
+		}
+		return sum, ok
+	})
+}
+
+// latest is the newest reading of each series: bits per second received and sent on the ports.
+func (t *wanTraffic) latest() map[string][2]float64 {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	out := map[string][2]float64{}
+	for name, s := range t.series {
+		if n := len(s.Rx); n > 0 {
+			out[name] = [2]float64{s.Rx[n-1], s.Tx[n-1]}
+		}
+	}
+	return out
+}
+
 func (a *App) registerTrafficRoutes() {
+	a.API.Handle("GET /api/net/zone-speed", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		// A port's received bytes are what the devices on it sent, so the names swap here.
+		out := map[string]map[string]float64{}
+		for zone, v := range a.netTraffic.latest() {
+			out[zone] = map[string]float64{"down": v[1], "up": v[0]}
+		}
+		api.JSON(w, 200, map[string]any{"zones": out})
+	})
 	a.registerViaRoutes()
 	a.API.Handle("GET /api/net/throughput", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-		api.JSON(w, 200, map[string]any{"interval": int(trafficEvery / time.Second), "links": a.traffic.snapshot()})
+		n, _ := strconv.Atoi(r.URL.Query().Get("tail"))
+		links, seq := a.traffic.tail(n)
+		api.JSON(w, 200, map[string]any{"interval": int(trafficEvery / time.Second), "seq": seq, "links": links})
 	})
 }

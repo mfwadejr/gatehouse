@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { del, put, useData } from '../api.js';
+import { del, put, useData, useThroughput } from '../api.js';
 import SourcePicker from '../SourcePicker.jsx';
 import { Button, Card, Empty, Field, Input, Modal, Note, Pill, Segmented, Select, Trend, useAction, confirmBox, noticeBox } from '../ui.jsx';
 import { linkState } from '../linkstate.js';
@@ -23,7 +23,7 @@ function RateChart({ values, label }) {
 // ---------------------------------------------------------------- traffic
 
 export function Traffic({ wans, links }) {
-  const { data } = useData('/api/net/throughput', { every: 3000 });
+  const { data } = useThroughput(3000);
   const on = wans.filter((w) => w.enabled);
   if (!on.length) return null;
   return (

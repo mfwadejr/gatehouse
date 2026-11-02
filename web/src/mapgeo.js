@@ -18,3 +18,8 @@ export function centreOf(cc) {
   return centreCache[cc];
 }
 
+
+// Latitude and longitude on the map's own drawing. The map is a plain grid of degrees, fitted to the
+// country outlines, so a point lands within about a degree (roughly 100 km) of its real place.
+export const project = (lat, lon) => [Math.round(500 + lon * 2.7788), Math.round(272 - lat * 2.99)];
+export const unproject = (x, y) => [Math.round(((272 - y) / 2.99) * 100) / 100, Math.round(((x - 500) / 2.7788) * 100) / 100];

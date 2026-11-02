@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { put, useData } from '../api.js';
-import { Button, Card, Field, Note, Select, useAction } from '../ui.jsx';
+import { Button, Card, Field, Input, Note, Select, useAction } from '../ui.jsx';
 import { COUNTRIES, MAP_H, MAP_W } from '../worldmap.js';
-import { centreOf } from '../mapgeo.js';
+import { centreOf, project, unproject } from '../mapgeo.js';
 
 // Where "you" are on the Overview map. Click the map, or pick a country from the list. It is kept
 // only on this machine. Without it the lines start from the middle of the country the browser is
@@ -11,7 +11,13 @@ export default function MapLocation() {
   const { data, reload } = useData('/api/overview/home');
   const [run, busy] = useAction();
   const [pt, setPt] = useState(null);
+  const [ll, setLl] = useState({ lat: '', lon: '' });
   if (!data) return null;
+  const setFromLatLon = (next) => {
+    setLl(next);
+    const la = Number(next.lat), lo = Number(next.lon);
+    if (next.lat !== '' && next.lon !== '' && Number.isFinite(la) && Number.isFinite(lo) && Math.abs(la) <= 90 && Math.abs(lo) <= 180) setPt(project(la, lo));
+  };
   const shown = pt || (data.set ? [data.x, data.y] : null);
   const place = (e) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -19,11 +25,16 @@ export default function MapLocation() {
   };
   const options = [{ value: '', label: 'Choose a country…' }, ...Object.entries(COUNTRIES).filter(([cc]) => cc !== 'AQ').map(([cc, c]) => ({ value: cc, label: c.name })).sort((a, b) => a.label.localeCompare(b.label))];
   return (
-    <Card title="Your place on the map" desc="Where the lines on the Overview map start. It stays on this machine and is not sent anywhere.">
+    <Card title="Your place on the map" desc="Where the lines on the Overview map start. Type your latitude and longitude, click the map, or pick a country. It stays on this machine and is not sent anywhere.">
       <div className="stack">
-        <Field label="Pick a country" hint="Or click the map below to place yourself exactly.">
+        <Field label="Pick a country" hint="Or type your coordinates, or click the map below.">
           <Select value="" onChange={(cc) => { const c = cc && centreOf(cc); if (c) setPt([Math.round(c[0]), Math.round(c[1])]); }} options={options} aria-label="Country" />
         </Field>
+        <div className="formgrid">
+          <Field label="Latitude" hint="Degrees, north is positive. For example 40.71."><Input value={ll.lat} onChange={(v) => setFromLatLon({ ...ll, lat: v })} placeholder="40.71" inputMode="decimal" /></Field>
+          <Field label="Longitude" hint="Degrees, east is positive. For example -74.01."><Input value={ll.lon} onChange={(v) => setFromLatLon({ ...ll, lon: v })} placeholder="-74.01" inputMode="decimal" /></Field>
+        </div>
+        {shown && <p className="small muted" style={{ margin: 0 }}>Placed at about {unproject(shown[0], shown[1]).map((n) => n.toFixed(1)).join(', ')} (latitude, longitude).</p>}
         <div className="ov-map" style={{ cursor: 'crosshair' }}>
           <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} role="img" aria-label="World map. Click to place yourself." onClick={place}>
             {Object.entries(COUNTRIES).filter(([cc]) => cc !== 'AQ').map(([cc, c]) => <path key={cc} d={c.d} />)}
