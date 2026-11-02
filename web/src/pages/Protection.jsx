@@ -1,3 +1,4 @@
+import { useHashTab } from '../hashtab.js';
 import React, { useState } from 'react';
 import { useData } from '../api.js';
 import { Card, Note, Page, Pill, Tabs } from '../ui.jsx';
@@ -36,7 +37,7 @@ function Summary({ go }) {
 }
 
 export default function Protection() {
-  const [tab, setTab] = useState('overview');
+  const [tab, setTab] = useHashTab('protection', ['overview','blocks','threats'], 'overview');
   return (
     <Page title="Protection" sub="Check how safe the network is, block apps and topics, and watch for threats.">
       <Tabs value={tab} onChange={setTab} tabs={[{ value: 'overview', label: 'Overview' }, { value: 'blocks', label: 'Apps & topics' }, { value: 'threats', label: 'Threats' }]} />

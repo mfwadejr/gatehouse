@@ -1,3 +1,4 @@
+import { AttentionProvider, useAttention, levelText } from './attention.jsx';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ApiError, get, post, setCsrf, useData } from './api.js';
 import { Guard, Icon, Loading } from './ui.jsx';
@@ -58,6 +59,7 @@ export const go = (id) => { window.location.hash = `#/${id}`; };
 
 function Shell({ me, onSignOut, reloadMe }) {
   const route = useRoute();
+  const attn = useAttention();
   const page = PAGES.find((p) => p.id === route) || PAGES[0];
   const Page = page.el;
   const { data: fw } = useData('/api/fw/overview', { topics: ['fw.status'] });
@@ -80,7 +82,9 @@ function Shell({ me, onSignOut, reloadMe }) {
             <a key={p.id} href={`#/${p.id}`} className={p.id === page.id ? 'on' : ''} aria-current={p.id === page.id ? 'page' : undefined}>
               <Icon name={p.icon} />
               <span>{p.label}</span>
-              {(p.id === 'firewall' || p.id === 'internet' || p.id === 'networks') && (dirty || pending) && <span className={`dot ${pending ? 'bad' : 'warn'} badge-dot`} title={pending ? 'A change is waiting for your confirmation' : 'Changes not applied yet'} />}
+              {(p.id === 'firewall' || p.id === 'internet' || p.id === 'networks') && (dirty || pending)
+                ? <span className={`dot ${pending ? 'bad' : 'warn'} badge-dot`} title={pending ? 'A change is waiting for your confirmation' : 'Changes not applied yet'} />
+                : attn.byPage[p.id] && <span className={`navdot ${attn.byPage[p.id]}`} role="img" aria-label={`${levelText[attn.byPage[p.id]]}: ${attn.items.filter((x) => x.to === p.id).map((x) => x.t).join('. ')}`} title={attn.items.filter((x) => x.to === p.id).map((x) => x.t).join('\n')} />}
             </a>
           ))}
         </nav>
@@ -144,5 +148,5 @@ export default function App() {
   if (state.kind === 'login') return <Login prefill={prefill} onSession={() => { setPrefill(null); boot(); }} />;
   if (state.kind === 'wizard') return <Wizard me={state.me} data={state.data} onDone={boot} />;
   if (state.kind === 'enrol') return <Enrol onDone={boot} />;
-  return <Shell me={state.me} onSignOut={signOut} reloadMe={boot} />;
+  return <AttentionProvider><Shell me={state.me} onSignOut={signOut} reloadMe={boot} /></AttentionProvider>;
 }

@@ -22,6 +22,10 @@ type Plan struct {
 	CPUPercent int      `json:"cpu_percent"` // of one core, 10 to 400
 	MemoryMB   int      `json:"memory_mb"`   // 256 to 16384
 	OffSIDs    []int    `json:"off_sids"`    // single rules the person switched off
+	// A custom setup is the preset plus these changes: groups the person switched on although the
+	// preset has them off, and groups switched off although the preset has them on.
+	GroupsOn  []string `json:"groups_on"`
+	GroupsOff []string `json:"groups_off"`
 }
 
 const (
@@ -54,6 +58,11 @@ func (p *Plan) Check() error {
 	}
 	if p.MemoryMB < 256 || p.MemoryMB > 16384 {
 		return errors.New("the memory limit must be between 256 MB and 16 GB")
+	}
+	for _, g := range append(append([]string{}, p.GroupsOn...), p.GroupsOff...) {
+		if !KnownGroup(g) {
+			return errors.New("a group of checks is not known")
+		}
 	}
 	for _, s := range p.OffSIDs {
 		if s <= 0 {
@@ -177,31 +186,100 @@ func Presets() []Preset {
 	return out
 }
 
-// Groups lists the rule groups with a plain description each, for the Advanced tab.
-func Groups() []Group {
-	desc := map[string]string{
-		"malware": "Known malware calling home", "current_events": "Fresh threats being spread right now", "exploit_kit": "Sites that attack browsers",
-		"phishing": "Sites that trick people", "coinminer": "Hidden coin miners", "mobile_malware": "Malware on phones", "worm": "Self-spreading malware",
-		"attack_response": "Signs a break-in worked", "exploit": "Attacks on software", "shellcode": "Code used to take over a device", "dos": "Floods that overwhelm a device",
-		"scan": "Someone probing for open doors", "policy": "Traffic some places ban, usually harmless at home", "p2p": "File sharing", "games": "Online games", "chat": "Chat programs",
-		"info": "Interesting but usually harmless", "web_server": "Attacks on web servers you run", "web_specific_apps": "Attacks on particular web programs", "sql": "Attacks on databases",
-		"dns": "Odd DNS use", "user_agents": "Programs that name themselves unusually", "inappropriate": "Adult content", "voip": "Phone calls over the internet", "scada": "Factory equipment",
-	}
-	var out []Group
+// groupText says what each rule group looks for, in everyday words. Every group must have one.
+var groupText = map[string]string{
+	"malware": "Known malware calling home", "mobile_malware": "Malware on phones", "current_events": "Fresh threats being spread right now",
+	"exploit_kit": "Sites that attack browsers", "phishing": "Sites that trick people", "coinminer": "Hidden coin miners", "worm": "Self-spreading malware",
+	"attack_response": "Signs a break-in worked", "exploit": "Attacks on software", "shellcode": "Code used to take over a device",
+	"adware_pup": "Adware and unwanted programs", "web_client": "Attacks on web browsers and programs that read web pages", "dos": "Floods that overwhelm a device",
+	"dns": "Odd DNS use, such as hiding data in lookups", "scan": "Someone probing for open doors",
+	"activex": "Attacks through old Internet Explorer add-ons", "chat": "Chat programs such as IRC and messengers", "deleted": "Old checks the rule authors have retired",
+	"ftp": "Problems with old file-transfer (FTP) servers", "games": "Online games", "hunting": "Broad experimental checks that are often noisy",
+	"icmp": "Odd ping and network-error packets", "icmp_info": "Ordinary ping traffic, noted for information", "imap": "Attacks on a mail server (IMAP) you run",
+	"inappropriate": "Adult content", "info": "Interesting but usually harmless", "ja3": "Fingerprints of encrypted connections made by known bad programs",
+	"misc": "Checks that do not fit anywhere else", "netbios": "Windows file sharing (NetBIOS and SMB) abuse", "p2p": "File sharing",
+	"policy": "Traffic some places ban, usually harmless at home", "pop3": "Attacks on a mail server (POP3) you run", "rpc": "Attacks on remote-procedure services",
+	"scada": "Factory and industrial equipment", "smtp": "Attacks on a mail server (SMTP) you run", "snmp": "Attacks on network-management (SNMP) services",
+	"sql": "Attacks on databases", "telnet": "Abuse of the old Telnet remote login", "tftp": "Abuse of the old TFTP boot service",
+	"user_agents": "Programs that name themselves unusually", "voip": "Phone calls over the internet", "web_server": "Attacks on web servers you run",
+	"web_specific_apps": "Attacks on particular web programs",
+}
+
+// commonGroups are the ones that matter at home, shown first and in this order.
+var commonGroups = []string{"malware", "mobile_malware", "current_events", "exploit_kit", "phishing", "coinminer", "worm", "attack_response",
+	"exploit", "shellcode", "adware_pup", "web_client", "dos", "dns", "scan"}
+
+// KnownGroup says whether a name is one of the rule groups.
+func KnownGroup(name string) bool {
 	for _, g := range allGroups {
-		d := desc[g]
-		if d == "" {
-			d = "Other checks"
+		if g == name {
+			return true
 		}
-		out = append(out, Group{Name: g, Text: d})
 	}
-	return out
+	return false
 }
 
 // Group is one rule group.
 type Group struct {
-	Name string `json:"name"`
-	Text string `json:"text"`
+	Name   string `json:"name"`
+	Text   string `json:"text"`
+	Common bool   `json:"common"` // matters at home; the rest are shown under "Less common"
+}
+
+// Groups lists the rule groups with a plain description each, the ones that matter at home first.
+func Groups() []Group {
+	var out []Group
+	seen := map[string]bool{}
+	for _, g := range commonGroups {
+		out = append(out, Group{g, groupText[g], true})
+		seen[g] = true
+	}
+	for _, g := range allGroups {
+		if !seen[g] {
+			out = append(out, Group{g, groupText[g], false})
+		}
+	}
+	return out
+}
+
+// PresetOff is the groups a preset has off.
+func PresetOff(key string) []string { return append([]string{}, presets[key].Off...) }
+
+// EffectiveOff is the groups that end up off: the preset's, plus the person's changes.
+func EffectiveOff(p Plan) []string {
+	off := map[string]bool{}
+	for _, g := range presets[p.Preset].Off {
+		off[g] = true
+	}
+	for _, g := range p.GroupsOn {
+		delete(off, g)
+	}
+	for _, g := range p.GroupsOff {
+		off[g] = true
+	}
+	var out []string
+	for g := range off {
+		out = append(out, g)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// Changes works out the person's changes from the groups they want off: only what differs from the preset is kept.
+func Changes(preset string, wantOff map[string]bool) (on, off []string) {
+	base := map[string]bool{}
+	for _, g := range presets[preset].Off {
+		base[g] = true
+	}
+	for _, g := range allGroups {
+		switch {
+		case base[g] && !wantOff[g]:
+			on = append(on, g)
+		case !base[g] && wantOff[g]:
+			off = append(off, g)
+		}
+	}
+	return
 }
 
 // DisableList is the disable.conf the rule updater reads: the preset's groups and any single rules
@@ -209,9 +287,7 @@ type Group struct {
 func DisableList(p Plan) string {
 	var b strings.Builder
 	b.WriteString("# Written by Gatehouse\n")
-	off := append([]string{}, presets[p.Preset].Off...)
-	sort.Strings(off)
-	for _, g := range off {
+	for _, g := range EffectiveOff(p) {
 		b.WriteString("group:emerging-" + g + ".rules\n")
 	}
 	sids := append([]int{}, p.OffSIDs...)

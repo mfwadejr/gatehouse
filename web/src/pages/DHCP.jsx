@@ -1,3 +1,4 @@
+import { useHashTab } from '../hashtab.js';
 import React, { useState } from 'react';
 import { del, post, put, useData } from '../api.js';
 import { Bar, Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Select, Tabs, ToggleRow, useAction, fmt, confirmBox, usePortNames } from '../ui.jsx';
@@ -157,7 +158,7 @@ function Reservations() {
 }
 
 export default function DHCP() {
-  const [tab, setTab] = useState('scopes');
+  const [tab, setTab] = useHashTab('dhcp', ['scopes','leases','resv'], 'scopes');
   const { data: rogue } = useData('/api/dhcp/alerts', { topics: ['dhcp.alerts'] });
   return (
     <Page title="DHCP" sub="Gives every device an address when it joins the network.">

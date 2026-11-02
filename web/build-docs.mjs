@@ -18,8 +18,10 @@ const inline = (s) => esc(s)
   .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
   .replace(/`([^`]+)`/g, '<code>$1</code>');
 
+export const slug = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
 export function render(md) {
-  const out = []; let list = null; let para = [];
+  const out = []; let list = null; let para = []; const seen = new Set();
   const flushP = () => { if (para.length) { out.push(`<p>${inline(para.join(' '))}</p>`); para = []; } };
   const flushL = () => { if (list) { out.push(`</${list}>`); list = null; } };
   let code = false;
@@ -27,7 +29,7 @@ export function render(md) {
     if (line.startsWith('```')) { flushP(); flushL(); out.push(code ? '</pre>' : '<pre>'); code = !code; continue; }
     if (code) { out.push(esc(line)); continue; }
     let m;
-    if ((m = line.match(/^(#{1,3}) (.*)/))) { flushP(); flushL(); out.push(`<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`); continue; }
+    if ((m = line.match(/^(#{1,3}) (.*)/))) { flushP(); flushL(); let id = slug(m[2]); while (seen.has(id)) id += '-2'; seen.add(id); out.push(`<h${m[1].length} id="${id}">${inline(m[2])}</h${m[1].length}>`); continue; }
     if ((m = line.match(/^\s*[-*] (.*)/))) { flushP(); if (list !== 'ul') { flushL(); out.push('<ul>'); list = 'ul'; } out.push(`<li>${inline(m[1])}</li>`); continue; }
     if ((m = line.match(/^\s*\d+\. (.*)/))) { flushP(); if (list !== 'ol') { flushL(); out.push('<ol>'); list = 'ol'; } out.push(`<li>${inline(m[1])}</li>`); continue; }
     if (!line.trim()) { flushP(); flushL(); continue; }
@@ -60,4 +62,17 @@ a{color:#2a6bd1}
 @media(max-width:700px){body{display:block}nav{width:auto;flex-direction:row;flex-wrap:wrap;border-right:0;border-bottom:1px solid #dde3ec}main{padding:1rem}}
 @media(prefers-color-scheme:dark){body{background:#12161d;color:#e4e9f1}nav{background:#1a2029;border-color:#2b3441}nav a{color:#e4e9f1}nav a:hover{background:#243044}nav a[aria-current=page]{background:#25395a}img{border-color:#2b3441}code,pre{background:#222a36}a{color:#7fb0f5}nav .home{color:#7fb0f5}}
 `);
+// What the console's search reads to find help: one entry per heading, with the words under it.
+const index = [];
+for (const [id, title] of have) {
+  const seen = new Set(); let cur = null;
+  const push = () => { if (cur) index.push({ file: id, chapter: title, heading: cur.h, slug: cur.slug, text: cur.t.join(' ').replace(/[*`]/g, '').replace(/!\[[^\]]*\]\([^)]*\)/g, '').slice(0, 400) }); };
+  for (const line of readFileSync(`../docs/help/${id}.md`, 'utf8').split('\n')) {
+    const m = line.match(/^(#{1,3}) (.*)/);
+    if (m) { push(); let sl = slug(m[2]); while (seen.has(sl)) sl += '-2'; seen.add(sl); cur = { h: m[2].replace(/[*`]/g, ''), slug: sl, t: [] }; }
+    else if (cur && line.trim()) cur.t.push(line.trim().replace(/^[-*] |^\d+\. /, ''));
+  }
+  push();
+}
+writeFileSync(join(dir, 'search.json'), JSON.stringify(index));
 console.log(`docs: built ${have.length} help pages`);

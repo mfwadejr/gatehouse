@@ -131,4 +131,7 @@ CREATE TABLE threat_alerts(
   device TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX idx_threat_ts ON threat_alerts(ts);
+`, `
+-- Which end started the connection the alert is about: out (a device of ours), in (the other end), or empty when the engine did not say.
+ALTER TABLE threat_alerts ADD COLUMN dir TEXT NOT NULL DEFAULT '';
 `}

@@ -76,6 +76,7 @@ type evePacket struct {
 	DestIP    string `json:"dest_ip"`
 	DestPort  int    `json:"dest_port"`
 	Proto     string `json:"proto"`
+	Direction string `json:"direction"` // to_server: the source started the connection; to_client: the destination did
 	Alert     struct {
 		SID       int64  `json:"signature_id"`
 		Signature string `json:"signature"`
@@ -142,13 +143,19 @@ func (a *App) threatIngest(line []byte, now time.Time) bool {
 			"Threat protection quieted a noisy check", e.Alert.Signature+" fired too often. You can see it under Firewall, Threat protection.")
 		return false
 	}
-	device := local
-	if mac != "" {
-		device = a.fwdDeviceName(mac, local)
-	}
+	device := a.deviceLabeler()(mac, local)
 	plain := plainThreat(e.Alert.Category, e.Alert.Signature)
-	a.Logs.Exec(`INSERT INTO threat_alerts(ts,sid,signature,plain,category,severity,src,dst,dport,proto,mac,device) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`,
-		now.Unix(), e.Alert.SID, e.Alert.Signature, plain, e.Alert.Category, e.Alert.Severity, e.SrcIP, e.DestIP, e.DestPort, strings.ToLower(e.Proto), mac, device)
+	// Who started the connection, when the engine says: the initiator is the source of a to_server
+	// packet and the destination of a to_client one.
+	dir := ""
+	if initiator := map[string]string{"to_server": e.SrcIP, "to_client": e.DestIP}[e.Direction]; initiator != "" {
+		dir = "in"
+		if initiator == local {
+			dir = "out"
+		}
+	}
+	a.Logs.Exec(`INSERT INTO threat_alerts(ts,sid,signature,plain,category,severity,src,dst,dport,proto,mac,device,dir) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		now.Unix(), e.Alert.SID, e.Alert.Signature, plain, e.Alert.Category, e.Alert.Severity, e.SrcIP, e.DestIP, e.DestPort, strings.ToLower(e.Proto), mac, device, dir)
 	sev := "warning"
 	if e.Alert.Severity >= 3 {
 		sev = "info"

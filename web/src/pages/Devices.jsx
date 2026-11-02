@@ -179,7 +179,9 @@ export default function Devices({ me }) {
   const { data: fwov } = useData('/api/fw/overview', { topics: ['fw.status'] });
   const { data: fwf, reload: reloadFwf } = useData('/api/fw/appforwards');
   const [opening, setOpening] = useState(null);
-  const [q, setQ] = useState('');
+  const takeFind = () => { try { const v = sessionStorage.getItem('gh.find.device'); sessionStorage.removeItem('gh.find.device'); return v || ''; } catch { return ''; } };
+  const [q, setQ] = useState(takeFind);
+  useEffect(() => { const on = () => { const v = takeFind(); if (v) setQ(v); }; window.addEventListener('gh-find-device', on); return () => window.removeEventListener('gh-find-device', on); }, []);
   const [f, setF] = useState({ state: '', conn: '', network: '', group: '' });
   const [open, setOpen] = useState(null);
   const [adding, setAdding] = useState(false);

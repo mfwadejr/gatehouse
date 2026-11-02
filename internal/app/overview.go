@@ -336,6 +336,13 @@ func (a *App) histPoints(now time.Time) []histPoint {
 		add("devices.online", float64(on))
 	}
 	add("dns.qps", a.DNS.Stats().Snapshot().QPS)
+	if a.DHCP != nil {
+		used := 0
+		for _, u := range a.DHCP.Utilisation() {
+			used += u.Active
+		}
+		add("dhcp.used", float64(used))
+	}
 	// Blocked connections per second since the last reading.
 	var fwN int64
 	a.Logs.QueryRow(`SELECT COUNT(*) FROM fw_events WHERE action='drop' AND ts>=?`, now.Add(-histEvery).Unix()).Scan(&fwN)
@@ -648,9 +655,12 @@ func (a *App) registerOverviewRoutes() {
 			var blocked, forwards int
 			a.Logs.QueryRow(`SELECT COUNT(*) FROM fw_events WHERE action='drop' AND ts>=?`, time.Now().Add(-24*time.Hour).Unix()).Scan(&blocked)
 			a.Config.QueryRow(`SELECT COUNT(*) FROM nat_forwards WHERE enabled=1`).Scan(&forwards)
-			return map[string]any{"blocked_24h": blocked, "open_ports": forwards}
+			loud, odd, loudDevs := a.threatToday()
+			return map[string]any{"blocked_24h": blocked, "open_ports": forwards, "threat_on": a.threatMode() == "watch",
+				"threat_alerts_24h": loud, "threat_odd_24h": odd, "threat_devices_24h": loudDevs}
 		}))
 	})
+	a.registerHomeAndHappened()
 	s.Handle("GET /api/overview/events", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		type ev struct {
 			TS       int64  `json:"ts"`

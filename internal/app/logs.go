@@ -76,6 +76,9 @@ func fwReason(verdict, tag, from, to string) string {
 	case "forward":
 		return "Allowed by a port forward."
 	case "default":
+		if rest == "dot" {
+			return "Not a problem: this device asked the router for encrypted DNS (DNS over TLS). Gatehouse answers DNS on the normal port, so the device uses that instead."
+		}
 		if rest == "in" {
 			return fmt.Sprintf("Blocked: nothing allows %s to connect to the router itself on this port.", orAny(from))
 		}

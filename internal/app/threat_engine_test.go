@@ -168,3 +168,74 @@ func TestThreatRuleSearchSwitchAndTuningRoundTrip(t *testing.T) {
 		t.Fatal("no rule groups listed")
 	}
 }
+
+func TestCustomGroupsRestoreDefaultsAndReset(t *testing.T) {
+	c, fn, _ := siteBox(t, "192.168.1.1/24")
+	fn.mu.Lock()
+	fn.threatInfo.Installed, fn.threatInfo.State = true, "idle"
+	fn.mu.Unlock()
+	if rc, _, raw := c.call("PUT", "/api/threat/settings", map[string]any{"mode": "watch", "preset": "balanced"}); rc != 200 {
+		t.Fatalf("watch: %d %s", rc, raw)
+	}
+	groups := func() map[string]map[string]any {
+		_, m, _ := c.call("GET", "/api/threat/groups", nil)
+		out := map[string]map[string]any{}
+		for _, x := range m["groups"].([]any) {
+			g := x.(map[string]any)
+			out[g["name"].(string)] = g
+			if g["text"] == "" || g["text"] == "Other checks" {
+				t.Fatalf("group %v has no description", g["name"])
+			}
+		}
+		return out
+	}
+	g := groups()
+	if g["scan"]["on"] != false || g["malware"]["on"] != true || g["scan"]["changed"] != false {
+		t.Fatalf("balanced defaults: %v %v", g["scan"], g["malware"])
+	}
+	// Switch scan on and malware off: send the whole set of groups that should be off.
+	var off []string
+	for n, x := range g {
+		if x["on"] == false && n != "scan" {
+			off = append(off, n)
+		}
+	}
+	off = append(off, "malware")
+	if rc, _, raw := c.call("PUT", "/api/threat/groups", map[string]any{"off": off}); rc != 200 {
+		t.Fatalf("groups: %d %s", rc, raw)
+	}
+	g = groups()
+	if g["scan"]["on"] != true || g["malware"]["on"] != false || g["scan"]["changed"] != true || g["malware"]["changed"] != true {
+		t.Fatalf("custom: %v %v", g["scan"], g["malware"])
+	}
+	_, m, _ := c.call("GET", "/api/threat", nil)
+	if m["custom"] != true || m["changes"].(float64) != 2 {
+		t.Fatalf("custom flag: %v %v", m["custom"], m["changes"])
+	}
+	fn.mu.Lock()
+	last := fn.threatPlans[len(fn.threatPlans)-1]
+	fn.mu.Unlock()
+	if len(last.GroupsOn) != 1 || last.GroupsOn[0] != "scan" || len(last.GroupsOff) != 1 || last.GroupsOff[0] != "malware" {
+		t.Fatalf("the engine was handed %+v", last)
+	}
+	if rc, _, _ := c.call("PUT", "/api/threat/groups", map[string]any{"off": []string{"nonsense"}}); rc == 200 {
+		t.Fatal("an unknown group was accepted")
+	}
+	// Choosing a preset again restores that preset's own groups.
+	c.call("PUT", "/api/threat/settings", map[string]any{"preset": "balanced"})
+	_, m, _ = c.call("GET", "/api/threat", nil)
+	if m["custom"] != false {
+		t.Fatal("choosing a preset kept the changes")
+	}
+	// Reset everything: setting, limits, groups, switched-off checks, allowed checks, trusted devices.
+	c.call("PUT", "/api/threat/settings", map[string]any{"preset": "strict", "cpu_percent": 90})
+	c.app.Config.Exec(`INSERT INTO threat_allowed(sid,mac,until) VALUES(5,'',0)`)
+	c.app.Config.Exec(`INSERT INTO threat_trusted(mac) VALUES('aa:bb:cc:dd:ee:01')`)
+	if rc, _, raw := c.call("POST", "/api/threat/reset", nil); rc != 200 {
+		t.Fatalf("reset: %d %s", rc, raw)
+	}
+	_, m, _ = c.call("GET", "/api/threat", nil)
+	if m["preset"] != "balanced" || m["cpu_percent"].(float64) != 50 || len(m["allowed"].([]any)) != 0 || len(m["trusted"].([]any)) != 0 {
+		t.Fatalf("not reset: %v", m)
+	}
+}

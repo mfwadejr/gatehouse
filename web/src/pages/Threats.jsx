@@ -1,6 +1,7 @@
+import { useHashTab } from '../hashtab.js';
 import React, { useState } from 'react';
 import { del, post, put, get, useData } from '../api.js';
-import { Button, Card, Empty, Field, Input, Modal, Note, NumberInput, Pill, Segmented, Tabs, useAction, fmt } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, NumberInput, Pill, Segmented, Switch, Tabs, useAction, fmt } from '../ui.jsx';
 
 // Threat watching. An engine (Suricata) is installed only when the owner asks. It watches copies of
 // the traffic and Gatehouse says what it noticed in plain words. It never holds traffic up, so a
@@ -41,25 +42,46 @@ function InstallPrompt({ data, reload }) {
   );
 }
 
+function AlertRow({ x, days, busy, run, reload }) {
+  const [more, setMore] = useState(false);
+  const who = x.started === 'device' ? 'your device started it' : x.started === 'remote' ? 'the other end started it' : '';
+  const remote = x.remote ? `${x.remote}${x.country ? ` (${x.country})` : ''}${x.port ? `, port ${x.port}${x.proto ? `/${x.proto}` : ''}` : ''}` : '';
+  const quiet = x.quiet;
+  return (
+    <div className="item" key={x.key}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="name">{x.title}{x.count > 1 && <> <Pill>×{x.count}</Pill></>}</div>
+        <div className="meta">{[x.device, remote, who, x.count > 1 ? `${fmt.ago(x.first)} to ${fmt.ago(x.last)}` : fmt.ago(x.last)].filter(Boolean).join(' · ')}</div>
+        {more && <div className="small muted" style={{ marginTop: 'var(--space-2)' }}>{x.explain} <span className="mono">{x.signature}</span></div>}
+        <button className="link small" onClick={() => setMore(!more)}>{more ? 'Hide details' : 'What does this mean?'}</button>
+      </div>
+      <div className="actions">
+        <Button small disabled={busy} onClick={() => run(() => post('/api/threat/allow', { sid: x.sid, mac: x.mac, days: Number(days), note: x.signature }), 'This will not alert again for this device.').then(reload)} title="Let this through for this device">Allow for this device</Button>
+        <Button small disabled={busy} onClick={() => run(() => post('/api/threat/allow', { sid: x.sid, mac: '', days: Number(days), note: x.signature }), 'This will not alert again.').then(reload)}>Allow for all</Button>
+        {x.mac && !quiet && <Button small disabled={busy} onClick={() => run(() => post('/api/threat/trust', { mac: x.mac }), `${x.device} will not be checked.`).then(reload)} title={`Never check ${x.device}`}>Never check this device</Button>}
+      </div>
+    </div>
+  );
+}
+
 function Alerts({ data, reload }) {
   const [run, busy] = useAction();
   const [days, setDays] = useState('0');
+  const [showQuiet, setShowQuiet] = useState(false);
+  const all = data.alerts || [];
+  const loud = all.filter((x) => !x.quiet);
+  const quiet = all.filter((x) => x.quiet);
   return (
     <div className="list">
-      {(data.alerts || []).map((x) => (
-        <div className="item" key={x.id}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="name">{x.plain}</div>
-            <div className="meta">{x.device} · {fmt.ago(x.ts)} · {x.signature}</div>
-          </div>
-          <div className="actions">
-            <Button small disabled={busy} onClick={() => run(() => post('/api/threat/allow', { sid: x.sid, mac: x.mac, days: Number(days), note: x.signature }), 'This will not alert again for this device.').then(reload)} title="Let this through for this device">Allow for this device</Button>
-            <Button small disabled={busy} onClick={() => run(() => post('/api/threat/allow', { sid: x.sid, mac: '', days: Number(days), note: x.signature }), 'This will not alert again.').then(reload)}>Allow for all</Button>
-            {x.mac && <Button small disabled={busy} onClick={() => run(() => post('/api/threat/trust', { mac: x.mac }), `${x.device} will not be checked.`).then(reload)}>Never check this device</Button>}
-          </div>
+      {loud.map((x) => <AlertRow key={x.key} x={x} days={days} busy={busy} run={run} reload={reload} />)}
+      {!loud.length && <Empty>Nothing suspicious has been seen.</Empty>}
+      {quiet.length > 0 && (
+        <div>
+          <button className="link" onClick={() => setShowQuiet(!showQuiet)}>{showQuiet ? 'Hide' : 'Show'} odd network behaviour and usually harmless traffic ({quiet.length})</button>
+          <p className="small muted">The engine noticed unusual packets. This is common and almost never a threat, so it is kept out of the way.</p>
+          {showQuiet && quiet.map((x) => <AlertRow key={x.key} x={x} days={days} busy={busy} run={run} reload={reload} />)}
         </div>
-      ))}
-      {!(data.alerts || []).length && <Empty>Nothing suspicious has been seen.</Empty>}
+      )}
       <Field label="Allowing lasts"><Segmented value={days} onChange={setDays} options={[{ value: '0', label: 'Until I remove it' }, { value: '7', label: '7 days' }, { value: '1', label: '1 day' }]} /></Field>
     </div>
   );
@@ -70,16 +92,27 @@ function Settings({ data, reload }) {
   const [cpu, setCpu] = useState(data.cpu_percent);
   const [mem, setMem] = useState(data.memory_mb);
   const p = data.program || {};
+  const base = (data.presets || []).find((x) => x.key === data.preset);
+  const choose = (key) => run(() => put('/api/threat/settings', { preset: key }), 'Saved.').then(reload);
   return (
     <div className="stack">
       <Card title="How closely to watch" desc="A lighter setting looks for fewer things and uses less of the machine.">
-        <div className="list">
+        <div className="list" id="threat-presets">
           {(data.presets || []).map((x) => (
             <label className="item" key={x.key} style={{ cursor: 'pointer' }}>
-              <input type="radio" name="preset" checked={data.preset === x.key} disabled={busy} onChange={() => run(() => put('/api/threat/settings', { preset: x.key }), 'Saved.').then(reload)} />
+              <input type="radio" name="preset" checked={data.preset === x.key && !data.custom} disabled={busy} onChange={() => choose(x.key)} />
               <div style={{ flex: 1 }}><div className="name">{x.title}</div><div className="meta">{x.text}</div></div>
+              {data.preset === x.key && data.custom && <Button small disabled={busy} onClick={(e) => { e.preventDefault(); choose(x.key); }} title="Go back to this setting's own groups">Restore defaults</Button>}
             </label>
           ))}
+          <label className="item" style={{ cursor: data.custom ? 'default' : 'not-allowed', opacity: data.custom ? 1 : 0.6 }}>
+            <input type="radio" name="preset" checked={!!data.custom} disabled readOnly />
+            <div style={{ flex: 1 }}>
+              <div className="name">Custom{data.custom && base ? `, based on ${base.title}` : ''}</div>
+              <div className="meta">{data.custom ? `${data.changes} group${data.changes === 1 ? '' : 's'} changed from ${base?.title}. Change groups under Rules.` : 'Appears when you change a group of checks under Rules.'}</div>
+            </div>
+            {data.custom && <Button small disabled={busy} onClick={() => choose(data.preset)}>Back to {base?.title}</Button>}
+          </label>
         </div>
       </Card>
       <Card title="Limits" desc="If watching uses all of its processor share for ten minutes, Gatehouse switches it off by itself and says so in the Logs. Your traffic is never held up either way.">
@@ -94,7 +127,50 @@ function Settings({ data, reload }) {
   );
 }
 
-function Rules({ data, reload }) {
+const nice = (n) => { const t = n.replace(/_/g, ' '); return t.charAt(0).toUpperCase() + t.slice(1); };
+
+function GroupsCard({ groups, reload, goSettings }) {
+  const [run, busy] = useAction();
+  const [want, setWant] = useState(null); // staged: name -> on
+  const list = groups.data?.groups || [];
+  const staged = (g) => (want && g.name in want ? want[g.name] : g.on);
+  const pending = want ? list.filter((g) => g.name in want && want[g.name] !== g.on).length : 0;
+  const flip = (g) => setWant({ ...(want || {}), [g.name]: !staged(g) });
+  const apply = async () => {
+    const off = list.filter((g) => !staged(g)).map((g) => g.name);
+    if (await run(() => put('/api/threat/groups', { off }), 'Applied. Watching carries on while the rules update.')) { setWant(null); groups.reload(); reload(); }
+  };
+  const row = (g) => {
+    const on = staged(g);
+    const differs = on !== g.preset_on;
+    return (
+      <div className="item" key={g.name}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="name">{nice(g.name)}{differs && <> <Pill tone="warn">Changed</Pill></>}</div>
+          <div className="meta">{g.text}</div>
+        </div>
+        <Switch checked={on} onChange={() => flip(g)} label={`${nice(g.name)}: ${g.text}`} disabled={busy} />
+      </div>
+    );
+  };
+  const grid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 17rem), 1fr))', columnGap: 'var(--space-4)' };
+  return (
+    <Card title="Groups of checks" desc={<>Which groups are on follows the setting you chose ({groups.data?.preset_title}). Turn a group on or off to make your own set, or <button type="button" className="link" onClick={goSettings}>change the setting</button>.</>}>
+      <div className="stack">
+        <div><div className="small muted">Matter most at home</div><div className="list" style={grid}>{list.filter((g) => g.common).map(row)}</div></div>
+        <div><div className="small muted">Less common</div><div className="list" style={grid}>{list.filter((g) => !g.common).map(row)}</div></div>
+        {pending > 0 && (
+          <div className="confirmbar" role="status">
+            <span>{pending} change{pending === 1 ? '' : 's'} not applied yet.</span>
+            <span className="actions"><Button disabled={busy} onClick={() => setWant(null)}>Discard</Button><Button kind="primary" disabled={busy} onClick={apply}>Apply</Button></span>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function Rules({ data, reload, goSettings }) {
   const [run, busy] = useAction();
   const [q, setQ] = useState('');
   const [found, setFound] = useState(null);
@@ -111,11 +187,7 @@ function Rules({ data, reload }) {
         </div>
         {!p.has_previous && <p className="small muted">There is no earlier set to go back to yet.</p>}
       </Card>
-      <Card title="Groups of checks" desc={groups.data?.note}>
-        <div className="list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 17rem), 1fr))', columnGap: 'var(--space-4)' }}>
-          {(groups.data?.groups || []).map((g) => <div className="item" key={g.name}><div><div className="name">{g.name}</div><div className="meta">{g.text}</div></div><Pill tone={g.on ? 'good' : ''}>{g.on ? 'On' : 'Off'}</Pill></div>)}
-        </div>
-      </Card>
+      <GroupsCard groups={groups} reload={reload} goSettings={goSettings} />
       <Card title="Single checks" desc="Find one by a word or its number, and switch it on or off.">
         <div className="actions"><Input value={q} onChange={setQ} placeholder="For example beacon, or 2001" onKeyDown={(e) => { if (e.key === 'Enter') search(); }} /><Button disabled={busy} onClick={search}>Search</Button></div>
         {found && (
@@ -147,6 +219,7 @@ function Advanced({ data, reload }) {
   const [run, busy] = useAction();
   const [eve, setEve] = useState(data.eve_path === data.default_eve ? '' : data.eve_path);
   const [removing, setRemoving] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const p = data.program || {};
   const importFile = async (f) => {
     if (!f) return;
@@ -183,6 +256,9 @@ function Advanced({ data, reload }) {
           <label className="btn" style={{ cursor: 'pointer' }}>Load tuning from a file<input type="file" accept=".json,application/json" hidden onChange={(e) => importFile(e.target.files[0])} /></label>
         </div>
       </Card>
+      <Card title="Reset all threat settings" desc="Puts everything on this tab and the Settings and Rules tabs back to how it was when you first installed.">
+        <div className="actions"><Button kind="danger" disabled={busy} onClick={() => setResetting(true)}>Reset all threat settings</Button></div>
+      </Card>
       <ProgramLog />
       <Card title="Program" desc="Where Gatehouse reads what the engine noticed.">
         <p className="small">{data.engine?.text}</p>
@@ -193,6 +269,11 @@ function Advanced({ data, reload }) {
           {p.installed && <Button kind="danger" disabled={busy} onClick={() => setRemoving(true)}>Remove threat watching</Button>}
         </div>
       </Card>
+      {resetting && (
+        <Modal title="Reset all threat settings" onClose={() => setResetting(false)} footer={<><Button onClick={() => setResetting(false)}>Cancel</Button><Button kind="danger" disabled={busy} onClick={async () => { if (await run(() => post('/api/threat/reset'), 'Everything is back to the defaults.')) { setResetting(false); reload(); } }}>Reset everything</Button></>}>
+          <p className="small">This puts back the Balanced setting, the standard limits and the standard groups of checks. It forgets every check you switched off, every check you allowed, and every device you told it never to check. Your alerts are kept, and your traffic is not affected.</p>
+        </Modal>
+      )}
       {removing && (
         <Modal title="Remove threat watching" onClose={() => setRemoving(false)} footer={<><Button onClick={() => setRemoving(false)}>Cancel</Button><Button kind="danger" disabled={busy} onClick={async () => { if (await run(() => post('/api/threat/remove'), 'Removing. This can take a minute.')) { setRemoving(false); reload(); } }}>Remove</Button></>}>
           <p className="small">The program is switched off and removed. Your traffic is not affected. Your alerts and tuning are kept.</p>
@@ -203,7 +284,7 @@ function Advanced({ data, reload }) {
 }
 
 export default function Threats() {
-  const [tab, setTab] = useState('alerts');
+  const [tab, setTab] = useHashTab('protection', ['alerts','settings','rules','advanced'], 'alerts',2);
   const [run, busy] = useAction();
   const { data, reload } = useData('/api/threat', { every: 5000 });
   if (!data) return null;
@@ -223,7 +304,7 @@ export default function Threats() {
         <Tabs value={tab} onChange={setTab} tabs={[{ value: 'alerts', label: 'Alerts' }, { value: 'settings', label: 'Settings' }, { value: 'rules', label: 'Rules' }, { value: 'advanced', label: 'Advanced' }]} />
         {tab === 'alerts' && <Alerts data={data} reload={reload} />}
         {tab === 'settings' && <Settings data={data} reload={reload} />}
-        {tab === 'rules' && <Rules data={data} reload={reload} />}
+        {tab === 'rules' && <Rules data={data} reload={reload} goSettings={() => setTab('settings')} />}
         {tab === 'advanced' && <Advanced data={data} reload={reload} />}
       </div>
     </Card>

@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"strings"
 	"testing"
+	"time"
 
 	"gatehouse/internal/netd"
 )
@@ -49,7 +50,7 @@ func TestSettingsInTheBundleHideSecrets(t *testing.T) {
 	}
 }
 
-func TestTerminalIsOffUntilSwitchedOnAndAsksForThePasswordEachTime(t *testing.T) {
+func TestTerminalIsOffUntilSwitchedOnAndAsksAgainAfterFifteenMinutes(t *testing.T) {
 	c, fn, _ := siteBoxWith(t, "192.168.1.1/24", nil)
 	_, m, _ := c.call("GET", "/api/term", nil)
 	if m["enabled"] != false {
@@ -69,17 +70,29 @@ func TestTerminalIsOffUntilSwitchedOnAndAsksForThePasswordEachTime(t *testing.T)
 	if rc, _, raw := c.call("PUT", "/api/term", map[string]any{"enabled": true, "password": "correct horse battery"}); rc != 200 {
 		t.Fatalf("switch on: %d %s", rc, raw)
 	}
+	// the password was just checked, so opening soon after does not ask again
+	if _, m, _ := c.call("GET", "/api/term", nil); m["confirmed"] != true {
+		t.Fatal("a recent check was not remembered")
+	}
+	rc, m, raw := c.call("POST", "/api/term/open", map[string]any{"rows": 24, "cols": 80})
+	if rc != 200 {
+		t.Fatalf("open soon after the check: %d %s", rc, raw)
+	}
+	id := m["id"].(string)
+	// after 15 minutes it asks again, and a wrong password is refused
+	termConfirmed.Lock()
+	for k := range termConfirmed.m {
+		termConfirmed.m[k] = time.Now().Add(-termConfirmFor - time.Minute)
+	}
+	termConfirmed.Unlock()
+	if _, m, _ := c.call("GET", "/api/term", nil); m["confirmed"] != false {
+		t.Fatal("an old check was still counted")
+	}
 	if open("") == 200 || open("wrong") == 200 {
 		t.Fatal("opened without the right password")
 	}
-	rc, m, raw := c.call("POST", "/api/term/open", map[string]any{"rows": 24, "cols": 80, "password": "correct horse battery"})
-	if rc != 200 {
-		t.Fatalf("open: %d %s", rc, raw)
-	}
-	id := m["id"].(string)
-	// each open asks again
-	if open("") == 200 {
-		t.Fatal("a second open did not ask for the password")
+	if rc, _, raw := c.call("POST", "/api/term/open", map[string]any{"rows": 24, "cols": 80, "password": "correct horse battery"}); rc != 200 {
+		t.Fatalf("open with the password: %d %s", rc, raw)
 	}
 	rc, m, _ = c.call("GET", "/api/term/"+id+"/out?since=3", nil)
 	d, _ := base64.StdEncoding.DecodeString(m["data"].(string))

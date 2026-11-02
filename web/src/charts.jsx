@@ -18,11 +18,13 @@ export function fmtBytes(v) {
   return `${round(n).toLocaleString()} ${u[i]}`;
 }
 
+// The top of a chart's scale, chosen so the four gridlines below it fall on round numbers
+// (for example 0, 1, 2, 3, 4 or 0, 2.5, 5, 7.5, 10) and not on 1.3, 2.5, 3.8.
 export function niceMax(v) {
   if (!(v > 0)) return 1;
-  const p = 10 ** Math.floor(Math.log10(v));
-  for (const m of [1, 2, 2.5, 5, 10]) if (v <= m * p) return m * p;
-  return 10 * p;
+  const p = 10 ** Math.floor(Math.log10(v / 4));
+  for (const m of [1, 1.5, 2, 2.5, 5, 10]) if (v <= 4 * m * p + 1e-9) return 4 * m * p;
+  return 40 * p;
 }
 
 export function agoText(sec) {

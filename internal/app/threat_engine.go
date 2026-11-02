@@ -25,11 +25,13 @@ import (
 // Fail open: the engine only reads copies of packets. Whatever it does, traffic is not touched.
 
 const (
-	threatPresetSetting = "threat.preset" // light, balanced, strict
-	threatCPUSetting    = "threat.cpu"    // processor limit, % of one core
-	threatMemSetting    = "threat.mem"    // memory limit, MB
-	threatOffSetting    = "threat.off"    // single rules switched off, comma-separated numbers
-	threatWhySetting    = "threat.paused" // why Gatehouse switched it off by itself, shown until dismissed
+	threatPresetSetting = "threat.preset"     // light, balanced, strict
+	threatCPUSetting    = "threat.cpu"        // processor limit, % of one core
+	threatMemSetting    = "threat.mem"        // memory limit, MB
+	threatOffSetting    = "threat.off"        // single rules switched off, comma-separated numbers
+	threatGroupsOnSet   = "threat.groups_on"  // groups switched on although the preset has them off
+	threatGroupsOffSet  = "threat.groups_off" // groups switched off although the preset has them on
+	threatWhySetting    = "threat.paused"     // why Gatehouse switched it off by itself, shown until dismissed
 	threatRulesFile     = "/var/lib/suricata/rules/suricata.rules"
 )
 
@@ -77,11 +79,31 @@ func (a *App) setThreatOffSIDs(ids []int) {
 	a.Config.SetSetting(threatOffSetting, strings.Join(parts, ","))
 }
 
+// threatGroupChanges are the person's changes to the preset's groups (custom setup).
+func (a *App) threatGroupChanges() (on, off []string) {
+	read := func(key string) []string {
+		var out []string
+		for _, f := range strings.Split(a.Config.Setting(key, ""), ",") {
+			if f = strings.TrimSpace(f); f != "" && threatcfg.KnownGroup(f) {
+				out = append(out, f)
+			}
+		}
+		return out
+	}
+	return read(threatGroupsOnSet), read(threatGroupsOffSet)
+}
+
+func (a *App) setThreatGroupChanges(on, off []string) {
+	a.Config.SetSetting(threatGroupsOnSet, strings.Join(on, ","))
+	a.Config.SetSetting(threatGroupsOffSet, strings.Join(off, ","))
+}
+
 func (a *App) threatPlan() threatcfg.Plan {
+	on, off := a.threatGroupChanges()
 	return threatcfg.Plan{
 		Enabled: a.threatMode() == "watch", Ifaces: a.ndpiIfaces(), Preset: a.threatPreset(),
 		CPUPercent: a.threatInt(threatCPUSetting, 50, 10, 400), MemoryMB: a.threatInt(threatMemSetting, 2048, 256, 16384),
-		OffSIDs: a.threatOffSIDs(),
+		OffSIDs: a.threatOffSIDs(), GroupsOn: on, GroupsOff: off,
 	}
 }
 
@@ -267,27 +289,6 @@ func (a *App) threatInfo() netdThreat {
 func (a *App) registerThreatEngineRoutes() {
 	s := a.API
 	s.Handle("GET /api/threat", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-		type alert struct {
-			ID        int64  `json:"id"`
-			TS        int64  `json:"ts"`
-			SID       int64  `json:"sid"`
-			Signature string `json:"signature"`
-			Plain     string `json:"plain"`
-			Device    string `json:"device"`
-			MAC       string `json:"mac"`
-			Src       string `json:"src"`
-			Dst       string `json:"dst"`
-			Severity  int    `json:"severity"`
-		}
-		alerts := []alert{}
-		if rows, err := a.Logs.Query(`SELECT id,ts,sid,signature,plain,device,mac,src,dst,severity FROM threat_alerts ORDER BY id DESC LIMIT 50`); err == nil {
-			for rows.Next() {
-				var x alert
-				rows.Scan(&x.ID, &x.TS, &x.SID, &x.Signature, &x.Plain, &x.Device, &x.MAC, &x.Src, &x.Dst, &x.Severity)
-				alerts = append(alerts, x)
-			}
-			rows.Close()
-		}
 		type allowed struct {
 			ID     int64  `json:"id"`
 			SID    int64  `json:"sid"`
@@ -334,12 +335,13 @@ func (a *App) registerThreatEngineRoutes() {
 			ps = append(ps, presetOut{p.Key, p.Title, p.Text})
 		}
 		info := a.threatInfo()
+		gon, goff := a.threatGroupChanges()
 		api.JSON(w, 200, map[string]any{
-			"mode": a.threatMode(), "preset": a.threatPreset(), "presets": ps,
+			"mode": a.threatMode(), "preset": a.threatPreset(), "presets": ps, "custom": len(gon)+len(goff) > 0, "changes": len(gon) + len(goff),
 			"cpu_percent": a.threatInt(threatCPUSetting, 50, 10, 400), "memory_mb": a.threatInt(threatMemSetting, 2048, 256, 16384),
 			"paused_reason": a.Config.Setting(threatWhySetting, ""),
 			"program":       info, "engine": a.threatEngine(), "eve_path": a.threatEvePath(), "default_eve": defaultEve,
-			"ports": a.ndpiIfaces(), "alerts": alerts, "allowed": al, "trusted": tr,
+			"ports": a.ndpiIfaces(), "alerts": a.threatGroups(60), "allowed": al, "trusted": tr,
 			"blocking":  "Blocking is not switched on. Gatehouse watches and tells you; it never holds up your traffic.",
 			"fail_open": "If the program stops, crashes or is removed, your traffic is not touched. It only reads copies of what passes by, and Gatehouse switches it off by itself if it uses too much of the machine.",
 			"limits":    "Most traffic is encrypted, so this finds known bad servers and attack patterns, not everything.",
@@ -439,6 +441,7 @@ func (a *App) registerThreatEngineRoutes() {
 		}
 		if in.Preset != nil {
 			a.Config.SetSetting(threatPresetSetting, *in.Preset)
+			a.setThreatGroupChanges(nil, nil) // choosing a preset starts from that preset's own groups
 		}
 		if in.CPU != nil {
 			a.Config.SetSetting(threatCPUSetting, strconv.Itoa(*in.CPU))
@@ -485,26 +488,84 @@ func (a *App) registerThreatEngineRoutes() {
 		}
 		ok(w)
 	})
-	// Rule groups and single rules, for the Advanced tab.
+	// Rule groups. Which are on is the preset plus the person's changes.
 	s.Handle("GET /api/threat/groups", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-		off := map[string]bool{}
-		for _, p := range threatcfg.Presets() {
-			if p.Key == a.threatPreset() {
-				for _, g := range p.Off {
-					off[g] = true
-				}
-			}
+		plan := a.threatPlan()
+		base := map[string]bool{}
+		for _, g := range threatcfg.PresetOff(plan.Preset) {
+			base[g] = true
+		}
+		eff := map[string]bool{}
+		for _, g := range threatcfg.EffectiveOff(plan) {
+			eff[g] = true
 		}
 		type g struct {
-			Name string `json:"name"`
-			Text string `json:"text"`
-			On   bool   `json:"on"`
+			Name     string `json:"name"`
+			Text     string `json:"text"`
+			On       bool   `json:"on"`
+			PresetOn bool   `json:"preset_on"` // what the chosen preset does with it
+			Common   bool   `json:"common"`
+			Changed  bool   `json:"changed"`
 		}
-		var out []g
+		out := []g{}
 		for _, x := range threatcfg.Groups() {
-			out = append(out, g{x.Name, x.Text, !off[x.Name]})
+			out = append(out, g{x.Name, x.Text, !eff[x.Name], !base[x.Name], x.Common, eff[x.Name] != base[x.Name]})
 		}
-		api.JSON(w, 200, map[string]any{"groups": out, "note": "Which groups are on follows the preset you chose. Change the preset to change them."})
+		title := plan.Preset
+		for _, p := range threatcfg.Presets() {
+			if p.Key == plan.Preset {
+				title = p.Title
+			}
+		}
+		api.JSON(w, 200, map[string]any{"groups": out, "preset": plan.Preset, "preset_title": title,
+			"note": "Which groups are on follows the preset you chose, plus any changes you make here."})
+	})
+	// The groups the person wants off, as a whole. Only the differences from the preset are kept, so
+	// a later improvement to a preset is not lost.
+	s.HandleAdmin("PUT /api/threat/groups", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		var in struct {
+			Off []string `json:"off"`
+		}
+		if !api.Decode(w, r, &in) {
+			return
+		}
+		want := map[string]bool{}
+		for _, g := range in.Off {
+			if !threatcfg.KnownGroup(g) {
+				fail(w, errors.New("a group of checks is not known"))
+				return
+			}
+			want[g] = true
+		}
+		on, off := threatcfg.Changes(a.threatPreset(), want)
+		a.setThreatGroupChanges(on, off)
+		if a.threatMode() == "watch" {
+			if err := a.threatSync(); err != nil {
+				fail(w, err)
+				return
+			}
+		}
+		a.event(c.User.Username, "info", "Changed the groups of threat checks", fmt.Sprintf("%d groups differ from the %s setting.", len(on)+len(off), a.threatPreset()))
+		ok(w)
+	})
+	// Back to the defaults for everything threat watching: the setting, limits, groups, single
+	// checks switched off, allowed checks and devices never checked. The program stays installed.
+	s.HandleAdmin("POST /api/threat/reset", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		a.Config.SetSetting(threatPresetSetting, "balanced")
+		a.Config.SetSetting(threatCPUSetting, "50")
+		a.Config.SetSetting(threatMemSetting, "2048")
+		a.setThreatOffSIDs(nil)
+		a.setThreatGroupChanges(nil, nil)
+		a.Config.Exec(`DELETE FROM threat_allowed`)
+		a.Config.Exec(`DELETE FROM threat_trusted`)
+		if a.threatMode() == "watch" {
+			if err := a.threatSync(); err != nil {
+				fail(w, err)
+				return
+			}
+		}
+		a.event(c.User.Username, "info", "Reset the threat settings to the defaults", "")
+		ok(w)
 	})
 	s.Handle("GET /api/threat/rules", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		rules, total := a.threatSearchRules(r.URL.Query().Get("q"), 50)
@@ -566,21 +627,24 @@ func (a *App) registerThreatEngineRoutes() {
 			}
 			rows.Close()
 		}
+		gon, goff := a.threatGroupChanges()
 		out, _ := json.MarshalIndent(map[string]any{"gatehouse_threat_tuning": 1, "preset": a.threatPreset(), "cpu_percent": a.threatInt(threatCPUSetting, 50, 10, 400),
-			"memory_mb": a.threatInt(threatMemSetting, 2048, 256, 16384), "off_sids": a.threatOffSIDs(), "allowed": al, "trusted": tr}, "", "  ")
+			"memory_mb": a.threatInt(threatMemSetting, 2048, 256, 16384), "off_sids": a.threatOffSIDs(), "groups_on": gon, "groups_off": goff, "allowed": al, "trusted": tr}, "", "  ")
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Content-Disposition", `attachment; filename="gatehouse-threat-tuning.json"`)
 		w.Write(out)
 	})
 	s.HandleAdmin("POST /api/threat/import", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		var in struct {
-			Version int      `json:"gatehouse_threat_tuning"`
-			Preset  string   `json:"preset"`
-			CPU     int      `json:"cpu_percent"`
-			Mem     int      `json:"memory_mb"`
-			Off     []int    `json:"off_sids"`
-			Trusted []string `json:"trusted"`
-			Allowed []struct {
+			Version   int      `json:"gatehouse_threat_tuning"`
+			Preset    string   `json:"preset"`
+			CPU       int      `json:"cpu_percent"`
+			Mem       int      `json:"memory_mb"`
+			Off       []int    `json:"off_sids"`
+			GroupsOn  []string `json:"groups_on"`
+			GroupsOff []string `json:"groups_off"`
+			Trusted   []string `json:"trusted"`
+			Allowed   []struct {
 				SID   int64  `json:"sid"`
 				MAC   string `json:"mac"`
 				Until int64  `json:"until"`
@@ -594,7 +658,7 @@ func (a *App) registerThreatEngineRoutes() {
 			fail(w, errors.New("that is not a Gatehouse threat tuning file"))
 			return
 		}
-		plan := threatcfg.Plan{Preset: in.Preset, CPUPercent: in.CPU, MemoryMB: in.Mem, OffSIDs: in.Off}
+		plan := threatcfg.Plan{Preset: in.Preset, CPUPercent: in.CPU, MemoryMB: in.Mem, OffSIDs: in.Off, GroupsOn: in.GroupsOn, GroupsOff: in.GroupsOff}
 		if err := plan.Check(); err != nil {
 			fail(w, err)
 			return
@@ -603,6 +667,7 @@ func (a *App) registerThreatEngineRoutes() {
 		a.Config.SetSetting(threatCPUSetting, strconv.Itoa(plan.CPUPercent))
 		a.Config.SetSetting(threatMemSetting, strconv.Itoa(plan.MemoryMB))
 		a.setThreatOffSIDs(in.Off)
+		a.setThreatGroupChanges(plan.GroupsOn, plan.GroupsOff)
 		for _, m := range in.Trusted {
 			a.Config.Exec(`INSERT OR IGNORE INTO threat_trusted(mac) VALUES(?)`, strings.ToLower(m))
 		}

@@ -3,16 +3,48 @@ import { useData, useStream, put, post, get } from '../api.js';
 import { Button, Card, Empty, Icon, Note, Page, Pill, Segmented, fmt, Bar, useAction } from '../ui.jsx';
 import { go } from '../App.jsx';
 import { COUNTRIES, MAP_H, MAP_W } from '../worldmap.js';
+import { centreOf } from '../mapgeo.js';
 import { Chart, fmtBits, fmtBytes } from '../charts.jsx';
 import { linkMeasure, linkState } from '../linkstate.js';
 import { PRESET_KEY } from './Logs.jsx';
 import { WhatsNewCard } from '../whatsnew.jsx';
-import Security from './Security.jsx';
-import Recipes from './Recipes.jsx';
+import { useAttention } from '../attention.jsx';
 
 const regionName = (cc) => { try { return new Intl.DisplayNames(undefined, { type: 'region' }).of(cc); } catch { return cc; } };
 const SERIES = ['var(--color-chart-series-1)', 'var(--color-chart-series-2)', 'var(--color-chart-series-3)', 'var(--color-chart-series-4)'];
 const EVERY = { '10m': 2000, '1h': 30000, '24h': 300000, '30d': 900000 };
+
+// A number that counts up once when it first appears, then simply follows the value. It does not
+// move for people who ask their browser for less motion.
+function CountUp({ value, format = (n) => n.toLocaleString() }) {
+  const [shown, setShown] = useState(null);
+  const first = React.useRef(true);
+  useEffect(() => {
+    const v = Number(value) || 0;
+    const calm = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!first.current || calm || v === 0) { first.current = false; setShown(v); return undefined; }
+    first.current = false;
+    const t0 = performance.now();
+    let raf;
+    const step = (t) => {
+      const k = Math.min(1, (t - t0) / 800);
+      setShown(Math.round(v * (1 - (1 - k) ** 3)));
+      if (k < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return <>{format(shown == null ? 0 : shown)}</>;
+}
+
+// "updated 3 s ago", ticking each second, so a quiet page still shows it is alive.
+function UpdatedAgo({ stamp }) {
+  const [, tick] = useState(0);
+  useEffect(() => { const t = setInterval(() => tick((n) => n + 1), 1000); return () => clearInterval(t); }, []);
+  if (!stamp) return null;
+  const age = Math.max(0, Math.round((Date.now() - stamp) / 1000));
+  return <span className="small muted">updated {age < 2 ? 'just now' : `${age} s ago`}</span>;
+}
 
 // Says nothing while data keeps arriving, and shows a grey "Reconnecting" when it stops.
 function LiveDot({ stamp }) {
@@ -26,97 +58,6 @@ function LiveDot({ stamp }) {
       <i />{age == null ? 'Loading…' : 'Reconnecting…'}
     </span>
   );
-}
-
-// The "Finish setting up" list. It is worked out from what the machine has, so it is right in any
-// order, and it goes away by itself when everything is done.
-function SetupChecklist({ bare }) {
-  const { data } = useData('/api/setup/checklist', { topics: ['net.status', 'fw.status'], every: 15000 });
-  if (!data || !data.items?.length) return null;
-  if (data.left === 0) return null;
-  const done = data.items.length - data.left;
-  const Wrap = bare ? ({ children }) => <div>{children}</div> : (p) => <Card {...p} />;
-  return (
-    <Wrap title="Finish setting up" desc={`${done} of ${data.items.length} done. You can do these in any order, and change any of them later.`}>
-      {bare && <p className="small muted">You can do these in any order, and change any of them later.</p>}
-      <ul className="stack" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-        {data.items.map((i) => (
-          <li key={i.id} className="spread" style={{ gap: 'var(--space-3)', alignItems: 'flex-start' }}>
-            <div>
-              <div style={{ fontWeight: 600 }}>{i.done ? '✓ ' : ''}{i.text}</div>
-              <div className="small muted">{i.why}</div>
-            </div>
-            {i.done ? <Pill tone="good">Done</Pill> : <button type="button" className="btn small primary" onClick={() => go(i.to)}>Set up</button>}
-          </li>
-        ))}
-      </ul>
-    </Wrap>
-  );
-}
-
-// One quiet panel instead of three stacked cards: each part is a single line until opened.
-function ToDoPanel() {
-  const cl = useData('/api/setup/checklist', { topics: ['net.status', 'fw.status'], every: 15000 }).data;
-  const sec = useData('/api/security/check', { topics: ['fw.status'], every: 60000 }).data;
-  const [open, setOpen] = useState('');
-  const left = cl?.items?.length ? cl.left : 0;
-  const bad = (sec?.items || []).filter((i) => i.level === 'bad').length;
-  const warn = (sec?.items || []).filter((i) => i.level === 'warn').length;
-  const rows = [];
-  if (left > 0) rows.push({ id: 'setup', title: 'Finish setting up', note: `${cl.items.length - left} of ${cl.items.length} done`, body: <SetupChecklist bare /> });
-  if (sec) rows.push({ id: 'sec', title: 'Security check', note: bad ? `${bad} to fix now${warn ? `, ${warn} worth fixing` : ''}` : warn ? `${warn} worth fixing` : 'all fine', tone: bad ? 'bad' : warn ? 'warn' : 'good', body: <Security bare /> });
-  rows.push({ id: 'recipes', title: 'Common setups', note: 'step-by-step guides', body: <Recipes bare /> });
-  return (
-    <Card title="Suggestions">
-      <div className="list">
-        {rows.map((r) => (
-          <div className="item" key={r.id} style={{ display: 'block' }}>
-            <button type="button" className="row" style={{ width: '100%', justifyContent: 'space-between', background: 'none', border: 0, color: 'inherit', padding: 0, cursor: 'pointer', textAlign: 'left' }}
-              aria-expanded={open === r.id} onClick={() => setOpen(open === r.id ? '' : r.id)}>
-              <span className="name">{r.title} {r.tone ? <Pill tone={r.tone}>{r.note}</Pill> : <span className="small muted">· {r.note}</span>}</span>
-              <span className="small muted">{open === r.id ? 'Hide' : 'Show'}</span>
-            </button>
-            {open === r.id && <div style={{ marginTop: 'var(--space-3)' }}>{r.body}</div>}
-          </div>
-        ))}
-      </div>
-    </Card>
-  );
-}
-
-// ---------------------------------------------------------------- what needs attention
-
-function useAttention({ wanList, links, fw, net, rogue, vpn, util, dns, upd }) {
-  return useMemo(() => {
-    const a = [];
-    if (net && !wanList.length) a.push({ t: 'No internet connection is set up yet', s: 'Devices cannot reach the internet until you add one.', to: 'internet' });
-    if (fw && !fw.zones?.length) a.push({ t: 'No networks defined in the firewall', s: 'Create your first network so devices are protected.', to: 'networks' });
-    if (fw?.status?.dirty) a.push({ t: 'Firewall changes are waiting to be applied', s: 'Review and apply them.', to: 'networks' });
-    if (net?.status?.dirty) a.push({ t: 'Internet settings are waiting to be applied', s: 'Review and apply them.', to: 'internet' });
-    (rogue || []).forEach((r) => a.push({ t: `Another DHCP server is answering on ${r.name}`, s: `${r.found.map((f) => f.server).join(', ')} hands out addresses too. Switch it off, or devices may get the wrong settings.`, to: 'dhcp' }));
-    wanList.filter((w) => w.enabled).forEach((w) => {
-      const s = linkState(links[w.name]);
-      if (s.tone === 'bad') a.push({ t: `${w.name}: ${s.text}`, s: s.detail, to: 'internet' });
-    });
-    (vpn?.vpns || []).forEach((v) => {
-      if (!v.enabled) return;
-      if (v.state === 'down') a.push({ t: `VPN ${v.label} is down`, s: v.message, to: 'vpn' });
-      else if (v.state === 'degraded') a.push({ t: `VPN ${v.label} is not passing traffic`, s: v.message, to: 'vpn' });
-    });
-    (util || []).forEach((s) => {
-      if (!s.size || s.active / s.size <= 0.8) return;
-      const left = Math.max(0, s.size - s.active);
-      a.push({
-        t: left === 0 ? `${s.name} has no addresses left` : `${s.name} is nearly out of addresses`,
-        s: `${s.active} of ${s.size} in use, ${left} left. ${left === 0 ? 'New devices cannot join until some are freed. ' : ''}Widen the range or shorten how long addresses are kept.`,
-        to: 'dhcp',
-      });
-    });
-    if (dns?.upstreams?.length && !dns.upstreams.some((u) => u.state === 'healthy')) a.push({ t: 'No DNS server is answering', s: 'Devices cannot look up names until one answers. Open DNS and press Test.', to: 'dns' });
-    if (upd?.available && upd.mode !== 'off' && upd.state === 'idle') a.push({ t: 'Updates are ready to install', s: [upd.gatehouse_new && upd.latest ? `Gatehouse ${upd.latest.version}` : '', upd.system_count > 0 ? `${upd.system_count} system update${upd.system_count === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and '), to: 'settings' });
-    if (upd?.needs_reboot) a.push({ t: 'A restart is needed', s: 'The system was updated and needs a restart to finish.', to: 'settings' });
-    return a;
-  }, [wanList, links, fw, net, rogue, vpn, util, dns, upd]);
 }
 
 // ---------------------------------------------------------------- internet hero
@@ -169,14 +110,20 @@ function Hero({ wanList, links, thr, onStamp }) {
     });
   }
   const sum = (k) => enabled.reduce((a, w) => a + lastOf(thr?.links?.[w.name]?.[k]), 0);
+  // Average and busiest over the range that is shown, so the big "now" number and the chart agree.
+  const seriesOf = (w, k) => (range === '10m' ? (thr?.links?.[w.name]?.[k] || []) : (hist?.series?.[`wan.${w.name}.${k}`] || []).map((p) => p[1]));
+  const avgOf = (k) => enabled.reduce((a, w) => { const v = seriesOf(w, k); return a + (v.length ? v.reduce((x, y) => x + y, 0) / v.length : 0); }, 0);
+  const peakOf = (k) => enabled.reduce((a, w) => Math.max(a, ...seriesOf(w, k), 0), 0);
+  const RANGE_WORDS = { '10m': 'the last 10 minutes', '1h': 'the last hour', '24h': 'the last 24 hours', '30d': 'the last 30 days' };
   const tone = head.tone;
   return (
     <Card className="ov-hero">
       <div className="ov-hero-l">
         <div className={`ov-state ${tone}`}><i className="dot" />{head.text}</div>
         <div className="small muted" style={{ marginBottom: 'var(--space-3)' }}>{head.sub}</div>
-        <div className="ov-big">{fmtBits(sum('rx')).split(' ')[0]}<span className="unit">{fmtBits(sum('rx')).split(' ')[1]} download</span></div>
-        <div className="ov-big">{fmtBits(sum('tx')).split(' ')[0]}<span className="unit">{fmtBits(sum('tx')).split(' ')[1]} upload</span></div>
+        <div className="ov-big">{fmtBits(sum('rx')).split(' ')[0]}<span className="unit">{fmtBits(sum('rx')).split(' ')[1]} download · now</span></div>
+        <div className="ov-big">{fmtBits(sum('tx')).split(' ')[0]}<span className="unit">{fmtBits(sum('tx')).split(' ')[1]} upload · now</span></div>
+        <div className="small muted" style={{ marginTop: 'var(--space-2)' }}>Average over {RANGE_WORDS[range]}: {fmtBits(avgOf('rx'))} down, {fmtBits(avgOf('tx'))} up · busiest {fmtBits(peakOf(dir))} {dir === 'rx' ? 'down' : 'up'}</div>
         <div className="ov-wans">
           {states.map((x, i) => {
             const m = linkMeasure(x.l);
@@ -227,11 +174,13 @@ function Tile({ title, pill, tone, big, unit, sub, children, chart, to, caption 
 
 const miniSeries = (h, key, scale = 1) => [{ key, name: '', color: 'var(--color-chart-series-1)', pts: (h?.series?.[key] || []).map((p) => [p[0], p[1] * scale]) }];
 
-function DevicesTile({ d }) {
+function DevicesTile({ d, h }) {
   const online = d?.online ?? 0;
   return (
-    <Tile title="Devices" pill={`${online} online`} tone="good" big={online} to="devices"
-      sub={d ? `${d.wired} wired · ${d.wifi} Wi-Fi${d.vpn ? ` · ${d.vpn} VPN` : ''}` : ''}>
+    <Tile title="Devices" pill={`${online} online`} tone="good" big={<CountUp value={online} />} to="devices"
+      sub={d ? `${d.wired} wired · ${d.wifi} Wi-Fi${d.vpn ? ` · ${d.vpn} VPN` : ''}` : ''}
+      chart={<Chart series={miniSeries(h, 'devices.online')} from={h?.from || 0} to={h?.to || 1} unit="devices" height={44} compact label="Devices online, last hour" />}
+      caption="Devices online · last hour">
       <div className="inline" style={{ marginTop: 'var(--space-2)' }}>
         {d?.new > 0 && <button type="button" className="pillbtn warn" onClick={() => go('devices')}>{d.new} new today</button>}
         {d?.unnamed > 0 && <button type="button" className="pillbtn" onClick={() => go('devices')}>{d.unnamed} without a name</button>}
@@ -248,20 +197,22 @@ function DnsTile({ dns, h }) {
   const pill = !ups.length ? '' : ok === ups.length ? 'Working' : ok ? `${ups.length - ok} slow or down` : 'No server answering';
   const tone = !ups.length ? '' : ok === ups.length ? 'good' : ok ? 'warn' : 'bad';
   return (
-    <Tile title="DNS" pill={pill} tone={tone} big={fmt.d1(st?.qps)} unit="queries/s" to="dns"
-      sub={`${ups.length} server${ups.length === 1 ? '' : 's'} · ${fmt.d1(st?.blocked_pct)} % blocked · ${fmt.d1(st?.cached_pct)} % cached`}
+    <Tile title="DNS" pill={pill} tone={tone} big={<CountUp value={st?.hour_total ?? 0} />} unit="lookups in the last hour" to="dns"
+      sub={`${fmt.d1(st?.qps)}/s now · ${ups.length} server${ups.length === 1 ? '' : 's'} · ${fmt.d1(st?.blocked_pct)} % blocked · ${fmt.d1(st?.cached_pct)} % cached`}
       chart={<Chart series={miniSeries(h, 'dns.qps')} from={h?.from || 0} to={h?.to || 1} unit="queries/s" height={44} compact label="DNS queries per second, last hour" />}
       caption="Queries per second · last hour" />
   );
 }
 
-function DhcpTile({ util }) {
+function DhcpTile({ util, h }) {
   const list = util || [];
   const used = list.reduce((a, s) => a + s.active, 0), size = list.reduce((a, s) => a + s.size, 0);
   const full = list.filter((s) => s.size && s.active / s.size > 0.8);
   return (
     <Tile title="DHCP" pill={!list.length ? 'No scope' : full.length ? `${full[0].name} nearly full` : 'Serving'} tone={!list.length ? 'warn' : full.length ? 'warn' : 'good'}
-      big={used} unit={size ? `of ${size} addresses` : 'leases'} to="dhcp">
+      big={<CountUp value={used} />} unit={size ? `of ${size} addresses` : 'leases'} to="dhcp"
+      chart={<Chart series={miniSeries(h, 'dhcp.used')} from={h?.from || 0} to={h?.to || 1} unit="addresses" height={44} compact label="Addresses in use, last hour" />}
+      caption="Addresses in use · last hour">
       <div className="ov-scopes">
         {list.map((s) => {
           const p = s.size ? (100 * s.active) / s.size : 0;
@@ -280,16 +231,35 @@ function DhcpTile({ util }) {
 
 function SecurityTile({ sec, fw, h }) {
   const bad = fw?.status?.pending || fw?.status?.dirty;
+  const alerts = sec?.threat_alerts_24h ?? 0;
+  const threat = !sec ? '' : !sec.threat_on ? 'Threat watching is off' : alerts ? `Threat watching on · ${alerts} alert${alerts === 1 ? '' : 's'} today` : 'Threat watching on · no alerts today';
   return (
-    <Tile title="Security" pill={!fw ? '' : !fw.zones?.length ? 'Not set up' : bad ? 'Changes waiting' : 'Protected'} tone={!fw ? '' : !fw.zones?.length ? 'warn' : bad ? 'warn' : 'good'}
-      big={fmt.n(sec?.blocked_24h ?? 0)} unit="blocked in 24 h" to="logs"
+    <Tile title="Protection" pill={!fw ? '' : !fw.zones?.length ? 'Not set up' : bad ? 'Changes waiting' : alerts ? `${alerts} alert${alerts === 1 ? '' : 's'}` : 'Protected'} tone={!fw ? '' : !fw.zones?.length ? 'warn' : bad || alerts ? 'warn' : 'good'}
+      big={<CountUp value={sec?.blocked_24h ?? 0} format={fmt.n} />} unit="blocked in 24 h" to="protection"
       sub={`${sec?.open_ports ? `${sec.open_ports} port${sec.open_ports === 1 ? '' : 's'} open to the internet` : 'No ports open to the internet'}`}
       chart={<Chart series={miniSeries(h, 'fw.blocked', 60)} from={h?.from || 0} to={h?.to || 1} unit="blocked/min" height={44} compact label="Blocked connections per minute, last hour" />}
-      caption="Blocked connections per minute · last hour" />
+      caption={threat || 'Blocked connections per minute · last hour'} />
   );
 }
 
 // ---------------------------------------------------------------- world map
+
+// Colour for a country: grey for none, then blue, then green for the busiest going out; amber then
+// orange for what comes in. The square root keeps one huge country from hiding all the others.
+function mapFill(dir, t) {
+  const pct = (x) => Math.round(Math.max(0, Math.min(1, x)) * 100);
+  if (dir === 'out') {
+    return t < 0.5
+      ? `color-mix(in srgb, var(--color-chart-series-1) ${Math.max(22, pct(t * 2))}%, var(--color-border-strong))`
+      : `color-mix(in srgb, var(--color-chart-series-3) ${pct((t - 0.5) * 2)}%, var(--color-chart-series-1))`;
+  }
+  return t < 0.5
+    ? `color-mix(in srgb, var(--color-status-warning) ${Math.max(22, pct(t * 2))}%, var(--color-border-strong))`
+    : `color-mix(in srgb, var(--color-status-serious) ${pct((t - 0.5) * 2)}%, var(--color-status-warning))`;
+}
+const mapLegend = (dir) => (dir === 'out'
+  ? 'linear-gradient(90deg, var(--color-border-strong), var(--color-chart-series-1), var(--color-chart-series-3))'
+  : 'linear-gradient(90deg, var(--color-border-strong), var(--color-status-warning), var(--color-status-serious))');
 
 const RANGE_HOURS = { '1h': '1', '24h': '24', '7d': '168', '30d': '720' };
 
@@ -300,6 +270,7 @@ function WorldCard() {
   const { data: geo, reload: reloadGeo } = useData('/api/fw/geo', { every: 5000 });
   const [dl, dlBusy] = useAction();
   const [hover, setHover] = useState(null);
+  const { data: homePt } = useData('/api/overview/home');
   const by = useMemo(() => Object.fromEntries((data?.countries || []).map((c) => [c.country, c])), [data]);
   const top = data?.top || 0;
   const word = dir === 'out' ? 'connections' : 'attempts';
@@ -309,6 +280,16 @@ function WorldCard() {
   };
   const rows = (data?.countries || []).slice(0, 8);
   const tip = hover && by[hover];
+  // Where "you" are: the place set in Settings, else the middle of the country the browser is set to.
+  const home = useMemo(() => {
+    if (homePt?.set) return [homePt.x, homePt.y];
+    const region = (navigator.language || '').split('-')[1]?.toUpperCase();
+    return (region && centreOf(region)) || null;
+  }, [homePt]);
+  const arcs = useMemo(() => {
+    if (!home) return [];
+    return (data?.countries || []).slice(0, 6).map((c) => ({ c, to: centreOf(c.country) })).filter((x) => x.to && Math.hypot(x.to[0] - home[0], x.to[1] - home[1]) > 14).slice(0, 5);
+  }, [data, home]);
   return (
     <div className="ov-gm">
       <Card title="Where connections go"
@@ -324,9 +305,27 @@ function WorldCard() {
           <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} role="img" aria-label={`${dir === 'out' ? 'Outgoing connections' : 'Incoming attempts'} by country`}>
             {Object.entries(COUNTRIES).filter(([cc]) => cc !== 'AQ').map(([cc, c]) => {
               const n = by[cc]?.n || 0;
-              const style = n ? { fill: `color-mix(in srgb, var(--color-accent-default) ${Math.round(18 + 82 * Math.sqrt(n / Math.max(1, top)))}%, var(--color-border-strong))` } : undefined;
-              return <path key={cc} d={c.d} className={n ? 'hit' : ''} style={style} onMouseEnter={() => setHover(cc)} onClick={n ? () => open(cc) : undefined} />;
+              const t = n ? Math.sqrt(n / Math.max(1, top)) : 0;
+              const style = n ? { fill: mapFill(dir, t) } : undefined;
+              return <path key={cc} d={c.d} className={`${n ? 'hit' : ''} ${t > 0.45 ? `hot ${dir}` : ''}`} style={style} onMouseEnter={() => setHover(cc)} onClick={n ? () => open(cc) : undefined} />;
             })}
+            {home && arcs.map(({ c, to }, i) => {
+              const mx = (home[0] + to[0]) / 2, my = Math.min(home[1], to[1]) - Math.abs(to[0] - home[0]) * 0.22 - 18;
+              const d = dir === 'out' ? `M${home[0]},${home[1]} Q${mx},${my} ${to[0]},${to[1]}` : `M${to[0]},${to[1]} Q${mx},${my} ${home[0]},${home[1]}`;
+              const w = 0.8 + 2.2 * Math.sqrt(c.n / Math.max(1, top));
+              return (
+                <g key={c.country} className={`ov-arc ${dir}`} pointerEvents="none">
+                  <path d={d} strokeWidth={w} />
+                  <circle className="ov-travel" r={w + 1.1}><animateMotion dur={`${3 + i * 0.6}s`} repeatCount="indefinite" path={d} /></circle>
+                </g>
+              );
+            })}
+            {home && (
+              <g className={`ov-home ${dir}`} pointerEvents="none">
+                <circle className="ov-ping" cx={home[0]} cy={home[1]} r="4" />
+                <circle className="ov-pin" cx={home[0]} cy={home[1]} r="4.5" />
+              </g>
+            )}
           </svg>
           {tip && (
             <div className="ov-maptip small">
@@ -337,8 +336,9 @@ function WorldCard() {
             </div>
           )}
         </div>
+        {!homePt?.set && <p className="small muted" style={{ margin: 0 }}>Lines start from {home ? 'the middle of your country' : 'you'}. {home ? 'To place yourself exactly, ' : 'To show where you are, '}<button type="button" className="link" onClick={() => go('settings')}>set your location in Settings</button>.</p>}
         <div className="ov-scale small muted">
-          <span>None</span><i /><span>{fmt.n(top)} {word}</span>
+          <span>None</span><i style={{ background: mapLegend(dir) }} /><span>{fmt.n(top)} {word}</span>
           <span className="grow" />
           <span>The country is approximate for CDN, cloud and VPN traffic.</span>
         </div>
@@ -407,9 +407,28 @@ function BusiestCard({ rows }) {
   );
 }
 
+function HappenedCard({ items }) {
+  return (
+    <Card title="What happened" desc="Newest first. Repeats are folded together.">
+      {!items?.length ? <Empty>Nothing has happened yet.</Empty> : (
+        <div className="ov-evs">
+          {items.map((e, i) => (
+            <div className={`ov-ev ${e.severity === 'warning' ? 'warn' : ''}`} key={i}>
+              <time className="muted small">{new Date(e.ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>
+              <span>{e.to ? <button type="button" className="link" style={{ textAlign: 'left' }} onClick={() => go(e.to)}>{e.title}</button> : e.title}</span>
+              {e.count > 1 ? <Pill>×{e.count}</Pill> : e.tag ? <Pill>{e.tag}</Pill> : <span />}
+            </div>
+          ))}
+        </div>
+      )}
+      <button type="button" className="link small" style={{ textAlign: 'left' }} onClick={() => go('logs')}>Open logs →</button>
+    </Card>
+  );
+}
+
 const upText = (s) => { const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60); return d ? `${d} d ${h} h` : h ? `${h} h ${m} min` : `${m} min`; };
 
-function MachineCard({ sys, upd, events }) {
+function MachineCard({ sys, upd }) {
   const [disk, setDisk] = useState(null);
   const [open, setOpen] = useState(false);
   const toggleDisk = async () => {
@@ -446,17 +465,8 @@ function MachineCard({ sys, upd, events }) {
             )}
           </>
         ))}
-        {sys?.temp > 0 ? g('Temperature', sys.temp, `${Math.round(sys.temp)} °C`) : <div><div className="spread small"><span>Temperature</span><b className="muted">This machine has no sensor</b></div></div>}
+        {sys?.temp > 0 && g('Temperature', sys.temp, `${Math.round(sys.temp)} °C`)}
       </div>
-      <h3 className="ov-h3">Recent events</h3>
-      {!events?.length ? <Empty>Nothing has happened yet.</Empty> : (
-        <div className="ov-evs">
-          {events.slice(0, 5).map((e, i) => (
-            <div className="ov-ev small" key={i}><time className="muted">{new Date(e.ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time><span>{e.title}</span></div>
-          ))}
-        </div>
-      )}
-      <button type="button" className="link small" style={{ textAlign: 'left' }} onClick={() => go('logs')}>Open logs →</button>
     </Card>
   );
 }
@@ -472,30 +482,34 @@ export default function Overview() {
   const { data: util } = useData('/api/dhcp/utilisation', { topics: ['dhcp.utilisation', 'dhcp.leases'], every: 10000 });
   const { data: devs } = useData('/api/overview/devices', { topics: ['dhcp.leases'], every: 10000 });
   const { data: fw } = useData('/api/fw/overview', { topics: ['fw.status'] });
-  const { data: vpn } = useData('/api/vpn', { topics: ['vpn.status'], every: 15000 });
   const { data: upd } = useData('/api/system/update', { every: 300000 });
-  const { data: rogue } = useData('/api/dhcp/alerts', { topics: ['dhcp.alerts'] });
   const { data: sec } = useData('/api/overview/security', { every: 10000 });
   const { data: h1 } = useData('/api/overview/history?range=1h', { every: 30000 });
   const { data: busiest } = useData('/api/overview/busiest', { every: 30000 });
   const { data: sys } = useData('/api/system/health', { every: 5000 });
-  const { data: events } = useData('/api/overview/events', { topics: ['events'], every: 30000 });
+  const { data: happened } = useData('/api/overview/happened', { topics: ['events', 'threat'], every: 20000 });
 
   const links = net?.links || {};
   const wanList = wans?.wans || [];
-  const attention = useAttention({ wanList, links, fw, net, rogue, vpn, util, dns, upd });
+  const { items: attention, needs, worst } = useAttention();
   const stamp = Math.max(thrAt || 0, netAt || 0, dnsAt || 0) || null;
+  const first = needs[0];
 
   return (
     <Page title="Overview"
-      sub={`${devs?.online ?? 0} devices online · ${attention.length ? `${attention.length} thing${attention.length > 1 ? 's' : ''} need${attention.length > 1 ? '' : 's'} attention` : 'everything is working'}`}
+      sub={`${devs?.online ?? 0} device${devs?.online === 1 ? '' : 's'} online`}
       actions={<LiveDot stamp={stamp} />}>
+      <div className="ov-statusline">
+        <span className={`ov-state ${needs.length ? (worst === 'bad' ? 'bad' : 'warn') : 'good'}`}><i className="dot" />{needs.length ? `${needs.length} thing${needs.length === 1 ? '' : 's'} need${needs.length === 1 ? 's' : ''} you` : 'Everything is working'}</span>
+        {first && <button type="button" className="link" onClick={() => go(first.to)}>{first.t} →</button>}
+        <UpdatedAgo stamp={stamp} />
+      </div>
       {attention.length > 0 && (
-        <Card className="ov-attn">
+        <Card className={`ov-attn ${needs.length ? '' : 'calm'}`}>
           <div className="stack" style={{ gap: 'var(--space-2)' }}>
             {attention.map((a, i) => (
               <div className="spread" key={i} style={{ alignItems: 'flex-start' }}>
-                <div className="inline" style={{ alignItems: 'flex-start', flexWrap: 'nowrap' }}><Icon name="warn" /><div><div className="name">{a.t}</div><div className="small muted">{a.s}</div></div></div>
+                <div className="inline" style={{ alignItems: 'flex-start', flexWrap: 'nowrap' }}><i className={`navdot ${a.level}`} style={{ marginLeft: 0, marginTop: '.4rem', animation: 'none' }} /><div><div className="name">{a.t}</div><div className="small muted">{a.s}</div></div></div>
                 <button className="btn small" onClick={() => go(a.to)}>Open</button>
               </div>
             ))}
@@ -505,18 +519,18 @@ export default function Overview() {
       <WhatsNewCard current={upd?.current} />
       <Hero wanList={wanList} links={links} thr={thr} />
       <section className="ov-g4" aria-label="Status">
-        <DevicesTile d={devs} />
+        <DevicesTile d={devs} h={h1} />
         <DnsTile dns={dns} h={h1} />
-        <DhcpTile util={util} />
+        <DhcpTile util={util} h={h1} />
         <SecurityTile sec={sec} fw={fw} h={h1} />
       </section>
-      <ToDoPanel />
       <WorldCard />
       <section className="ov-g3">
-        <NetworksCard fw={fw} wanList={wanList} links={links} devs={devs} h24={h1} />
+        <HappenedCard items={happened} />
         <BusiestCard rows={busiest} />
-        <MachineCard sys={sys} upd={upd} events={events} />
+        <MachineCard sys={sys} upd={upd} />
       </section>
+      <NetworksCard fw={fw} wanList={wanList} links={links} devs={devs} h24={h1} />
     </Page>
   );
 }

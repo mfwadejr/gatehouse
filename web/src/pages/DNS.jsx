@@ -1,3 +1,4 @@
+import { useHashTab } from '../hashtab.js';
 import EncryptedDns from './EncryptedDns.jsx';
 import React, { useState } from 'react';
 import { del, get, patch, post, put, useData, useStream } from '../api.js';
@@ -448,7 +449,7 @@ function SettingsTab() {
 }
 
 export default function DNS() {
-  const [tab, setTab] = useState('overview');
+  const [tab, setTab] = useHashTab('dns', ['overview','lists','records','groups','settings'], 'overview');
   return (
     <Page title="DNS" sub="Translates names to addresses for every device, and blocks the ones you do not want.">
       <Tabs value={tab} onChange={setTab} tabs={[{ value: 'overview', label: 'Overview' }, { value: 'lists', label: 'Blocking' }, { value: 'records', label: 'Your names' }, { value: 'groups', label: 'Profiles' }, { value: 'settings', label: 'Settings' }]} />

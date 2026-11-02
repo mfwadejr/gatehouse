@@ -20,7 +20,7 @@ The **Log** card under Services has **Show the log of** (one service, or **Warni
 ## The terminal
 A terminal is a full command line with the highest rights on the machine. Anyone who can sign in as an administrator and pass the check can do anything on it, so Gatehouse treats it carefully:
 - It is off until you switch it on, and only administrators can use it.
-- It asks for your password, or your authenticator code if you use one, every time it is opened.
+- Switching it on asks for your password, or your authenticator code if you use one. Opening it asks again only if the last check was more than 15 minutes ago.
 - It closes by itself when nobody has typed for 10 minutes, and after two hours at most. Two can be open at once.
 - The Logs record who opened it, when, from where, and when it closed. What is typed is not recorded.
 - It cannot hold up your traffic by itself. If you break something from it, that is on the command you typed.

@@ -1,3 +1,5 @@
+import GetStarted from './GetStarted.jsx';
+import MapLocation from './MapLocation.jsx';
 import React, { useEffect, useState } from 'react';
 import { del, get, post, put, useData } from '../api.js';
 import { Guard, Button, Card, Empty, Field, Form, Input, Modal, Note, Page, Pill, Segmented, Select, Tabs, ToggleRow, useAction, fmt, useStepUp, stepReady, StepUp } from '../ui.jsx';
@@ -446,10 +448,12 @@ export default function Settings({ me, reloadMe }) {
       {admin && <Tabs value={tab} onChange={choose} tabs={TABS} />}
       {admin && tab === 'general' && (
         <>
+          <Guard what="Get started"><GetStarted /></Guard>
           <Guard what="Device mode"><DeviceMode /></Guard>
           <Guard what="Updates"><Updates me={me} /></Guard>
           <Guard what="PowerCard"><PowerCard me={me} /></Guard>
           <Guard what="ConsolePort"><ConsolePort /></Guard>
+          <Guard what="Map location"><MapLocation /></Guard>
         </>
       )}
       {(!admin || tab === 'account') && (

@@ -1,6 +1,19 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.51',
+    title: 'A livelier Overview, threat alerts you can read, search that works everywhere',
+    items: [
+      'The Overview is redone: a status line with a steady coloured dot, one box for what needs you, a large internet card, a world map with lines from your place to the busiest countries, and a What happened list that folds repeats together. The Suggestions card is gone; what needs you now shows as a small dot beside the page in the left menu.',
+      'Settings, General has Your place on the map: click the map or pick a country so the lines start from your home. Common setups and the first-run checklist now live in Settings, General.',
+      'Threat alerts are rewritten in plain words, name the device you gave a name to, say which way it started, and fold repeats into one row with a count. Harmless engine chatter is tucked into a folded section.',
+      'Threat settings: a Custom choice appears when you change groups of checks, Restore defaults goes back to a setting, groups have plain descriptions and apply only when you press Apply, and Advanced has Reset all threat settings.',
+      'The terminal asks for your password when you switch it on, and again only if 15 minutes have passed since the last check.',
+      'A device asking this machine for encrypted DNS on port 853 is refused at once and shown in the Logs as Blocked, expected, so its software falls back to normal DNS quickly.',
+      'Search now opens the exact tab and flashes the card it found, groups results into Pages, Settings, Devices, Networks and Help, finds help chapters, and opens a device straight on the Devices page. Every tab can be opened from its address. A build check stops a search result from pointing at something that no longer exists.',
+    ],
+  },
+  {
     version: '0.8.50',
     title: 'Build fixes for 0.8.48',
     items: [

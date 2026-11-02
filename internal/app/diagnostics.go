@@ -25,6 +25,38 @@ type termOwner struct {
 	started time.Time
 }
 
+// termConfirmed remembers, per signed-in session, when the password or code was last checked for
+// the terminal, so opening it again soon after does not ask a second time.
+const termConfirmFor = 15 * time.Minute
+
+var termConfirmed = struct {
+	sync.Mutex
+	m map[string]time.Time
+}{m: map[string]time.Time{}}
+
+func termRecentlyConfirmed(c *api.Ctx) bool {
+	if c.Session == nil {
+		return false
+	}
+	termConfirmed.Lock()
+	defer termConfirmed.Unlock()
+	t, ok := termConfirmed.m[c.Session.ID]
+	if ok && time.Since(t) > termConfirmFor {
+		delete(termConfirmed.m, c.Session.ID)
+		return false
+	}
+	return ok
+}
+
+func termConfirm(c *api.Ctx) {
+	if c.Session == nil {
+		return
+	}
+	termConfirmed.Lock()
+	termConfirmed.m[c.Session.ID] = time.Now()
+	termConfirmed.Unlock()
+}
+
 var termOwners = struct {
 	sync.Mutex
 	m map[string]termOwner
@@ -43,7 +75,7 @@ func (a *App) settingsForBundle() string {
 	for rows.Next() {
 		var k, v string
 		rows.Scan(&k, &v)
-		if reSecretKey.MatchString(k) {
+		if reSecretKey.MatchString(k) || k == homeMapSetting {
 			v = "[hidden]"
 		}
 		if len(v) > 300 {
@@ -125,8 +157,10 @@ func (a *App) registerDiagnosticsRoutes() {
 	s.HandleAdmin("GET /api/term", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		api.JSON(w, 200, map[string]any{
 			"enabled": a.Config.Setting(termEnabledSetting, "0") == "1",
-			"warning": "A terminal is a full command line on the firewall, with the highest rights. Anyone who can sign in as an administrator and pass the check can do anything on this machine. It is off until you switch it on, asks for your password or code every time it is opened, closes by itself when nobody types for 10 minutes, and each time it is opened and closed is recorded in the Logs (what is typed is not).",
+			"warning": "A terminal is a full command line on the firewall, with the highest rights. Anyone who can sign in as an administrator and pass the check can do anything on this machine. It is off until you switch it on, asks for your password or code when it is switched on and again when it is opened if you have not confirmed in the last 15 minutes, closes by itself when nobody types for 10 minutes, and each time it is opened and closed is recorded in the Logs (what is typed is not).",
 			"totp":    c.User.TOTPEnabled,
+			// true when the check was done in the last 15 minutes, so opening needs no new password
+			"confirmed": termRecentlyConfirmed(c),
 		})
 	})
 	s.HandleAdmin("PUT /api/term", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
@@ -143,6 +177,7 @@ func (a *App) registerDiagnosticsRoutes() {
 				api.Error(w, http.StatusForbidden, err.Error())
 				return
 			}
+			termConfirm(c)
 		}
 		v := "0"
 		if in.Enabled {
@@ -173,9 +208,12 @@ func (a *App) registerDiagnosticsRoutes() {
 			fail(w, errNoHelper)
 			return
 		}
-		if err := a.serious(c, in.Code, in.Password); err != nil {
-			api.Error(w, http.StatusForbidden, err.Error())
-			return
+		if !termRecentlyConfirmed(c) {
+			if err := a.serious(c, in.Code, in.Password); err != nil {
+				api.Error(w, http.StatusForbidden, err.Error())
+				return
+			}
+			termConfirm(c)
 		}
 		id, err := a.Net.TermOpen(in.Rows, in.Cols)
 		if err != nil {

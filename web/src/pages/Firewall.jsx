@@ -1,3 +1,4 @@
+import { useHashTab } from '../hashtab.js';
 import React, { useMemo, useState } from 'react';
 import { del, post, put, useData, useStream } from '../api.js';
 import ApplyBar from '../ApplyBar.jsx';
@@ -234,7 +235,7 @@ export default function Firewall({ me }) {
   // One live connection for both lists, since a browser only keeps a few open per site.
   useStream(['fw.status', 'dhcp.leases'], (topic) => { if (topic === 'fw.status') reloadRules(); else reloadPickers(); });
   const { data: pr } = useData('/api/fw/presets');
-  const [tab, setTab] = useState('networks');
+  const [tab, setTab] = useHashTab('firewall', ['networks','rules','groups','ports','countries','discovery','protection','history'], 'networks');
   const [filter, setFilter] = useState({});
   const [pair, setPair] = useState(null);
   const [newRule, setNewRule] = useState(null);

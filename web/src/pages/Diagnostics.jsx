@@ -1,3 +1,4 @@
+import { useHashTab } from '../hashtab.js';
 import React, { useState } from 'react';
 import { get, post, useData } from '../api.js';
 import { Button, Card, Empty, Field, Input, Note, Page, Pill, Select, Tabs, useAction } from '../ui.jsx';
@@ -66,7 +67,7 @@ function LogView({ unit: first }) {
 }
 
 export default function Diagnostics() {
-  const [tab, setTab] = useState('services');
+  const [tab, setTab] = useHashTab('diagnostics', ['services','tools','terminal'], 'services');
   return (
     <Page title="Diagnostics" sub="See how each part of Gatehouse is doing, read its log, test the connection, and open a terminal if you need one.">
       <Tabs value={tab} onChange={setTab} tabs={[{ value: 'services', label: 'Services' }, { value: 'tools', label: 'Network tools' }, { value: 'terminal', label: 'Terminal' }]} />

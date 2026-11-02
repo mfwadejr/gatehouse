@@ -1,3 +1,4 @@
+import { useHashTab } from '../hashtab.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { del, get, getWatched, post, put, setFailing, useData, useStream } from '../api.js';
 import { RuleForm } from './FirewallRules.jsx';
@@ -125,7 +126,7 @@ export default function Logs() {
   const preset = useRef(null);
   if (preset.current === null) preset.current = takePreset();
   useEffect(() => { try { sessionStorage.removeItem(PRESET_KEY); } catch { /* ignore */ } }, []);
-  const [tab, setTab] = useState('log');
+  const [tab, setTab] = useHashTab('logs', ['log','summary','activity'], 'log');
   const [q, setQ] = useState('');
   const [kind, setKind] = useState('');
   const [verdict, setVerdict] = useState(preset.current.verdict || '');
@@ -268,7 +269,7 @@ export default function Logs() {
               <tbody>
                 {groups.map((g) => {
                   const r = g.first;
-                  const [tone, label] = VERDICT[r.verdict] || ['', r.verdict];
+                  const [tone, label] = r.verdict === 'blocked' && (r.why || '').startsWith('Not a problem') ? ['', 'Blocked · expected'] : (VERDICT[r.verdict] || ['', r.verdict]);
                   const conn = r.kind === 'firewall';
                   const { title, sub } = rowTitle(r);
                   const n = g.items.length;

@@ -337,6 +337,19 @@ func (c *compiler) input() {
 			c.explicit(2, r, false)
 		}
 	}
+	// Devices that ask the router for encrypted DNS (port 853, which Android's Private DNS tries
+	// first) are refused at once, so they fall back to the normal DNS port without waiting. It is
+	// still a block and is logged, but with its own reason so the log can say it is harmless.
+	// From the internet side it stays a silent drop.
+	dot := ""
+	if wan := m.WanIfaces(); len(wan) > 0 {
+		dot = "iifname != " + ifSet(wan) + " "
+	}
+	if c.m.LogDrops {
+		c.line(2, "%smeta l4proto { tcp, udp } th dport 853 ct state new limit rate 20/second burst 50 packets log prefix %s", dot, q(logPrefix("drop", "default:dot")))
+	}
+	c.line(2, "%smeta l4proto tcp th dport 853 counter reject with tcp reset comment \"encrypted DNS to the router: quick refusal\"", dot)
+	c.line(2, "%smeta l4proto udp th dport 853 counter reject comment \"encrypted DNS to the router: quick refusal\"", dot)
 	c.dropTail(2, "in")
 	c.line(1, "}")
 }

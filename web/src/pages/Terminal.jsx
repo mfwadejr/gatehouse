@@ -3,7 +3,7 @@ import { del, post, put, useData } from '../api.js';
 import { Button, Card, Modal, Note, Pill, useAction, useStepUp, stepReady, StepUp } from '../ui.jsx';
 
 // A command line on the firewall, in the browser. Off until the owner switches it on, asks for the
-// password or code each time it is opened, ends by itself when idle, and each open and close is
+// password or code when switched on and again when opened unless confirmed in the last 15 minutes, ends by itself when idle, and each open and close is
 // recorded in the Logs (what is typed is not). It cannot touch traffic by itself. The terminal
 // emulator runs in its own page (terminal.html) shown here in a frame, because it needs a looser
 // style rule than the rest of the console.
@@ -29,12 +29,15 @@ export default function TerminalTab() {
   if (!data) return null;
   const ready = stepReady(su, code, pw);
   const reset = () => { setAsk(null); setCode(''); setPw(''); };
+  const openNow = async (c = '', p = '') => {
+    const r = await run(() => post('/api/term/open', { rows: 24, cols: 80, code: c, password: p }));
+    if (r?.id) { reset(); setEnded(false); setId(r.id); }
+  };
   const go = async () => {
     if (ask === 'on') {
       if (await run(() => put('/api/term', { enabled: true, code, password: pw }), 'The terminal is on.')) { reset(); reload(); }
     } else {
-      const r = await run(() => post('/api/term/open', { rows: 24, cols: 80, code, password: pw }));
-      if (r?.id) { reset(); setEnded(false); setId(r.id); }
+      await openNow(code, pw);
     }
   };
   const close = async () => { const cur = id; setId(null); if (cur && !ended) await run(() => del(`/api/term/${cur}`)); setEnded(false); };
@@ -46,7 +49,7 @@ export default function TerminalTab() {
         {!data.enabled && <div className="actions"><Button kind="primary" disabled={busy} onClick={() => setAsk('on')}>Switch the terminal on</Button></div>}
         {data.enabled && !id && (
           <div className="actions">
-            <Button kind="primary" disabled={busy} onClick={() => setAsk('open')}>Open a terminal</Button>
+            <Button kind="primary" disabled={busy} onClick={() => (data.confirmed ? openNow() : setAsk('open'))}>Open a terminal</Button>
             <Button disabled={busy} onClick={() => run(() => put('/api/term', { enabled: false }), 'The terminal is off.').then(reload)}>Switch the terminal off</Button>
           </div>
         )}

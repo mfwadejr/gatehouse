@@ -264,3 +264,24 @@ func TestFirstBootBaselineLetsTheSetupPortGetAnAddress(t *testing.T) {
 		}
 	}
 }
+
+func TestEncryptedDNSToTheRouterIsRefusedAtOnceFromInside(t *testing.T) {
+	out, err := Compile(sample())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		`iifname != "eth0" meta l4proto tcp th dport 853 counter reject with tcp reset`,
+		`iifname != "eth0" meta l4proto udp th dport 853 counter reject`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+	// It comes before the final drop of the router's own input chain, and is not an accept.
+	i := strings.Index(out, "th dport 853 counter reject with tcp reset")
+	j := strings.Index(out, `counter drop comment "default"`)
+	if i < 0 || j < 0 || i > j {
+		t.Fatal("the refusal must come before the default drop")
+	}
+}
