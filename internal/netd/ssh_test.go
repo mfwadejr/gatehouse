@@ -127,3 +127,45 @@ func TestSSHNamesThatCannotHaveALogin(t *testing.T) {
 		t.Fatalf("%q %v", l, ok)
 	}
 }
+
+func TestSSHMakesMissingHostKeysAndLeavesExistingOnes(t *testing.T) {
+	s := sshRoot(t)
+	os.MkdirAll(filepath.Join(s.Root, "etc/ssh"), 0o755)
+	calls := recordRun(t, func(name string, args []string) (string, error) {
+		if name == "id" {
+			return "", os.ErrNotExist
+		}
+		return "", nil
+	})
+	if err := s.SSHApply(SSHPlan{Enabled: true, Users: []string{"marvin"}, Binary: "/usr/local/bin/gatehouse"}); err != nil {
+		t.Fatal(err)
+	}
+	all := strings.Join(*calls, "\n")
+	i, j := strings.Index(all, "ssh-keygen -A"), strings.Index(all, "sshd -t")
+	if i < 0 || j < 0 || i > j {
+		t.Fatalf("keys must be made before the settings check:\n%s", all)
+	}
+	// with keys present nothing is made
+	os.WriteFile(filepath.Join(s.Root, "etc/ssh/ssh_host_ed25519_key"), []byte("k"), 0o600)
+	*calls = nil
+	s.SSHApply(SSHPlan{Enabled: true, Users: []string{"marvin"}, Binary: "/usr/local/bin/gatehouse"})
+	if strings.Contains(strings.Join(*calls, "\n"), "ssh-keygen") {
+		t.Fatal("made keys that already existed")
+	}
+	// a failure is reported in plain words and leaves nothing in place
+	s2 := sshRoot(t)
+	os.MkdirAll(filepath.Join(s2.Root, "etc/ssh"), 0o755)
+	recordRun(t, func(name string, args []string) (string, error) {
+		if name == "ssh-keygen" {
+			return "no space left", os.ErrInvalid
+		}
+		return "", nil
+	})
+	err := s2.SSHApply(SSHPlan{Enabled: true, Users: nil, Binary: "/usr/local/bin/gatehouse"})
+	if err == nil || !strings.Contains(err.Error(), "no SSH identity") {
+		t.Fatalf("%v", err)
+	}
+	if _, e := os.Stat(filepath.Join(s2.Root, sshDropIn)); e == nil {
+		t.Fatal("settings left in place after a failure")
+	}
+}

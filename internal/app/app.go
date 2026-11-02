@@ -206,6 +206,7 @@ func New(cfg Config) (*App, error) {
 	a.registerOverrideRoutes()
 	a.registerBridgeifyRoutes()
 	a.registerStepUpRoutes()
+	a.registerDiagnosticsRoutes()
 	a.registerWifiCardRoutes()
 	a.registerSummaryRoutes()
 	a.registerISPRoutes()

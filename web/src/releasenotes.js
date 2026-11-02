@@ -1,9 +1,13 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
-    version: '0.8.47',
-    title: 'Protection page, threat watching you install yourself, five kinds of network',
+    version: '0.8.48',
+    title: 'Diagnostics page, terminal, Suricata reasons, SSH fix',
     items: [
+      'A new Diagnostics page in the left menu: every part of Gatehouse with its state, why it is failing in plain words, its log, Restart, and Save a support bundle (passwords and keys hidden). The network tests are on it too.',
+      'An optional Terminal on the Diagnostics page: a command line on the firewall from the console. It is off until you switch it on, asks for your password or code every time, closes by itself after 10 idle minutes, and each open and close is recorded in the Logs.',
+      'Threat watching now says when the program keeps failing and restarting, shows the last thing it said, and has a Program log under Advanced. Its default memory limit is 2 GB.',
+      'Remote login (SSH) could not be turned on because the machine had no SSH identity. Gatehouse now makes one when you turn it on, and once at first start.',
       'A new Protection page in the left menu. Overview gives a one-line verdict and the Security check; Apps & topics (moved from DNS) blocks apps, topics and websites; Threats is threat watching. Block lists for ads, trackers and adult sites stay under DNS.',
       'Threat watching is no longer installed behind your back. Press Install threat watching: Gatehouse shows the packages, the download size, the disk space needed and any worry about this machine, and installs only when you agree. Choose Light, Balanced or Strict, set a processor and memory limit, update the rules (and roll back to the previous ones), search and switch off single checks, and save or load your tuning. It only watches and tells you; blocking threats is not available yet. If it stops, nothing changes for your devices, and if it uses all of its processor share for ten minutes Gatehouse switches it off and says why.',
       'Add a network now offers five kinds: Trusted, Private, Guest, Isolated and Custom. Guest devices cannot see each other unless you turn that on. Choose the whole port or a VLAN on any port, and a VLAN with no address and no DHCP for a link to a switch or access point.',

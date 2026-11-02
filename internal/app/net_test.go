@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/cookiejar"
 	"os"
@@ -56,6 +57,11 @@ type fakeNet struct {
 	threatPlans []threatcfg.Plan
 	threatErr   error
 	threatCalls []string
+	diagUnits   []netd.DiagService
+	restarted   string
+	termOpened  int
+	termWrote   string
+	termGone    bool
 	ovPlans     []netd.OverridePlan
 	ovErr       error
 	flowAcct    []bool
@@ -439,4 +445,44 @@ func TestFingerprintNoticesTunnelFileVersion(t *testing.T) {
 	if hex.EncodeToString(h[:]) == fingerprint(with) {
 		t.Fatal("the tunnel file version is not part of the fingerprint")
 	}
+}
+
+func (f *fakeNet) DiagServices() []netd.DiagService {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.diagUnits
+}
+func (f *fakeNet) DiagLog(unit string, lines int) (string, error) {
+	if unit == "bogus" {
+		return "", errors.New("that service cannot be shown")
+	}
+	return "2026-11-01 log of " + unit, nil
+}
+func (f *fakeNet) DiagRestart(unit string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.restarted = unit
+	return nil
+}
+func (f *fakeNet) DiagBundle() (string, error) { return "machine info password=hunter2", nil }
+func (f *fakeNet) TermOpen(rows, cols int) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.termOpened++
+	return "t1", nil
+}
+func (f *fakeNet) TermRead(id string, since int, wait time.Duration) ([]byte, int, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return []byte("hello"), since + 5, f.termGone, nil
+}
+func (f *fakeNet) TermWrite(id string, data []byte) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.termWrote = string(data)
+	return nil
+}
+func (f *fakeNet) TermResize(id string, rows, cols int) error { return nil }
+func (f *fakeNet) TermClose(id string) (netd.TermSummary, error) {
+	return netd.TermSummary{Seconds: 7}, nil
 }

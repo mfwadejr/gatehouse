@@ -109,6 +109,9 @@ type fakeNetCtl struct {
 	power         string
 	speed         speedtest.Params
 	threat        threatcfg.Plan
+	restarted     string
+	termSize      [2]int
+	termIn        string
 }
 
 func (f *fakeNetCtl) Apply(netd.Plan, time.Duration) (string, time.Time, error) {
@@ -192,6 +195,33 @@ func TestEveryClientCallIsRouted(t *testing.T) {
 	if err := c.ThreatRemove(); err != nil {
 		t.Fatalf("threat.remove: %v", err)
 	}
+	if sv := c.DiagServices(); len(sv) != 1 || sv[0].State != "running" {
+		t.Fatalf("diag.services: %+v", sv)
+	}
+	if l, err := c.DiagLog("ssh", 50); err != nil || l != "log of ssh" {
+		t.Fatalf("diag.log: %q %v", l, err)
+	}
+	if err := c.DiagRestart("ssh"); err != nil || nc.restarted != "ssh" {
+		t.Fatalf("diag.restart: %v %q", err, nc.restarted)
+	}
+	if b, err := c.DiagBundle(); err != nil || b != "bundle" {
+		t.Fatalf("diag.bundle: %q %v", b, err)
+	}
+	if id, err := c.TermOpen(30, 100); err != nil || id != "t1" || nc.termSize != [2]int{30, 100} {
+		t.Fatalf("term.open: %q %v %v", id, err, nc.termSize)
+	}
+	if d, next, closed, err := c.TermRead("t1", 4, time.Second); err != nil || string(d) != "hi" || next != 6 || closed {
+		t.Fatalf("term.read: %q %d %v %v", d, next, closed, err)
+	}
+	if err := c.TermWrite("t1", []byte("ls\n")); err != nil || nc.termIn != "ls\n" {
+		t.Fatalf("term.write: %v %q", err, nc.termIn)
+	}
+	if err := c.TermResize("t1", 50, 160); err != nil || nc.termSize != [2]int{50, 160} {
+		t.Fatalf("term.resize: %v %v", err, nc.termSize)
+	}
+	if sum, err := c.TermClose("t1"); err != nil || sum.BytesOut != 9 {
+		t.Fatalf("term.close: %+v %v", sum, err)
+	}
 	if err := c.call("nope.nothing", nil, nil); err == nil {
 		t.Fatal("a made-up method was accepted")
 	}
@@ -229,3 +259,26 @@ func (f *fakeNetCtl) ThreatApply(p threatcfg.Plan) error   { f.threat = p; retur
 func (f *fakeNetCtl) ThreatUpdateRules() error             { return nil }
 func (f *fakeNetCtl) ThreatRollback() error                { return nil }
 func (f *fakeNetCtl) SSHLog(since int64) ([]string, error) { return nil, nil }
+func (f *fakeNetCtl) DiagServices() []netd.DiagService {
+	return []netd.DiagService{{Unit: "ssh", Title: "Remote login", State: "running"}}
+}
+func (f *fakeNetCtl) DiagLog(unit string, lines int) (string, error) {
+	return "log of " + unit, nil
+}
+func (f *fakeNetCtl) DiagRestart(unit string) error { f.restarted = unit; return nil }
+func (f *fakeNetCtl) DiagBundle() (string, error)   { return "bundle", nil }
+func (f *fakeNetCtl) TermOpen(rows, cols int) (string, error) {
+	f.termSize = [2]int{rows, cols}
+	return "t1", nil
+}
+func (f *fakeNetCtl) TermRead(id string, since int, wait time.Duration) ([]byte, int, bool, error) {
+	return []byte("hi"), since + 2, false, nil
+}
+func (f *fakeNetCtl) TermWrite(id string, data []byte) error { f.termIn = string(data); return nil }
+func (f *fakeNetCtl) TermResize(id string, rows, cols int) error {
+	f.termSize = [2]int{rows, cols}
+	return nil
+}
+func (f *fakeNetCtl) TermClose(id string) (netd.TermSummary, error) {
+	return netd.TermSummary{Seconds: 3, BytesIn: 5, BytesOut: 9}, nil
+}

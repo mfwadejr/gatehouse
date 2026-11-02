@@ -485,3 +485,6 @@ details.more > .card { margin-top: var(--space-3); }
 
 .helplink { color: var(--color-text-link); text-decoration: none; align-self: center; white-space: nowrap; }
 .helplink:hover { text-decoration: underline; color: var(--color-text-link); }
+
+.termhost { width: 100%; border: 0; height: 28rem; background: var(--color-bg-inset); border-radius: var(--radius-md, 8px); padding: var(--space-2); overflow: hidden; }
+.logpre { max-height: 28rem; overflow: auto; background: var(--color-bg-inset); border: var(--border-width-thin) solid var(--color-border-default); border-radius: var(--radius-md, 8px); padding: var(--space-3); white-space: pre-wrap; word-break: break-word; margin: 0; }

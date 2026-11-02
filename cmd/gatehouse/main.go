@@ -213,6 +213,10 @@ func runNetd(args []string) {
 		log.Fatalf("netd: %v", err)
 	}
 	defer svc.Stop()
+	// Make this machine's SSH identity on first start (it must not come from the shared image).
+	if err := svc.EnsureHostKeys(); err != nil {
+		log.Printf("netd: %v", err)
+	}
 
 	if err := os.MkdirAll(filepath.Dir(*sock), 0o755); err != nil {
 		log.Fatalf("netd: %v", err)

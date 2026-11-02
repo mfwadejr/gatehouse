@@ -250,3 +250,23 @@ func TestStreamSurvivesQuietPeriodsOverHTTP2(t *testing.T) {
 		t.Fatalf("expected several keepalives, got %q", got)
 	}
 }
+
+func TestOnlyTheTerminalPageMayBeFramedOrWriteInlineStyles(t *testing.T) {
+	h := Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	get := func(path string) http.Header {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest("GET", path, nil))
+		return rec.Header()
+	}
+	main := get("/")
+	if !strings.Contains(main.Get("Content-Security-Policy"), "style-src 'self';") || strings.Contains(main.Get("Content-Security-Policy"), "unsafe-inline") || main.Get("X-Frame-Options") != "DENY" {
+		t.Fatalf("the console lost its strict rules: %v", main)
+	}
+	term := get("/terminal.html")
+	if !strings.Contains(term.Get("Content-Security-Policy"), "style-src 'self' 'unsafe-inline'") || term.Get("X-Frame-Options") != "SAMEORIGIN" || !strings.Contains(term.Get("Content-Security-Policy"), "frame-ancestors 'self'") {
+		t.Fatalf("terminal page: %v", term)
+	}
+	if strings.Contains(term.Get("Content-Security-Policy"), "script-src 'self' 'unsafe") {
+		t.Fatal("scripts must stay strict")
+	}
+}

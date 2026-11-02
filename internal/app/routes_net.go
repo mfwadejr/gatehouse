@@ -60,6 +60,15 @@ type NetController interface {
 	ThreatApply(p threatcfg.Plan) error
 	ThreatUpdateRules() error
 	ThreatRollback() error
+	DiagServices() []netd.DiagService
+	DiagLog(unit string, lines int) (string, error)
+	DiagRestart(unit string) error
+	DiagBundle() (string, error)
+	TermOpen(rows, cols int) (string, error)
+	TermRead(id string, since int, wait time.Duration) ([]byte, int, bool, error)
+	TermWrite(id string, data []byte) error
+	TermResize(id string, rows, cols int) error
+	TermClose(id string) (netd.TermSummary, error)
 	FlowAcct(on bool) error
 	ConntrackDump() (string, error)
 	SQMApply(p netd.SQMPlan) (string, error)

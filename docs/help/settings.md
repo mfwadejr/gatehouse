@@ -9,7 +9,7 @@ The picture is an example from a new, empty box; yours will show your own device
 
 ## What is on the page
 - **General**: **Device mode** (Router or Bridge, with a three-step change), **Updates** (**Check now**, **How often to check**, **Off**, **Notify** or **Automatic**), **Power** (restart or shut down), **Console address** and **Appearance**.
-- **Account & sign-in**: **Two-factor sign-in**, **Password**, **Where you are signed in** and **Remote login** (SSH, off unless you turn it on).
+- **Account & sign-in**: **Two-factor sign-in**, **Password**, **Where you are signed in** and **Remote login** (SSH, off unless you turn it on; if the machine has no SSH identity yet, Gatehouse makes one when you turn it on).
 - **Alerts & logs**: **Alerts** (ntfy or email, with quiet hours), **Send logs elsewhere**, **Send traffic records (NetFlow / IPFIX)** and SNMP.
 - **Backup & recovery**: **Backups**, **Changes** (a copy before every change, to go back to), **My network** (a printable summary with a map) and **Reset to default**.
 - **Advanced**: **High availability** (two boxes as a pair), **Bridge mode** (all the detailed settings), **Traffic labels**, **Guest sign-in page** and **Lists used for blocking** (the version of the app names and topic lists Gatehouse blocks by).

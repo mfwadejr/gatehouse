@@ -14,6 +14,7 @@ export const ICONS = {
   vpn: 'M6 11V8a6 6 0 1112 0v3M5 11h14v9H5zM12 15v2',
   devices: 'M3 5h14v10H3zM8 19h4M10 15v4M19 9h2v10h-2z',
   logs: 'M5 4h14v16H5zM9 9h6M9 13h6M9 17h3',
+  diagnostics: 'M4 5h16v11H4zM8 20h8M12 16v4M8 9l2 2-2 2M12 13h4',
   settings: 'M4 7h10M18 7h2M4 17h2M10 17h10M14 5v4M6 15v4',
   check: 'M5 12l5 5 9-10',
   up: 'M12 19V5M5 12l7-7 7 7',

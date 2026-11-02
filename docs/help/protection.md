@@ -11,7 +11,7 @@ Tabs along the top:
   - **Alerts** show what was noticed in plain words, with **Allow for this device**, **Allow for all** and **Never check this device**.
   - **Settings** has **How closely to watch** (Light, Balanced or Strict) and **Limits** for the processor and memory.
   - **Rules** has **Update rules now**, **Roll back to the previous rules**, **Groups of checks** and **Single checks**.
-  - **Advanced** has **Allowed checks**, **Devices never checked**, **Save or load your tuning**, and **Program**, where **Remove threat watching** is.
+  - **Advanced** has **Program log** (the last lines the program wrote, the first place to look when it is not running), **Allowed checks**, **Devices never checked**, **Save or load your tuning**, and **Program**, where **Remove threat watching** is.
 
 ## Common tasks
 1. See what needs fixing: **Overview**, read the **Security check**, press the button beside a risk.
@@ -32,4 +32,4 @@ These features only add protection. If they fail, the protection goes and your i
 A new camera starts talking to an address on a bad list. The **Threats** tab shows "A device may be infected and talking to a known bad server", with the camera's name. You unplug it, or choose **Never check this device** if you know it is fine.
 
 ## If something goes wrong
-If **Install threat watching** fails, the page shows the reason; try again once the internet works and there is disk space. If the page says the program is not running, your traffic is not affected and Gatehouse keeps trying to start it. If it keeps stopping, choose **Light** under **Settings**. If a rule update breaks things, use **Roll back to the previous rules**.
+If the page says **The program keeps failing**, the program starts and stops again and again; read the reason, then **Program log** under **Advanced** (or Diagnostics in the left menu). If **Install threat watching** fails, the page shows the reason; try again once the internet works and there is disk space. If the page says the program is not running, your traffic is not affected and Gatehouse keeps trying to start it. If it keeps stopping, choose **Light** under **Settings**. If a rule update breaks things, use **Roll back to the previous rules**.

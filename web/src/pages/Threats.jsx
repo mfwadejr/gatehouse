@@ -130,6 +130,19 @@ function Rules({ data, reload }) {
   );
 }
 
+// The engine's own words, for when it will not start. Administrators only.
+function ProgramLog() {
+  const [run, busy] = useAction();
+  const [text, setText] = useState(null);
+  const load = async () => { const r = await run(() => get('/api/diag/log?unit=gatehouse-suricata&lines=60')); if (r) setText(r.log); };
+  return (
+    <Card title="Program log" desc="The last lines the threat-watching program wrote. The first place to look when it is not running.">
+      <div className="actions"><Button small disabled={busy} onClick={load}>{text === null ? 'Show the log' : 'Refresh'}</Button></div>
+      {text !== null && <pre className="logpre mono small" tabIndex={0}>{text.trim() || 'It has not written anything yet.'}</pre>}
+    </Card>
+  );
+}
+
 function Advanced({ data, reload }) {
   const [run, busy] = useAction();
   const [eve, setEve] = useState(data.eve_path === data.default_eve ? '' : data.eve_path);
@@ -170,6 +183,7 @@ function Advanced({ data, reload }) {
           <label className="btn" style={{ cursor: 'pointer' }}>Load tuning from a file<input type="file" accept=".json,application/json" hidden onChange={(e) => importFile(e.target.files[0])} /></label>
         </div>
       </Card>
+      <ProgramLog />
       <Card title="Program" desc="Where Gatehouse reads what the engine noticed.">
         <p className="small">{data.engine?.text}</p>
         <p className="small muted">Watching: {(data.ports || []).length ? `port${data.ports.length === 1 ? '' : 's'} ${data.ports.join(', ')}` : 'no ports yet'}. {p.version ? `Version ${p.version}.` : ''}</p>
@@ -201,7 +215,7 @@ export default function Threats() {
       <div className="stack">
         <Segmented value={data.mode} onChange={(v) => run(() => put('/api/threat/settings', { mode: v }), v === 'watch' ? 'Watching is on.' : 'Watching is off.').then(reload)} options={[{ value: 'off', label: 'Off' }, { value: 'watch', label: 'Watch and tell' }, { value: 'protect', label: 'Protect (not yet)', disabled: true }]} disabled={busy || p.state === 'installing' || p.state === 'removing'} />
         {data.paused_reason && !watching && <Note tone="warn" title="Gatehouse switched watching off">{data.paused_reason} Your traffic was never held up.</Note>}
-        {watching && !p.running && <Note tone="warn">The program is not running. {p.why} Your traffic is not affected. Gatehouse keeps trying to start it.</Note>}
+        {watching && !p.running && <Note tone={p.failing ? 'bad' : 'warn'} title={p.failing ? 'The program keeps failing' : 'The program is not running'}>{p.why} Your traffic is not affected. See Advanced, Program log, or Diagnostics in the left menu.</Note>}
         {p.state === 'updating' && <Note>Updating the rules. {p.message}</Note>}
         {p.state === 'failed' && <Note tone="warn">{p.message}</Note>}
         <Note tone={data.engine?.state === 'missing' && watching ? 'warn' : undefined}>{data.engine?.text}</Note>

@@ -55,7 +55,10 @@ const STATIC = [
   ['Check for updates', 'settings/general', 'Install a new version of Gatehouse', 'upgrade version install'],
   ['Backups', 'settings/backup', 'Save and restore your settings', 'backup restore export import'],
   ['Restart or shut down', 'settings/general', 'Power controls', 'reboot power off shutdown'],
-  ['Remote login', 'devices', 'Turn SSH on or off', 'ssh'],
+  ['Diagnostics', 'diagnostics', 'How each service is doing, its log, and a terminal', 'logs services status restart support bundle troubleshoot failing'],
+  ['Terminal', 'diagnostics', 'A command line on the firewall, if you switch it on', 'shell console command line ssh root'],
+  ['Support bundle', 'diagnostics', 'Save the logs and state to send when asking for help', 'logs report troubleshoot help'],
+  ['Remote login', 'settings/general', 'Turn SSH on or off', 'ssh'],
 ].map(([label, page, hint, words]) => ({ label, page, hint, words, kind: 'Page' }));
 
 export function useSearchShortcut(open) {

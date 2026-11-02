@@ -198,6 +198,9 @@ func Decode(w http.ResponseWriter, r *http.Request, v any) bool {
 	return true
 }
 
+// terminalPage is the one page with a looser style rule (see Middleware).
+const terminalPage = "/terminal.html"
+
 // Middleware applies security headers to everything.
 func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -205,6 +208,12 @@ func Middleware(next http.Handler) http.Handler {
 		h.Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("X-Frame-Options", "DENY")
+		if r.URL.Path == terminalPage {
+			// The terminal emulator writes inline styles. Only its own page, shown in a frame by the
+			// console, may; every other page keeps the strict rule and cannot be framed by anyone.
+			h.Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'")
+			h.Set("X-Frame-Options", "SAMEORIGIN")
+		}
 		h.Set("Referrer-Policy", "no-referrer")
 		h.Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
 		next.ServeHTTP(w, r)

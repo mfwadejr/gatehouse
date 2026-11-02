@@ -251,6 +251,7 @@ type netdThreat = struct {
 	RulesUpdated int64  `json:"rules_updated"`
 	RulesCount   int    `json:"rules_count"`
 	Why          string `json:"why"`
+	Failing      bool   `json:"failing"`
 	HasPrevious  bool   `json:"has_previous"`
 	CPUNSec      uint64 `json:"cpu_nsec"`
 	MemoryBytes  uint64 `json:"memory_bytes"`

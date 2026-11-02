@@ -63,6 +63,15 @@ type NetController interface {
 	ThreatApply(p threatcfg.Plan) error
 	ThreatUpdateRules() error
 	ThreatRollback() error
+	DiagServices() []netd.DiagService
+	DiagLog(unit string, lines int) (string, error)
+	DiagRestart(unit string) error
+	DiagBundle() (string, error)
+	TermOpen(rows, cols int) (string, error)
+	TermRead(id string, since int, wait time.Duration) ([]byte, int, bool, error)
+	TermWrite(id string, data []byte) error
+	TermResize(id string, rows, cols int) error
+	TermClose(id string) (netd.TermSummary, error)
 }
 
 const maxRequest = 16 << 20
@@ -399,6 +408,76 @@ func (s *Server) dispatchNet(r request) (any, error) {
 		return nil, s.Net.ThreatUpdateRules()
 	case "threat.rollback":
 		return nil, s.Net.ThreatRollback()
+	case "diag.services":
+		return s.Net.DiagServices(), nil
+	case "diag.log":
+		var p struct {
+			Unit  string `json:"unit"`
+			Lines int    `json:"lines"`
+		}
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return s.Net.DiagLog(p.Unit, p.Lines)
+	case "diag.restart":
+		var p struct {
+			Unit string `json:"unit"`
+		}
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return nil, s.Net.DiagRestart(p.Unit)
+	case "diag.bundle":
+		return s.Net.DiagBundle()
+	case "term.open":
+		var p struct{ Rows, Cols int }
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return s.Net.TermOpen(p.Rows, p.Cols)
+	case "term.read":
+		var p struct {
+			ID     string `json:"id"`
+			Since  int    `json:"since"`
+			WaitMS int    `json:"wait_ms"`
+		}
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		if p.WaitMS < 0 || p.WaitMS > 5000 {
+			p.WaitMS = 5000
+		}
+		d, next, closed, err := s.Net.TermRead(p.ID, p.Since, time.Duration(p.WaitMS)*time.Millisecond)
+		if err != nil {
+			return nil, err
+		}
+		return TermChunk{Data: d, Next: next, Closed: closed}, nil
+	case "term.write":
+		var p struct {
+			ID   string `json:"id"`
+			Data []byte `json:"data"`
+		}
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return nil, s.Net.TermWrite(p.ID, p.Data)
+	case "term.resize":
+		var p struct {
+			ID         string `json:"id"`
+			Rows, Cols int
+		}
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return nil, s.Net.TermResize(p.ID, p.Rows, p.Cols)
+	case "term.close":
+		var p struct {
+			ID string `json:"id"`
+		}
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return s.Net.TermClose(p.ID)
 	case "ssh.log":
 		var p struct {
 			Since int64 `json:"since"`
@@ -750,4 +829,68 @@ func (c *Client) FWEvents(since uint64, max int) ([]netd.FWEvent, uint64, error)
 	var out FWBatch
 	err := c.call("fwlog.read", map[string]any{"since": since, "max": max}, &out)
 	return out.Events, out.Last, err
+}
+
+// TermChunk is what a terminal read returns.
+type TermChunk struct {
+	Data   []byte `json:"data"`
+	Next   int    `json:"next"`
+	Closed bool   `json:"closed"`
+}
+
+// DiagServices lists the Gatehouse services and how each is doing.
+func (c *Client) DiagServices() []netd.DiagService {
+	var out []netd.DiagService
+	c.call("diag.services", nil, &out)
+	return out
+}
+
+// DiagLog returns the last lines of one service's log.
+func (c *Client) DiagLog(unit string, lines int) (string, error) {
+	var out string
+	err := c.call("diag.log", map[string]any{"unit": unit, "lines": lines}, &out)
+	return out, err
+}
+
+// DiagRestart restarts one of the listed services.
+func (c *Client) DiagRestart(unit string) error {
+	return c.call("diag.restart", map[string]any{"unit": unit}, nil)
+}
+
+// DiagBundle gathers the support bundle text.
+func (c *Client) DiagBundle() (string, error) {
+	var out string
+	err := c.callWithin(3*time.Minute, "diag.bundle", nil, &out)
+	return out, err
+}
+
+// TermOpen starts a shell and returns its id.
+func (c *Client) TermOpen(rows, cols int) (string, error) {
+	var out string
+	err := c.call("term.open", map[string]any{"rows": rows, "cols": cols}, &out)
+	return out, err
+}
+
+// TermRead returns new shell output, waiting briefly for some.
+func (c *Client) TermRead(id string, since int, wait time.Duration) ([]byte, int, bool, error) {
+	var out TermChunk
+	err := c.call("term.read", map[string]any{"id": id, "since": since, "wait_ms": int(wait / time.Millisecond)}, &out)
+	return out.Data, out.Next, out.Closed, err
+}
+
+// TermWrite sends keystrokes.
+func (c *Client) TermWrite(id string, data []byte) error {
+	return c.call("term.write", map[string]any{"id": id, "data": data}, nil)
+}
+
+// TermResize sets the window size.
+func (c *Client) TermResize(id string, rows, cols int) error {
+	return c.call("term.resize", map[string]any{"id": id, "rows": rows, "cols": cols}, nil)
+}
+
+// TermClose ends a session.
+func (c *Client) TermClose(id string) (netd.TermSummary, error) {
+	var out netd.TermSummary
+	err := c.call("term.close", map[string]any{"id": id}, &out)
+	return out, err
 }

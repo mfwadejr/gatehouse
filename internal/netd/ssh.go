@@ -106,6 +106,13 @@ func (s *Service) SSHApply(p SSHPlan) error {
 	if err := s.syncSSHUsers(p.Users); err != nil {
 		return err
 	}
+	// The server cannot start without its own identity files. They are made on each machine (never
+	// shipped in the image, where every box would share them), so make any that are missing.
+	if err := s.EnsureHostKeys(); err != nil {
+		os.Remove(drop)
+		removePamLine(pam)
+		return err
+	}
 	// A configuration that sshd rejects must never be left in place: check it first.
 	if out, err := wifiRun(10*time.Second, "sshd", "-t"); err != nil {
 		os.Remove(drop)
@@ -118,6 +125,25 @@ func (s *Service) SSHApply(p SSHPlan) error {
 	}
 	if out, err := wifiRun(30*time.Second, "systemctl", "restart", "ssh.service"); err != nil {
 		return fmt.Errorf("could not start the SSH server: %s", strings.TrimSpace(out))
+	}
+	return nil
+}
+
+// EnsureHostKeys creates the SSH server's host keys if the machine has none. It is safe to repeat:
+// ssh-keygen -A only makes the keys that are missing.
+func (s *Service) EnsureHostKeys() error {
+	if m, _ := filepath.Glob(s.rootPath("etc/ssh/ssh_host_*_key")); len(m) > 0 {
+		return nil
+	}
+	if _, err := os.Stat(s.rootPath(sshPamFile)); err != nil {
+		return nil // no SSH server on this machine
+	}
+	args := []string{"-A"}
+	if s.Root != "" && s.Root != "/" {
+		args = append(args, "-f", s.Root)
+	}
+	if out, err := wifiRun(30*time.Second, "ssh-keygen", args...); err != nil {
+		return fmt.Errorf("this machine had no SSH identity (host keys) and Gatehouse could not make one: %s", strings.TrimSpace(out))
 	}
 	return nil
 }

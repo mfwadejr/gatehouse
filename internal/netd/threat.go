@@ -40,7 +40,8 @@ type ThreatInfo struct {
 	CPUs         int    `json:"cpus"`
 	RulesUpdated int64  `json:"rules_updated"`
 	RulesCount   int    `json:"rules_count"`
-	Why          string `json:"why"` // plain reason it is not running, when it should be
+	Why          string `json:"why"`     // plain reason it is not running, when it should be
+	Failing      bool   `json:"failing"` // crashing and being restarted, not just starting
 	HasPrevious  bool   `json:"has_previous"`
 	CPUNSec      uint64 `json:"cpu_nsec"` // processor time used so far
 	MemoryBytes  uint64 `json:"memory_bytes"`
@@ -123,7 +124,7 @@ func (s *Service) ThreatStatus() ThreatInfo {
 		}
 	}
 	if !info.Running {
-		info.Why = s.threatWhy()
+		info.Why, info.Failing = s.threatWhy()
 	}
 	if st, err := os.Stat(s.rootPath(threatRules)); err == nil {
 		info.RulesUpdated = st.ModTime().Unix()
@@ -353,37 +354,27 @@ func (s *Service) ThreatApply(p threatcfg.Plan) error {
 }
 
 // threatWhy says in plain words why the engine's service is not running: it ran out of memory, it
-// was never started, or the last thing it complained about. Empty when there is nothing to say.
-func (s *Service) threatWhy() string {
-	out, _ := wifiRun(10*time.Second, "systemctl", "show", "-p", "Result", "-p", "ActiveState", "-p", "LoadState", threatcfg.UnitName)
-	kv := map[string]string{}
-	for _, l := range strings.Split(out, "\n") {
-		k, v, _ := strings.Cut(strings.TrimSpace(l), "=")
-		kv[k] = v
-	}
+// keeps failing and being restarted, it was never started, or the last thing it complained about.
+// failing is true when the service is crashing rather than just starting or stopped.
+func (s *Service) threatWhy() (why string, failing bool) {
+	st := unitState(threatcfg.UnitName)
 	switch {
-	case kv["LoadState"] == "not-found" || kv["LoadState"] == "":
-		return "It has not been started yet."
-	case kv["Result"] == "oom-kill":
-		return "It ran out of memory and was stopped. Raise its memory limit under Settings, or choose Light."
-	case kv["ActiveState"] == "activating":
-		return "It is starting. Loading the rules takes a minute or two."
-	}
-	j, _ := wifiRun(10*time.Second, "journalctl", "-u", threatcfg.UnitName, "-n", "40", "--no-pager", "-o", "cat")
-	last := ""
-	for _, l := range strings.Split(j, "\n") {
-		l = strings.TrimSpace(l)
-		if strings.Contains(l, "<Error>") || strings.Contains(l, "<Critical>") || strings.Contains(l, "rror:") {
-			last = l
+	case st.Load == "not-found" || st.Load == "":
+		return "It has not been started yet.", false
+	case st.Result == "oom-kill":
+		return "It ran out of memory and was stopped. Raise its memory limit under Settings, or choose Light.", true
+	case st.Sub == "auto-restart" || st.Active == "failed" || (st.Active == "inactive" && st.Result != "success" && st.Result != ""):
+		if e := lastUnitError(threatcfg.UnitName); e != "" {
+			return "It keeps stopping and Gatehouse keeps restarting it. The last thing it said: " + e, true
 		}
+		return "It keeps stopping and Gatehouse keeps restarting it, and it did not say why. See Advanced, Program log.", true
+	case st.Active == "activating":
+		return "It is starting. Loading the rules takes a minute or two.", false
 	}
-	if len(last) > 240 {
-		last = last[:240]
+	if e := lastUnitError(threatcfg.UnitName); e != "" {
+		return "It stopped. The last thing it said: " + e, true
 	}
-	if last != "" {
-		return "It stopped with: " + last
-	}
-	return "It is not running, and it did not say why."
+	return "It is switched off.", false
 }
 
 var threatUpdateMu sync.Mutex
