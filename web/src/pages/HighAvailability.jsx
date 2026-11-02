@@ -34,7 +34,7 @@ export default function HighAvailability({ me }) {
           <Segmented value={side} onChange={(v) => { setSide(v); setLook(null); }} options={[{ value: 'main', label: 'This is the main unit' }, { value: 'backup', label: 'This is the backup' }]} />
           {side === 'main' && (
             <>
-              <Note title="Before you start">The second machine needs at least as many wired ports as this one uses, on the same switches. Its Wi-Fi is not part of the pair. Each machine gets its own address on your network, and the address your devices use as a gateway becomes shared between them.</Note>
+              <Note title="Before you start">The second machine needs at least as many wired ports as this one uses, on the same switches. Each machine gets its own address on your network, and the address your devices use as a gateway becomes shared between them.</Note>
               <div className="formgrid">
                 <Field label="This unit's own address" hint="An unused address on your network. The gateway address you use today becomes the shared one."><Input value={f.own} onChange={(v) => setF({ ...f, own: v })} className="in mono" /></Field>
                 <Field label="The backup's own address" hint="Another unused address. The backup machine must already have it."><Input value={f.standby} onChange={(v) => setF({ ...f, standby: v })} className="in mono" /></Field>
@@ -58,7 +58,7 @@ export default function HighAvailability({ me }) {
                           <div className="item" key={m.role} style={{ display: 'block' }}>
                             <div className="spread">
                               <div><div className="name">{m.label}</div><div className="meta">Main unit port {m.primary}</div></div>
-                              <Select value={keep[m.role] || m.backup} onChange={(v) => setKeep({ ...keep, [m.role]: v })} options={look.ports.filter((p) => !p.wifi).map((p) => ({ value: p.name, label: `${p.name}${p.speed > 0 ? ` (${p.speed} Mbps)` : ' (no cable)'}` }))} />
+                              <Select value={keep[m.role] || m.backup} onChange={(v) => setKeep({ ...keep, [m.role]: v })} options={look.ports.map((p) => ({ value: p.name, label: `${p.name}${p.speed > 0 ? ` (${p.speed} Mbps)` : ' (no cable)'}` }))} />
                             </div>
                             {m.warning && <div className="small" style={{ color: 'var(--color-status-warning)' }}>{m.warning}</div>}
                           </div>

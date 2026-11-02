@@ -344,7 +344,7 @@ func repairEvent(actor, title string) bool {
 	case "Gatehouse was updated", "System updates were installed", "An update did not work and was undone":
 		return true
 	}
-	return actor == "wifi" && (strings.HasSuffix(title, "is working again") || strings.HasSuffix(title, "keeps failing"))
+	return false
 }
 
 func (a *App) alertFromEvent(actor, title, detail string) {

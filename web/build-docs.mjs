@@ -8,7 +8,7 @@ if (!existsSync('../docs/help')) { console.log('docs build skipped: the docs fol
 
 export const ORDER = [
   ['getting-started', 'Getting started'], ['recovery', 'If you are locked out'],
-  ['overview', 'Overview'], ['internet', 'Internet'], ['networks', 'Networks'], ['wifi', 'Wi-Fi'], ['dns', 'DNS'], ['dhcp', 'DHCP'],
+  ['overview', 'Overview'], ['internet', 'Internet'], ['networks', 'Networks'], ['dns', 'DNS'], ['dhcp', 'DHCP'],
   ['firewall', 'Firewall'], ['protection', 'Protection'], ['services', 'Services'], ['vpn', 'VPN'], ['routes', 'Routes'], ['profiles', 'Profiles'],
   ['devices', 'Devices & access'], ['logs', 'Logs'], ['diagnostics', 'Diagnostics'], ['settings', 'Settings'], ['reference', 'Reference'], ['ease-of-use', 'How easy is it?'],
 ];

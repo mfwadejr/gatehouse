@@ -9,10 +9,9 @@ import (
 
 // Port is a wired network port on one of the two machines.
 type Port struct {
-	Name     string `json:"name"`
-	Speed    int    `json:"speed"` // megabits per second; -1 when no cable is plugged in
-	Link     bool   `json:"link"`
-	Wireless bool   `json:"wifi"`
+	Name  string `json:"name"`
+	Speed int    `json:"speed"` // megabits per second; -1 when no cable is plugged in
+	Link  bool   `json:"link"`
 }
 
 // PortRole is a job one of the primary's ports does: carrying the internet, or a network.
@@ -37,12 +36,7 @@ type Match struct {
 // has fewer wired ports than the primary uses, and warns, with the plain consequence, about a
 // backup port that is slower than the one it replaces or has no cable plugged in to measure.
 func MapPorts(roles []PortRole, backup []Port, keep map[string]string) ([]Match, error) {
-	var wired []Port
-	for _, p := range backup {
-		if !p.Wireless {
-			wired = append(wired, p)
-		}
-	}
+	wired := backup // ports lists only wired ports; Gatehouse has no wireless support
 	if len(roles) == 0 {
 		return nil, errors.New("the primary has no ports in use to match")
 	}

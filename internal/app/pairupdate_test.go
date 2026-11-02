@@ -142,7 +142,7 @@ func TestHeartbeatCableIsOptionalAndUsedOnlyWhileConnected(t *testing.T) {
 	pc, sc, pfn, sfn := pairedUnits(t)
 	old := portsLister
 	portsLister = func() []map[string]any {
-		return []map[string]any{{"name": "tp1", "wifi": false}, {"name": "tp2", "wifi": false}, {"name": "tp3", "wifi": false}, {"name": "tpw", "wifi": true}}
+		return []map[string]any{{"name": "tp1"}, {"name": "tp2"}, {"name": "tp3"}}
 	}
 	t.Cleanup(func() { portsLister = old })
 	P, S := pc.app, sc.app

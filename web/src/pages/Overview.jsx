@@ -178,7 +178,7 @@ function DevicesTile({ d, h }) {
   const online = d?.online ?? 0;
   return (
     <Tile title="Devices" pill={`${online} online`} tone="good" big={<CountUp value={online} />} to="devices"
-      sub={d ? `${d.wired} wired · ${d.wifi} Wi-Fi${d.vpn ? ` · ${d.vpn} VPN` : ''}` : ''}
+      sub={d ? `${d.wired} wired${d.vpn ? ` · ${d.vpn} VPN` : ''}` : ''}
       chart={<Chart series={miniSeries(h, 'devices.online')} from={h?.from || 0} to={h?.to || 1} unit="devices" height={44} compact label="Devices online, last hour" />}
       caption="Devices online · last hour">
       <div className="inline" style={{ marginTop: 'var(--space-2)' }}>

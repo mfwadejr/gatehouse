@@ -51,15 +51,7 @@ func (a *App) checklist(username string) []checkItem {
 	}
 	items = append(items, checkItem{ID: "network", Done: lan && dhcp, To: "networks",
 		Text: "Set up your network and its addresses",
-		Why:  "A network is a port (or Wi-Fi) with an address range and DHCP, so your devices get addresses."})
-
-	if hasWifiCard() {
-		var n int
-		a.Config.QueryRow(`SELECT count(*) FROM wifi_radios WHERE enabled=1 AND ssid<>''`).Scan(&n)
-		items = append(items, checkItem{ID: "wifi", Done: n > 0, To: "wifi",
-			Text: "Set up Wi-Fi",
-			Why:  "Each Wi-Fi card does one job: broadcast a network for your devices, or join another network (such as a hotspot) for internet."})
-	}
+		Why:  "A network is a port with an address range and DHCP, so your devices get addresses."})
 
 	two := a.Auth.MFARequired()
 	if !two && username != "" {
@@ -71,15 +63,6 @@ func (a *App) checklist(username string) []checkItem {
 		Text: "Turn on two-factor sign-in",
 		Why:  "Asks for a code from an authenticator app each time you sign in."})
 	return items
-}
-
-func hasWifiCard() bool {
-	for _, p := range ports() {
-		if p["wifi"] == true {
-			return true
-		}
-	}
-	return false
 }
 
 func (a *App) registerChecklistRoutes() {

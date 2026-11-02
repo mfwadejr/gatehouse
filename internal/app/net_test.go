@@ -45,8 +45,6 @@ type fakeNet struct {
 	speedCalls []speedtest.Params
 	speedErr   error
 
-	wifiStates  []netd.WifiState
-	wifiCalls   int
 	powerSave   map[string]bool
 	sshPlans    []netd.SSHPlan
 	sshLines    []string
@@ -70,25 +68,7 @@ type fakeNet struct {
 	sqmErr      error
 }
 
-func (f *fakeNet) WifiHealth(ifaces []string, keepAwake bool) ([]netd.WifiState, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.wifiCalls++
-	return f.wifiStates, nil
-}
-
-func (f *fakeNet) WifiPowerSave(iface string, keepAwake bool) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if f.powerSave == nil {
-		f.powerSave = map[string]bool{}
-	}
-	f.powerSave[iface] = keepAwake
-	return nil
-}
-
 func (f *fakeNet) Diag(kind, target string) (string, error) { return kind + " " + target, nil }
-func (f *fakeNet) WifiReport(iface string) (string, error)  { return "== Card ==\nsample " + iface, nil }
 
 func (f *fakeNet) SSHApply(p netd.SSHPlan) error {
 	f.mu.Lock()
@@ -225,10 +205,6 @@ func (f *fakeNet) VPNStatus() (netd.VPNStatus, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.status, nil
-}
-
-func (f *fakeNet) WifiScan(string) ([]netd.WifiNetwork, error) {
-	return []netd.WifiNetwork{{SSID: "Home", Signal: -50, Security: "wpa2"}}, nil
 }
 
 func (f *fakeNet) UpdateStart(path string) error {

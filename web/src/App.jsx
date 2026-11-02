@@ -7,7 +7,6 @@ import Overview from './pages/Overview.jsx';
 import FailbackPrompt from './pages/FailbackPrompt.jsx';
 import Internet from './pages/Internet.jsx';
 import Networks from './pages/Networks.jsx';
-import Wifi from './pages/Wifi.jsx';
 import DNS from './pages/DNS.jsx';
 import DHCP from './pages/DHCP.jsx';
 import VPN from './pages/VPN.jsx';
@@ -29,7 +28,6 @@ export const PAGES = [
   { id: 'overview', label: 'Overview', icon: 'overview', el: Overview },
   { id: 'internet', label: 'Internet', icon: 'internet', el: Internet },
   { id: 'networks', label: 'Networks', icon: 'networks', el: Networks },
-  { id: 'wifi', label: 'Wi-Fi', icon: 'wifi', el: Wifi },
   { id: 'dns', label: 'DNS', icon: 'dns', el: DNS },
   { id: 'dhcp', label: 'DHCP', icon: 'dhcp', el: DHCP },
   { id: 'firewall', label: 'Firewall', icon: 'firewall', el: Firewall },

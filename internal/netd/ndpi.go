@@ -33,7 +33,7 @@ func (s *Service) NDPIInstalled() bool {
 func (s *Service) NDPIApply(p NDPIPlan) error {
 	conf := s.rootPath(ndpiConf)
 	if !p.Enabled || len(p.Ifaces) == 0 {
-		wifiRun(30*time.Second, "systemctl", "disable", "--now", ndpiUnit)
+		sysRun(30*time.Second, "systemctl", "disable", "--now", ndpiUnit)
 		os.Remove(conf)
 		return nil
 	}
@@ -59,11 +59,11 @@ func (s *Service) NDPIApply(p NDPIPlan) error {
 		return err
 	}
 	if string(old) == nw {
-		wifiRun(30*time.Second, "systemctl", "start", ndpiUnit)
+		sysRun(30*time.Second, "systemctl", "start", ndpiUnit)
 		return nil
 	}
-	wifiRun(30*time.Second, "systemctl", "enable", ndpiUnit)
-	if out, err := wifiRun(60*time.Second, "systemctl", "restart", ndpiUnit); err != nil {
+	sysRun(30*time.Second, "systemctl", "enable", ndpiUnit)
+	if out, err := sysRun(60*time.Second, "systemctl", "restart", ndpiUnit); err != nil {
 		return fmt.Errorf("the labelling program did not start: %s", strings.TrimSpace(out))
 	}
 	return nil

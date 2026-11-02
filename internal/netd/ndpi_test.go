@@ -12,12 +12,12 @@ func TestNDPIApply(t *testing.T) {
 	root := t.TempDir()
 	s := &Service{Root: root}
 	var calls []string
-	old := wifiRun
-	wifiRun = func(_ time.Duration, name string, args ...string) (string, error) {
+	old := sysRun
+	sysRun = func(_ time.Duration, name string, args ...string) (string, error) {
 		calls = append(calls, name+" "+strings.Join(args, " "))
 		return "", nil
 	}
-	t.Cleanup(func() { wifiRun = old })
+	t.Cleanup(func() { sysRun = old })
 
 	// Not installed: refuse in plain words, start nothing.
 	if err := s.NDPIApply(NDPIPlan{Enabled: true, Ifaces: []string{"lan0"}}); err == nil || !strings.Contains(err.Error(), "fresh install image") {

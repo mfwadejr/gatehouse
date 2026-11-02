@@ -135,6 +135,11 @@ func currentZone() string {
 
 func (a *App) registerSetupRoutes() {
 	s := a.API
+	// The console asks every machine whether it is the installer. An installed machine says no, so
+	// the browser's error log stays clean instead of showing a 404 on every page load.
+	s.Public("GET /api/install/info", func(w http.ResponseWriter, r *http.Request) {
+		api.JSON(w, 200, map[string]any{"installer": false})
+	})
 	s.Public("GET /api/setup", func(w http.ResponseWriter, r *http.Request) {
 		api.JSON(w, 200, map[string]bool{"needed": !a.Auth.HasUsers()})
 	})
@@ -215,7 +220,7 @@ func (a *App) registerSetupRoutes() {
 		api.JSON(w, 200, map[string]any{
 			"pending": a.wizardPending(), "ports": a.labelledPorts(), "here": here, "here_addr": hereAddr,
 			"suggested_lan": suggested, "hostname": host, "timezone": currentZone(),
-			"timezones": installer.Timezones(), "country": countryFromZone(currentZone()), "install": install,
+			"timezones": installer.Timezones(), "install": install,
 		})
 	})
 	s.HandleAdmin("POST /api/setup/wizard", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
@@ -251,25 +256,9 @@ func (a *App) registerSetupRoutes() {
 		for _, p := range ports() {
 			have[p["name"].(string)] = true
 		}
-		isWifi := map[string]bool{}
-		for _, p := range ports() {
-			isWifi[p["name"].(string)] = p["wifi"] == true
-		}
-		if isWifi[in.Network.LAN.Port] {
-			fail(w, errors.New("your own network needs a wired port; a Wi-Fi card is set up under Wi-Fi"))
-			return
-		}
 		all := []string{in.Network.LAN.Port}
 		if in.Network.WAN != nil {
 			all = append(all, in.Network.WAN.Port)
-			switch {
-			case isWifi[in.Network.WAN.Port] && in.Network.WAN.Wifi == nil:
-				fail(w, errors.New("choose the Wi-Fi network to join for the internet"))
-				return
-			case !isWifi[in.Network.WAN.Port] && in.Network.WAN.Wifi != nil:
-				fail(w, errors.New("only a Wi-Fi card can join a Wi-Fi network"))
-				return
-			}
 		}
 		all = append(all, in.Network.Bridge...)
 		for _, p := range all {

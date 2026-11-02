@@ -11,7 +11,7 @@ const bytes = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.m
 
 const LABELS = [
   ['networks', 'Networks'], ['zones', 'Firewall networks'], ['rules', 'Firewall rules'], ['scopes', 'DHCP scopes'],
-  ['reservations', 'Reserved addresses'], ['vpn_devices', 'VPN devices'], ['wifi', 'Wi-Fi cards'], ['devices', 'Named devices'], ['users', 'Accounts'],
+  ['reservations', 'Reserved addresses'], ['vpn_devices', 'VPN devices'], ['devices', 'Named devices'], ['users', 'Accounts'],
 ];
 
 function statusPill(b) {
@@ -83,7 +83,7 @@ function RestoreModal({ b, me, onClose, onDone }) {
     <Modal title="Restore this backup?" onClose={onClose}
       footer={<><Button onClick={onClose}>Cancel</Button><Button kind="danger" disabled={busy || word.toLowerCase() !== 'restore' || !stepReady(su, code, spw)} onClick={async () => { const r = await run(() => post(`/api/backups/${b.name}/restore`, { confirm: word.toLowerCase(), code, step_password: spw, password: pw })); if (r) setRes(r); }}>Restore</Button></>}>
       <div className="stack">
-        <p>Your networks, firewall, DHCP, DNS, VPN and Wi-Fi settings are replaced with the ones in the backup made {fmt.dt(b.created)}. Nothing changes on the network until you apply it.</p>
+        <p>Your networks, firewall, DHCP, DNS and VPN settings are replaced with the ones in the backup made {fmt.dt(b.created)}. Nothing changes on the network until you apply it.</p>
         <p className="small muted">Your current settings are saved as a backup first, so you can come back. Sign-in accounts stay as they are, unless the backup came from a different machine.</p>
         {b.protected && <Field label="Password for this backup"><Input type="password" value={pw} onChange={setPw} /></Field>}
         <Field label="Type the word restore to confirm"><Input value={word} onChange={setWord} autoFocus /></Field>
@@ -101,7 +101,7 @@ function PlainDownload({ b, onClose }) {
   return (
     <Modal title="Download this backup?" onClose={onClose}
       footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy || !stepReady(su, code, pw)} onClick={async () => { if (await run(() => saveFile('POST', `/api/backups/${b.name}/plain`, { code, step_password: pw }, b.name))) onClose(); }}>Download</Button></>}>
-      <p>This file holds the secrets of this machine (Wi-Fi passwords, VPN keys and similar) and is not protected by a password. Keep it somewhere safe, or use "Download with password" instead.</p>
+      <p>This file holds the secrets of this machine (internet passwords, VPN keys and similar) and is not protected by a password. Keep it somewhere safe, or use "Download with password" instead.</p>
       <StepUp su={su} code={code} setCode={setCode} password={pw} setPassword={setPw} autoFocus />
     </Modal>
   );
@@ -113,7 +113,7 @@ function ProtectedDownload({ b, onClose }) {
   return (
     <Modal title="Download with a password" onClose={onClose}
       footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy || pw.length < 8} onClick={async () => { if (await run(() => saveFile('POST', `/api/backups/${b.name}/download`, { password: pw }, b.name.replace(/\.ghbk$/, '') + '-protected.ghbk'))) onClose(); }}>Download</Button></>}>
-      <p>A backup holds the key to your saved Wi-Fi, internet and VPN passwords. A password keeps it safe if the file is stored somewhere shared. There is no way to recover a lost password, so keep it somewhere safe.</p>
+      <p>A backup holds the key to your saved internet and VPN passwords. A password keeps it safe if the file is stored somewhere shared. There is no way to recover a lost password, so keep it somewhere safe.</p>
       <Field label="Password (at least 8 characters)"><Input type="password" value={pw} onChange={setPw} autoFocus /></Field>
     </Modal>
   );

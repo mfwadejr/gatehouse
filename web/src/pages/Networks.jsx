@@ -37,7 +37,7 @@ function PortRow({ p, onSaved }) {
       </div>
       <div className="inline">
         {!editing && <Button small icon="edit" onClick={() => setEditing(true)}>Rename</Button>}
-        <Pill tone={p.link ? 'good' : ''}>{p.wifi ? (p.link ? 'Wi-Fi connected' : 'Wi-Fi not connected') : p.link ? `Connected${p.speed > 0 ? ` · ${p.speed} Mb/s` : ''}` : 'No cable'}</Pill>
+        <Pill tone={p.link ? 'good' : ''}>{p.link ? `Connected${p.speed > 0 ? ` · ${p.speed} Mb/s` : ''}` : 'No cable'}</Pill>
       </div>
     </div>
   );
@@ -101,7 +101,7 @@ function EditNetwork({ n, zones, onClose, onSaved }) {
                   <label key={p.name} className="small" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', opacity: reason ? 0.6 : 1 }}>
                     <input type="checkbox" checked={on} disabled={!!reason} onChange={(e) => tick(p.name, e.target.checked)} />
                     <span className="mono">{p.name}</span>
-                    <span className="muted">{p.wifi ? 'Wi-Fi card' : p.link ? `cable connected${p.speed > 0 ? `, ${p.speed} Mb/s` : ''}` : 'no cable'}{reason ? ` · ${reason}` : on && !first.includes(p.name) ? ' · will join' : ''}</span>
+                    <span className="muted">{p.link ? `cable connected${p.speed > 0 ? `, ${p.speed} Mb/s` : ''}` : 'no cable'}{reason ? ` · ${reason}` : on && !first.includes(p.name) ? ' · will join' : ''}</span>
                   </label>
                 );
               })}
@@ -113,7 +113,7 @@ function EditNetwork({ n, zones, onClose, onSaved }) {
         {plain && (
           <Field label="Add more ports to this network" hint="Devices on these ports share this network's addresses, like extra ports on a switch. Nothing changes until you apply.">
             <div className="stack">
-              {((allPorts && allPorts.ports) || []).filter((p) => !p.wifi && p.name !== n.iface.name).map((p) => {
+              {((allPorts && allPorts.ports) || []).filter((p) => p.name !== n.iface.name).map((p) => {
                 const reason = why(p);
                 return (
                   <label key={p.name} className="small" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', opacity: reason ? 0.6 : 1 }}>

@@ -34,24 +34,15 @@ type LAN struct {
 	DNS        string `json:"dns"`
 }
 
-// WifiJoin makes the internet connection a Wi-Fi network the machine joins (a hotspot, for example)
-// instead of a cable. Port is then the wireless card.
-type WifiJoin struct {
-	SSID    string `json:"ssid"`
-	PSK     string `json:"psk"` // empty for an open network
-	Country string `json:"country"`
-}
-
 // WAN is the optional internet connection.
 type WAN struct {
-	Port      string    `json:"port"`
-	Wifi      *WifiJoin `json:"wifi,omitempty"`
-	Type      string    `json:"type"` // dhcp, static, pppoe
-	Addr      string    `json:"addr"`
-	Gateway   string    `json:"gateway"`
-	DNS       string    `json:"dns"`
-	PPPoEUser string    `json:"pppoe_user"`
-	PPPoEPass string    `json:"pppoe_pass"`
+	Port      string `json:"port"`
+	Type      string `json:"type"` // dhcp, static, pppoe
+	Addr      string `json:"addr"`
+	Gateway   string `json:"gateway"`
+	DNS       string `json:"dns"`
+	PPPoEUser string `json:"pppoe_user"`
+	PPPoEPass string `json:"pppoe_pass"`
 }
 
 // Network is the whole choice.
@@ -61,12 +52,7 @@ type Network struct {
 	// Bridge lists extra ports that join the LAN port as one switch. Ports not listed anywhere
 	// are left unused.
 	Bridge []string `json:"bridge,omitempty"`
-	// WifiShare makes the LAN a bridge even with one port, so a Wi-Fi card can later join the
-	// same network as the wired devices. Only meaningful when Gatehouse is the router.
-	WifiShare bool `json:"wifi_share,omitempty"`
 }
-
-var reCountry = regexp.MustCompile(`^[A-Z]{2}$`)
 
 var rePort = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,14}$`)
 
@@ -91,17 +77,6 @@ func (n *Network) Validate() error {
 			return errors.New("the internet and local network need different ports")
 		}
 		seen[n.WAN.Port] = true
-		if w := n.WAN.Wifi; w != nil {
-			n.WAN.Type = "dhcp"
-			switch {
-			case strings.TrimSpace(w.SSID) == "" || len(w.SSID) > 32:
-				return errors.New("enter the name of the Wi-Fi network to join (up to 32 characters)")
-			case w.PSK != "" && (len(w.PSK) < 8 || len(w.PSK) > 63):
-				return errors.New("a Wi-Fi password is 8 to 63 characters; leave it empty only for an open network")
-			case !reCountry.MatchString(strings.ToUpper(strings.TrimSpace(w.Country))):
-				return errors.New("choose the country this device is in; it sets which Wi-Fi channels are legal")
-			}
-		}
 		switch n.WAN.Type {
 		case "dhcp":
 		case "static":
@@ -214,19 +189,7 @@ func fromU32(v uint32) netip.Addr {
 	return netip.AddrFrom4([4]byte{byte(v >> 24), byte(v >> 16), byte(v >> 8), byte(v)})
 }
 
-func wanName(w *WAN) string {
-	if w.Wifi != nil {
-		return "Internet (Wi-Fi)"
-	}
-	return "Internet"
-}
-
-func sealPSK(box *crypt.Box, psk string) string {
-	if psk == "" {
-		return ""
-	}
-	return box.Seal(psk)
-}
+func wanName(w *WAN) string { return "Internet" }
 
 // Apply stores the choice. The first boot applies it without asking for confirmation, because
 // there is nothing earlier to return to.
@@ -249,7 +212,7 @@ func Apply(db *store.DB, box *crypt.Box, n *Network) error {
 	zone.Gateway = l.Mode == "router"
 	lanName := l.Port
 	members := ""
-	if len(n.Bridge) > 0 || (n.WifiShare && l.Mode == "router") {
+	if len(n.Bridge) > 0 {
 		lanName = BridgeName
 		members = strings.Join(append([]string{l.Port}, n.Bridge...), ",")
 	}
@@ -290,14 +253,6 @@ func Apply(db *store.DB, box *crypt.Box, n *Network) error {
 		}
 	}
 	if w := n.WAN; w != nil {
-		if j := w.Wifi; j != nil {
-			// The card joins the network; the connection below then rides on it.
-			if _, err := tx.Exec(`INSERT INTO wifi_radios(iface,mode,ssid,psk,country,band,channel,hidden,wpa3,fast,enabled) VALUES(?,'client',?,?,?,'5',0,0,0,0,1)
-				ON CONFLICT(iface) DO UPDATE SET mode='client',ssid=excluded.ssid,psk=excluded.psk,country=excluded.country,enabled=1`,
-				w.Port, strings.TrimSpace(j.SSID), sealPSK(box, j.PSK), strings.ToUpper(strings.TrimSpace(j.Country))); err != nil {
-				return err
-			}
-		}
 		sealed := ""
 		if w.Type == "pppoe" {
 			sealed = box.Seal(w.PPPoEPass)

@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { get, post } from '../api.js';
 import { Button, Field, Icon, Input, Note, Pill, Segmented, Select, ToggleRow, enterToPrimary } from '../ui.jsx';
-import { COUNTRIES } from './Wifi.jsx';
 
 const baseAddr = (cidr) => (cidr || '').split('/')[0];
 
@@ -37,7 +36,7 @@ function PortPick({ ports, value, onChange, roles = {}, here }) {
         return (
           <button type="button" key={p.name} disabled={off} className={`preset ${value === p.name ? 'on' : ''}`} aria-pressed={value === p.name} onClick={() => onChange(p.name)}>
             <span className="t">
-              {p.name}{p.usb ? ' (USB adapter)' : ''}{p.wifi ? ' (Wi-Fi)' : ''}{' '}
+              {p.name}{p.usb ? ' (USB adapter)' : ''}{' '}
               {p.link ? <Pill tone="good">cable connected{p.speed && p.speed > 0 ? `, ${p.speed} Mb/s` : ''}</Pill> : <Pill>no cable</Pill>}
               {role ? <Pill tone="info">{role}</Pill> : null}
               {here === p.name && !role ? <Pill tone="info">you are connected here</Pill> : null}
@@ -54,10 +53,7 @@ const empty = (lan) => ({ lan: { port: lan, mode: 'router', address: '', address
 
 // The first-run wizard: how this device is used on the network. Everything here can be changed later.
 export default function Wizard({ data, me, onDone }) {
-  const wired = (data.ports || []).filter((p) => !p.wifi);
-  const wifiCards = (data.ports || []).filter((p) => p.wifi);
-  const [found, setFound] = useState(null);
-  const [scanning, setScanning] = useState(false);
+  const wired = data.ports || [];
   const [step, setStep] = useState('mode');
   const [wantBridge, setWantBridge] = useState(false);
   const [net, setNet] = useState(() => {
@@ -87,7 +83,7 @@ export default function Wizard({ data, me, onDone }) {
   const hereIsLan = data.here && data.here === lan.port;
 
   const okLan = router ? /^\d+\.\d+\.\d+\.\d+\/\d+$/.test(lan.address) : lan.addressing === 'dhcp' || (/\//.test(lan.static) && lan.gateway);
-  const okWan = !wan || (wan.wifi ? !!(wan.port && wan.wifi.ssid.trim() && (!wan.wifi.psk || wan.wifi.psk.length >= 8) && wan.wifi.country) : wan.port && (wan.type === 'dhcp' || (wan.type === 'pppoe' && wan.pppoe_user && wan.pppoe_pass) || (wan.type === 'static' && wan.addr && wan.gateway)));
+  const okWan = !wan || (wan.port && (wan.type === 'dhcp' || (wan.type === 'pppoe' && wan.pppoe_user && wan.pppoe_pass) || (wan.type === 'static' && wan.addr && wan.gateway)));
   const ready = lan.port && okLan && okWan;
   const others = wired.filter((p) => p.name !== lan.port && p.name !== wan?.port);
 
@@ -140,60 +136,23 @@ export default function Wizard({ data, me, onDone }) {
 
   if (step === 'internet') {
     const cand = wired.filter((p) => p.name !== data.here);
-    const viaWifi = !!wan?.wifi;
     const blank = { type: 'dhcp', addr: '', gateway: '', dns: '', pppoe_user: '', pppoe_pass: '' };
     const pick = (p) => setNet((m) => ({
       ...m,
-      wan: { ...blank, ...(m.wan && !m.wan.wifi ? m.wan : {}), port: p },
+      wan: { ...blank, ...(m.wan || {}), port: p },
       bridge: m.bridge.filter((b) => b !== p),
       lan: m.lan.port === p ? { ...m.lan, port: data.here || '' } : m.lan,
     }));
-    const useWifi = () => setNet((m) => ({ ...m, wan: { ...blank, port: wifiCards[0].name, wifi: { ssid: '', psk: '', country: data.country || 'US' } } }));
-    const setJoin = (k) => (v) => setNet((m) => ({ ...m, wan: { ...m.wan, wifi: { ...m.wan.wifi, [k]: v } } }));
-    const scan = async () => {
-      setScanning(true); setErr('');
-      try { setFound(await get(`/api/net/wifi/${wan.port}/scan`)); } catch (e) { setErr(e.message || 'The card could not look for networks.'); setFound(null); }
-      finally { setScanning(false); }
-    };
     return (
       <Frame title="Your internet connection" step={sn} of={order.length}>
-        {wifiCards.length > 0 && (
-          <Field label="How does the internet reach this device?">
-            <Segmented value={viaWifi ? 'wifi' : 'cable'} onChange={(v) => (v === 'wifi' ? useWifi() : setNet((m) => ({ ...m, wan: null })))} options={[{ value: 'cable', label: 'A cable from my modem' }, { value: 'wifi', label: 'A Wi-Fi network (hotspot)' }]} />
-          </Field>
-        )}
-        {viaWifi ? (
-          <>
-            <p className="sec">This device joins another Wi-Fi network, such as a mobile hotspot, and uses it as the internet.</p>
-            {wifiCards.length > 1 && (
-              <Field label="Wi-Fi card"><Select value={wan.port} onChange={(v) => { setNet((m) => ({ ...m, wan: { ...m.wan, port: v } })); setFound(null); }} options={wifiCards.map((c) => ({ value: c.name, label: `${c.name}${c.usb ? ' (USB adapter)' : ''}` }))} /></Field>
-            )}
-            <div className="actions"><Button onClick={scan} disabled={scanning}>{scanning ? 'Looking…' : 'Look for networks'}</Button></div>
-            {found && (
-              <div className="stack">
-                {found.length === 0 && <p className="small muted">No networks found. Move closer, or type the name below.</p>}
-                {found.slice(0, 10).map((n) => (
-                  <button type="button" key={n.ssid} className={`preset ${wan.wifi.ssid === n.ssid ? 'on' : ''}`} aria-pressed={wan.wifi.ssid === n.ssid} onClick={() => setJoin('ssid')(n.ssid)}>
-                    <span className="t">{n.ssid}</span><span className="d">{n.security === 'open' ? 'Open network' : 'Needs a password'}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-            <Field label="Network name"><Input value={wan.wifi.ssid} onChange={setJoin('ssid')} autoComplete="off" /></Field>
-            <Field label="Password" hint="Leave empty for an open network. A Wi-Fi password is 8 to 63 characters."><Input type="password" value={wan.wifi.psk} onChange={setJoin('psk')} autoComplete="off" /></Field>
-            <Field label="Country this device is in" hint="Sets which Wi-Fi channels are legal.">
-              <Select value={wan.wifi.country} onChange={setJoin('country')} options={[...(COUNTRIES[wan.wifi.country] ? [] : [{ value: wan.wifi.country, label: wan.wifi.country }]), ...Object.entries(COUNTRIES).map(([v, l]) => ({ value: v, label: l }))]} />
-            </Field>
-            <p className="small muted">Joining happens when you finish. If the name or password is wrong, change it under Wi-Fi once you are in.</p>
-          </>
-        ) : (
+        {(
           <>
             <p className="sec">Which port does the cable from your modem or provider plug into?</p>
             {data.here && <p className="small muted">You are using {data.here} right now, so it stays your own network.</p>}
             {cand.length ? (
               <PortPick ports={cand} value={wan?.port || ''} onChange={pick} roles={lan.port ? { [lan.port]: 'Your network' } : {}} />
             ) : (
-              <Note tone="warn" title="This machine has only one wired port">It cannot be both your internet and your network. Add a USB network adapter{wifiCards.length ? ', or choose a Wi-Fi network above' : ''}.</Note>
+              <Note tone="warn" title="This machine has only one wired port">It cannot be both your internet and your network. Add a USB network adapter.</Note>
             )}
             {wan?.port && (
               <>
@@ -239,9 +198,6 @@ export default function Wizard({ data, me, onDone }) {
             <Field label="Address of this device on your network" hint={data.install?.address && lan.address === data.install.address ? 'Chosen during install. You can change it here.' : 'Gatehouse picked a range that does not clash with the network you are on now.'}>
               <Input className="mono" value={lan.address} onChange={setLan('address')} placeholder="192.168.1.1/24" />
             </Field>
-            {wifiCards.some((c) => c.name !== wan?.port) && (
-              <ToggleRow title="I will also use Wi-Fi on this network" desc="Lets a Wi-Fi card share this network with your wired devices. You set up the Wi-Fi itself later, under Wi-Fi." checked={!!net.wifi_share} onChange={(v) => setNet((m) => ({ ...m, wifi_share: v }))} />
-            )}
             <ToggleRow title="Give devices their addresses (DHCP)" desc={lan.no_dhcp ? 'Off. Devices need an address set by hand, or another server on this network must hand them out.' : 'Recommended. Devices that connect get an address, the gateway and DNS automatically.'} checked={!lan.no_dhcp} onChange={(v) => setLan('no_dhcp')(!v)} />
           </>
         ) : (

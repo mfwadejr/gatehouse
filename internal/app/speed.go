@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -77,16 +76,13 @@ func (a *App) speedConfig() speedConfig {
 }
 
 // isMetered says whether a connection probably has a data limit: the person's own answer when
-// there is one, otherwise yes for a wireless card or a USB phone, which is how a hotspot appears.
+// there is one, otherwise yes for a USB phone, which is how a hotspot appears.
 func (a *App) isMetered(name, iface string, c speedConfig) bool {
 	if l, ok := c.Links[name]; ok && l.Metered != nil {
 		return *l.Metered
 	}
 	if iface == "" {
 		return false
-	}
-	if _, err := os.Stat(filepath.Join("/sys/class/net", iface, "wireless")); err == nil {
-		return true
 	}
 	if real, err := filepath.EvalSymlinks(filepath.Join("/sys/class/net", iface)); err == nil && strings.Contains(real, "/usb") {
 		return true

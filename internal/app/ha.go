@@ -225,9 +225,8 @@ func (a *App) haPortList() []ha.Port {
 	var out []ha.Port
 	for _, p := range portsLister() {
 		n, _ := p["name"].(string)
-		w, _ := p["wifi"].(bool)
 		l, _ := p["link"].(bool)
-		out = append(out, ha.Port{Name: n, Speed: speedOf(p), Link: l, Wireless: w})
+		out = append(out, ha.Port{Name: n, Speed: speedOf(p), Link: l})
 	}
 	return out
 }
@@ -644,7 +643,7 @@ func remapPorts(tx *sql.Tx, ms []ha.Match) error {
 			return fmt.Errorf("renaming ports: %w", err)
 		}
 	}
-	for _, t := range []string{"wan_links", "dhcp_scopes", "wifi_radios"} {
+	for _, t := range []string{"wan_links", "dhcp_scopes"} {
 		rows, err := tx.Query(`SELECT rowid,iface FROM ` + t)
 		if err != nil {
 			return err

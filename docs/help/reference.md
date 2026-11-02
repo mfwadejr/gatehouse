@@ -1,5 +1,10 @@
 # Reference
 
+## What is not included
+
+- **Wireless (Wi-Fi):** not included. There are no Wi-Fi drivers or firmware on the installer, and wireless cards are blocked from loading. Use a separate access point.
+- **ARM builds and Secure Boot signing:** not built yet.
+
 ## Ports Gatehouse uses
 
 - **443**: the console (HTTPS). You can change it under **Settings, General, Console address**.

@@ -81,8 +81,6 @@ func (a *App) networkSummary() (string, []sumSection) {
 		a.table(`SELECT hostname,ip,mac FROM dhcp_reservations ORDER BY ip`))
 	add("Devices", "Name, address and the network each was last seen on.", []string{"Device", "Last address", "Hardware address"},
 		a.table(`SELECT CASE WHEN name<>'' THEN name ELSE mac END,last_ip,mac FROM devices ORDER BY last_ip`))
-	add("Wi-Fi names", "Passwords are not printed here. Use the Wi-Fi page to print a join card.", []string{"Name", "Card", "Hidden"},
-		a.table(`SELECT ssid,iface,CASE WHEN hidden=1 THEN 'yes' ELSE 'no' END FROM wifi_radios WHERE mode='ap' AND enabled=1 AND ssid<>''`))
 	add("Open ports to the internet", "", []string{"Name", "Protocol", "Port", "Goes to"},
 		a.table(`SELECT name,proto,ext_port,int_addr||CASE WHEN int_port<>'' THEN ':'||int_port ELSE '' END FROM nat_forwards WHERE enabled=1 ORDER BY id`))
 	upnp := []string{}

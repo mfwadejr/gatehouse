@@ -220,7 +220,7 @@ func TestHARefusesBackupWithFewerPorts(t *testing.T) {
 	// The backup has a single wired port.
 	old := portsLister
 	portsLister = func() []map[string]any {
-		return []map[string]any{{"name": "only", "wifi": false, "link": true, "speed": "1000"}}
+		return []map[string]any{{"name": "only", "link": true, "speed": "1000"}}
 	}
 	t.Cleanup(func() { portsLister = old })
 	_, m, _ = sc.call("POST", "/api/ha/discover", map[string]string{"code": code})

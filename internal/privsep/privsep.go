@@ -36,16 +36,12 @@ type NetController interface {
 	VPNStatus() netd.VPNStatus
 	FWEvents(since uint64, max int) ([]netd.FWEvent, uint64)
 	SetSystem(hostname, zone string) error
-	WifiScan(iface string) ([]netd.WifiNetwork, error)
 	UPnPApply(ms []netd.UPnPMapping) error
 	UpdateStart(path string) error
 	SystemCheck() (netd.SystemUpdates, error)
 	SystemUpdateStart() error
 	Power(action string) error
 	SpeedTest(ctx context.Context, p speedtest.Params) (speedtest.Result, error)
-	WifiHealth(ifaces []string, keepAwake bool) ([]netd.WifiState, error)
-	WifiPowerSave(iface string, keepAwake bool) error
-	WifiReport(iface string) (string, error)
 	Diag(kind, target string) (string, error)
 	SSHApply(p netd.SSHPlan) error
 	SSHLog(since int64) ([]string, error)
@@ -305,40 +301,6 @@ func (s *Server) dispatchNet(r request) (any, error) {
 		return nil, s.Net.ApplyVPN(p)
 	case "vpn.status":
 		return s.Net.VPNStatus(), nil
-	case "net.wifiscan":
-		var p struct {
-			Iface string `json:"iface"`
-		}
-		if err := json.Unmarshal(r.Params, &p); err != nil {
-			return nil, errors.New("bad parameters")
-		}
-		return s.Net.WifiScan(p.Iface)
-	case "wifi.health":
-		var p struct {
-			Ifaces    []string `json:"ifaces"`
-			KeepAwake bool     `json:"keep_awake"`
-		}
-		if err := json.Unmarshal(r.Params, &p); err != nil {
-			return nil, errors.New("bad parameters")
-		}
-		return s.Net.WifiHealth(p.Ifaces, p.KeepAwake)
-	case "wifi.powersave":
-		var p struct {
-			Iface     string `json:"iface"`
-			KeepAwake bool   `json:"keep_awake"`
-		}
-		if err := json.Unmarshal(r.Params, &p); err != nil {
-			return nil, errors.New("bad parameters")
-		}
-		return nil, s.Net.WifiPowerSave(p.Iface, p.KeepAwake)
-	case "wifi.report":
-		var p struct {
-			Iface string `json:"iface"`
-		}
-		if err := json.Unmarshal(r.Params, &p); err != nil {
-			return nil, errors.New("bad parameters")
-		}
-		return s.Net.WifiReport(p.Iface)
 	case "diag.run":
 		var p struct {
 			Kind   string `json:"kind"`
@@ -662,32 +624,6 @@ func (c *Client) VPNStatus() (netd.VPNStatus, error) {
 // SetSystem changes the device name and time zone.
 func (c *Client) SetSystem(hostname, zone string) error {
 	return c.call("net.system", map[string]string{"hostname": hostname, "zone": zone}, nil)
-}
-
-// WifiScan lists the networks a wireless card can see.
-func (c *Client) WifiScan(iface string) ([]netd.WifiNetwork, error) {
-	var out []netd.WifiNetwork
-	err := c.call("net.wifiscan", map[string]string{"iface": iface}, &out)
-	return out, err
-}
-
-// WifiHealth checks the broadcasting cards and takes a recovery step for one that has stalled.
-func (c *Client) WifiHealth(ifaces []string, keepAwake bool) ([]netd.WifiState, error) {
-	var out []netd.WifiState
-	err := c.callWithin(3*time.Minute, "wifi.health", map[string]any{"ifaces": ifaces, "keep_awake": keepAwake}, &out)
-	return out, err
-}
-
-// WifiPowerSave keeps a card from sleeping.
-func (c *Client) WifiPowerSave(iface string, keepAwake bool) error {
-	return c.call("wifi.powersave", map[string]any{"iface": iface, "keep_awake": keepAwake}, nil)
-}
-
-// WifiReport reads what is known about a card, for the console.
-func (c *Client) WifiReport(iface string) (string, error) {
-	var out string
-	err := c.callWithin(time.Minute, "wifi.report", map[string]string{"iface": iface}, &out)
-	return out, err
 }
 
 // Diag runs a ping or traceroute from the machine itself.

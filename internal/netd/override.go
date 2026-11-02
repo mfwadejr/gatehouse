@@ -130,7 +130,7 @@ func (s *Service) OverrideApply(p OverridePlan) error {
 		return err
 	}
 	for _, c := range cmds {
-		out, err := wifiRun(15*time.Second, "tc", c...)
+		out, err := sysRun(15*time.Second, "tc", c...)
 		if err == nil || c[0] == "filter" && c[1] == "del" {
 			continue
 		}
@@ -140,7 +140,7 @@ func (s *Service) OverrideApply(p OverridePlan) error {
 		}
 		if cc, e := OverrideCommands(clear); e == nil {
 			for _, x := range cc {
-				wifiRun(15*time.Second, "tc", x...)
+				sysRun(15*time.Second, "tc", x...)
 			}
 		}
 		msg := strings.TrimSpace(out)

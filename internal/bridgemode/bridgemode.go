@@ -147,9 +147,8 @@ func (c Config) Validate() error {
 
 // PortInfo is what is known about a port on this machine, for the checks.
 type PortInfo struct {
-	Name     string
-	Wireless bool
-	UsedFor  string // "internet", "network" or "" when free
+	Name    string
+	UsedFor string // "internet", "network" or "" when free
 }
 
 // CheckPorts refuses setups that name missing or already-used ports, and returns advice that does
@@ -164,13 +163,8 @@ func (c Config) CheckPorts(have []PortInfo, current []string) (warnings []string
 	}
 	var errs []string
 	for _, n := range c.Ports() {
-		p, ok := by[n]
-		if !ok {
+		if _, ok := by[n]; !ok {
 			errs = append(errs, fmt.Sprintf("%s is not a port on this machine", n))
-			continue
-		}
-		if p.Wireless {
-			errs = append(errs, fmt.Sprintf("%s is a Wi-Fi card; a bridge needs wired ports", n))
 		}
 	}
 	if len(errs) > 0 {

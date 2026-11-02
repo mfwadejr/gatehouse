@@ -96,8 +96,6 @@ func (a *App) checkInternetPort(iface, clientIP string) error {
 	switch {
 	case info == nil:
 		return errors.New(iface + " is not a port on this machine")
-	case info.Wireless:
-		return errors.New(a.portName(iface) + " is a Wi-Fi card; choose a wired port")
 	}
 	for _, cp := range a.currentPorts(clientIP) {
 		if cp == iface {

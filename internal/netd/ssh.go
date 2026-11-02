@@ -84,8 +84,8 @@ func (s *Service) SSHApply(p SSHPlan) error {
 	pam := s.rootPath(sshPamFile)
 	drop := s.rootPath(sshDropIn)
 	if !p.Enabled {
-		wifiRun(30*time.Second, "systemctl", "disable", "--now", "ssh.socket")
-		wifiRun(30*time.Second, "systemctl", "disable", "--now", "ssh.service")
+		sysRun(30*time.Second, "systemctl", "disable", "--now", "ssh.socket")
+		sysRun(30*time.Second, "systemctl", "disable", "--now", "ssh.service")
 		os.Remove(drop)
 		// The logins stay (locked, with their files); nothing can reach them with the server off.
 		return removePamLine(pam)
@@ -93,7 +93,7 @@ func (s *Service) SSHApply(p SSHPlan) error {
 	if _, err := os.Stat(pam); err != nil {
 		return errors.New("the SSH server is not installed on this machine")
 	}
-	wifiRun(10*time.Second, "groupadd", "-f", sshGroup)
+	sysRun(10*time.Second, "groupadd", "-f", sshGroup)
 	if err := os.MkdirAll(filepath.Dir(drop), 0o755); err != nil {
 		return err
 	}
@@ -114,16 +114,16 @@ func (s *Service) SSHApply(p SSHPlan) error {
 		return err
 	}
 	// A configuration that sshd rejects must never be left in place: check it first.
-	if out, err := wifiRun(10*time.Second, "sshd", "-t"); err != nil {
+	if out, err := sysRun(10*time.Second, "sshd", "-t"); err != nil {
 		os.Remove(drop)
 		removePamLine(pam)
 		return fmt.Errorf("the SSH server rejected its settings: %s", strings.TrimSpace(out))
 	}
-	wifiRun(30*time.Second, "systemctl", "disable", "--now", "ssh.socket")
-	if out, err := wifiRun(30*time.Second, "systemctl", "enable", "ssh.service"); err != nil {
+	sysRun(30*time.Second, "systemctl", "disable", "--now", "ssh.socket")
+	if out, err := sysRun(30*time.Second, "systemctl", "enable", "ssh.service"); err != nil {
 		return fmt.Errorf("could not enable the SSH server: %s", strings.TrimSpace(out))
 	}
-	if out, err := wifiRun(30*time.Second, "systemctl", "restart", "ssh.service"); err != nil {
+	if out, err := sysRun(30*time.Second, "systemctl", "restart", "ssh.service"); err != nil {
 		return fmt.Errorf("could not start the SSH server: %s", strings.TrimSpace(out))
 	}
 	return nil
@@ -142,7 +142,7 @@ func (s *Service) EnsureHostKeys() error {
 	if s.Root != "" && s.Root != "/" {
 		args = append(args, "-f", s.Root)
 	}
-	if out, err := wifiRun(30*time.Second, "ssh-keygen", args...); err != nil {
+	if out, err := sysRun(30*time.Second, "ssh-keygen", args...); err != nil {
 		return fmt.Errorf("this machine had no SSH identity (host keys) and Gatehouse could not make one: %s", strings.TrimSpace(out))
 	}
 	return nil
@@ -152,7 +152,7 @@ func (s *Service) EnsureHostKeys() error {
 // logins this made for people who are no longer administrators are removed.
 func (s *Service) syncSSHUsers(want []string) error {
 	have := map[string]bool{}
-	if out, err := wifiRun(10*time.Second, "getent", "group", sshGroup); err == nil {
+	if out, err := sysRun(10*time.Second, "getent", "group", sshGroup); err == nil {
 		parts := strings.Split(strings.TrimSpace(out), ":")
 		if len(parts) == 4 && parts[3] != "" {
 			for _, u := range strings.Split(parts[3], ",") {
@@ -170,18 +170,18 @@ func (s *Service) syncSSHUsers(want []string) error {
 		if have[n] {
 			continue
 		}
-		if _, err := wifiRun(10*time.Second, "id", "-u", n); err == nil {
+		if _, err := sysRun(10*time.Second, "id", "-u", n); err == nil {
 			// A login of that name already exists and is not ours: never take it over.
 			continue
 		}
-		if out, err := wifiRun(20*time.Second, "useradd", "-m", "-s", "/bin/bash", "-G", sshGroup+",systemd-journal", "-p", "!", n); err != nil {
+		if out, err := sysRun(20*time.Second, "useradd", "-m", "-s", "/bin/bash", "-G", sshGroup+",systemd-journal", "-p", "!", n); err != nil {
 			return fmt.Errorf("could not make the login %s: %s", n, strings.TrimSpace(out))
 		}
 	}
 	for u := range have {
 		if !wanted[u] && reLinuxUser.MatchString(u) {
-			wifiRun(10*time.Second, "loginctl", "terminate-user", u)
-			wifiRun(20*time.Second, "userdel", "-r", u)
+			sysRun(10*time.Second, "loginctl", "terminate-user", u)
+			sysRun(20*time.Second, "userdel", "-r", u)
 		}
 	}
 	return nil
@@ -230,7 +230,7 @@ func (s *Service) SSHLog(since int64) ([]string, error) {
 	if since < 0 {
 		since = 0
 	}
-	out, err := wifiRun(10*time.Second, "journalctl", "-u", "ssh.service", "--no-pager", "-o", "short-unix", "--since", fmt.Sprintf("@%d", since))
+	out, err := sysRun(10*time.Second, "journalctl", "-u", "ssh.service", "--no-pager", "-o", "short-unix", "--since", fmt.Sprintf("@%d", since))
 	if err != nil && strings.TrimSpace(out) == "" {
 		return nil, nil
 	}

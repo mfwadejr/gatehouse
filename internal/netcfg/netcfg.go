@@ -59,7 +59,6 @@ type Config struct {
 	WANs       []WAN       `json:"wans"`
 	WireGuard  []WG        `json:"wireguard,omitempty"`
 	Tunnels    []Tunnel    `json:"tunnels,omitempty"`
-	Wifi       []Wifi      `json:"wifi,omitempty"`
 }
 
 // Output is the set of files to install.
@@ -71,9 +70,6 @@ type Output struct {
 	Sysctl   string
 	// Private holds secret files (keys), by file name inside the VPN key directory.
 	Private map[string]string
-	// Wifi holds the wireless card configuration files (they contain passphrases), by file name
-	// inside WifiDir.
-	Wifi map[string]string
 }
 
 var (
@@ -266,7 +262,6 @@ func (c *Config) Validate() error {
 			add("%s: MTU must be between 576 and 9216", w.Name)
 		}
 	}
-	errs = append(errs, c.validateWifi()...)
 	errs = append(errs, c.validateWG()...)
 	errs = append(errs, c.validateTunnels()...)
 	if len(errs) > 0 {
@@ -284,7 +279,7 @@ func Generate(c *Config) (*Output, error) {
 	if err := c.Validate(); err != nil {
 		return nil, err
 	}
-	out := &Output{Networkd: map[string]string{}, PPPPeers: map[string]string{}, Private: map[string]string{}, Wifi: map[string]string{}}
+	out := &Output{Networkd: map[string]string{}, PPPPeers: map[string]string{}, Private: map[string]string{}}
 
 	// Which physical ports carry VLANs, and which VLANs.
 	vlansOn := map[string][]string{}
@@ -535,7 +530,6 @@ func Generate(c *Config) (*Output, error) {
 		finish(p, f)
 	}
 
-	c.generateWifi(out)
 	c.generateWG(out)
 	c.generateTunnels(out)
 

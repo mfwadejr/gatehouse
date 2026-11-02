@@ -18,9 +18,9 @@ func fakeThreatBox(t *testing.T) (*Service, *[]string) {
 	s := &Service{Root: root}
 	var calls []string
 	fakeApt(t, &aptLog{}, "13") // the Debian 13 guard reads these files
-	oldRun, oldApt := wifiRun, aptRun
-	t.Cleanup(func() { wifiRun, aptRun = oldRun, oldApt; setThreat("idle", "") })
-	wifiRun = func(_ time.Duration, name string, args ...string) (string, error) {
+	oldRun, oldApt := sysRun, aptRun
+	t.Cleanup(func() { sysRun, aptRun = oldRun, oldApt; setThreat("idle", "") })
+	sysRun = func(_ time.Duration, name string, args ...string) (string, error) {
 		calls = append(calls, name+" "+strings.Join(args, " "))
 		if name == "suricata-update" {
 			os.MkdirAll(filepath.Join(root, "var/lib/suricata/rules"), 0o755)
@@ -185,7 +185,7 @@ func TestThreatRulesRollBackAndKeepOldOnFailure(t *testing.T) {
 	os.MkdirAll(filepath.Dir(rules), 0o755)
 	os.WriteFile(rules, []byte("alert tcp any any -> any any (msg:\"old\"; sid:7;)\n"), 0o644)
 	// a failing update keeps the old rules
-	wifiRun = func(_ time.Duration, name string, args ...string) (string, error) {
+	sysRun = func(_ time.Duration, name string, args ...string) (string, error) {
 		if name == "suricata-update" {
 			os.WriteFile(rules, []byte("broken"), 0o644)
 			return "download failed", os.ErrInvalid
@@ -199,7 +199,7 @@ func TestThreatRulesRollBackAndKeepOldOnFailure(t *testing.T) {
 		t.Fatalf("old rules lost: %q", got)
 	}
 	// a good update, then roll back to the one before
-	wifiRun = func(_ time.Duration, name string, args ...string) (string, error) {
+	sysRun = func(_ time.Duration, name string, args ...string) (string, error) {
 		if name == "suricata-update" {
 			os.WriteFile(rules, []byte("alert tcp any any -> any any (msg:\"new\"; sid:8;)\n"), 0o644)
 		}

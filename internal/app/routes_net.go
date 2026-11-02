@@ -37,16 +37,12 @@ type NetController interface {
 	VPNStatus() (netd.VPNStatus, error)
 	FWEvents(since uint64, max int) ([]netd.FWEvent, uint64, error)
 	SetSystem(hostname, zone string) error
-	WifiScan(iface string) ([]netd.WifiNetwork, error)
 	UPnPApply(ms []netd.UPnPMapping) error
 	UpdateStart(path string) error
 	SystemCheck() (netd.SystemUpdates, error)
 	SystemUpdateStart() error
 	Power(action string) error
 	SpeedTest(p speedtest.Params) (speedtest.Result, error)
-	WifiHealth(ifaces []string, keepAwake bool) ([]netd.WifiState, error)
-	WifiPowerSave(iface string, keepAwake bool) error
-	WifiReport(iface string) (string, error)
 	Diag(kind, target string) (string, error)
 	SSHApply(p netd.SSHPlan) error
 	SSHLog(since int64) ([]string, error)
@@ -228,9 +224,6 @@ func (a *App) buildPlanFrom(q querier, bridge *bridgemode.Config) (*netd.Plan, e
 	if err := a.addGroupsToPlan(q, p); err != nil {
 		return nil, err
 	}
-	if err := a.addWifiToPlan(q, p); err != nil {
-		return nil, err
-	}
 	applyBridgeToPlan(p, bridge)
 	return p, nil
 }
@@ -308,7 +301,7 @@ func (a *App) netStatus() map[string]any {
 func (a *App) publishNet() { a.Bus.Publish("net.status", a.netStatus()) }
 
 // ports lists network ports a person can plug a cable into: built-in, PCIe and USB adapters.
-// Virtual devices (bridges, VPNs, containers, loopback) are left out. Wireless cards are listed with wifi set.
+// Virtual devices (bridges, VPNs, containers, loopback) and wireless cards are left out: Gatehouse has no wireless support.
 func ports() []map[string]any {
 	ents, _ := os.ReadDir("/sys/class/net")
 	out := []map[string]any{}
@@ -322,7 +315,9 @@ func ports() []map[string]any {
 		if err != nil || strings.Contains(real, "/devices/virtual/") {
 			continue
 		}
-		_, werr := os.Stat(base + "/wireless")
+		if _, werr := os.Stat(base + "/wireless"); werr == nil {
+			continue // wireless is not supported
+		}
 		if t, _ := os.ReadFile(base + "/type"); strings.TrimSpace(string(t)) != "1" {
 			continue // not Ethernet
 		}
@@ -334,7 +329,7 @@ func ports() []map[string]any {
 		speed, _ := os.ReadFile(base + "/speed")
 		out = append(out, map[string]any{"name": n, "mac": ifi.HardwareAddr.String(),
 			"link": strings.TrimSpace(string(carrier)) == "1", "speed": strings.TrimSpace(string(speed)),
-			"usb": strings.Contains(real, "/usb"), "wifi": werr == nil, "addrs": ifaceAddrs(n)})
+			"usb": strings.Contains(real, "/usb"), "addrs": ifaceAddrs(n)})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i]["name"].(string) < out[j]["name"].(string) })
 	return out

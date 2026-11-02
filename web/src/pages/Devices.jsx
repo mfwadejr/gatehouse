@@ -49,10 +49,6 @@ const PAGE_SIZES = [10, 15, 25, 50, 100];
 function Conn({ d }) {
   const pn = usePortNames();
   if (!d.conn) return <span className="muted">–</span>;
-  if (d.conn === 'wifi') {
-    const sig = d.signal ? ` · ${d.signal} dBm` : '';
-    return <span>Wi-Fi{d.band ? ` ${d.band} GHz` : ''}{d.channel ? ` ch ${d.channel}` : ''}<span className="muted small">{sig}</span></span>;
-  }
   if (d.conn === 'vpn') return <span>VPN</span>;
   return <span>Wired{d.port ? <span className="muted small"> · {pn(d.port)}</span> : ''}</span>;
 }
@@ -107,7 +103,7 @@ function Details({ d, groups, onClose, onSaved }) {
         <span className="devicon big"><DeviceIcon d={d} size={30} /></span>
         <div>
           <div className="small muted mono">{d.mac}</div>
-          <div className="small">{[d.vendor, d.network, d.via ? `Sent through ${d.via}` : '', d.conn === 'wifi' ? 'Wi-Fi' : d.conn === 'wired' ? `Wired ${pn(d.port)}` : d.conn === 'vpn' ? 'VPN' : ''].filter(Boolean).join(' · ') || 'Not seen on the network yet'}</div>
+          <div className="small">{[d.vendor, d.network, d.via ? `Sent through ${d.via}` : '', d.conn === 'wired' ? `Wired ${pn(d.port)}` : d.conn === 'vpn' ? 'VPN' : ''].filter(Boolean).join(' · ') || 'Not seen on the network yet'}</div>
         </div>
         <Pill tone={d.online ? 'good' : ''}>{d.online ? 'Online' : `Seen ${fmt.ago(d.last_seen)}`}</Pill>
       </div>
@@ -163,7 +159,7 @@ function Filters({ rows, f, setF }) {
         { value: '', label: `All ${rows.length}` }, { value: 'online', label: `Online ${count((d) => d.online)}` }, { value: 'offline', label: `Offline ${count((d) => !d.online)}` }]} />
       <Segmented value={f.conn} onChange={set('conn')} options={[
         { value: '', label: 'Any connection' }, { value: 'wired', label: `Wired ${count((d) => d.conn === 'wired')}` },
-        { value: 'wifi', label: `Wi-Fi ${count((d) => d.conn === 'wifi')}` }, { value: 'vpn', label: `VPN ${count((d) => d.conn === 'vpn')}` }]} />
+        { value: 'vpn', label: `VPN ${count((d) => d.conn === 'vpn')}` }]} />
       {networks.length > 0 && <div style={{ width: '11rem' }}><Select value={f.network} onChange={set('network')} aria-label="Network" options={[{ value: '', label: 'All networks' }, ...networks.map((n) => ({ value: n, label: n }))]} /></div>}
       {groups.length > 0 && <div style={{ width: '11rem' }}><Select value={f.group} onChange={set('group')} aria-label="Group" options={[{ value: '', label: 'All groups' }, ...groups.map((g) => ({ value: g, label: g }))]} /></div>}
       {(f.state || f.conn || f.network || f.group) && <Button small onClick={() => setF({ state: '', conn: '', network: '', group: '' })}>Clear filters</Button>}

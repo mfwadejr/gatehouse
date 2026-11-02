@@ -191,10 +191,10 @@ func TestOVPNReasonSaysWhatIsWrong(t *testing.T) {
 func TestStatusReadsOpenVPNMessagesForABrokenClient(t *testing.T) {
 	v, _ := newTestVPN(t)
 	defer v.Stop()
-	old := wifiRun
-	defer func() { wifiRun = old }()
+	old := sysRun
+	defer func() { sysRun = old }()
 	var asked string
-	wifiRun = func(_ time.Duration, name string, args ...string) (string, error) {
+	sysRun = func(_ time.Duration, name string, args ...string) (string, error) {
 		asked = name + " " + strings.Join(args, " ")
 		return "TLS Error: TLS handshake failed\n", nil
 	}

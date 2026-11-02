@@ -212,7 +212,7 @@ const RESET = {
   network: {
     title: 'Reset network settings',
     verb: 'Reset network settings',
-    lines: ['Networks, firewall rules, port forwards, DHCP, DNS names and lists, VPNs, and Wi-Fi go back to a clean start.', 'Your accounts, sign-in settings, update settings and the console port stay.'],
+    lines: ['Networks, firewall rules, port forwards, DHCP, DNS names and lists, and VPNs go back to a clean start.', 'Your accounts, sign-in settings, update settings and the console port stay.'],
   },
   factory: {
     title: 'Factory reset',

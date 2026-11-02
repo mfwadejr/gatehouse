@@ -52,24 +52,3 @@ func TestTurningOnRemoteLoginOpensManagementNetworksOnlyAndFailureLeavesItOff(t 
 		t.Fatalf("no network lists SSH as reachable: %s", raw)
 	}
 }
-
-func TestStalledWifiIsRecordedAndRecoveryIsLogged(t *testing.T) {
-	a, fn := newSpeedApp(t)
-	a.Config.Exec(`INSERT INTO wifi_radios(iface,mode,ssid,psk,country,band,channel,hidden,wpa3,fast,enabled) VALUES('wlp3s0','ap','gatehouse','',?,'2.4',0,0,0,0,1)`, "US")
-	fn.wifiStates = []netd.WifiState{{Iface: "wlp3s0", OK: false, Reason: "the card's driver does not answer", Action: "restarted the Wi-Fi service", Recoveries: 1}}
-	a.wifiCheckOnce()
-	var n int
-	a.Logs.QueryRow(`SELECT COUNT(*) FROM events WHERE title LIKE 'Wi-Fi on wlp3s0 stopped working%'`).Scan(&n)
-	if n != 1 {
-		t.Fatalf("the stall was not logged (%d)", n)
-	}
-	if st, ok := a.wifiState("wlp3s0"); !ok || st.OK {
-		t.Fatalf("state: %+v %v", st, ok)
-	}
-	fn.wifiStates = []netd.WifiState{{Iface: "wlp3s0", OK: true, Stations: 2}}
-	a.wifiCheckOnce()
-	a.Logs.QueryRow(`SELECT COUNT(*) FROM events WHERE title='Wi-Fi on wlp3s0 is working again'`).Scan(&n)
-	if n != 1 {
-		t.Fatalf("the recovery was not logged (%d)", n)
-	}
-}

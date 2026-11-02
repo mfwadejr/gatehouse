@@ -27,11 +27,6 @@ iputils-ping
 nftables
 ppp
 ethtool
-hostapd
-wpasupplicant
-iw
-rfkill
-wireless-regdb
 tcpdump
 conntrack
 curl
@@ -61,16 +56,13 @@ pciutils
 usbutils
 
 # Hardware support. USB Ethernet adapters (Realtek, ASIX, Microchip) work with the kernel
-# drivers; the Realtek ones need their firmware package.
+# drivers; the Realtek ones need their firmware package. No wireless firmware is included: Gatehouse
+# has no wireless support (see docs/help/getting-started.md).
 firmware-linux-free
 firmware-realtek
 firmware-misc-nonfree
 firmware-bnx2
 firmware-bnx2x
-firmware-atheros
-firmware-iwlwifi
-firmware-brcm80211
-firmware-mediatek
 firmware-intel-misc
 intel-microcode
 amd64-microcode

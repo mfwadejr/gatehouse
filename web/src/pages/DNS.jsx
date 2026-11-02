@@ -71,7 +71,7 @@ function Overview() {
             </div>
           )}
         </Card>
-        <Card title="Most blocked" desc="Last 24 hours">
+        <Card title="Most blocked" desc="Names that were stopped by a blocklist or your own rules, last 24 hours">
           {!top?.blocked?.length ? <Empty>Nothing has been blocked yet.</Empty> : (
             <div className="list">
               {top.blocked.slice(0, 6).map((c) => <div className="item" key={c.key}><span className="name" style={{ wordBreak: 'break-all' }}>{c.key}</span><span>{fmt.n(c.n)}</span></div>)}

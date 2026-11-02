@@ -15,7 +15,7 @@ function usePlugs() {
     if (!Array.isArray(data)) return;
     const now = Object.fromEntries(data.map((p) => [p.name, p.link]));
     if (base.current) {
-      const hits = data.filter((p) => p.link && !p.wifi && base.current[p.name] === false).map((p) => p.name);
+      const hits = data.filter((p) => p.link && base.current[p.name] === false).map((p) => p.name);
       if (hits.length) setPlugs((x) => [...x, ...hits]);
     }
     base.current = now;
@@ -27,7 +27,7 @@ function usePlugs() {
 function PortList({ ports, value, onPick, off = [], pn, here }) {
   return (
     <div className="stack">
-      {ports.filter((p) => !p.wifi).map((p) => {
+      {ports.map((p) => {
         const gone = off.includes(p.name);
         return (
           <button type="button" key={p.name} disabled={gone} className={`preset ${value === p.name ? 'on' : ''}`} aria-pressed={value === p.name} onClick={() => onPick(p.name)}>
@@ -58,7 +58,7 @@ function Walk({ data, start, onClose, onApplied }) {
   const [target, setTarget] = useState(outside ? 'inside' : 'outside');
   const [addr, setAddr] = useState({ mode: draft.mode || 'static', addr: draft.addr || '', gateway: draft.gateway || '', dns: draft.dns || '' });
   const seen = useRef(0);
-  const wired = ports.filter((p) => !p.wifi);
+  const wired = ports;
 
   // Hand each newly detected cable to what the person is plugging in now.
   useEffect(() => {

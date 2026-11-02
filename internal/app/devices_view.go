@@ -5,15 +5,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/netip"
-	"os/exec"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"gatehouse/internal/api"
@@ -24,126 +20,14 @@ import (
 // The Devices page: every device with its maker, where it is connected, what network it is on, how
 // much it is using, and an icon.
 
-type station struct {
-	Iface   string `json:"iface"`
-	Signal  int    `json:"signal"`  // dBm
-	Band    string `json:"band"`    // 2.4, 5 or 6 (GHz)
-	Channel int    `json:"channel"` //
-	Rate    string `json:"rate"`    // for example "866 Mb/s"
-}
-
-var (
-	reStation = regexp.MustCompile(`^Station ([0-9a-f:]{17}) `)
-	reSignal  = regexp.MustCompile(`^\s*signal:\s*(-?\d+)`)
-	reTxRate  = regexp.MustCompile(`^\s*tx bitrate:\s*([\d.]+) MBit/s`)
-	reChannel = regexp.MustCompile(`channel (\d+) \((\d+) MHz\)`)
-)
-
-// ParseStationDump reads `iw dev X station dump`: the devices connected to the card, with their
-// signal and speed.
-func ParseStationDump(out string) map[string]station {
-	res := map[string]station{}
-	var cur string
-	var st station
-	flush := func() {
-		if cur != "" {
-			res[cur] = st
-		}
-	}
-	for _, l := range strings.Split(out, "\n") {
-		if m := reStation.FindStringSubmatch(l); m != nil {
-			flush()
-			cur, st = m[1], station{}
-			continue
-		}
-		if m := reSignal.FindStringSubmatch(l); m != nil {
-			st.Signal, _ = strconv.Atoi(m[1])
-		} else if m := reTxRate.FindStringSubmatch(l); m != nil {
-			if f, err := strconv.ParseFloat(m[1], 64); err == nil {
-				st.Rate = fmt.Sprintf("%.0f Mb/s", f)
-			}
-		}
-	}
-	flush()
-	return res
-}
-
-// ParseChannel reads the channel and band from `iw dev X info`.
-func ParseChannel(out string) (band string, channel int) {
-	m := reChannel.FindStringSubmatch(out)
-	if m == nil {
-		return "", 0
-	}
-	channel, _ = strconv.Atoi(m[1])
-	mhz, _ := strconv.Atoi(m[2])
-	switch {
-	case mhz < 3000:
-		band = "2.4"
-	case mhz < 5925:
-		band = "5"
-	default:
-		band = "6"
-	}
-	return band, channel
-}
-
-type stationCache struct {
-	mu   sync.Mutex
-	at   time.Time
-	data map[string]station
-}
-
-// stations lists the devices on this machine's own Wi-Fi cards. Other access points and wired
-// devices are not visible this way.
-func (a *App) stations() map[string]station {
-	c := &a.stationCache
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.data != nil && time.Since(c.at) < 5*time.Second {
-		return c.data
-	}
-	out := map[string]station{}
-	rows, err := a.Config.Query(`SELECT iface FROM wifi_radios WHERE mode='ap' AND enabled=1`)
-	if err == nil {
-		var ifs []string
-		for rows.Next() {
-			var n string
-			rows.Scan(&n)
-			ifs = append(ifs, n)
-		}
-		rows.Close()
-		for _, n := range ifs {
-			b, err := exec.Command("iw", "dev", n, "station", "dump").Output()
-			if err != nil {
-				continue
-			}
-			var band string
-			var ch int
-			if ib, err := exec.Command("iw", "dev", n, "info").Output(); err == nil {
-				band, ch = ParseChannel(string(ib))
-			}
-			for mac, st := range ParseStationDump(string(b)) {
-				st.Iface, st.Band, st.Channel = n, band, ch
-				out[mac] = st
-			}
-		}
-	}
-	c.data, c.at = out, time.Now()
-	return out
-}
-
 type deviceRow struct {
 	devices.Device
 	Vendor    string   `json:"vendor"`
 	IconGuess string   `json:"icon_guess"`
 	Source    string   `json:"source"`  // "device" or "vpn"
-	Conn      string   `json:"conn"`    // wired, wifi, vpn, or empty when not known
+	Conn      string   `json:"conn"`    // wired, vpn, or empty when not known
 	Port      string   `json:"port"`    // the port, card or tunnel
 	Network   string   `json:"network"` // the firewall network
-	Signal    int      `json:"signal,omitempty"`
-	Band      string   `json:"band,omitempty"`
-	Channel   int      `json:"channel,omitempty"`
-	Rate      string   `json:"rate,omitempty"`
 	DownBps   float64  `json:"down_bps"`
 	UpBps     float64  `json:"up_bps"`
 	TodayDown int64    `json:"today_down"`
@@ -178,7 +62,6 @@ func (a *App) deviceRows() ([]deviceRow, error) {
 	}
 	zones := a.zoneByIface()
 	arp := arpTable()
-	st := a.stations()
 	rates := a.devRates()
 	today := a.todayBytes()
 	scopeIface := map[string]string{}
@@ -224,12 +107,7 @@ func (a *App) deviceRows() ([]deviceRow, error) {
 		}
 		r.IconGuess = devices.GuessIcon(r.Vendor, d.Name, d.Hostname)
 		iface := scopeIface[leaseScope[mac]]
-		if s, ok := st[mac]; ok && d.Online {
-			r.Conn, r.Port, r.Signal, r.Band, r.Channel, r.Rate = "wifi", s.Iface, s.Signal, s.Band, s.Channel, s.Rate
-			if iface == "" {
-				iface = s.Iface
-			}
-		} else if d.Online {
+		if d.Online {
 			if e, ok := arp[d.IP]; ok && e.MAC == mac {
 				r.Conn, r.Port = "wired", e.Dev
 				if iface == "" {

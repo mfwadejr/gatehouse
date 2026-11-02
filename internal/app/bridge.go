@@ -98,8 +98,7 @@ func (a *App) bridgePorts() []bridgemode.PortInfo {
 	var out []bridgemode.PortInfo
 	for _, p := range portsLister() {
 		n, _ := p["name"].(string)
-		wifi, _ := p["wifi"].(bool)
-		out = append(out, bridgemode.PortInfo{Name: n, Wireless: wifi, UsedFor: use[n]})
+		out = append(out, bridgemode.PortInfo{Name: n, UsedFor: use[n]})
 	}
 	return out
 }

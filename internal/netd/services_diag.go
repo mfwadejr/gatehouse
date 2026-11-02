@@ -26,8 +26,6 @@ var diagUnits = []DiagUnit{
 	{"gatehouse-suricata", "Threat watching", "unit"},
 	{"ssh", "Remote login (SSH)", "unit"},
 	{"keepalived", "High availability", "unit"},
-	{"wpa_supplicant", "Wi-Fi client", ""},
-	{"hostapd", "Wi-Fi access point", "unit"},
 	{"chrony", "Clock", "unit"},
 }
 
@@ -47,7 +45,7 @@ type unitInfo struct {
 }
 
 func unitState(unit string) unitInfo {
-	out, _ := wifiRun(10*time.Second, "systemctl", "show", "-p", "LoadState", "-p", "ActiveState", "-p", "SubState", "-p", "Result", "-p", "NRestarts", unit)
+	out, _ := sysRun(10*time.Second, "systemctl", "show", "-p", "LoadState", "-p", "ActiveState", "-p", "SubState", "-p", "Result", "-p", "NRestarts", unit)
 	var u unitInfo
 	for _, l := range strings.Split(out, "\n") {
 		k, v, _ := strings.Cut(strings.TrimSpace(l), "=")
@@ -71,7 +69,7 @@ var reErrLine = regexp.MustCompile(`(?i)<error>|<critical>|error|failed|fatal|ca
 
 // lastUnitError is the most recent line in a service's log that reads like a complaint.
 func lastUnitError(unit string) string {
-	j, _ := wifiRun(10*time.Second, "journalctl", "-u", unit, "-n", "60", "--no-pager", "-o", "cat")
+	j, _ := sysRun(10*time.Second, "journalctl", "-u", unit, "-n", "60", "--no-pager", "-o", "cat")
 	last := ""
 	for _, l := range strings.Split(j, "\n") {
 		l = strings.TrimSpace(l)
@@ -145,7 +143,7 @@ func (s *Service) DiagLog(unit string, lines int) (string, error) {
 		}
 		args = append(args, "-u", unit)
 	}
-	out, err := wifiRun(20*time.Second, "journalctl", args...)
+	out, err := sysRun(20*time.Second, "journalctl", args...)
 	if err != nil && strings.TrimSpace(out) == "" {
 		return "", fmt.Errorf("the log could not be read: %v", err)
 	}
@@ -161,7 +159,7 @@ func (s *Service) DiagRestart(unit string) error {
 	if d.Restart == "gatehouse" {
 		return s.Power("restart-gatehouse")
 	}
-	if out, err := wifiRun(60*time.Second, "systemctl", "restart", unit); err != nil {
+	if out, err := sysRun(60*time.Second, "systemctl", "restart", unit); err != nil {
 		return fmt.Errorf("it did not restart: %s", strings.TrimSpace(out))
 	}
 	return nil
@@ -172,7 +170,7 @@ func (s *Service) DiagRestart(unit string) error {
 func (s *Service) DiagBundle() (string, error) {
 	var b strings.Builder
 	section := func(title, name string, args ...string) {
-		out, _ := wifiRun(30*time.Second, name, args...)
+		out, _ := sysRun(30*time.Second, name, args...)
 		fmt.Fprintf(&b, "\n===== %s =====\n%s\n", title, redact(strings.TrimSpace(out)))
 	}
 	fmt.Fprintf(&b, "Gatehouse support bundle, made %s\n", time.Now().Format(time.RFC3339))

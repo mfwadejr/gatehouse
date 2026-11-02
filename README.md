@@ -36,8 +36,8 @@ Layout: `cmd/gatehouse` (the program), `internal/` (DNS, DHCP, firewall, network
 
 ## Status
 
-Early, but complete in scope. DNS, DHCP, the zone firewall, internet connections (failover, load sharing and named connection groups), WireGuard and OpenVPN, Wi-Fi (client or access point per card), UPnP, the web console and the installer are written and tested. The installer asks only for the disk; the account and network are set up in a browser on first start. The machine's own screens are drawn as graphics on the frame buffer (`internal/gfx`), with a text fallback. Hardware testing is ongoing; see `docs/` for the specification, the text and serial installer, Wi-Fi, and UPnP.
+Early, but complete in scope. DNS, DHCP, the zone firewall, internet connections (failover, load sharing and named connection groups), WireGuard and OpenVPN, UPnP, the web console and the installer are written and tested. The installer asks only for the disk; the account and network are set up in a browser on first start. The machine's own screens are drawn as graphics on the frame buffer (`internal/gfx`), with a text fallback. Hardware testing is ongoing; see `docs/` for the specification, the text and serial installer, and UPnP. **Wireless (Wi-Fi) is not supported:** the ISO carries no Wi-Fi drivers or firmware, so use a separate access point; the earlier Wi-Fi code is kept for reference in `archive/`.
 
 ### Known gaps
 
-Not built yet: a sign-in code (TOTP) for OpenVPN users (each person already has their own certificate that can be revoked), DNS servers chosen per outbound tunnel, a signed Secure Boot loader, and an ARM build. Nothing here has been run on real hardware except what you test yourself.
+Not supported: wireless (Wi-Fi) in any form. Not built yet: a sign-in code (TOTP) for OpenVPN users (each person already has their own certificate that can be revoked), DNS servers chosen per outbound tunnel, a signed Secure Boot loader, and an ARM build. Nothing here has been run on real hardware except what you test yourself.

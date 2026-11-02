@@ -57,64 +57,62 @@ func DefaultConfig() Config {
 
 // App is the running daemon.
 type App struct {
-	sysout       syslogOut
-	flow         flowOut
-	snmp         snmpState
-	sqm          sqmState
-	portal       portalState
-	ddns         ddnsState
-	haActiveFn   func() bool // tests replace the check for holding the shared addresses
-	haOwnsFn     func(addr string) bool
-	haListen     string // the link's listen address; empty means the usual port
-	haBound      atomic.Value
-	pairRun      pairRun
-	warmMACs     string
-	pairHooks    pairHooks
-	NDPI         *ndpi.Table
-	ov           ovState
-	ndpiOnce     sync.Once
-	haApplyMu    sync.Mutex
-	Cfg          Config
-	Config       *store.DB
-	Logs         *store.DB
-	Box          *crypt.Box
-	Auth         *auth.Service
-	Bus          *events.Bus
-	API          *api.Server
-	DNS          *dnssrv.Server
-	Lists        *dnssrv.Manager
-	QLog         *dnssrv.QueryLog
-	DHCP         *dhcp.Engine
-	DHCPSrv      *dhcp.Server
-	Devices      *devices.Directory
-	FW           fw.Controller // nil when no privileged helper is available
-	Net          NetController
-	apply        applyState
-	vpn          vpnState
-	fwn          fwNames
-	scope        scopeCache
-	threats      threatState
-	threatW      threatWatch
-	traffic      wanTraffic
-	viaNames     viaCache
-	health       healthSampler
-	hist         histState
-	speed        speedRun
-	ocache       ocache
-	probeKick    chan struct{}
-	upnp         upnpState
-	mdns         mdns.Reflector
-	alerts       alertState
-	setupMu      sync.Mutex
-	con          consoles
-	upd          updates
-	dyn          *fwDyn
-	rogue        rogueState
-	devt         devTraffic
-	names        nameCache
-	geoIdx       geoIndex
-	stationCache stationCache
-	wifiw        wifiWatch
+	sysout     syslogOut
+	flow       flowOut
+	snmp       snmpState
+	sqm        sqmState
+	portal     portalState
+	ddns       ddnsState
+	haActiveFn func() bool // tests replace the check for holding the shared addresses
+	haOwnsFn   func(addr string) bool
+	haListen   string // the link's listen address; empty means the usual port
+	haBound    atomic.Value
+	pairRun    pairRun
+	warmMACs   string
+	pairHooks  pairHooks
+	NDPI       *ndpi.Table
+	ov         ovState
+	ndpiOnce   sync.Once
+	haApplyMu  sync.Mutex
+	Cfg        Config
+	Config     *store.DB
+	Logs       *store.DB
+	Box        *crypt.Box
+	Auth       *auth.Service
+	Bus        *events.Bus
+	API        *api.Server
+	DNS        *dnssrv.Server
+	Lists      *dnssrv.Manager
+	QLog       *dnssrv.QueryLog
+	DHCP       *dhcp.Engine
+	DHCPSrv    *dhcp.Server
+	Devices    *devices.Directory
+	FW         fw.Controller // nil when no privileged helper is available
+	Net        NetController
+	apply      applyState
+	vpn        vpnState
+	fwn        fwNames
+	scope      scopeCache
+	threats    threatState
+	threatW    threatWatch
+	traffic    wanTraffic
+	viaNames   viaCache
+	health     healthSampler
+	hist       histState
+	speed      speedRun
+	ocache     ocache
+	probeKick  chan struct{}
+	upnp       upnpState
+	mdns       mdns.Reflector
+	alerts     alertState
+	setupMu    sync.Mutex
+	con        consoles
+	upd        updates
+	dyn        *fwDyn
+	rogue      rogueState
+	devt       devTraffic
+	names      nameCache
+	geoIdx     geoIndex
 
 	netApplyState struct {
 		mu     sync.Mutex
@@ -207,7 +205,6 @@ func New(cfg Config) (*App, error) {
 	a.registerBridgeifyRoutes()
 	a.registerStepUpRoutes()
 	a.registerDiagnosticsRoutes()
-	a.registerWifiCardRoutes()
 	a.registerSummaryRoutes()
 	a.registerISPRoutes()
 	a.registerDNSEncRoutes()
@@ -417,7 +414,6 @@ func (a *App) Run(ctx context.Context) error {
 	run(func() { a.updateLoop(ctx) })
 	run(func() { a.dynLoop(ctx) })
 	run(func() { a.rogueLoop(ctx) })
-	run(func() { a.wifiLoop(ctx) })
 	run(func() { a.sshLoop(ctx) })
 
 	a.con.begin(ctx)

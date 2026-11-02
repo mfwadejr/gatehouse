@@ -88,7 +88,7 @@ func (s *Service) ThreatStatus() ThreatInfo {
 	info := ThreatInfo{State: threatState.state, Message: threatState.msg}
 	threatState.Unlock()
 	info.CPUs = runtime.NumCPU()
-	if out, err := wifiRun(10*time.Second, "df", "-Pm", "/var"); err == nil {
+	if out, err := sysRun(10*time.Second, "df", "-Pm", "/var"); err == nil {
 		if m := reDF.FindStringSubmatch(out); m != nil {
 			info.DiskFreeMB, _ = strconv.ParseInt(m[1], 10, 64)
 		}
@@ -103,12 +103,12 @@ func (s *Service) ThreatStatus() ThreatInfo {
 	if !info.Installed {
 		return info
 	}
-	if out, err := wifiRun(10*time.Second, s.rootPath(threatBinary), "-V"); err == nil {
+	if out, err := sysRun(10*time.Second, s.rootPath(threatBinary), "-V"); err == nil {
 		info.Version = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(out), "This is Suricata version"))
 	}
-	if out, _ := wifiRun(10*time.Second, "systemctl", "is-active", threatcfg.UnitName); strings.TrimSpace(out) == "active" {
+	if out, _ := sysRun(10*time.Second, "systemctl", "is-active", threatcfg.UnitName); strings.TrimSpace(out) == "active" {
 		info.Running = true
-		if out, err := wifiRun(10*time.Second, "systemctl", "show", "-p", "CPUUsageNSec", "-p", "MemoryCurrent", threatcfg.UnitName); err == nil {
+		if out, err := sysRun(10*time.Second, "systemctl", "show", "-p", "CPUUsageNSec", "-p", "MemoryCurrent", threatcfg.UnitName); err == nil {
 			for _, l := range strings.Split(out, "\n") {
 				k, v, _ := strings.Cut(strings.TrimSpace(l), "=")
 				n, err := strconv.ParseUint(v, 10, 64)
@@ -283,11 +283,11 @@ func (s *Service) ThreatRemove() error {
 			setThreat("idle", "")
 		}
 	}()
-	wifiRun(30*time.Second, "systemctl", "disable", "--now", threatcfg.UnitName)
+	sysRun(30*time.Second, "systemctl", "disable", "--now", threatcfg.UnitName)
 	os.Remove(s.rootPath(threatcfg.UnitFile))
 	os.Remove(s.rootPath(threatcfg.IncludeFile))
 	os.Remove(s.rootPath(threatcfg.DisableConf))
-	wifiRun(30*time.Second, "systemctl", "daemon-reload")
+	sysRun(30*time.Second, "systemctl", "daemon-reload")
 	if s.threatInstalled() {
 		if b, err := aptRun(10*time.Minute, "apt-get", aptArgs("remove", "suricata", "suricata-update")...); err != nil {
 			setThreat("failed", "The removal did not work: "+lastLine(b, err))
@@ -309,7 +309,7 @@ func (s *Service) ThreatApply(p threatcfg.Plan) error {
 		return err
 	}
 	if !p.Enabled {
-		wifiRun(30*time.Second, "systemctl", "disable", "--now", threatcfg.UnitName)
+		sysRun(30*time.Second, "systemctl", "disable", "--now", threatcfg.UnitName)
 		return nil
 	}
 	if !s.threatInstalled() {
@@ -331,7 +331,7 @@ func (s *Service) ThreatApply(p threatcfg.Plan) error {
 	}
 	changed := unit != oldUnit || inc != oldInc
 	if changed {
-		wifiRun(30*time.Second, "systemctl", "daemon-reload")
+		sysRun(30*time.Second, "systemctl", "daemon-reload")
 	}
 	if dis != oldDisable {
 		// Which groups are on changed, so the rules are rebuilt from the groups the person chose.
@@ -342,12 +342,12 @@ func (s *Service) ThreatApply(p threatcfg.Plan) error {
 			}
 		}
 	}
-	wifiRun(30*time.Second, "systemctl", "enable", threatcfg.UnitName)
+	sysRun(30*time.Second, "systemctl", "enable", threatcfg.UnitName)
 	verb := "start"
 	if changed {
 		verb = "restart"
 	}
-	if out, err := wifiRun(90*time.Second, "systemctl", verb, threatcfg.UnitName); err != nil {
+	if out, err := sysRun(90*time.Second, "systemctl", verb, threatcfg.UnitName); err != nil {
 		return fmt.Errorf("the threat-watching program did not start: %s", strings.TrimSpace(out))
 	}
 	return nil
@@ -394,7 +394,7 @@ func (s *Service) ThreatUpdateRules() error {
 	if b, err := os.ReadFile(rules); err == nil {
 		os.WriteFile(rules+".prev", b, 0o644)
 	}
-	out, err := wifiRun(10*time.Minute, "suricata-update", "--no-reload", "--disable-conf", s.rootPath(threatcfg.DisableConf))
+	out, err := sysRun(10*time.Minute, "suricata-update", "--no-reload", "--disable-conf", s.rootPath(threatcfg.DisableConf))
 	if err != nil {
 		// put the old rules back
 		if b, e := os.ReadFile(rules + ".prev"); e == nil {
@@ -402,8 +402,8 @@ func (s *Service) ThreatUpdateRules() error {
 		}
 		return fmt.Errorf("the rules could not be updated: %s", lastLine([]byte(out), err))
 	}
-	if out, _ := wifiRun(10*time.Second, "systemctl", "is-active", threatcfg.UnitName); strings.TrimSpace(out) == "active" {
-		wifiRun(time.Minute, "systemctl", "restart", threatcfg.UnitName)
+	if out, _ := sysRun(10*time.Second, "systemctl", "is-active", threatcfg.UnitName); strings.TrimSpace(out) == "active" {
+		sysRun(time.Minute, "systemctl", "restart", threatcfg.UnitName)
 	}
 	return nil
 }
@@ -420,8 +420,8 @@ func (s *Service) ThreatRollback() error {
 		return err
 	}
 	os.WriteFile(rules+".prev", cur, 0o644) // so going back can itself be undone
-	if out, _ := wifiRun(10*time.Second, "systemctl", "is-active", threatcfg.UnitName); strings.TrimSpace(out) == "active" {
-		wifiRun(time.Minute, "systemctl", "restart", threatcfg.UnitName)
+	if out, _ := sysRun(10*time.Second, "systemctl", "is-active", threatcfg.UnitName); strings.TrimSpace(out) == "active" {
+		sysRun(time.Minute, "systemctl", "restart", threatcfg.UnitName)
 	}
 	return nil
 }

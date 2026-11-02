@@ -10,30 +10,6 @@ import (
 	"gatehouse/internal/fw"
 )
 
-const stationSample = `Station 5c:cf:7f:11:22:33 (on wlan0)
-	inactive time:	40 ms
-	rx bytes:	123456
-	signal:  	-52 [-53, -55] dBm
-	tx bitrate:	866.7 MBit/s VHT-MCS 9 80MHz short GI VHT-NSS 2
-Station aa:bb:cc:dd:ee:ff (on wlan0)
-	signal:  	-71 dBm
-	tx bitrate:	72.2 MBit/s MCS 7
-`
-
-func TestStationDumpAndChannel(t *testing.T) {
-	st := ParseStationDump(stationSample)
-	if len(st) != 2 || st["5c:cf:7f:11:22:33"].Signal != -52 || st["5c:cf:7f:11:22:33"].Rate != "867 Mb/s" || st["aa:bb:cc:dd:ee:ff"].Signal != -71 {
-		t.Fatalf("%+v", st)
-	}
-	band, ch := ParseChannel("Interface wlan0\n\tchannel 36 (5180 MHz), width: 80 MHz, center1: 5210 MHz\n")
-	if band != "5" || ch != 36 {
-		t.Fatal(band, ch)
-	}
-	if b, c := ParseChannel("channel 6 (2437 MHz), width: 20 MHz"); b != "2.4" || c != 6 {
-		t.Fatal(b, c)
-	}
-}
-
 func TestDeviceTrafficIsCountedPerDevice(t *testing.T) {
 	c, _, _ := siteBox(t, "192.168.1.1/24")
 	a := c.app

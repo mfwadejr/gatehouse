@@ -16,8 +16,6 @@ const ROWS = [
   ['Data use and limit', 'internet/usage', 'How much data was used and an optional monthly limit', 'cap bandwidth usage metered billing', 'Data use'],
   ['Networks', 'networks', 'Ports, networks and VLANs', 'lan vlan port interface add network guest iot', 'Your networks'],
   ['Network ports', 'networks', 'The ports on this device and what each is for', 'ethernet nic interface cable link speed', 'Network ports on this device'],
-  ['Wi-Fi', 'wifi', 'Wireless networks', 'wireless ssid password access point'],
-  ['Wi-Fi QR code', 'wifi', 'A code that joins the Wi-Fi when scanned, and a card to print', 'qr guest password join print card', 'Join cards and QR codes'],
   ['DNS', 'dns/overview', 'Lookups, busiest devices and what was blocked', 'domain resolver queries'],
   ['Block ads and trackers', 'dns/lists', 'Blocklists on the DNS page', 'adblock blocklist ads tracking malware', 'Blocklists'],
   ['Why is this blocked?', 'dns/lists', 'Check whether a name is on a blocklist', 'blocked domain lookup allow', 'Why is this blocked?'],
@@ -48,7 +46,7 @@ const ROWS = [
   ['Allowed threat checks', 'protection/threats/advanced', 'Things you let through, and devices never checked', 'allow trusted ignore exclude', 'Allowed checks'],
   ['Reset all threat settings', 'protection/threats/advanced', 'Put threat watching back to how it started', 'restore defaults reset', 'Reset all threat settings'],
   ['Undo a change', 'settings/backup', 'Go back to how things were before a change', 'undo revert restore point rollback changes timeline', 'Changes'],
-  ['Common setups', 'settings/general', 'Guest Wi-Fi, cameras, Plex from outside, UniFi', 'recipe guest cameras plex unifi how to get started finish setting up', 'Common setups'],
+  ['Common setups', 'settings/general', 'Guest network, cameras, Plex from outside, UniFi', 'recipe guest cameras plex unifi how to get started finish setting up', 'Common setups'],
   ['Finish setting up', 'settings/general', 'The first-run list', 'get started checklist first run', 'Finish setting up'],
   ['My network (printable)', 'settings/backup', 'A printable summary of the whole network', 'summary handover print document records', 'My network'],
   ['Reach my home from anywhere', 'vpn', 'A web name and VPN to connect from outside', 'ddns duckdns noip dynamic dns remote access', 'Reach my home from anywhere'],
@@ -57,7 +55,7 @@ const ROWS = [
   ['Device mode', 'settings/general', 'Choose Router or Bridge and see which cable goes where', 'router bridge mode ports cables internet port change walkthrough', 'Device mode'],
   ['Bridge mode', 'settings/advanced', 'Filter between another router and your network without routing', 'bridge transparent filtering inline passthrough', 'Bridge mode'],
   ['Lists used for blocking', 'settings/advanced', 'Which version of each blocklist is in use, and going back', 'blocklist version rollback', 'Lists used for blocking'],
-  ['Guest sign-in page', 'settings/advanced', 'Make guests tap Connect before they get internet', 'captive portal guest wifi terms splash sign in hotspot', 'Guest sign-in page'],
+  ['Guest sign-in page', 'settings/advanced', 'Make guests tap Connect before they get internet', 'captive portal guest terms splash sign in hotspot', 'Guest sign-in page'],
   ['Send logs elsewhere', 'settings/alerts', 'Copy logs to a syslog server', 'syslog export siem', 'Send logs elsewhere'],
   ['Send traffic records (NetFlow / IPFIX)', 'settings/alerts', 'Tell a traffic analysis tool about connections', 'netflow ipfix flow export collector', 'Send traffic records'],
   ['Let a monitoring tool read this device (SNMP)', 'settings/alerts', 'Read only status for monitoring tools', 'snmp monitoring librenms zabbix prometheus', 'Let a monitoring tool read this device'],
@@ -209,5 +207,5 @@ export function SearchBox({ onClose, go }) {
 }
 
 // "dns/lists" reads as "DNS" in the list.
-const NAMES = { internet: 'Internet', networks: 'Networks', wifi: 'Wi-Fi', dns: 'DNS', dhcp: 'DHCP', firewall: 'Firewall', protection: 'Protection', services: 'Services', vpn: 'VPN', routes: 'Routes', profiles: 'Profiles', devices: 'Devices', logs: 'Logs', diagnostics: 'Diagnostics', settings: 'Settings', overview: 'Overview' };
+const NAMES = { internet: 'Internet', networks: 'Networks', dns: 'DNS', dhcp: 'DHCP', firewall: 'Firewall', protection: 'Protection', services: 'Services', vpn: 'VPN', routes: 'Routes', profiles: 'Profiles', devices: 'Devices', logs: 'Logs', diagnostics: 'Diagnostics', settings: 'Settings', overview: 'Overview' };
 const where = (p) => NAMES[p.split('/')[0]] || p;

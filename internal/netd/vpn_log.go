@@ -125,7 +125,7 @@ func (v *VPN) recentOVPN(unit string) ([]string, []int64) {
 	if c, ok := v.logCache[unit]; ok && time.Since(c.at) < 15*time.Second {
 		return c.lines, c.times
 	}
-	out, _ := wifiRun(10*time.Second, "journalctl", "-u", unit, "--no-pager", "-o", "short-unix", "-n", "40")
+	out, _ := sysRun(10*time.Second, "journalctl", "-u", unit, "--no-pager", "-o", "short-unix", "-n", "40")
 	lines, times := parseJournal(out)
 	if v.logCache == nil {
 		v.logCache = map[string]logEntry{}

@@ -524,4 +524,9 @@ CREATE TABLE threat_allowed(
 CREATE TABLE threat_trusted(
   mac TEXT PRIMARY KEY
 );
+`, `
+-- Wireless support was removed (v0.8.53): the Wi-Fi tables and settings are no longer used.
+DROP TABLE IF EXISTS wifi_radios;
+DROP TABLE IF EXISTS wifi_cards;
+DELETE FROM settings WHERE key LIKE 'wifi.%';
 `}

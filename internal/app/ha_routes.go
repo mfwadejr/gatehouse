@@ -643,7 +643,7 @@ func (a *App) haHeartChoices(st *haLocal) []string {
 	}
 	out := []string{}
 	for _, p := range a.haPortList() {
-		if !p.Wireless && !used[p.Name] || st != nil && p.Name == st.HeartDev && !p.Wireless {
+		if !used[p.Name] || st != nil && p.Name == st.HeartDev {
 			out = append(out, p.Name)
 		}
 	}

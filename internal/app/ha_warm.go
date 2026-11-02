@@ -27,7 +27,7 @@ type haWanSplit struct {
 }
 
 // haWanSplit sorts the internet connections: plain ones (automatic or fixed address) can be warm;
-// a login (PPPoE) and a wireless connection keep the earlier behaviour.
+// a login (PPPoE) keeps the earlier behaviour.
 func (a *App) haWanSplit(warm bool) haWanSplit {
 	sp := haWanSplit{ByName: map[string]string{}}
 	wans, err := a.listWans(a.Config)
@@ -39,8 +39,7 @@ func (a *App) haWanSplit(warm bool) haWanSplit {
 			continue
 		}
 		dev := netcfg.WanDevice(netcfg.WAN{Name: w.Name, Iface: w.Iface, Type: w.Type, VLAN: w.VLAN})
-		_, wireless := statErr(filepath.Join("/sys/class/net", w.Iface, "wireless"))
-		if warm && (w.Type == "dhcp" || w.Type == "static") && !wireless {
+		if warm && (w.Type == "dhcp" || w.Type == "static") {
 			sp.Warm = append(sp.Warm, dev)
 			sp.ByName[w.Name] = dev
 			if w.Type == "static" {

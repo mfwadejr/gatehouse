@@ -126,7 +126,6 @@ func (f *fakeNetCtl) ApplyVPN(netd.VPNPlan) error                   { return nil
 func (f *fakeNetCtl) VPNStatus() netd.VPNStatus                     { return netd.VPNStatus{} }
 func (f *fakeNetCtl) FWEvents(uint64, int) ([]netd.FWEvent, uint64) { return nil, 7 }
 func (f *fakeNetCtl) SetSystem(string, string) error                { return nil }
-func (f *fakeNetCtl) WifiScan(string) ([]netd.WifiNetwork, error)   { return nil, nil }
 func (f *fakeNetCtl) UPnPApply([]netd.UPnPMapping) error            { return nil }
 func (f *fakeNetCtl) UpdateStart(p string) error                    { f.updatePath = p; return nil }
 func (f *fakeNetCtl) SystemCheck() (netd.SystemUpdates, error) {
@@ -160,9 +159,6 @@ func TestEveryClientCallIsRouted(t *testing.T) {
 	}
 	if _, last, err := c.FWEvents(0, 10); err != nil || last != 7 {
 		t.Fatalf("fwlog.read: %v %d", err, last)
-	}
-	if _, err := c.WifiScan("wlan0"); err != nil {
-		t.Fatalf("net.wifiscan: %v", err)
 	}
 	if err := c.UPnPApply(nil); err != nil {
 		t.Fatalf("net.upnp: %v", err)
@@ -233,12 +229,7 @@ func (f *fakeNetCtl) SpeedTest(ctx context.Context, p speedtest.Params) (speedte
 }
 func (f *fakeNetCtl) Power(a string) error { f.power = a; return nil }
 
-func (f *fakeNetCtl) WifiHealth(ifaces []string, keepAwake bool) ([]netd.WifiState, error) {
-	return []netd.WifiState{{Iface: "wlan0", OK: true}}, nil
-}
-func (f *fakeNetCtl) WifiPowerSave(iface string, keepAwake bool) error { return nil }
 func (f *fakeNetCtl) Diag(kind, target string) (string, error)         { return kind + " " + target, nil }
-func (f *fakeNetCtl) WifiReport(iface string) (string, error)          { return "report " + iface, nil }
 func (f *fakeNetCtl) SSHApply(p netd.SSHPlan) error                    { return nil }
 func (f *fakeNetCtl) HAApply(p netd.HAPlan) error                      { return nil }
 func (f *fakeNetCtl) NDPIApply(p netd.NDPIPlan) error                  { return nil }

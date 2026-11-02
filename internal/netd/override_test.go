@@ -56,8 +56,8 @@ func TestOverrideCommands(t *testing.T) {
 
 func TestOverrideApplyFailureCleansUp(t *testing.T) {
 	var ran []string
-	old := wifiRun
-	wifiRun = func(_ time.Duration, name string, args ...string) (string, error) {
+	old := sysRun
+	sysRun = func(_ time.Duration, name string, args ...string) (string, error) {
 		line := name + " " + strings.Join(args, " ")
 		ran = append(ran, line)
 		if strings.Contains(line, "vlan push") {
@@ -65,7 +65,7 @@ func TestOverrideApplyFailureCleansUp(t *testing.T) {
 		}
 		return "", nil
 	}
-	t.Cleanup(func() { wifiRun = old })
+	t.Cleanup(func() { sysRun = old })
 	s := &Service{Root: t.TempDir()}
 	err := s.OverrideApply(OverridePlan{Rules: []OverrideRule{{Parent: "eth1", MAC: "aa:bb:cc:00:11:22", VID: 20}}})
 	if err == nil || !strings.Contains(err.Error(), "kernel cannot tag") {

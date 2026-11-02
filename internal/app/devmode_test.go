@@ -10,8 +10,8 @@ import (
 func modePorts(t *testing.T) {
 	old := portsLister
 	portsLister = func() []map[string]any {
-		return []map[string]any{{"name": "eth0", "wifi": false, "link": true}, {"name": "eth1", "wifi": false, "link": true},
-			{"name": "eth2", "wifi": false, "link": false}, {"name": "wlan0", "wifi": true}}
+		return []map[string]any{{"name": "eth0", "link": true}, {"name": "eth1", "link": true},
+			{"name": "eth2", "link": false}}
 	}
 	t.Cleanup(func() { portsLister = old })
 }
@@ -59,9 +59,6 @@ func TestInternetPortChangeIsGuarded(t *testing.T) {
 	}
 	if rc, raw := put("eth1"); rc == 200 || !strings.Contains(raw, "carries one of your networks") {
 		t.Fatalf("a port with a network must be refused: %d %s", rc, raw)
-	}
-	if rc, raw := put("wlan0"); rc == 200 || !strings.Contains(raw, "Wi-Fi") {
-		t.Fatalf("a Wi-Fi card must be refused: %d %s", rc, raw)
 	}
 	if rc, raw := put("nope9"); rc == 200 || !strings.Contains(raw, "not a port") {
 		t.Fatalf("unknown port: %d %s", rc, raw)

@@ -110,7 +110,7 @@ func SQMCommands(p SQMPlan, disc string) ([][]string, error) {
 
 // sqmRemoveIfbs deletes the helper devices an earlier plan made.
 func sqmRemoveIfbs() {
-	out, _ := wifiRun(10*time.Second, "ip", "-o", "link", "show", "type", "ifb")
+	out, _ := sysRun(10*time.Second, "ip", "-o", "link", "show", "type", "ifb")
 	for _, ln := range strings.Split(out, "\n") {
 		f := strings.Fields(ln)
 		if len(f) < 2 {
@@ -118,7 +118,7 @@ func sqmRemoveIfbs() {
 		}
 		name := strings.TrimSuffix(strings.SplitN(f[1], "@", 2)[0], ":")
 		if strings.HasPrefix(name, sqmPrefix) {
-			wifiRun(10*time.Second, "ip", "link", "del", name)
+			sysRun(10*time.Second, "ip", "link", "del", name)
 		}
 	}
 }
@@ -129,7 +129,7 @@ func sqmClearAll(p SQMPlan) {
 		devs = append(devs, l.Iface)
 	}
 	for _, c := range sqmClear(devs) {
-		wifiRun(10*time.Second, c[0], c[1:]...)
+		sysRun(10*time.Second, c[0], c[1:]...)
 	}
 	sqmRemoveIfbs()
 }
@@ -151,7 +151,7 @@ func (s *Service) SQMApply(p SQMPlan) (string, error) {
 		cmds, _ := SQMCommands(p, disc)
 		failed := false
 		for _, c := range cmds {
-			out, err := wifiRun(15*time.Second, c[0], c[1:]...)
+			out, err := sysRun(15*time.Second, c[0], c[1:]...)
 			if err == nil {
 				continue
 			}

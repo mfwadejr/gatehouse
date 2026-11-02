@@ -4,10 +4,10 @@ import DeviceIcon from '../DeviceIcon.jsx';
 import { Card, Empty, Pill, ToggleRow, usePortNames } from '../ui.jsx';
 import { linkState } from '../linkstate.js';
 
-const CONN = { wired: 'Wired', wifi: 'Wi-Fi', vpn: 'VPN' };
+const CONN = { wired: 'Wired', vpn: 'VPN' };
 const SHOW = 18;
 
-// The map shows what Gatehouse itself can see: its own ports, its Wi-Fi cards and its VPNs, and the
+// The map shows what Gatehouse itself can see: its own ports and its VPNs, and the
 // devices it has seen on each. A device behind a switch or access point that Gatehouse does not
 // manage appears under the port that switch is plugged into.
 function PortGroup({ g, onOpen, showOffline }) {
@@ -59,7 +59,7 @@ export default function DeviceMap({ devices, onOpen }) {
     return arr;
   }, [devices]);
   return (
-    <Card title="Map" desc="Gatehouse in the middle. It can only see its own ports, Wi-Fi cards and VPNs, so devices behind a switch show under the port it is plugged into."
+    <Card title="Map" desc="Gatehouse in the middle. It can only see its own ports and VPNs, so devices behind a switch show under the port it is plugged into."
       actions={<ToggleRow title="Show devices that are away" checked={showOffline} onChange={setShowOffline} />}>
       {!devices.length ? <Empty>No devices have joined yet.</Empty> : (
         <div className="dm">

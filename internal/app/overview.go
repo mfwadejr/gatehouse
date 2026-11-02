@@ -567,7 +567,7 @@ func (a *App) deviceCounts() map[string]any {
 	if err != nil {
 		return map[string]any{"total": 0}
 	}
-	var online, wired, wifi, vpn, unnamed, fresh, away int
+	var online, wired, vpn, unnamed, fresh, away int
 	byNet := map[string]int{}
 	day := time.Now().Add(-24 * time.Hour).Unix()
 	first := map[string]int64{}
@@ -596,15 +596,13 @@ func (a *App) deviceCounts() map[string]any {
 			byNet[d.Network]++
 		}
 		switch d.Conn {
-		case "wifi":
-			wifi++
 		case "vpn":
 			vpn++
 		default:
 			wired++
 		}
 	}
-	return map[string]any{"online": online, "wired": wired, "wifi": wifi, "vpn": vpn, "offline": away, "unnamed": unnamed, "new": fresh, "total": len(rows), "by_network": byNet}
+	return map[string]any{"online": online, "wired": wired, "vpn": vpn, "offline": away, "unnamed": unnamed, "new": fresh, "total": len(rows), "by_network": byNet}
 }
 
 func (a *App) registerOverviewRoutes() {

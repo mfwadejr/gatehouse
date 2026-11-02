@@ -48,7 +48,7 @@ func (s *Service) heartApply(dev, cidr string) error {
 	if dev == "" {
 		if _, err := os.Stat(f); err == nil {
 			os.Remove(f)
-			wifiRun(15*time.Second, "networkctl", "reload")
+			sysRun(15*time.Second, "networkctl", "reload")
 		}
 		return nil
 	}
@@ -70,8 +70,8 @@ func (s *Service) heartApply(dev, cidr string) error {
 	if err := writeFileAtomic(f, []byte(body), 0o644); err != nil {
 		return err
 	}
-	wifiRun(15*time.Second, "networkctl", "reload")
-	wifiRun(15*time.Second, "networkctl", "reconfigure", dev)
+	sysRun(15*time.Second, "networkctl", "reload")
+	sysRun(15*time.Second, "networkctl", "reconfigure", dev)
 	return nil
 }
 
@@ -99,8 +99,8 @@ func (s *Service) HAApply(p HAPlan) error {
 	ka, ct := s.rootPath(haKeepalived), s.rootPath(haConntrackd)
 	notify, sc := s.rootPath(strings.TrimPrefix(ha.NotifyPath, "/")), s.rootPath(haSysctl)
 	if !p.Enabled {
-		wifiRun(30*time.Second, "systemctl", "disable", "--now", "keepalived.service")
-		wifiRun(30*time.Second, "systemctl", "disable", "--now", "conntrackd.service")
+		sysRun(30*time.Second, "systemctl", "disable", "--now", "keepalived.service")
+		sysRun(30*time.Second, "systemctl", "disable", "--now", "conntrackd.service")
 		for _, f := range []string{ka, ct, notify, sc, s.rootPath(haWan), s.rootPath(haWanWarm), s.rootPath(haWanStatic), s.rootPath(haWanMACs)} {
 			os.Remove(f)
 		}
@@ -171,11 +171,11 @@ func (s *Service) HAApply(p HAPlan) error {
 	if err := writeFileAtomic(sc, []byte("net.ipv4.ip_nonlocal_bind = 1\n"), 0o644); err != nil {
 		return err
 	}
-	wifiRun(10*time.Second, "sysctl", "-w", "net.ipv4.ip_nonlocal_bind=1")
+	sysRun(10*time.Second, "sysctl", "-w", "net.ipv4.ip_nonlocal_bind=1")
 	if err := writeFileAtomic(ka, []byte(p.Keepalived), 0o600); err != nil {
 		return err
 	}
-	if out, err := wifiRun(15*time.Second, "keepalived", "--config-test", "-f", ka); err != nil {
+	if out, err := sysRun(15*time.Second, "keepalived", "--config-test", "-f", ka); err != nil {
 		if len(oldKA) > 0 {
 			writeFileAtomic(ka, oldKA, 0o600)
 		} else {
@@ -184,10 +184,10 @@ func (s *Service) HAApply(p HAPlan) error {
 		return errors.New("the high-availability program rejected its settings: " + strings.TrimSpace(out))
 	}
 	for _, unit := range []string{"conntrackd.service", "keepalived.service"} {
-		if out, err := wifiRun(30*time.Second, "systemctl", "enable", unit); err != nil {
+		if out, err := sysRun(30*time.Second, "systemctl", "enable", unit); err != nil {
 			return fmt.Errorf("could not enable %s: %s", unit, strings.TrimSpace(out))
 		}
-		if out, err := wifiRun(30*time.Second, "systemctl", "restart", unit); err != nil {
+		if out, err := sysRun(30*time.Second, "systemctl", "restart", unit); err != nil {
 			return fmt.Errorf("could not start %s: %s", unit, strings.TrimSpace(out))
 		}
 	}
@@ -207,11 +207,11 @@ func (s *Service) haConfOnly(ka, body string) error {
 	if err := writeFileAtomic(ka, []byte(body), 0o600); err != nil {
 		return err
 	}
-	if out, err := wifiRun(15*time.Second, "keepalived", "--config-test", "-f", ka); err != nil {
+	if out, err := sysRun(15*time.Second, "keepalived", "--config-test", "-f", ka); err != nil {
 		writeFileAtomic(ka, old, 0o600)
 		return errors.New("the high-availability program rejected its settings: " + strings.TrimSpace(out))
 	}
 	// A reload keeps the unit's current role; a failure here only means the new priority waits for the next start.
-	wifiRun(30*time.Second, "systemctl", "reload", "keepalived.service")
+	sysRun(30*time.Second, "systemctl", "reload", "keepalived.service")
 	return nil
 }

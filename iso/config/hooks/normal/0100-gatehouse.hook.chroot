@@ -18,11 +18,14 @@ for u in keepalived.service conntrackd.service; do systemctl disable "$u" 2>/dev
 
 # Use systemd-networkd for the network; we serve DNS and DHCP ourselves.
 systemctl enable systemd-networkd.service || true
-# Wi-Fi is started per card by Gatehouse (gatehouse-wifi-*@), never by the packages themselves.
-for u in hostapd.service wpa_supplicant.service wpa_supplicant@.service wpa_supplicant-nl80211@.service wpa_supplicant-wired@.service wpa_supplicant-nl80211.service; do
-	systemctl disable "$u" 2>/dev/null || true
-	systemctl mask "$u" 2>/dev/null || true
-done
+# No wireless support: the kernel's wireless stack is blocked from loading, so a Wi-Fi card that is
+# plugged in is never brought up, whatever drivers or firmware the hardware brings with it.
+mkdir -p /etc/modprobe.d
+cat > /etc/modprobe.d/gatehouse-no-wireless.conf <<'EOW'
+# Gatehouse has no wireless support. Remove this file to let Wi-Fi drivers load (they will not be configured).
+install cfg80211 /bin/false
+install mac80211 /bin/false
+EOW
 systemctl disable systemd-resolved.service 2>/dev/null || true
 systemctl mask systemd-resolved.service 2>/dev/null || true
 rm -f /etc/resolv.conf

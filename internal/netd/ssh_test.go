@@ -19,15 +19,15 @@ func sshRoot(t *testing.T) *Service {
 func recordRun(t *testing.T, reply func(name string, args []string) (string, error)) *[]string {
 	t.Helper()
 	var calls []string
-	old := wifiRun
-	wifiRun = func(_ time.Duration, name string, args ...string) (string, error) {
+	old := sysRun
+	sysRun = func(_ time.Duration, name string, args ...string) (string, error) {
 		calls = append(calls, name+" "+strings.Join(args, " "))
 		if reply != nil {
 			return reply(name, args)
 		}
 		return "", nil
 	}
-	t.Cleanup(func() { wifiRun = old })
+	t.Cleanup(func() { sysRun = old })
 	return &calls
 }
 

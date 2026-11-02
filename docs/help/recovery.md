@@ -32,4 +32,4 @@ Open **Overview** or **Internet**. Each connection shows what is wrong in words:
 
 ## Last resort
 
-Under **Settings, Backup & recovery**, **Reset network settings** puts networks, firewall rules, port forwards, DHCP, DNS names and lists, VPNs and Wi-Fi back to a clean start, and keeps your accounts, sign-in settings, update settings and console port. **Factory reset** erases everything and opens the setup wizard again. Both save a copy of your settings first, which you can download, and ask for your authenticator code if you use one, or your password.
+Under **Settings, Backup & recovery**, **Reset network settings** puts networks, firewall rules, port forwards, DHCP, DNS names and lists, and VPNs back to a clean start, and keeps your accounts, sign-in settings, update settings and console port. **Factory reset** erases everything and opens the setup wizard again. Both save a copy of your settings first, which you can download, and ask for your authenticator code if you use one, or your password.

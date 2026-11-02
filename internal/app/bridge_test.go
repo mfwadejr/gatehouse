@@ -13,7 +13,7 @@ func bridgeBody() map[string]any {
 func fakePorts(t *testing.T) {
 	old := portsLister
 	portsLister = func() []map[string]any {
-		return []map[string]any{{"name": "tp1", "wifi": false}, {"name": "tp2", "wifi": false}, {"name": "tpw", "wifi": true}}
+		return []map[string]any{{"name": "tp1"}, {"name": "tp2"}}
 	}
 	t.Cleanup(func() { portsLister = old })
 }
@@ -25,9 +25,9 @@ func TestBridgeModeApplyConfirmAndLeave(t *testing.T) {
 
 	// Bad setups are refused in words and nothing is saved.
 	bad := bridgeBody()
-	bad["inside"] = []string{"tpw"}
-	if rc, _, raw := c.call("PUT", "/api/bridge", bad); rc == 200 || !strings.Contains(string(raw), "wired") {
-		t.Fatalf("a Wi-Fi card must be refused: %d %s", rc, raw)
+	bad["inside"] = []string{"nope9"}
+	if rc, _, raw := c.call("PUT", "/api/bridge", bad); rc == 200 || !strings.Contains(string(raw), "not a port") {
+		t.Fatalf("a port that does not exist must be refused: %d %s", rc, raw)
 	}
 	if rc, _, raw := c.call("PUT", "/api/bridge", bridgeBody()); rc != 200 {
 		t.Fatalf("save: %d %s", rc, raw)

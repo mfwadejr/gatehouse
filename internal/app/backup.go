@@ -67,7 +67,6 @@ type BackupContents struct {
 	Scopes       int `json:"scopes"`
 	Reservations int `json:"reservations"`
 	VPN          int `json:"vpn_devices"`
-	Wifi         int `json:"wifi"`
 	Devices      int `json:"devices"`
 	Users        int `json:"users"`
 }
@@ -368,7 +367,6 @@ func contents(q interface{ QueryRow(string, ...any) *sql.Row }) BackupContents {
 		Scopes:       countOf(q, `SELECT COUNT(*) FROM dhcp_scopes`),
 		Reservations: countOf(q, `SELECT COUNT(*) FROM dhcp_reservations`),
 		VPN:          countOf(q, `SELECT COUNT(*) FROM vpn_wg_peers`) + countOf(q, `SELECT COUNT(*) FROM vpn_ovpn_users`),
-		Wifi:         countOf(q, `SELECT COUNT(*) FROM wifi_radios`),
 		Devices:      countOf(q, `SELECT COUNT(*) FROM devices`),
 		Users:        countOf(q, `SELECT COUNT(*) FROM users`),
 	}
@@ -431,7 +429,7 @@ func (a *App) verifyBackup(path, password string) (*BackupReport, error) {
 		add("Saved passwords can be read", false, "The key stored with this backup is missing or unusable.")
 	} else {
 		tried, bad := 0, 0
-		for _, q := range []string{`SELECT psk FROM wifi_radios WHERE psk<>''`, `SELECT pppoe_pass FROM wan_links WHERE pppoe_pass<>''`} {
+		for _, q := range []string{`SELECT pppoe_pass FROM wan_links WHERE pppoe_pass<>''`} {
 			if rows, err := db.Query(q); err == nil {
 				for rows.Next() {
 					var s string
@@ -479,9 +477,9 @@ func hasPrefixAny(k string, l []string) bool {
 var restoreTables = []string{
 	"fw_hits", "dns_exceptions", "dns_zone_targets", "fw_rules", "fw_objects", "nat_forwards", "upnp_allow",
 	"routes", "vpn_routes", "vpn_ovpn_users", "vpn_ovpn", "vpn_wg_peers", "vpn_wg",
-	"wan_group_routes", "wan_group_members", "wan_groups", "wan_links", "wifi_radios",
+	"wan_group_routes", "wan_group_members", "wan_groups", "wan_links",
 	"dhcp_leases", "dhcp_reservations", "dhcp_scopes", "interfaces", "zones",
-	"dns_records", "custom_rules", "scope_rules", "threat_allowed", "threat_trusted", "dns_upstreams", "group_blocklists", "blocklists", "network_profiles", "groups", "wifi_cards",
+	"dns_records", "custom_rules", "scope_rules", "threat_allowed", "threat_trusted", "dns_upstreams", "group_blocklists", "blocklists", "network_profiles", "groups",
 	"device_group_members", "device_groups", "devices", "device_icons", "fw_revisions",
 }
 

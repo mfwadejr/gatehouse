@@ -72,7 +72,7 @@ export default function BridgeMode() {
   if (!data || !f) return null;
 
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
-  const wired = (data.ports || []).filter((p) => !p.Wireless);
+  const wired = (data.ports || []);
   const portOpts = (blankLabel) => [{ value: '', label: blankLabel }, ...wired.map((p) => ({ value: p.Name, label: `${p.Name}${p.UsedFor ? ` (used for ${p.UsedFor === 'internet' ? 'the internet' : 'a network'} now)` : ''}` }))];
   const payload = () => ({ ...f, subnets: subnets.split(/[,\s]+/).filter(Boolean), allow: f.allow.map((a) => ({ ...a, port: Number(a.port) })) });
   const save = () => run(async () => { const r = await put('/api/bridge', payload()); reload(); return r; }, 'Saved. Nothing has changed on the machine yet.');
@@ -150,7 +150,7 @@ export default function BridgeMode() {
           <Button kind="primary" disabled={busy} onClick={async () => { if (await confirmBox(f.enabled ? 'Turn on bridge mode? You have 60 seconds to keep it; otherwise everything goes back by itself.' : 'Turn bridge mode off and go back to routing? You have 60 seconds to keep it.', { title: 'Apply this change', yes: 'Apply' })) apply(); }}>Apply</Button>
           {data.dirty && <Button disabled={busy} onClick={() => run(async () => { await post('/api/bridge/discard', {}); setF(null); reload(); }, 'Changes dropped.')}>Drop my changes</Button>}
         </div>
-        <span className="small muted">Wi-Fi networks, VPNs and port forwards are paused while bridge mode is on and come back when it is off. If something goes wrong, the 60-second way back restores everything; a reset to defaults from the screen on this machine also switches bridge mode off.</span>
+        <span className="small muted">VPNs and port forwards are paused while bridge mode is on and come back when it is off. If something goes wrong, the 60-second way back restores everything; a reset to defaults from the screen on this machine also switches bridge mode off.</span>
       </div>
     </Card>
   );

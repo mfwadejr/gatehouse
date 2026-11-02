@@ -1,6 +1,16 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.8.53',
+    title: 'Wireless removed: Gatehouse is wired only',
+    items: [
+      'Wi-Fi support is gone. The Wi-Fi page and its link in the sidebar, Wi-Fi join cards, the Wi-Fi internet option in the setup wizard, and the Wi-Fi columns and filters on Devices are removed. If you need Wi-Fi, plug in a separate access point or Wi-Fi router; Gatehouse still protects everything that connects through it.',
+      'The installer no longer carries Wi-Fi software or wireless firmware (hostapd, wpa_supplicant, iw, regulatory data, and the Intel, Atheros, Broadcom and MediaTek Wi-Fi firmware), and wireless cards are blocked from loading, so a Wi-Fi card in the machine is ignored. Wired network card firmware is unchanged.',
+      'Updating from an earlier version drops the saved Wi-Fi settings and join cards. Old backups still restore; their Wi-Fi part is skipped. The Help now says plainly that wireless is not included.',
+      'The earlier Wi-Fi code is kept in the project archive folder for reference.',
+    ],
+  },
+  {
     version: '0.8.52',
     title: 'Every link checked: Security check, search and Help',
     items: [

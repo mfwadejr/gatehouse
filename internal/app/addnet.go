@@ -400,9 +400,6 @@ func (a *App) registerAddNetRoutes() {
 		pl := []map[string]any{}
 		for _, p := range ports() {
 			n := p["name"].(string)
-			if p["wifi"] == true && r.URL.Query().Get("all") == "" {
-				continue // the Wi-Fi page sets up wireless networks
-			}
 			p["use"] = use[n]
 			pl = append(pl, p)
 		}

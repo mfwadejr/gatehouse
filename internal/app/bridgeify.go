@@ -49,9 +49,7 @@ func (a *App) addPortsToNetwork(id int64, add []string) (string, error) {
 	have := map[string]bool{}
 	for _, p := range portsLister() {
 		if n, ok := p["name"].(string); ok {
-			if w, _ := p["wifi"].(bool); !w {
-				have[n] = true
-			}
+			have[n] = true
 		}
 	}
 	for _, p := range add {

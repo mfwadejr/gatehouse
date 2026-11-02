@@ -46,7 +46,7 @@ func TestValidate(t *testing.T) {
 }
 
 func TestCheckPorts(t *testing.T) {
-	have := []PortInfo{{Name: "enp1s0"}, {Name: "enp2s0"}, {Name: "enp3s0"}, {Name: "wlp4s0", Wireless: true}}
+	have := []PortInfo{{Name: "enp1s0"}, {Name: "enp2s0"}, {Name: "enp3s0"}}
 	c := good()
 	if _, err := c.CheckPorts(have, nil); err != nil {
 		t.Fatal(err)
@@ -54,10 +54,6 @@ func TestCheckPorts(t *testing.T) {
 	c.Inside = []string{"missing"}
 	if _, err := c.CheckPorts(have, nil); err == nil {
 		t.Error("a port that does not exist must be refused")
-	}
-	c.Inside = []string{"wlp4s0"}
-	if _, err := c.CheckPorts(have, nil); err == nil || !strings.Contains(err.Error(), "wired") {
-		t.Error("a Wi-Fi card must be refused with a plain reason")
 	}
 	c = good()
 	w, _ := c.CheckPorts(have, []string{"enp2s0"})

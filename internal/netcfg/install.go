@@ -27,21 +27,16 @@ type Installer struct {
 	PPPSecrets  string // /etc/ppp/chap-secrets (pap-secrets is written beside it)
 	SysctlFile  string // /etc/sysctl.d/90-gatehouse.conf
 	VPNDir      string // where tunnel keys live; empty disables key files
-	WifiDir     string // wireless card configuration; empty disables it
 	StateDir    string // /var/lib/gatehouse/net
 
 	// Hooks for the parts that talk to systemd; replaced in tests.
 	Reload   func() error
 	Services func(start, stop []string) error
-	// Restart is told which wireless cards had their settings changed while running, so they can
-	// rejoin with the new settings and ask for a fresh address. Nil in tests.
-	Restart  func(units []string)
 	Sysctl   func(file string) error
 	Watchdog func(dir string, deadline time.Time, token string) error
 	Now      func() time.Time
 
-	mu      sync.Mutex
-	changed []string // wireless units whose files changed, until activate has acted on them
+	mu sync.Mutex
 }
 
 const filePrefix = "gatehouse-"
@@ -49,7 +44,7 @@ const filePrefix = "gatehouse-"
 func NewInstaller() *Installer {
 	return &Installer{
 		NetworkdDir: "/etc/systemd/network", PPPDir: "/etc/ppp/peers", PPPSecrets: "/etc/ppp/chap-secrets",
-		SysctlFile: "/etc/sysctl.d/90-gatehouse.conf", VPNDir: VPNKeyDir, WifiDir: WifiDir, StateDir: "/var/lib/gatehouse/net",
+		SysctlFile: "/etc/sysctl.d/90-gatehouse.conf", VPNDir: VPNKeyDir, StateDir: "/var/lib/gatehouse/net",
 		Reload: func() error {
 			if out, err := exec.Command("networkctl", "reload").CombinedOutput(); err != nil {
 				return fmt.Errorf("networkctl reload: %s", strings.TrimSpace(string(out)))
@@ -58,12 +53,7 @@ func NewInstaller() *Installer {
 			return nil
 		},
 		Services: func(start, stop []string) error {
-			unit := func(u string) string {
-				if mode, dev, ok := strings.Cut(u, ":"); ok && strings.HasPrefix(mode, "wifi-") {
-					return "gatehouse-" + mode + "@" + dev + ".service"
-				}
-				return "gatehouse-ppp@" + u + ".service"
-			}
+			unit := func(u string) string { return "gatehouse-ppp@" + u + ".service" }
 			for _, u := range stop {
 				exec.Command("systemctl", "disable", "--now", unit(u)).Run()
 			}
@@ -74,62 +64,11 @@ func NewInstaller() *Installer {
 			}
 			return nil
 		},
-		Restart: restartWifi,
 		Sysctl: func(file string) error {
 			return exec.Command("sysctl", "-p", file).Run()
 		},
 		Now: time.Now, Watchdog: StartWatchdogProcess,
 	}
-}
-
-// restartWifi makes a card that was already running use its new settings. Starting a service that
-// is already running does nothing, so without this a changed network name is never joined and the
-// old address stays.
-func restartWifi(units []string) {
-	for _, u := range units {
-		mode, dev, ok := strings.Cut(u, ":")
-		if !ok || !strings.HasPrefix(mode, "wifi-") {
-			continue
-		}
-		exec.Command("systemctl", "restart", "gatehouse-"+mode+"@"+dev+".service").Run()
-		if mode == "wifi-client" {
-			go func(dev string) {
-				// Give the card time to join, then make sure it asks the new network for an address.
-				for _, wait := range []time.Duration{6 * time.Second, 10 * time.Second} {
-					time.Sleep(wait)
-					exec.Command("networkctl", "renew", dev).Run()
-				}
-			}(dev)
-		}
-	}
-}
-
-// wifiChanged lists the wireless units whose file differs from what is on disk now.
-func (in *Installer) wifiChanged(want map[string]string) []string {
-	if in.WifiDir == "" {
-		return nil
-	}
-	var out []string
-	for path, body := range want {
-		if filepath.Dir(path) != filepath.Clean(in.WifiDir) {
-			continue
-		}
-		old, err := os.ReadFile(path)
-		if err == nil && string(old) == body {
-			continue
-		}
-		if err != nil {
-			continue // a new file: the card is started, not restarted
-		}
-		base := filepath.Base(path)
-		if dev, ok := strings.CutSuffix(base, ".supplicant.conf"); ok {
-			out = append(out, "wifi-client:"+dev)
-		} else if dev, ok := strings.CutSuffix(base, ".hostapd.conf"); ok {
-			out = append(out, "wifi-ap:"+dev)
-		}
-	}
-	sort.Strings(out)
-	return out
 }
 
 type pendingState struct {
@@ -183,11 +122,6 @@ func (in *Installer) current() (map[string]string, error) {
 			}
 		}
 	}
-	if in.WifiDir != "" {
-		if err := add(in.WifiDir, "*.conf"); err != nil {
-			return nil, err
-		}
-	}
 	for _, f := range []string{in.SysctlFile, in.PPPSecrets, in.papSecrets(), in.path("ppp-units")} {
 		if b, err := os.ReadFile(f); err == nil {
 			out[f] = string(b)
@@ -214,11 +148,6 @@ func (in *Installer) desired(o *Output) map[string]string {
 	if in.VPNDir != "" {
 		for n, b := range o.Private {
 			want[filepath.Join(in.VPNDir, n)] = b
-		}
-	}
-	if in.WifiDir != "" {
-		for n, b := range o.Wifi {
-			want[filepath.Join(in.WifiDir, n)] = b
 		}
 	}
 	want[in.SysctlFile] = o.Sysctl
@@ -319,7 +248,6 @@ func (in *Installer) install(o *Output) error {
 	if err != nil {
 		return err
 	}
-	in.changed = in.wifiChanged(want)
 	for path := range have {
 		if _, keep := want[path]; keep {
 			continue
@@ -345,9 +273,6 @@ func (in *Installer) install(o *Output) error {
 
 // writeFile writes one managed file. Keys are readable by root and the network service only.
 func (in *Installer) writeFile(path string, body []byte) error {
-	if in.WifiDir != "" && filepath.Dir(path) == filepath.Clean(in.WifiDir) {
-		return writeAtomic(path, body, 0o600)
-	}
 	if in.VPNDir != "" && filepath.Dir(path) == filepath.Clean(in.VPNDir) {
 		if err := os.MkdirAll(in.VPNDir, 0o750); err != nil {
 			return err
@@ -395,12 +320,6 @@ func (in *Installer) activate(units []string) error {
 	if in.Services != nil {
 		err = in.Services(units, stop)
 	}
-	if ch := in.changed; len(ch) > 0 {
-		in.changed = nil
-		if in.Restart != nil && err == nil {
-			in.Restart(ch)
-		}
-	}
 	return err
 }
 
@@ -440,7 +359,6 @@ func (in *Installer) restoreLocked() error {
 	if err := json.Unmarshal(b, &prev); err != nil {
 		return err
 	}
-	in.changed = in.wifiChanged(prev)
 	have, _ := in.current()
 	for path := range have {
 		if _, ok := prev[path]; !ok && path != in.PPPSecrets && path != in.papSecrets() {

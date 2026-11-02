@@ -7,7 +7,7 @@ import (
 
 func TestMapPortsRefusesFewerPorts(t *testing.T) {
 	roles := []PortRole{{ID: "internet:A", Label: "Internet A", Port: "enp1s0", Speed: 1000}, {ID: "network:Home", Label: "Home", Port: "enp2s0", Speed: 1000}}
-	_, err := MapPorts(roles, []Port{{Name: "eth0", Speed: 1000, Link: true}, {Name: "wlan0", Wireless: true}}, nil)
+	_, err := MapPorts(roles, []Port{{Name: "eth0", Speed: 1000, Link: true}}, nil)
 	if err == nil || !strings.Contains(err.Error(), "at least as many") {
 		t.Fatalf("a backup with fewer wired ports must be refused in words: %v", err)
 	}
