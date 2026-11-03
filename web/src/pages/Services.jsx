@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { del, put, useData } from '../api.js';
+import { del, holdAnd, put, useData } from '../api.js';
+import { SAVED_LATER, SaveChoice } from '../changes.jsx';
 import { Button, Card, Empty, Field, Input, Modal, Page, Paged, useAction, confirmBox, useUndoDelete } from '../ui.jsx';
 
 // Services: the one place to see what Gatehouse knows by name and to make your own. A service is a
@@ -12,7 +13,7 @@ function ServiceForm({ initial, onClose, onSaved }) {
   const ports = text.split(/[\s,]+/).filter(Boolean).map((x) => x.toLowerCase());
   return (
     <Modal title={initial?.id ? `Edit ${initial.name}` : 'New service'} onClose={onClose}
-      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy || !name.trim() || !ports.length} onClick={async () => { if (await run(() => put('/api/fw/portlists', { id: initial?.id || 0, name: name.trim(), ports }), 'Saved.')) { onSaved(); onClose(); } }}>Save</Button></>}>
+      footer={<><Button onClick={onClose}>Cancel</Button><SaveChoice busy={busy} disabled={!name.trim() || !ports.length} onSave={async (later) => { const body = { id: initial?.id || 0, name: name.trim(), ports }; if (await run(() => (later ? holdAnd(() => put('/api/fw/portlists', body)) : put('/api/fw/portlists', body)), later ? SAVED_LATER : 'Saved.')) { onSaved(); onClose(); } }} /></>}>
       <Field label="Name" hint="What you will search for when you make a rule. If you rename it, open ports and rules that use it follow the new name."><Input value={name} onChange={setName} placeholder="Plex" /></Field>
       <Field label="Ports" hint="One per line, like tcp/32400 or udp/27000-27050. A built-in name such as https also works.">
         <textarea className="in mono" rows={6} value={text} onChange={(e) => setText(e.target.value)} spellCheck={false} placeholder={'tcp/32400\nudp/1900'} />

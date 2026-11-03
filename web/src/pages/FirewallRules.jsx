@@ -285,7 +285,7 @@ function GroupForm({ initial, pickers, reloadPickers, onClose, onSaved }) {
   const tog = (mac) => setG((x) => ({ ...x, members: x.members.includes(mac) ? x.members.filter((m) => m !== mac) : [...x.members, mac] }));
   return (
     <Modal title={g.id ? `Edit ${initial.name}` : 'New device group'} onClose={onClose}
-      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy || !g.name} onClick={async () => { const r = await run(() => put('/api/fw/groups', g), 'Saved.'); if (r) { if (r.vpn_warning) await noticeBox(r.vpn_warning); onSaved(); onClose(); } }}>Save</Button></>}>
+      footer={<><Button onClick={onClose}>Cancel</Button><SaveChoice busy={busy} disabled={!g.name} onSave={async (later) => { const r = await run(() => (later ? holdAnd(() => put('/api/fw/groups', g)) : put('/api/fw/groups', g)), later ? SAVED_LATER : 'Saved.'); if (r) { if (r.vpn_warning) await noticeBox(r.vpn_warning); onSaved(); onClose(); } }} /></>}>
       <Field label="Name"><Input value={g.name} onChange={(v) => setG({ ...g, name: v })} placeholder="Kids' devices" /></Field>
       <ToggleRow title="Reserved addresses only" desc="A device counts only at the address you reserved for it on the DHCP page. Devices without a reservation are left out, so a stranger who borrows a free address is not covered." checked={g.reserved_only} onChange={(v) => setG({ ...g, reserved_only: v })} />
       <Field label={`Devices (${g.members.length})`}>

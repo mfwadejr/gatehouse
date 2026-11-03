@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { del, put, useData, useThroughput } from '../api.js';
+import { del, holdAnd, put, useData, useThroughput } from '../api.js';
+import { SAVED_LATER, SaveChoice } from '../changes.jsx';
 import SourcePicker from '../SourcePicker.jsx';
 import { Button, Card, Empty, Field, Input, Modal, Note, Pill, Segmented, Select, Trend, useAction, confirmBox, noticeBox } from '../ui.jsx';
 import { linkState } from '../linkstate.js';
@@ -123,14 +124,14 @@ function GroupForm({ initial, wans, onClose, onSaved }) {
   const [g, setG] = useState({ name: '', mode: 'failover', fallback: 'default', members: [], uses: [], ...initial });
   const [run, busy] = useAction();
   const patch = (p) => setG((x) => ({ ...x, ...p }));
-  const save = async () => {
+  const save = async (later) => {
     const body = { ...g, members: g.members.map((m) => ({ wan_id: m.wan_id, weight: m.weight })) };
-    const r = await run(() => put('/api/net/groups', body), 'Saved. Apply it to start using it.');
+    const r = await run(() => (later ? holdAnd(() => put('/api/net/groups', body)) : put('/api/net/groups', body)), later ? SAVED_LATER : 'Saved.');
     if (r) { if (r.warnings?.length) noticeBox(r.warnings.join('\n')); onSaved(); onClose(); }
   };
   return (
     <Modal title={g.id ? `Edit ${initial.name}` : 'New connection group'} onClose={onClose}
-      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy || !g.name.trim() || !g.members.length} onClick={save}>Save</Button></>}>
+      footer={<><Button onClick={onClose}>Cancel</Button><SaveChoice busy={busy} disabled={!g.name.trim() || !g.members.length} onSave={save} /></>}>
       <div className="stack">
         <Field label="Name" hint="For example Cameras, Work, or Guests."><Input value={g.name} onChange={(v) => patch({ name: v })} placeholder="Work" /></Field>
         <Field label="Which connections does it use?">

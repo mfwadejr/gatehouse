@@ -1,6 +1,7 @@
 import { useHashTab } from '../hashtab.js';
 import React, { useState } from 'react';
-import { del, post, put, useData } from '../api.js';
+import { del, holdAnd, post, put, useData } from '../api.js';
+import { SAVED_LATER, SaveChoice } from '../changes.jsx';
 import { Bar, Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Select, Tabs, ToggleRow, useAction, fmt, confirmBox, usePortNames } from '../ui.jsx';
 
 const HOURS = [{ value: 3600, label: '1 hour' }, { value: 14400, label: '4 hours' }, { value: 43200, label: '12 hours' }, { value: 86400, label: '1 day' }, { value: 604800, label: '1 week' }];
@@ -18,7 +19,7 @@ export function ScopeForm({ initial, ifaces, onClose, onSaved }) {
   };
   return (
     <Modal title={s.id ? `DHCP for ${s.name}` : `Set up DHCP for ${s.name || 'this network'}`} onClose={onClose}
-      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy} onClick={async () => { if (await run(() => put('/api/dhcp/scopes', s), 'Saved.')) { onSaved(); onClose(); } }}>Save</Button></>}>
+      footer={<><Button onClick={onClose}>Cancel</Button><SaveChoice busy={busy} onSave={async (later) => { if (await run(() => (later ? holdAnd(() => put('/api/dhcp/scopes', s)) : put('/api/dhcp/scopes', s)), later ? SAVED_LATER : 'Saved.')) { onSaved(); onClose(); } }} /></>}>
       <div className="formgrid">
         <Field label="Name"><Input value={s.name} onChange={set('name')} /></Field>
         <Field label="Port or VLAN"><Select value={s.iface} onChange={set('iface')} options={[{ value: '', label: 'Choose…' }, ...ifaces.map((i) => i.name)]} /></Field>
@@ -130,7 +131,7 @@ function ResvForm({ initial, scopes, onClose, onSaved }) {
   const [run, busy] = useAction();
   const set = (k) => (v) => setR((x) => ({ ...x, [k]: v }));
   return (
-    <Modal title="Reserve an address" onClose={onClose} footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy} onClick={async () => { if (await run(() => post('/api/dhcp/reservations', r), 'Reserved.')) { onSaved?.(); onClose(); } }}>Reserve</Button></>}>
+    <Modal title="Reserve an address" onClose={onClose} footer={<><Button onClick={onClose}>Cancel</Button><SaveChoice busy={busy} label="Reserve and apply" onSave={async (later) => { if (await run(() => (later ? holdAnd(() => post('/api/dhcp/reservations', r)) : post('/api/dhcp/reservations', r)), later ? SAVED_LATER : 'Reserved.')) { onSaved?.(); onClose(); } }} /></>}>
       <Field label="Network"><Select value={String(r.scope_id || '')} onChange={(v) => set('scope_id')(Number(v))} options={scopes.map((s) => ({ value: String(s.id), label: s.name }))} /></Field>
       <div className="formgrid">
         <Field label="Device address (MAC)" hint="Like aa:bb:cc:dd:ee:ff"><Input value={r.mac} onChange={set('mac')} /></Field>

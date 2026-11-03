@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { put, useData } from '../api.js';
+import { holdAnd, put, useData } from '../api.js';
+import { SAVED_LATER, SaveChoice } from '../changes.jsx';
 import { Button, Card, Empty, Note, Select, useAction } from '../ui.jsx';
 
 // Devices finding each other across networks: printers, casting, AirPlay, Home Assistant. Pick
@@ -23,7 +24,7 @@ export default function Discovery({ reload }) {
     setPairs([...pairs, { a, b }]);
     setA(''); setB('');
   };
-  const save = () => run(async () => { await put('/api/fw/discovery', { pairs, kinds }); await again(); reload?.(); }, 'Saved. Apply the firewall to start using it.');
+  const save = (later) => run(async () => { await (later ? holdAnd(() => put('/api/fw/discovery', { pairs, kinds })) : put('/api/fw/discovery', { pairs, kinds })); await again(); reload?.(); }, later ? SAVED_LATER : 'Saved.');
   const tick = (id, v) => setKinds(v ? [...kinds, id] : kinds.filter((k) => k !== id));
   return (
     <Card title="Let networks see each other's devices" desc="Printers, Chromecast, AirPlay and Home Assistant find each other by announcing themselves, which normally stops at the edge of a network. Pair two networks and Gatehouse passes those announcements across.">
@@ -56,7 +57,7 @@ export default function Discovery({ reload }) {
             <Note tone="warn" title="This only lets devices find each other">
               Seeing a printer is not the same as being allowed to use it. If the two networks are kept apart by the firewall, add a rule on the Rules tab for what you want to allow, such as printing. Passing announcements also tells every device on a paired network what exists on the other, so do not pair your guests with your home.
             </Note>
-            <div className="actions"><Button kind="primary" onClick={save} disabled={busy || !dirty}>Save</Button></div>
+            <div className="actions"><SaveChoice onSave={save} busy={busy} disabled={!dirty} /></div>
           </>
         )}
       </div>

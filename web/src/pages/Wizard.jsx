@@ -49,6 +49,20 @@ function PortPick({ ports, value, onChange, roles = {}, here }) {
   );
 }
 
+// The common United States zones come first, in plain words; every other zone follows as before.
+const US_ZONES = [
+  ['America/New_York', 'Eastern time (New York)'], ['America/Chicago', 'Central time (Chicago)'], ['America/Denver', 'Mountain time (Denver)'],
+  ['America/Phoenix', 'Arizona, no daylight saving (Phoenix)'], ['America/Los_Angeles', 'Pacific time (Los Angeles)'],
+  ['America/Anchorage', 'Alaska (Anchorage)'], ['Pacific/Honolulu', 'Hawaii (Honolulu)'],
+];
+export function zoneOptions(all) {
+  const list = all && all.length ? all : ['UTC'];
+  const us = US_ZONES.filter(([v]) => list.includes(v)).map(([value, label]) => ({ value, label }));
+  if (!us.length) return list;
+  const taken = new Set(us.map((o) => o.value));
+  return [{ group: 'United States', options: us }, { group: 'All other zones', options: list.filter((z) => !taken.has(z)).map((z) => ({ value: z, label: z })) }];
+}
+
 const empty = (lan) => ({ lan: { port: lan, mode: 'router', address: '', addressing: 'dhcp', static: '', gateway: '', dns: '' }, wan: null, bridge: [] });
 
 // The first-run wizard: how this device is used on the network. Everything here can be changed later.
@@ -241,7 +255,7 @@ export default function Wizard({ data, me, onDone }) {
   return (
     <Frame title="About this device" step={sn} of={order.length}>
       <Field label="Name of this device" hint="Shown on your network, for example gatehouse"><Input value={host} onChange={setHost} /></Field>
-      <Field label="Time zone"><Select value={zone} onChange={setZone} options={data.timezones || ['UTC']} /></Field>
+      <Field label="Time zone"><Select value={zone} onChange={setZone} options={zoneOptions(data.timezones)} /></Field>
       <ToggleRow title="Require two-factor sign-in" desc="Optional. Asks for a code from an authenticator app each time you sign in. You can change this later in Settings." checked={mfa} onChange={setMfa} />
       {router && hereIsLan && !(data.install?.address && lan.address === data.install.address) && <Note tone="warn" title="Your connection will move">Gatehouse becomes your router on this port. After you finish, unplug and replug the cable on this computer so it gets a new address. The next page shows where to go.</Note>}
       {err && <Note tone="bad">{err}</Note>}

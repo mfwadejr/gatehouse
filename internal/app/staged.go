@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,14 +19,16 @@ import (
 // Staged changes. A change saved "for later" waits, in plain words, on the Review page until the
 // person commits everything at once or discards it. Gatehouse keeps:
 //   - a journal of what was staged, in words, written when each change is saved; and
-//   - one copy of the settings from just before the first staged change, so Discard puts everything
-//     back exactly as it was running.
-// Both are cleared the moment nothing is waiting any more (after a commit, or a discard).
+//   - a copy of the settings from just before each staged change, so Discard puts everything back
+//     exactly as it was running, or goes back to just before one line (dropping that line and the
+//     ones saved after it, because later changes can depend on earlier ones).
+// All of it is cleared the moment nothing is waiting any more (after a commit, or a discard).
 
 const (
 	stagedJournalKey = "staged.journal"
 	stagedBaseKey    = "staged.base"
 	stagedBaseKind   = "staged-base"
+	stagedTipKey     = "staged.tip"
 	stepUpMemory     = 15 * time.Minute
 )
 
@@ -34,9 +37,38 @@ type stagedEntry struct {
 	TS    int64  `json:"ts"`
 	Actor string `json:"actor"`
 	Text  string `json:"text"`
+	// Before names the copy of the settings taken just before this change was saved. Discarding this
+	// line puts that copy back, which also drops every change saved after it.
+	Before string `json:"before,omitempty"`
 }
 
 var stagedMu sync.Mutex
+
+var reStagedSnap = regexp.MustCompile(`^snap-[0-9]+\.[a-z.]+$`)
+
+func (a *App) stagedSnapPath(name string) string {
+	if !reStagedSnap.MatchString(name) {
+		return ""
+	}
+	return filepath.Join(a.backupDir(), "staged", name)
+}
+
+// takeStagedSnap saves a copy of the settings as they are right now and returns its name ("" if it
+// could not be saved).
+func (a *App) takeStagedSnap() string {
+	name := "snap-" + strconv.FormatInt(time.Now().UnixNano(), 10) + bkExt
+	if err := a.writeBackupFile(a.stagedSnapPath(name), stagedBaseKind); err != nil {
+		return ""
+	}
+	return name
+}
+
+func (a *App) removeStagedSnap(name string) {
+	if p := a.stagedSnapPath(name); p != "" {
+		os.Remove(p)
+		os.Remove(p + ".json")
+	}
+}
 
 // stagedPath says whether a request can stage a change to the firewall or the network.
 func stagedPath(path string) bool {
@@ -81,18 +113,20 @@ func (a *App) stagedBefore(method, path string) {
 	if f, n := a.anyDirty(); f || n {
 		return // something was already waiting before staging was tracked; nothing clean to go back to
 	}
-	if name, err := a.saveBackup(stagedBaseKind); err == nil {
-		a.Config.SetSetting(stagedBaseKey, filepath.Base(name))
+	if name := a.takeStagedSnap(); name != "" {
+		a.Config.SetSetting(stagedBaseKey, name)
+		a.Config.SetSetting(stagedTipKey, name)
 	}
 }
 
 func (a *App) clearStaged() {
-	if name := a.Config.Setting(stagedBaseKey, ""); name != "" {
-		if p, err := a.backupPath(name); err == nil {
-			os.Remove(p)
-		}
+	for _, e := range a.stagedJournal() {
+		a.removeStagedSnap(e.Before)
 	}
+	a.removeStagedSnap(a.Config.Setting(stagedBaseKey, ""))
+	a.removeStagedSnap(a.Config.Setting(stagedTipKey, ""))
 	a.Config.SetSetting(stagedBaseKey, "")
+	a.Config.SetSetting(stagedTipKey, "")
 	a.Config.SetSetting(stagedJournalKey, "")
 	a.Config.SetSetting("staged.upto", "0")
 }
@@ -138,17 +172,16 @@ func (a *App) stagedAfter(actor, method, path string, body []byte) {
 			for _, e := range j {
 				if e.ID > upto {
 					keep = append(keep, e)
+				} else {
+					a.removeStagedSnap(e.Before)
 				}
 			}
 			b, _ := json.Marshal(keep)
 			a.Config.SetSetting(stagedJournalKey, string(b))
-			// What went live is no longer "as it was", so there is no copy to go back to.
-			if name := a.Config.Setting(stagedBaseKey, ""); name != "" {
-				if p, err := a.backupPath(name); err == nil {
-					os.Remove(p)
-				}
-				a.Config.SetSetting(stagedBaseKey, "")
-			}
+			// What went live is no longer "as it was", so there is no single copy to go back to;
+			// lines saved after it keep their own copies.
+			a.removeStagedSnap(a.Config.Setting(stagedBaseKey, ""))
+			a.Config.SetSetting(stagedBaseKey, "")
 			a.Config.SetSetting("staged.upto", "0")
 		}
 		return
@@ -157,16 +190,26 @@ func (a *App) stagedAfter(actor, method, path string, body []byte) {
 		return
 	}
 	text := stagedWords(method, path, body)
+	tip := a.Config.Setting(stagedTipKey, "")
 	if len(j) > 0 && j[len(j)-1].Text == text {
+		// The same line again: whatever it changed belongs to that line, so the next line starts from now.
+		if nt := a.takeStagedSnap(); nt != "" {
+			a.removeStagedSnap(tip)
+			a.Config.SetSetting(stagedTipKey, nt)
+		}
 		return
 	}
 	var id int64 = 1
 	if len(j) > 0 {
 		id = j[len(j)-1].ID + 1
 	}
-	j = append(j, stagedEntry{ID: id, TS: time.Now().Unix(), Actor: actor, Text: text})
-	if len(j) > 200 {
-		j = j[len(j)-200:]
+	j = append(j, stagedEntry{ID: id, TS: time.Now().Unix(), Actor: actor, Text: text, Before: tip})
+	a.Config.SetSetting(stagedTipKey, a.takeStagedSnap())
+	if len(j) > 60 { // each line holds a copy of the settings, so the list is kept short
+		for _, e := range j[:len(j)-60] {
+			a.removeStagedSnap(e.Before)
+		}
+		j = j[len(j)-60:]
 	}
 	b, _ := json.Marshal(j)
 	a.Config.SetSetting(stagedJournalKey, string(b))
@@ -206,8 +249,18 @@ func stagedWords(method, path string, body []byte) string {
 
 func (a *App) stagedView() map[string]any {
 	f, n := a.anyDirty()
+	items := []map[string]any{}
+	for _, e := range a.stagedJournal() {
+		can := false
+		if p := a.stagedSnapPath(e.Before); p != "" {
+			if _, err := os.Stat(p); err == nil {
+				can = true
+			}
+		}
+		items = append(items, map[string]any{"id": e.ID, "ts": e.TS, "actor": e.Actor, "text": e.Text, "can_discard": can})
+	}
 	return map[string]any{
-		"items": a.stagedJournal(), "fw": f, "net": n,
+		"items": items, "fw": f, "net": n,
 		"can_discard": a.Config.Setting(stagedBaseKey, "") != "",
 	}
 }
@@ -217,15 +270,19 @@ func (a *App) registerStagedRoutes() {
 	s.Handle("GET /api/staged", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		api.JSON(w, 200, a.stagedView())
 	})
-	// Discard puts the settings back exactly as they were running, dropping everything staged.
+	// Discard puts the settings back as they were running. With no "from" it drops everything that is
+	// waiting; with "from" it goes back to just before that line, dropping it and the lines after it.
 	s.HandleAdmin("POST /api/staged/discard", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		var in struct {
+			From int64 `json:"from"`
+		}
+		if r.ContentLength != 0 {
+			if !api.Decode(w, r, &in) {
+				return
+			}
+		}
 		stagedMu.Lock()
 		defer stagedMu.Unlock()
-		name := a.Config.Setting(stagedBaseKey, "")
-		if name == "" {
-			fail(w, errors.New("there is no earlier copy to go back to; change the items by hand"))
-			return
-		}
 		if a.applyPending() {
 			api.Error(w, http.StatusConflict, "a change is being tried out right now; wait for it to finish first")
 			return
@@ -234,20 +291,65 @@ func (a *App) registerStagedRoutes() {
 			api.Error(w, http.StatusConflict, "an update is running ("+st+"); wait for it to finish")
 			return
 		}
-		p, err := a.backupPath(name)
-		if err != nil {
+		j := a.stagedJournal()
+		snap, idx := a.Config.Setting(stagedBaseKey, ""), -1
+		if in.From > 0 {
+			for i, e := range j {
+				if e.ID == in.From {
+					idx = i
+				}
+			}
+			if idx < 0 {
+				fail(w, errors.New("that change is no longer waiting"))
+				return
+			}
+			snap = j[idx].Before
+		}
+		p := a.stagedSnapPath(snap)
+		if p == "" {
+			fail(w, errors.New("there is no earlier copy to go back to; change the items by hand"))
+			return
+		}
+		if _, err := os.Stat(p); err != nil {
 			fail(w, errors.New("the earlier copy is gone; change the items by hand"))
 			return
 		}
+		// Restoring puts the settings from that moment back, including these bookkeeping values, so read
+		// them first and write them again afterwards.
+		oldBase, oldTip := a.Config.Setting(stagedBaseKey, ""), a.Config.Setting(stagedTipKey, "")
 		if _, err := a.restoreBackup(p, "", c.User.Username); err != nil {
 			fail(w, err)
 			return
 		}
-		a.clearStaged()
+		what, detail := "Staged changes discarded", "Discarded every change that was waiting to be applied."
+		if idx >= 0 {
+			what, detail = "Staged change discarded", "Discarded a waiting change and the ones saved after it: "+j[idx].Text
+			// Everything from that line on is gone. Its copy becomes the new starting point.
+			for _, e := range j[idx+1:] {
+				a.removeStagedSnap(e.Before)
+			}
+			a.removeStagedSnap(oldTip)
+			a.Config.SetSetting(stagedBaseKey, oldBase)
+			a.Config.SetSetting(stagedTipKey, snap)
+			b, _ := json.Marshal(j[:idx])
+			a.Config.SetSetting(stagedJournalKey, string(b))
+		} else {
+			for _, e := range j {
+				a.removeStagedSnap(e.Before)
+			}
+			a.removeStagedSnap(oldBase)
+			a.removeStagedSnap(oldTip)
+			a.clearStaged()
+		}
 		a.markDirty()
 		a.fwSync()
 		a.publishNet()
-		a.auditEvent(c.User.Username, "info", "Staged changes discarded", "Discarded every change that was waiting to be applied.")
+		if idx >= 0 {
+			if f, n := a.anyDirty(); !f && !n {
+				a.clearStaged()
+			}
+		}
+		a.auditEvent(c.User.Username, "info", what, detail)
 		ok(w)
 	})
 }

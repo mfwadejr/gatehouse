@@ -66,7 +66,7 @@ jobs:
         run: |
           chmod +x bin/gatehouse
           mkdir -p out
-          docker run --rm --privileged -v "$PWD":/src -w /src debian:trixie sh -ec '
+          docker run --rm --privileged -e VERSION -v "$PWD":/src -w /src debian:trixie sh -ec '
             apt-get update
             apt-get install -y --no-install-recommends live-build debootstrap squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin mtools dosfstools syslinux syslinux-common isolinux ca-certificates
             # Optional traffic-labelling program. A failure here only means the image has no gh-ndpi.

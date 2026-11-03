@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { hashQuery, setHashQuery, useWantedEdit } from '../hashtab.js';
-import { del, get, post, put, useData } from '../api.js';
+import { del, get, holdAnd, post, put, useData } from '../api.js';
+import { SAVED_LATER, SaveChoice } from '../changes.jsx';
 import { CODES, countryName } from '../AddrPicker.jsx';
 import { PolicyControls, WhenField, whenText } from '../policykit.jsx';
 import { Button, Card, Empty, Field, Input, Modal, Note, Pill, Select, ToggleRow, useAction, useToast, confirmBox } from '../ui.jsx';
@@ -232,7 +233,7 @@ function LegacyForm({ f, wans, onClose, onSaved }) {
   const [e, setE] = useState({ ...f });
   const [run, busy] = useAction();
   return (
-    <Modal title="Edit port" onClose={onClose} footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy || !e.name} onClick={async () => { if (await run(() => put('/api/fw/forwards', e), 'Saved. Apply it to start using it.')) onSaved(); }}>Save</Button></>}>
+    <Modal title="Edit port" onClose={onClose} footer={<><Button onClick={onClose}>Cancel</Button><SaveChoice busy={busy} disabled={!e.name} onSave={async (later) => { if (await run(() => (later ? holdAnd(() => put('/api/fw/forwards', e)) : put('/api/fw/forwards', e)), later ? SAVED_LATER : 'Saved.')) onSaved(); }} /></>}>
       <Field label="Name"><Input value={e.name} onChange={(v) => setE({ ...e, name: v })} /></Field>
       <div className="formgrid">
         <Field label="Kind"><Select value={e.proto} onChange={(v) => setE({ ...e, proto: v })} options={['tcp', 'udp']} /></Field>

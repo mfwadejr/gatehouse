@@ -42,6 +42,13 @@ export default function Review() {
     try { await post('/api/staged/discard'); toast('Discarded. Everything is back as it was running.'); ch.reload(); }
     catch (e) { toast(e.message, 'bad'); }
   };
+  const discardFrom = async (e, last) => {
+    const msg = last ? `Put things back the way they were before this change? “${e.text}”`
+      : `Go back to just before this change? “${e.text}” and every change saved after it are dropped, because later changes can depend on it.`;
+    if (!(await confirmBox(msg, { title: last ? 'Discard this change?' : 'Discard this and the changes after it?', yes: 'Discard' }))) return;
+    try { await post('/api/staged/discard', { from: e.id }); toast(last ? 'Discarded.' : 'Discarded that change and the ones after it.'); ch.reload(); }
+    catch (er) { toast(er.message, 'bad'); }
+  };
   return (
     <Page title="Review changes" sub="Saved for later and not in use yet. Check them here, then put them all live in one step.">
       {ch.pend && <Note tone="warn" title="A change is being tried out">Wait for it to be kept or undone first. It takes up to a minute.</Note>}
@@ -52,7 +59,10 @@ export default function Review() {
         <>
           <Card title={`${items.length || dirty.length} ${(items.length || dirty.length) === 1 ? 'change' : 'changes'} waiting`} desc="In the order you made them.">
             {items.length > 0 ? (
-              <ul className="reviewlist">{items.map((e) => <li key={e.id}><time>{fmt.time(e.ts)}</time><span>{e.text}</span></li>)}</ul>
+              <ul className="reviewlist">{items.map((e, i) => (
+                <li key={e.id}><time>{fmt.time(e.ts)}</time><span>{e.text}</span>
+                  {e.can_discard && <button type="button" className="link small" disabled={ch.busy || !!ch.pend} onClick={() => discardFrom(e, i === items.length - 1)}>{i === items.length - 1 ? 'Discard' : 'Discard this and later'}</button>}
+                </li>))}</ul>
             ) : (
               <ul className="reviewlist">{summary.length ? summary.map((s, i) => <li key={i}><span>{s}</span></li>) : AREAS.filter(([k]) => dirty.includes(k)).map(([k, l]) => <li key={k}><span>{l} changed.</span></li>)}</ul>
             )}

@@ -157,7 +157,9 @@ export function NumberInput({ value, onChange, onBlur, className, ...rest }) {
 export function Select({ value, onChange, options, className, ...rest }) {
   return (
     <select value={value ?? ''} onChange={(e) => onChange(e.target.value)} {...rest} className={inClass(className)}>
-      {options.map((o) => (typeof o === 'string' ? <option key={o} value={o}>{o}</option> : <option key={o.value} value={o.value}>{o.label}</option>))}
+      {options.map((o) => (o.group
+        ? <optgroup key={o.group} label={o.group}>{o.options.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}</optgroup>
+        : typeof o === 'string' ? <option key={o} value={o}>{o}</option> : <option key={o.value} value={o.value}>{o.label}</option>))}
     </select>
   );
 }

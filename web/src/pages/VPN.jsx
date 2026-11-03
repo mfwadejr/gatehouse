@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { del, get, post, put, useData } from '../api.js';
+import { del, get, holdAnd, post, put, useData } from '../api.js';
+import { SAVED_LATER, SaveChoice } from '../changes.jsx';
 import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, ToggleRow, useAction, fmt, Switch, confirmBox, noticeBox, Dots } from '../ui.jsx';
 
 const STATE = {
@@ -390,14 +391,14 @@ function Settings({ v, onClose, onSaved }) {
   const [run, busy] = useAction();
   const client = v.role === 'client';
   const [f, setF] = useState({ label: v.label, check: v.check_target || '', killswitch: v.killswitch, endpoint: v.endpoint || '', mtu: v.mtu || 0 });
-  const save = async () => {
+  const save = async (later) => {
     const body = { label: f.label };
     if (client) { body.check = f.check; body.killswitch = f.killswitch; } else if (!v.site) body.endpoint = f.endpoint;
     if (v.kind === 'wireguard') body.mtu = Number(f.mtu) || 0;
-    if (await run(() => put(`/api/vpn/${v.kind}/${v.id}`, body), 'Saved.')) { onSaved(); onClose(); }
+    if (await run(() => (later ? holdAnd(() => put(`/api/vpn/${v.kind}/${v.id}`, body)) : put(`/api/vpn/${v.kind}/${v.id}`, body)), later ? SAVED_LATER : 'Saved.')) { onSaved(); onClose(); }
   };
   return (
-    <Modal title={`Settings for ${v.label}`} onClose={onClose} footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy} onClick={save}>Save</Button></>}>
+    <Modal title={`Settings for ${v.label}`} onClose={onClose} footer={<><Button onClick={onClose}>Cancel</Button><SaveChoice busy={busy} onSave={save} /></>}>
       <div className="stack">
         <Field label="Name"><Input value={f.label} onChange={(x) => setF({ ...f, label: x })} /></Field>
         {client ? (

@@ -149,11 +149,12 @@ function Protected({ reload }) {
   if (!data) return null;
   const startEdit = () => { setNets(data.allow.networks || []); setCidrs((data.allow.cidrs || []).join('\n')); setEdit(true); };
   const toggle = (n) => setNets((x) => (x.includes(n) ? x.filter((y) => y !== n) : [...x, n]));
-  const save = async () => {
+  const save = async (later) => {
     const list = cidrs.split(/[\s,]+/).filter(Boolean);
     const o = data.allow, key = (x) => [...(x || [])].sort().join(',');
     if (key(nets) === key(o.networks) && key(list) === key(o.cidrs)) { toast('No changes. These are already saved.'); setEdit(false); return; }
-    if (await run(() => put('/api/fw/management-access', { networks: nets, cidrs: list }), 'Saved. Apply the firewall to put it into effect.')) { setEdit(false); again(); reload(); }
+    const body = { networks: nets, cidrs: list };
+    if (await run(() => (later ? holdAnd(() => put('/api/fw/management-access', body)) : put('/api/fw/management-access', body)), later ? SAVED_LATER : 'Saved.')) { setEdit(false); again(); reload(); }
   };
   const test = async () => { const r = await run(() => post('/api/fw/access-check', {})); if (r) setRes(r); };
   const limited = (data.allow.resolved || []).length > 0;
@@ -189,7 +190,7 @@ function Protected({ reload }) {
             <textarea className="in mono" rows={3} value={cidrs} onChange={(e) => setCidrs(e.target.value)} spellCheck={false} placeholder="192.168.1.0/24" />
           </Field>
           <span className="small muted">You are connecting from {data.you.ip}{data.you.iface ? ` (${data.you.iface})` : ''}.</span>
-          <div className="actions"><Button kind="primary" disabled={busy} onClick={save}>Save</Button><Button onClick={() => setEdit(false)}>Cancel</Button></div>
+          <div className="actions"><SaveChoice busy={busy} onSave={save} /><Button onClick={() => setEdit(false)}>Cancel</Button></div>
         </div>
       )}
       {res && (

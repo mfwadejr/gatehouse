@@ -1,6 +1,16 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.3',
+    title: 'Discard one change, Save for later in more places, and US time zones',
+    items: [
+      'Review changes: every waiting change now has its own Discard. It puts things back to just before that change. Because later changes can depend on earlier ones, it also drops the changes saved after it, and says so before it does. Discard all changes is still there.',
+      'Save for later is now on more forms: the open-port editor, services, device groups, DHCP networks and reservations, connection groups, VPN settings, letting networks see each other, and who may manage Gatehouse. Each one also has Save and apply.',
+      'Setup wizard: the time zone list starts with the United States (Eastern, Central, Mountain, Arizona, Pacific, Alaska, Hawaii) in plain words, followed by every other zone.',
+      'The installer image is now named with its version (for example gatehouse-0.9.3-amd64.iso). The 0.9.2 image was called gatehouse-dev-amd64.iso by mistake.',
+    ],
+  },
+  {
     version: '0.9.2',
     title: 'Save and it is live, a Policies page, and tidier alerts',
     items: [

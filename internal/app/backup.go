@@ -125,19 +125,33 @@ func (a *App) saveBackup(prefix string) (string, error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", err
 	}
+	name := filepath.Join(dir, fmt.Sprintf("%s-%s%s", prefix, time.Now().Format("20060102-150405"), bkExt))
+	if err := a.writeBackupFile(name, prefix); err != nil {
+		return "", err
+	}
+	a.pruneBackups(prefix)
+	return name, nil
+}
+
+// writeBackupFile writes a checked copy of the settings and the secret key to the named file.
+func (a *App) writeBackupFile(name, prefix string) error {
+	dir := filepath.Dir(name)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
 	tmp, err := os.MkdirTemp(dir, ".work-")
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer os.RemoveAll(tmp)
 	dbf := filepath.Join(tmp, "config.db")
 	if _, err := a.Config.Exec(`VACUUM INTO ?`, dbf); err != nil {
-		return "", fmt.Errorf("could not save a copy of the settings: %w", err)
+		return fmt.Errorf("could not save a copy of the settings: %w", err)
 	}
 	key, _ := os.ReadFile(a.keyPath())
 	dbb, err := os.ReadFile(dbf)
 	if err != nil {
-		return "", err
+		return err
 	}
 	sum := func(b []byte) string { h := sha256.Sum256(b); return hex.EncodeToString(h[:]) }
 	man := bkManifest{Format: 1, Created: time.Now().Unix(), Version: a.Cfg.Version, Schema: store.ConfigSchemaVersion(), Kind: prefix,
@@ -151,27 +165,25 @@ func (a *App) saveBackup(prefix string) (string, error) {
 		b []byte
 	}{{"manifest.json", mb}, {"config.db", dbb}, {"secret.key", key}} {
 		if err := tw.WriteHeader(&tar.Header{Name: f.n, Mode: 0o600, Size: int64(len(f.b)), ModTime: time.Now()}); err != nil {
-			return "", err
+			return err
 		}
 		if _, err := tw.Write(f.b); err != nil {
-			return "", err
+			return err
 		}
 	}
 	tw.Close()
 	gz.Close()
-	name := filepath.Join(dir, fmt.Sprintf("%s-%s%s", prefix, time.Now().Format("20060102-150405"), bkExt))
 	if err := os.WriteFile(name+".part", buf.Bytes(), 0o600); err != nil {
-		return "", err
+		return err
 	}
 	if err := os.Rename(name+".part", name); err != nil {
-		return "", err
+		return err
 	}
 	// Check it straight away, so a bad backup is found now and not on the day it is needed.
 	if rep, err := a.verifyBackup(name, ""); err == nil {
 		a.writeMeta(name, bkMeta{Report: rep})
 	}
-	a.pruneBackups(prefix)
-	return name, nil
+	return nil
 }
 
 // pruneBackups keeps the number the person chose of the backups made by hand or on a schedule, and
