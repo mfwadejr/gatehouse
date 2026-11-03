@@ -57,7 +57,7 @@ func (a *App) stagedSnapPath(name string) string {
 // could not be saved).
 func (a *App) takeStagedSnap() string {
 	name := "snap-" + strconv.FormatInt(time.Now().UnixNano(), 10) + bkExt
-	if err := a.writeBackupFile(a.stagedSnapPath(name), stagedBaseKind); err != nil {
+	if err := a.writeBackupFile(a.stagedSnapPath(name), stagedBaseKind, false); err != nil {
 		return ""
 	}
 	return name
@@ -66,7 +66,6 @@ func (a *App) takeStagedSnap() string {
 func (a *App) removeStagedSnap(name string) {
 	if p := a.stagedSnapPath(name); p != "" {
 		os.Remove(p)
-		os.Remove(p + ".json")
 	}
 }
 

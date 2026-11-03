@@ -126,7 +126,7 @@ func (a *App) saveBackup(prefix string) (string, error) {
 		return "", err
 	}
 	name := filepath.Join(dir, fmt.Sprintf("%s-%s%s", prefix, time.Now().Format("20060102-150405"), bkExt))
-	if err := a.writeBackupFile(name, prefix); err != nil {
+	if err := a.writeBackupFile(name, prefix, true); err != nil {
 		return "", err
 	}
 	a.pruneBackups(prefix)
@@ -134,7 +134,7 @@ func (a *App) saveBackup(prefix string) (string, error) {
 }
 
 // writeBackupFile writes a checked copy of the settings and the secret key to the named file.
-func (a *App) writeBackupFile(name, prefix string) error {
+func (a *App) writeBackupFile(name, prefix string, verify bool) error {
 	dir := filepath.Dir(name)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
@@ -180,8 +180,10 @@ func (a *App) writeBackupFile(name, prefix string) error {
 		return err
 	}
 	// Check it straight away, so a bad backup is found now and not on the day it is needed.
-	if rep, err := a.verifyBackup(name, ""); err == nil {
-		a.writeMeta(name, bkMeta{Report: rep})
+	if verify {
+		if rep, err := a.verifyBackup(name, ""); err == nil {
+			a.writeMeta(name, bkMeta{Report: rep})
+		}
 	}
 	return nil
 }
