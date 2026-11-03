@@ -211,7 +211,7 @@ export default function Internet({ me }) {
                     <div>
                       <div className="name">{w.name} {!w.enabled && <Pill>Off</Pill>}</div>
                       <div className="meta">{pn(w.iface)}{w.vlan ? ` · VLAN ${w.vlan}` : ''} · {TYPES.find((t) => t.value === w.type)?.label}{links[w.name]?.gateway ? ` · gateway ${links[w.name].gateway}` : ''}{measure ? ` · ${measure}` : ''}</div>
-                      {ls.detail && ls.tone === 'bad' && <div className="small" style={{ color: 'var(--color-status-serious)' }}>{ls.detail}</div>}
+                      {ls.detail && ls.tone === 'bad' && <div className="small errtext">{ls.detail}</div>}
                     </div>
                     <div className="actions">
                       <Pill tone={ls.tone}>{ls.text}</Pill>

@@ -125,7 +125,7 @@ function Hero({ wanList, links, thr, onStamp }) {
         <div className="small muted" style={{ marginBottom: 'var(--space-3)' }}>{head.sub}</div>
         <div className="ov-big">{fmtBits(sum('rx')).split(' ')[0]}<span className="unit">{fmtBits(sum('rx')).split(' ')[1]} download · now</span></div>
         <div className="ov-big">{fmtBits(sum('tx')).split(' ')[0]}<span className="unit">{fmtBits(sum('tx')).split(' ')[1]} upload · now</span></div>
-        <div className="small muted" style={{ marginTop: 'var(--space-2)' }}>Average over {RANGE_WORDS[range]}: {fmtBits(avgOf('rx'))} down, {fmtBits(avgOf('tx'))} up · busiest {fmtBits(peakOf(dir))} {dir === 'rx' ? 'down' : 'up'}</div>
+        <div className="small muted mt2">Average over {RANGE_WORDS[range]}: {fmtBits(avgOf('rx'))} down, {fmtBits(avgOf('tx'))} up · busiest {fmtBits(peakOf(dir))} {dir === 'rx' ? 'down' : 'up'}</div>
         <div className="ov-wans">
           {states.map((x, i) => {
             const m = linkMeasure(x.l);
@@ -169,7 +169,7 @@ function Tile({ title, pill, tone, big, unit, sub, children, chart, to, caption 
       {children}
       {chart}
       {caption && <div className="small muted">{caption}</div>}
-      {to && <button type="button" className="link small" style={{ textAlign: 'left' }} onClick={() => go(to)}>Open →</button>}
+      {to && <button type="button" className="link small leftalign" onClick={() => go(to)}>Open →</button>}
     </Card>
   );
 }
@@ -183,7 +183,7 @@ function DevicesTile({ d, h }) {
       sub={d ? `${d.wired} wired${d.vpn ? ` · ${d.vpn} VPN` : ''}` : ''}
       chart={<Chart series={miniSeries(h, 'devices.online')} from={h?.from || 0} to={h?.to || 1} unit="devices" height={44} compact label="Devices online, last hour" />}
       caption="Devices online · last hour">
-      <div className="inline" style={{ marginTop: 'var(--space-2)' }}>
+      <div className="inline mt2">
         {d?.new > 0 && <button type="button" className="pillbtn warn" onClick={() => go('devices')}>{d.new} new today</button>}
         {d?.unnamed > 0 && <button type="button" className="pillbtn" onClick={() => go('devices')}>{d.unnamed} without a name</button>}
         {d && !d.new && !d.unnamed && <span className="small muted">Everything on the list has a name.</span>}
@@ -353,7 +353,7 @@ function WorldCard() {
       </Card>
       <Card title={dir === 'out' ? 'Top countries (outgoing)' : 'Top countries (incoming)'} desc={dir === 'out' ? 'By connections, with the data sent and received · your devices talking out' : 'Attempts from the internet'}>
         {!rows.length ? <Empty>{data ? 'Nothing recorded in this time.' : 'Loading…'}</Empty> : (
-          <div className="stack" style={{ gap: 'var(--space-2)' }}>
+          <div className="stack gap2">
             {rows.map((c) => (
               <button type="button" className="ov-cr" key={c.country} onClick={() => open(c.country)}>
                 <span className="muted small">{c.country}</span>
@@ -398,11 +398,11 @@ function NetworksCard({ fw, wanList, links, devs, h24 }) {
             })}
           </tbody>
         </table></div>
-      <div className="ov-net" style={{ marginTop: 'var(--space-3)' }}>
+      <div className="ov-net mt3">
           <div className="spread"><b>Internet</b>{enabled.length ? <Pill tone={ok ? 'good' : states.every((s) => s.health === 'unknown' || s.health === 'none') ? '' : 'bad'}>{ok ? (enabled.length > 1 ? `${ok} of ${enabled.length} working` : 'Connected') : states.every((s) => s.health === 'unknown' || s.health === 'none') ? 'Checking…' : 'Down'}</Pill> : <Pill>Not set up</Pill>}</div>
           <div className="small muted">{enabled.map((w) => w.iface).join(', ') || 'no port yet'} · managed automatically</div>
         </div>
-      <button type="button" className="link small" style={{ textAlign: 'left' }} onClick={() => go('networks')}>Open networks →</button>
+      <button type="button" className="link small leftalign" onClick={() => go('networks')}>Open networks →</button>
     </Card>
   );
 }
@@ -412,7 +412,7 @@ function BusiestCard({ rows }) {
   return (
     <Card title="Busiest devices" desc="Data used, last 24 hours">
       {!rows?.length ? <Empty>No data used yet today.</Empty> : (
-        <div className="stack" style={{ gap: 'var(--space-2)' }}>
+        <div className="stack gap2">
           {rows.map((r) => (
             <div className="ov-bd" key={r.mac}>
               <span><span className="name">{r.name || r.mac}</span><Bar pct={(100 * r.total) / max} thin /></span>
@@ -433,13 +433,13 @@ function HappenedCard({ items }) {
           {items.map((e, i) => (
             <div className={`ov-ev ${e.severity === 'warning' ? 'warn' : ''}`} key={i}>
               <time className="muted small">{new Date(e.ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>
-              <span>{e.to ? <button type="button" className="link" style={{ textAlign: 'left' }} onClick={() => go(e.to)}>{e.title}</button> : e.title}</span>
+              <span>{e.to ? <button type="button" className="link leftalign" onClick={() => go(e.to)}>{e.title}</button> : e.title}</span>
               {e.count > 1 ? <Pill>×{e.count}</Pill> : e.tag ? <Pill>{e.tag}</Pill> : <span />}
             </div>
           ))}
         </div>
       )}
-      <button type="button" className="link small" style={{ textAlign: 'left' }} onClick={() => go('logs')}>Open logs →</button>
+      <button type="button" className="link small leftalign" onClick={() => go('logs')}>Open logs →</button>
     </Card>
   );
 }
@@ -524,7 +524,7 @@ export default function Overview() {
       </div>
       {attention.length > 0 && (
         <Card className={`ov-attn ${needs.length ? '' : 'calm'}`}>
-          <div className="stack" style={{ gap: 'var(--space-2)' }}>
+          <div className="stack gap2">
             {attention.map((a, i) => (
               <div className="spread" key={i} style={{ alignItems: 'flex-start' }}>
                 <div className="inline" style={{ alignItems: 'flex-start', flexWrap: 'nowrap' }}><i className={`navdot ${a.level}`} style={{ marginLeft: 0, marginTop: '.4rem', animation: 'none' }} /><div><div className="name">{a.t}</div><div className="small muted">{a.s}</div></div></div>

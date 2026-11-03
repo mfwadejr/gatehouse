@@ -1,6 +1,8 @@
 package app
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 )
@@ -91,5 +93,37 @@ func TestSelfHealthVerdict(t *testing.T) {
 	}
 	if !found || h["level"] == "good" {
 		t.Fatalf("repeated warnings were not raised: %v", h)
+	}
+}
+
+func TestFirewallFailureStaysVisibleUntilAChangeApplies(t *testing.T) {
+	a := newScopeApp(t)
+	a.noteFWFailure(fmt.Errorf("nft: syntax error"), "marvin")
+	st := a.fwStatus()
+	if st["last_error"] != "nft: syntax error" {
+		t.Fatalf("status should carry the failure: %v", st)
+	}
+	h := a.selfHealth()
+	if h["level"] != "bad" {
+		t.Fatalf("Diagnostics should say there is a problem: %v", h["level"])
+	}
+	a.clearFWFailure()
+	if _, still := a.fwStatus()["last_error"]; still {
+		t.Fatal("failure should clear once a change applies")
+	}
+}
+
+func TestFailedSavesAreNotSilent(t *testing.T) {
+	a := newScopeApp(t)
+	if _, err := a.Logs.Exec(`INSERT INTO no_such_table VALUES(1)`); err == nil {
+		t.Fatal("expected an error")
+	}
+	n, last, _ := a.Logs.WriteFailures(time.Hour)
+	if n != 1 || last == "" {
+		t.Fatalf("n=%d last=%q", n, last)
+	}
+	h := a.selfHealth()
+	if !strings.Contains(fmt.Sprint(h["issues"]), "saves failed") || h["level"] != "bad" {
+		t.Fatalf("health: %v", h)
 	}
 }

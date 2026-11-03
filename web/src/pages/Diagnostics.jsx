@@ -24,7 +24,7 @@ function Services() {
         <div className="list">
           {(data.services || []).filter((s) => s.state !== 'missing').map((s) => (
             <div className="item" key={s.unit}>
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="fill">
                 <div className="name">{s.title} <Pill tone={tone[s.state]}>{word[s.state]}</Pill></div>
                 {s.reason && <div className="meta">{s.reason}</div>}
               </div>
@@ -81,7 +81,7 @@ function Verdict() {
           <div className="list">
             {data.issues.map((i, k) => (
               <div className="item" key={k}>
-                <div style={{ flex: 1, minWidth: 0 }}><div className="name"><Pill tone={i.level === 'bad' ? 'bad' : 'warn'}>{i.level === 'bad' ? 'Problem' : 'Check'}</Pill> {i.text}</div></div>
+                <div className="fill"><div className="name"><Pill tone={i.level === 'bad' ? 'bad' : 'warn'}>{i.level === 'bad' ? 'Problem' : 'Check'}</Pill> {i.text}</div></div>
                 {i.to && <div className="actions"><Button small onClick={() => to(i.to)}>Look</Button></div>}
               </div>
             ))}

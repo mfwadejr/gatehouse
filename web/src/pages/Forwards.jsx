@@ -142,7 +142,7 @@ export function OpenPortModal({ initial, preset, apps, connections, existing, on
             <Field label="Enter the outside port for this one">
               <Input value={typed} onChange={setTyped} className="in mono" placeholder="Type a port" />
             </Field>
-            {typedUse && <span className="small" style={{ color: 'var(--color-status-serious)' }}>{typedUse}</span>}
+            {typedUse && <span className="small errtext">{typedUse}</span>}
             {typedNotes.map((n, i) => <span key={i} className="small muted">{n}</span>)}
             <div className="actions" style={{ justifyContent: 'flex-start' }}>
               <Button small onClick={suggest}>Suggest one</Button>
@@ -259,11 +259,11 @@ export default function Forwards({ reload }) {
       <div className="list">
         {items.map((g) => (
           <div className="item" key={`${g.group}-${g.id || ''}`}>
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="fill">
               <div className="name">{g.text} {!g.enabled && <Pill>Off</Pill>}</div>
               {g.ports?.some((p) => p.inside) && <div className="small muted">{g.ports.map((p) => `${p.proto} ${p.port} → ${p.inside || p.std || p.port}`).join(', ')}</div>}
               <div className="meta">{g.countries.length > 0 ? `Only from ${g.countries.map(countryName).join(', ')}. ` : ''}{g.src.length > 0 ? `Only from ${g.src.join(', ')}. ` : ''}{!g.countries.length && !g.src.length ? 'Anyone on the internet can try to connect.' : ''}</div>
-              {g.blocked && <div className="small" style={{ color: 'var(--color-status-serious)' }}>{g.blocked}</div>}
+              {g.blocked && <div className="small errtext">{g.blocked}</div>}
               {!g.legacy && g.mac && !g.reserved && g.reserve_scope > 0 && <div className="small">If {g.device_name} gets a different address, this follows it. <button type="button" className="link small" disabled={busy} onClick={() => fix(g)}>Give it a fixed address</button> so it never changes.</div>}
             </div>
             <div className="actions">

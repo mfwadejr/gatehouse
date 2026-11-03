@@ -95,8 +95,8 @@ function Shell({ me, onSignOut, reloadMe }) {
           <div className="who">
             <span>{me.user.username}</span>
             <span className="small muted">{me.user.role === 'admin' ? 'Admin' : 'Viewer'}{me.user.totp_enabled ? ' · 2-step on' : ''}</span>
-            <button className="link small" style={{ textAlign: 'left' }} onClick={onSignOut}>Sign out</button>
-            {upd?.current && <button className="link small" style={{ textAlign: 'left' }} onClick={() => setNotes(true)}>What's new in {upd.current}</button>}
+            <button className="link small leftalign" onClick={onSignOut}>Sign out</button>
+            {upd?.current && <button className="link small leftalign" onClick={() => setNotes(true)}>What's new in {upd.current}</button>}
           </div>
         </div>
       </aside>

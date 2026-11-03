@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { get } from '../api.js';
+import { hashQuery, setHashQuery } from '../hashtab.js';
 import { Button, Card, Empty, Input, Pill, Segmented, fmt } from '../ui.jsx';
 
 // Highlight the words that were searched for inside a row.
@@ -14,8 +15,9 @@ export function Hit({ text, words }) {
 const RANGES = [{ value: '0', label: 'All' }, { value: '1', label: '1 h' }, { value: '24', label: '24 h' }, { value: '168', label: '7 d' }, { value: '720', label: '30 d' }];
 
 // Admin activity: who did what to Gatehouse, when, and from which address.
-export default function AdminActivity({ initialQ = '', onQ }) {
-  const [q, setQ] = useState(initialQ);
+export default function AdminActivity({ onQ }) {
+  const [q, setQ] = useState(() => hashQuery('q'));
+  useEffect(() => { setHashQuery('q', q.trim()); }, [q]);
   const [hours, setHours] = useState('0');
   const [d, setD] = useState(null);
   const [limit, setLimit] = useState(100);

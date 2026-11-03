@@ -55,7 +55,7 @@ function Overview() {
           {total === 0 ? <Empty>No queries yet.</Empty> : (
             <div className="stack">
               {outcomes.map(([k, v]) => (
-                <div key={k} className="stack" style={{ gap: 'var(--space-1)' }}>
+                <div key={k} className="stack gap1">
                   <div className="spread small"><span>{k}</span><span className="muted">{fmt.n(v || 0)} · {fmt.d1((100 * (v || 0)) / total)}%</span></div>
                   <Bar pct={(100 * (v || 0)) / total} thin />
                 </div>
@@ -111,7 +111,7 @@ function UpstreamRow({ u, num, first, last, ordered, onMove, onRemove, reload })
     if (r) { setRes(r); reload(); }
   };
   return (
-    <div className="item" style={{ alignItems: 'flex-start' }}>
+    <div className="item startalign">
       <div style={{ display: 'flex', gap: '0.75rem', minWidth: 0 }}>
         {ordered && <span className="muted" style={{ fontVariantNumeric: 'tabular-nums', minWidth: '1.2rem', paddingTop: '0.1rem' }} aria-label={`Number ${num}`}>{num}</span>}
         <div style={{ minWidth: 0 }}>
@@ -207,7 +207,7 @@ function ListMeta({ l }) {
   if (l.status === 'error') {
     return (
       <div className="meta">
-        <span style={{ color: 'var(--color-status-serious)' }}>{l.plain || "Couldn't download this list."}</span>
+        <span className="errtext">{l.plain || "Couldn't download this list."}</span>
         {l.retry_at ? ` Gatehouse will try again at ${hhmm(l.retry_at)}.` : ''}
         {l.last_ok ? <> Using the copy from {fmt.ago(l.last_ok)} ({counts}).</> : ' Nothing is blocked from this list yet.'}
         {' '}<button className="linkbtn" onClick={() => setDetails(!details)}>{details ? 'Hide details' : 'Details'}</button>
@@ -360,7 +360,7 @@ function Records() {
     reload();
   };
   const nameBox = (
-    <div className="stack" style={{ gap: 'var(--space-2)' }}>
+    <div className="stack gap2">
       <div className="namerow">
         <Input value={label} onChange={setLabel} aria-label="Name for this firewall" placeholder="firewall" />
         <span className="muted mono">.{domain}</span>

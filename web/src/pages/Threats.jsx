@@ -49,10 +49,10 @@ function AlertRow({ x, days, busy, run, reload }) {
   const quiet = x.quiet;
   return (
     <div className="item" key={x.key}>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="fill">
         <div className="name">{x.title}{x.count > 1 && <> <Pill>×{x.count}</Pill></>}</div>
         <div className="meta">{[x.device, remote, who, x.count > 1 ? `${fmt.ago(x.first)} to ${fmt.ago(x.last)}` : fmt.ago(x.last)].filter(Boolean).join(' · ')}</div>
-        {more && <div className="small muted" style={{ marginTop: 'var(--space-2)' }}>{x.explain} <span className="mono">{x.signature}</span></div>}
+        {more && <div className="small muted mt2">{x.explain} <span className="mono">{x.signature}</span></div>}
         <button className="link small" onClick={() => setMore(!more)}>{more ? 'Hide details' : 'What does this mean?'}</button>
       </div>
       <div className="actions">
@@ -76,7 +76,7 @@ function AlertGroups({ rows, ...p }) {
       const times = g.rows.reduce((a, x) => a + (x.count || 1), 0);
       return (
         <div key={g.title}>
-          <div className="small muted" style={{ marginTop: 'var(--space-2)' }}>{g.title}: {fmt.n(times)} times, {devs} device{devs === 1 ? '' : 's'}</div>
+          <div className="small muted mt2">{g.title}: {fmt.n(times)} times, {devs} device{devs === 1 ? '' : 's'}</div>
           {g.rows.map((x) => <AlertRow key={x.key} x={x} {...p} />)}
         </div>
       );
@@ -165,7 +165,7 @@ function GroupsCard({ groups, reload, goSettings }) {
     const differs = on !== g.preset_on;
     return (
       <div className="item" key={g.name}>
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="fill">
           <div className="name">{nice(g.name)}{differs && <> <Pill tone="warn">Changed</Pill></>}</div>
           <div className="meta">{g.text}</div>
         </div>
@@ -212,7 +212,7 @@ function Rules({ data, reload, goSettings }) {
         <div className="actions"><Input value={q} onChange={setQ} placeholder="For example beacon, or 2001" onKeyDown={(e) => { if (e.key === 'Enter') search(); }} /><Button disabled={busy} onClick={search}>Search</Button></div>
         {found && (
           <div className="list">
-            {found.rules.map((x) => <div className="item" key={x.sid}><div style={{ flex: 1, minWidth: 0 }}><div className="name">{x.msg}</div><div className="meta">Check {x.sid}</div></div><Button small disabled={busy} onClick={() => flip(x)}>{x.on ? 'Switch off' : 'Switch on'}</Button></div>)}
+            {found.rules.map((x) => <div className="item" key={x.sid}><div className="fill"><div className="name">{x.msg}</div><div className="meta">Check {x.sid}</div></div><Button small disabled={busy} onClick={() => flip(x)}>{x.on ? 'Switch off' : 'Switch on'}</Button></div>)}
             {!found.rules.length && <Empty>No check matches that.</Empty>}
             {found.total > found.rules.length && <p className="small muted">Showing {found.rules.length} of {found.total}. Narrow the search to see others.</p>}
           </div>

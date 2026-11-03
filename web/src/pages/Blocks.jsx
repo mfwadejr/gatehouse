@@ -106,7 +106,7 @@ export default function Blocks() {
           const [word, tone] = STATUS[r.status] || [r.status, ''];
           return (
             <div className="item" key={r.id}>
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="fill">
                 <div className="name">{r.text} <Pill tone={tone}>{word}</Pill></div>
                 <div className="meta">{r.when}{r.method === 'thorough' ? ' · thorough, waiting for it to be switched on' : r.method === 'both' ? ' · by name now, thorough once it is on' : ' · by name'}</div>
               </div>

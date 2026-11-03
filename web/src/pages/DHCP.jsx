@@ -66,7 +66,7 @@ function Scopes() {
           const pct = u && u.size ? (100 * u.active) / u.size : 0;
           return (
             <div className="item" key={s.id}>
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="fill">
                 <div className="name">{s.name} {!s.enabled && <Pill>Off</Pill>}{s.mode !== 'serve' && <Pill>{s.mode === 'relay' ? 'Relayed' : 'Another device'}</Pill>}</div>
                 <div className="meta">{pn(s.iface)} · {s.subnet}{s.mode !== 'off' ? ` · ${s.range_start} – ${s.range_end}` : ''}</div>
                 {result[s.id] && (
@@ -110,7 +110,7 @@ function Leases() {
                 <td>{l.hostname || <span className="muted">unnamed</span>}</td>
                 <td className="mono">{l.ip}</td><td className="mono">{l.mac}</td><td>{l.scope}</td>
                 <td>{l.static ? <Pill>Reserved</Pill> : fmt.dt(l.expires)}</td>
-                <td className="r"><div className="actions" style={{ justifyContent: 'flex-end' }}>
+                <td className="r"><div className="actions endalign">
                   {!l.static && <Button small onClick={() => setResv({ scope_id: l.scope_id, mac: l.mac, ip: l.ip, hostname: l.hostname })}>Reserve</Button>}
                   <Button small kind="danger" onClick={() => run(() => del(`/api/dhcp/leases/${l.scope_id}/${l.ip}`), 'Released.').then(reload)}>Release</Button>
                 </div></td>

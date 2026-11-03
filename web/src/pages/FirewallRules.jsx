@@ -128,7 +128,7 @@ export function Matrix({ ov, rules, onPick }) {
         <span className="chip"><i style={{ background: 'var(--color-matrix-block-dot)' }} />Blocked: they are not</span>
         <span className="chip"><i style={{ background: 'var(--color-matrix-replies-dot)' }} />Replies only: this side cannot start a connection, but can answer one the other side started</span>
       </div>
-      <p className="small muted" style={{ marginTop: 'var(--space-2)' }}>A number in brackets counts the rules for that pair.</p>
+      <p className="small muted mt2">A number in brackets counts the rules for that pair.</p>
     </Card>
   );
 }
@@ -161,7 +161,7 @@ export function PairModal({ pair, ov, onClose, onChanged, onShowRules, onAddRule
             {choices.filter((c) => !c.disabled && !(c.mode === 'allow' && p.state === 'open' && p.changed) ).map((c) => <Button key={c.mode} onClick={() => setMode(c.mode)}>{c.label}</Button>)}
             {p.changed && <Button onClick={() => apply('default')} disabled={busy}>Back to the default</Button>}
           </div>
-          <div className="spread" style={{ marginTop: 'var(--space-3)' }}>
+          <div className="spread mt3">
             <span>{p.exceptions.length ? `${p.exceptions.length} rule${p.exceptions.length > 1 ? 's' : ''} for this pair` : 'No rules for this pair'}</span>
             <div className="inline">
               {p.exceptions.length > 0 && <Button small onClick={() => { onShowRules(from, to); onClose(); }}>Show them</Button>}
@@ -292,7 +292,7 @@ function GroupForm({ initial, pickers, reloadPickers, onClose, onSaved }) {
           ))}
           {!devs.length && <span className="muted small">No matching devices.</span>}
         </div>
-        <div style={{ marginTop: 'var(--space-2)' }}><Button small icon="plus" onClick={() => setAdding(true)}>Add a device that has not connected yet</Button></div>
+        <div className="mt2"><Button small icon="plus" onClick={() => setAdding(true)}>Add a device that has not connected yet</Button></div>
       </Field>
       {adding && <NewDevice onClose={() => setAdding(false)} onCreated={(mac) => { reloadPickers(); setG((x) => ({ ...x, members: [...x.members, mac] })); }} />}
     </Modal>

@@ -1,6 +1,26 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.0',
+    title: 'Find your place, and no silent failures',
+    items: [
+      'Your place on the map: a Find a place box takes a zip or postal code, a city or a street address and offers up to five matches. Pick one and the pin moves there. Only the words you type are sent, to OpenStreetMap, and only when you press Find. The place you save never leaves this machine.',
+      'Failed saves are no longer silent: if the disk will not take a setting or a log line, Diagnostics now says how many saves failed in the last hour, when, and why.',
+      'Behind the scenes: new checks call every page of the console as a stranger, as a read-only user and on an empty box, and an empty request to every route, to make sure each one refuses cleanly instead of crashing.',
+    ],
+  },
+  {
+    version: '0.8.57',
+    title: 'Searchable links, clearer failures and tidier styles',
+    items: [
+      'Logs: the words you search for are highlighted in each row, a note says how far back the search reaches, and the search is part of the address (#/logs/log?q=word), so you can share or bookmark it. The same works on Admin activity.',
+      'A firewall change that fails to apply now stays visible: the Firewall item in the menu gets a dot, Diagnostics says there is a problem, and the reason is shown until a change applies. It is also written to the activity log.',
+      'The Security check buttons for SSH, UPnP and console access now open the edit window of the exact network that needs fixing, instead of the list.',
+      'Remote login: an old Last attempt failed note from before a restart no longer lingers, and a note that is shown says when it happened.',
+      'Behind the scenes: 70 repeated inline styles became shared named classes, and a slow-machine timing in one high-availability test was relaxed.',
+    ],
+  },
+  {
     version: '0.8.56',
     title: 'Storage, and three clear kinds of log',
     items: [

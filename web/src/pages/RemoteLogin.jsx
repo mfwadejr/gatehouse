@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { put, useData } from '../api.js';
-import { Button, Card, Field, Input, Modal, Note, Pill, useAction, useStepUp, stepReady, StepUp } from '../ui.jsx';
+import { Button, Card, Field, Input, Modal, Note, Pill, useAction, useStepUp, stepReady, StepUp, fmt } from '../ui.jsx';
 
 // Remote login (SSH) with the console's own administrator names and passwords. Off until switched on.
 
@@ -36,7 +36,7 @@ export default function RemoteLogin({ me }) {
             {(data.users || []).filter((u) => !u.usable).map((u) => u.name).join(', ')}: a login name can only have lower-case letters, digits, dash and underscore. Make a new administrator with a simple name to use SSH.
           </Note>
         )}
-        {data.last_error && <Note tone="bad" title="Last attempt failed">{data.last_error}</Note>}
+        {data.last_error && <Note tone="bad" title={`Last attempt failed${data.last_error_at ? `, ${fmt.dt(data.last_error_at)}` : ''}`}>{data.last_error}</Note>}
         <ul className="small muted" style={{ margin: 0, paddingLeft: 'var(--space-4)' }}>
           <li>Only administrators can sign in. Changing a password in the console changes it here at once.</li>
           <li>Three wrong passwords end a connection, and one address can start only a few connections a minute.</li>

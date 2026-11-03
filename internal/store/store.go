@@ -13,7 +13,8 @@ import (
 // DB wraps a *sql.DB with the helpers the rest of the program uses.
 type DB struct {
 	*sql.DB
-	Path string
+	Path  string
+	fails Failures
 }
 
 func open(path string, maxConns int) (*DB, error) {

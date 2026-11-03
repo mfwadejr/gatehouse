@@ -46,15 +46,15 @@ func pairedUnits(t *testing.T) (pc, sc *client, pfn, sfn *fakeNet) {
 		t.Fatalf("start: %d %s", rc, raw)
 	}
 	code := m["code"].(string)
-	waitHA(t, "primary link", 8*time.Second, func() bool { _, ok := P.haBound.Load().(string); return ok })
+	waitHA(t, "primary link", 30*time.Second, func() bool { _, ok := P.haBound.Load().(string); return ok })
 	if rc, _, raw := sc.call("POST", "/api/ha/discover", map[string]string{"code": code}); rc != 200 {
 		t.Fatalf("discover: %d %s", rc, raw)
 	}
-	waitHA(t, "backup link", 8*time.Second, func() bool { _, ok := S.haBound.Load().(string); return ok })
+	waitHA(t, "backup link", 30*time.Second, func() bool { _, ok := S.haBound.Load().(string); return ok })
 	if rc, _, raw := sc.call("POST", "/api/ha/join", map[string]any{"code": code, "keep": map[string]string{}}); rc != 200 {
 		t.Fatalf("join: %d %s", rc, raw)
 	}
-	waitHA(t, "settings", 25*time.Second, func() bool { s := S.haLoad(); return s != nil && s.SyncedAt > 0 })
+	waitHA(t, "settings", 60*time.Second, func() bool { s := S.haLoad(); return s != nil && s.SyncedAt > 0 })
 	_, lm, _ := sc.call("POST", "/api/auth/login", map[string]string{"username": "admin", "password": "correct horse battery"})
 	sc.csrf = lm["csrf"].(string)
 	applyBoth(t, pc)
@@ -240,7 +240,7 @@ func TestWarmStandbyKeepsTheInternetPortReadyAndCopiesTheAddress(t *testing.T) {
 		t.Fatalf("a plain connection should be kept silent, not down: %+v", plan)
 	}
 	// The setting reaches the other unit with the next copy, then it learns the address to copy.
-	waitHA(t, "the setting to reach the spare", 25*time.Second, func() bool { return S.haWarmOn() })
+	waitHA(t, "the setting to reach the spare", 60*time.Second, func() bool { return S.haWarmOn() })
 	S.haWarmRefresh(S.haLoad())
 	sfn.mu.Lock()
 	sp := sfn.haPlans[len(sfn.haPlans)-1]

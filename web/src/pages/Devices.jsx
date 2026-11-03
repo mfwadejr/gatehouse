@@ -237,7 +237,7 @@ export default function Devices({ me }) {
                     {COLUMNS.filter((c) => colIds.includes(c.id)).map((c) => <td key={c.id}>{c.show(d)}</td>)}
                     <td className="r" onClick={(e) => e.stopPropagation()}>
                       {d.source !== 'vpn' && (
-                        <div className="actions" style={{ justifyContent: 'flex-end' }}>
+                        <div className="actions endalign">
                           {d.mac && <Button small onClick={() => setOpening(d)}>Open a port</Button>}
                           <Button small onClick={() => run(() => patch(`/api/devices/${d.id}`, { internet: !d.internet }), d.internet ? 'Paused.' : 'Back online.').then(reload)}>{d.internet ? 'Pause' : 'Resume'}</Button>
                           {!d.online && <Button small kind="danger" icon="trash" onClick={async () => await confirmBox('Forget this device?') && run(() => del(`/api/devices/${d.id}`), 'Forgotten.').then(reload)}>Forget</Button>}

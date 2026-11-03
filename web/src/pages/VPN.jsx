@@ -52,7 +52,7 @@ function FileDrop({ onText, accept, label }) {
       onDrop={(e) => { e.preventDefault(); setOver(false); take(e.dataTransfer.files?.[0]); }}>
       <span>{name ? `Loaded ${name}` : label}</span>
       <label className="btn small">Choose a file<input type="file" accept={accept} hidden onChange={(e) => take(e.target.files?.[0])} /></label>
-      {err && <span className="small" style={{ color: 'var(--color-status-serious)' }}>{err}</span>}
+      {err && <span className="small errtext">{err}</span>}
     </div>
   );
 }
@@ -347,7 +347,7 @@ function Uses({ v, onClose, onSaved }) {
       <div className="stack">
         <p className="sec">Tick the networks and devices whose internet should go through this VPN. Everything you leave unticked keeps using your normal connection. You can skip this and choose later, or use the Routes page to send only some websites or countries through it.</p>
         <Field label="Whole networks">
-          <div className="stack" style={{ gap: 'var(--space-1)' }}>
+          <div className="stack gap1">
             {(ch?.networks || []).map((n) => (
               <label key={n.name} className="inline"><input type="checkbox" checked={sel.has(`network|${n.name}`)} onChange={() => toggle(`network|${n.name}`)} /> <span className="name">{n.name}</span> <span className="small muted mono">{n.subnets.join(', ')}</span></label>
             ))}
@@ -356,7 +356,7 @@ function Uses({ v, onClose, onSaved }) {
         </Field>
         {(ch?.groups || []).length > 0 && (
           <Field label="Device groups" hint="Everyone in the group, now and as the group changes.">
-            <div className="stack" style={{ gap: 'var(--space-1)' }}>
+            <div className="stack gap1">
               {ch.groups.map((g) => <label key={g} className="inline"><input type="checkbox" checked={sel.has(`group|${g}`)} onChange={() => toggle(`group|${g}`)} /> <span className="name">{g}</span></label>)}
             </div>
           </Field>
@@ -501,18 +501,18 @@ function Outbound({ v, reload, setModal }) {
           {v.kind === 'wireguard' && <Fact label="Traffic">{`↓ ${bytes(v.rx)}  ↑ ${bytes(v.tx)}`}</Fact>}
           <Fact label="Checked">{v.checked_at ? `${fmt.ago(v.checked_at)} via ${v.check_target}` : 'waiting'}</Fact>
         </div>
-        <div className="stack" style={{ gap: 'var(--space-1)' }}>
+        <div className="stack gap1">
           <span className="small muted">Used by</span>
           {sources.length === 0 ? <span className="muted">Nothing yet. Choose which networks or devices should use this VPN.</span> : (
             <div className="inline">{sources.map((u) => (
-              <span key={u.id} className="inline" style={{ gap: 'var(--space-1)' }}>
+              <span key={u.id} className="inline gap1">
                 <Pill tone="">{u.kind === 'network' ? `${u.label} network` : u.label}</Pill>
                 {u.kind === 'device' && <button type="button" className="link small" onClick={() => { setChecked(null); setCheckMac(u.value); }}>Check</button>}
               </span>
             ))}</div>
           )}
           {checkMac && (
-            <div className="stack" style={{ gap: 'var(--space-1)' }}>
+            <div className="stack gap1">
               {!checked ? <span className="small muted">Checking…</span> : (
                 <>
                   <span className="small" style={{ color: checked.verdict === 'leak' || checked.verdict === 'address' ? 'var(--color-status-serious)' : undefined }}>{checked.device ? `${checked.device}: ` : ''}{checked.sentence}</span>

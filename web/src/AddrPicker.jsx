@@ -93,7 +93,7 @@ export function AddrPicker({ value, onChange, side, pickers, local = true, reloa
   const isDom = side === 'dst' && typed && reDomain.test(typed);
   const showList = open || needle;
   return (
-    <div className="stack" style={{ gap: 'var(--space-2)' }}>
+    <div className="stack gap2">
       <div className="chips">
         {toks.length === 0 && <span className="chip any">{side === 'src' ? 'Any device' : 'Anywhere'}</span>}
         {toks.map((t) => <Chip key={t} tok={t} pickers={pickers} onRemove={() => remove(t)} />)}
@@ -205,7 +205,7 @@ export function ServicePicker({ value, onChange, pickers, reload }) {
     </button>
   );
   return (
-    <div className="stack" style={{ gap: 'var(--space-2)' }}>
+    <div className="stack gap2">
       <div className="chips">
         {toks.length === 0 && <span className="chip any">Everything</span>}
         {toks.map((t) => <span className="chip" key={t}>{label(t)}<button type="button" className="chipx" aria-label={`Remove ${label(t)}`} onClick={() => remove(t)}>×</button></span>)}

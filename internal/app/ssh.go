@@ -79,7 +79,7 @@ func (a *App) registerSSHRoutes() {
 			l, ok := netd.SSHUserName(n)
 			us = append(us, user{Name: n, Login: l, Usable: ok})
 		}
-		api.JSON(w, 200, map[string]any{"enabled": a.sshOn(), "users": us, "networks": a.sshNetworks(), "last_error": a.Config.Setting("ssh.last_error", "")})
+		api.JSON(w, 200, map[string]any{"enabled": a.sshOn(), "users": us, "networks": a.sshNetworks(), "last_error": a.Config.Setting("ssh.last_error", ""), "last_error_at": int64(a.settingFloat("ssh.last_error_at", 0))})
 	})
 	s.HandleAdmin("PUT /api/system/ssh", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		var in struct {
@@ -111,6 +111,7 @@ func (a *App) registerSSHRoutes() {
 			a.Config.SetSetting("ssh.enabled", "0")
 			a.sshSync()
 			a.Config.SetSetting("ssh.last_error", err.Error())
+			a.Config.SetSetting("ssh.last_error_at", strconv.FormatInt(time.Now().Unix(), 10))
 			fail(w, fmt.Errorf("remote login could not be turned on: %w", err))
 			return
 		}

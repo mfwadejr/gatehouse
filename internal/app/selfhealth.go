@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"gatehouse/internal/store"
 	"net/http"
 	"os"
 	"time"
@@ -61,6 +62,17 @@ func (a *App) selfHealth() map[string]any {
 				failing++
 				issues = append(issues, healthIssue{"bad", s.Title + " keeps stopping. " + s.Reason, "diagnostics/services"})
 			}
+		}
+	}
+
+	if msg := a.setting("fw.last_error", ""); msg != "" {
+		issues = append(issues, healthIssue{"bad", "The last firewall change did not apply: " + msg, "firewall"})
+	}
+
+	for _, db := range []*store.DB{a.Config, a.Logs} {
+		if n, last, at := db.WriteFailures(time.Hour); n > 0 {
+			issues = append(issues, healthIssue{"bad", fmt.Sprintf("%d saves failed in the last hour, the latest %s ago: %s. If the disk is full or failing, settings and logs are not being kept.", n, agoSpan(now.Sub(at)), last), "settings/alerts"})
+			break
 		}
 	}
 

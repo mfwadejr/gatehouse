@@ -181,6 +181,8 @@ func New(cfg Config) (*App, error) {
 
 	a.API = api.New(a.Auth, a.Bus)
 	a.API.Static = cfg.Static
+	// An old "last attempt failed" note from before this start would show a problem that may be gone.
+	a.Config.SetSetting("ssh.last_error", "")
 	a.API.Audit = func(actor, sev, title, detail string) { a.auditEvent(actor, sev, title, detail) }
 	a.API.Secure = cfg.TLSCert != ""
 	a.API.Topic("dns.stats", "dns.live", "dns.upstreams", "dns.lists", "dhcp.leases", "dhcp.utilisation", "fw.status", "net.status", "vpn.status", "logs.live", "upnp.maps", "dhcp.alerts", "speedtest", "events")

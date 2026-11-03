@@ -59,7 +59,7 @@ function RouteForm({ initial, targets, onClose, onSaved }) {
           <p className="small muted">If this connection is down, the traffic uses your normal connection.{tgt && !tgt.enabled ? ' This connection is switched off right now.' : ''}</p>
         )}
         <Field label="Who uses this route?" hint="Optional. You can save now and choose later.">
-          <div className="stack" style={{ gap: 'var(--space-1)' }}>
+          <div className="stack gap1">
             {(ch?.networks || []).map((n) => (
               <label key={n.name} className="inline"><input type="checkbox" checked={sel.has(`network|${n.name}`)} onChange={() => toggle(`network|${n.name}`)} /> <span className="name">{n.name}</span> <span className="small muted mono">{n.subnets.join(', ')}</span></label>
             ))}
@@ -71,7 +71,7 @@ function RouteForm({ initial, targets, onClose, onSaved }) {
               <label key={d.mac} className="inline"><input type="checkbox" checked={sel.has(`device|${d.mac}`)} onChange={() => toggle(`device|${d.mac}`)} /> <span className={`dot ${d.online ? '' : 'off'}`} /> <span className="name">{d.name}</span> <span className="small muted mono">{d.ip || 'not seen yet'}</span></label>
             ))}
           </div>
-          <div className="addrow" style={{ marginTop: 'var(--space-2)' }}>
+          <div className="addrow mt2">
             <Input value={range} onChange={setRange} aria-label="Address or range" placeholder="Or an address like 192.168.1.50" onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addRange(); } }} />
             <Button onClick={addRange}>Add</Button>
           </div>
@@ -130,7 +130,7 @@ export default function Routes() {
             const st = STATE[r.state] || STATE.working;
             return (
               <div className={`item ${r.enabled ? '' : 'off'}`} key={r.id}>
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="fill">
                   <div className="name">{r.name} <Pill tone={st.tone}>{st.label}</Pill></div>
                   <div className="meta">{r.plain}</div>
                   {(r.warnings || []).map((w, k) => <div className="meta warnline" key={k}>⚠ {w}</div>)}

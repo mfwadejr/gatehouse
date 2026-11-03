@@ -16,7 +16,7 @@ const HOURS = Array.from({ length: 24 }, (_, h) => ({ value: String(h), label: `
 
 function Result({ r, plan }) {
   if (!r) return <span className="small muted">Not tested yet.</span>;
-  if (r.error) return <span className="small" style={{ color: 'var(--color-status-serious)' }}>{fmt.dt(r.ts)}: {r.error}</span>;
+  if (r.error) return <span className="small errtext">{fmt.dt(r.ts)}: {r.error}</span>;
   const pct = plan?.down_mbps ? Math.round((100 * r.down_bps) / (plan.down_mbps * 1e6)) : 0;
   return (
     <div className="small">
@@ -166,7 +166,7 @@ export default function SpeedTest({ wans, links }) {
                 <div>
                   <div className="name">{l.name} <Pill tone={ls.tone}>{ls.health === 'working' ? (links?.[l.name]?.active ? 'In use' : 'Standing by') : ls.text}</Pill>{l.metered && <Pill tone="warn">Data limit</Pill>}</div>
                   <Result r={last[l.name]} plan={l} />
-                  {!last[l.name] && l.last_error && <div className="small" style={{ color: 'var(--color-status-serious)' }}>{l.last_error}</div>}
+                  {!last[l.name] && l.last_error && <div className="small errtext">{l.last_error}</div>}
                   {l.metered && <div className="small muted">This connection looks like it has a data limit, so a short test is run (usually under 10 MB). The full test would use hundreds of MB.</div>}
                 </div>
                 <div className="actions">
@@ -181,7 +181,7 @@ export default function SpeedTest({ wans, links }) {
           })}
         </div>
         {form && (
-          <div className="stack" style={{ marginTop: 'var(--space-3)' }}>
+          <div className="stack mt3">
             <h3 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)' }}>What you pay for</h3>
             <p className="small muted">Optional. Fill in the speed your plan promises and results show how close you get.</p>
             {rows.map((l) => (

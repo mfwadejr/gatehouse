@@ -84,7 +84,7 @@ export default function Countries({ reload }) {
         ))}
         {!shown.length && <span className="muted small">Nothing matches.</span>}
       </div>
-      <div className="inline" style={{ marginTop: 'var(--space-3)' }}>
+      <div className="inline mt3">
         <Button kind="primary" disabled={busy || over} onClick={doSave}>Save</Button>
         <span className="small muted">Your own networks and VPN far ends are never matched. Rules appear under Rules, Show system rules.</span>
       </div>

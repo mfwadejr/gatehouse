@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -83,18 +84,18 @@ func (a *App) securityCheck() secReport {
 		case len(mgmtBad) > 0:
 			add(secItem{ID: "console", Level: "bad", Title: "Guests can reach this console",
 				Text: names(mgmtBad) + " is allowed to open the Gatehouse console. Anyone on it can try to sign in.",
-				Fix:  &whyFix{Label: "Open network settings", Kind: "goto", Page: "firewall/networks"}})
+				Fix:  &whyFix{Label: "Edit " + mgmtBad[0], Kind: "goto", Page: editPage(mgmtBad[0])}})
 		default:
 			add(secItem{ID: "console", Level: "ok", Title: "The console is only open to your own networks", Text: "Guest and isolated networks cannot reach it."})
 		}
 		switch {
 		case len(sshBad) > 0:
 			add(secItem{ID: "ssh", Level: "bad", Title: "Remote command-line access is open to the wrong network",
-				Text: "SSH is allowed from " + names(sshBad) + ".", Fix: &whyFix{Label: "Open network settings", Kind: "goto", Page: "firewall/networks"}})
+				Text: "SSH is allowed from " + names(sshBad) + ".", Fix: &whyFix{Label: "Edit " + sshBad[0], Kind: "goto", Page: editPage(sshBad[0])}})
 		case len(ssh) > 0:
 			add(secItem{ID: "ssh", Level: "warn", Title: "SSH is on for " + names(ssh),
 				Text: "Fine if you use it, but turn it off if you do not. It is a way in that needs a key or password to be strong. To turn it off, press Edit beside the network and switch off Allow remote login (SSH).",
-				Fix:  &whyFix{Label: "Open network settings", Kind: "goto", Page: "firewall/networks"}})
+				Fix:  &whyFix{Label: "Edit " + ssh[0], Kind: "goto", Page: editPage(ssh[0])}})
 		default:
 			add(secItem{ID: "ssh", Level: "ok", Title: "SSH is off", Text: "Remote login is switched off, so there is no command-line way in over the network."})
 		}
@@ -102,7 +103,7 @@ func (a *App) securityCheck() secReport {
 		case len(upnpBad) > 0:
 			add(secItem{ID: "upnp", Level: "bad", Title: "Devices on a guest network can open ports to the internet",
 				Text: names(upnpBad) + " allows UPnP, so any device there can make your router accept connections from outside.",
-				Fix:  &whyFix{Label: "Open network settings", Kind: "goto", Page: "firewall/networks"}})
+				Fix:  &whyFix{Label: "Edit " + upnpBad[0], Kind: "goto", Page: editPage(upnpBad[0])}})
 		case len(upnp) > 0:
 			add(secItem{ID: "upnp", Level: "warn", Title: "UPnP is on for " + names(upnp),
 				Text: "Games and apps there can open ports to the internet by themselves. Handy, but anything on that network can do it. You can limit it to chosen devices.",
@@ -185,4 +186,9 @@ func (a *App) registerSecurityRoutes() {
 	a.API.HandleAdmin("GET /api/security/check", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		api.JSON(w, 200, a.securityCheck())
 	})
+}
+
+// editPage is the address that opens one network's edit window on the Firewall, Networks tab.
+func editPage(network string) string {
+	return "firewall/networks?edit=" + url.QueryEscape(network)
 }

@@ -517,3 +517,14 @@ mark { background: color-mix(in srgb, var(--color-status-warning) 35%, transpare
 .facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: var(--space-3); margin: 0; }
 .facts dd { margin: 0; }
 .facts dt { margin: 0; }
+
+/* Small layout helpers, so pages do not repeat the same inline styles. */
+.fill { flex: 1; min-width: 0; }
+.mt2 { margin-top: var(--space-2); }
+.mt3 { margin-top: var(--space-3); }
+.gap1 { gap: var(--space-1); }
+.gap2 { gap: var(--space-2); }
+.errtext { color: var(--color-status-serious); }
+.leftalign { text-align: left; }
+.endalign { justify-content: flex-end; }
+.startalign { align-items: flex-start; }

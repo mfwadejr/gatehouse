@@ -28,7 +28,7 @@ function NetworkRow({ n, target, onSave }) {
   };
   const commit = () => { if (mode === 'server' && addr.trim() && addr.trim() !== n.target) onSave({ id: n.id, mode: 'server', target: addr.trim() }); };
   return (
-    <div className="item" style={{ alignItems: 'flex-start' }}>
+    <div className="item startalign">
       <div>
         <div className="name">{n.name}</div>
         <div className="meta">
@@ -82,7 +82,7 @@ export default function ForcedDns({ s, save, pickers, reload }) {
       {s.dns_redirect && <DnsTargetPicker s={s} save={save('dns_target')} />}
       {s.dns_redirect && (
         <>
-          <div className="small muted" style={{ marginTop: 'var(--space-3)' }}>
+          <div className="small muted mt3">
             {covered.length ? `Forced on ${covered.join(', ')}.` : 'No network is forced.'}
             {data?.redirected > 0 ? ` ${fmt.n(data.redirected)} lookups sent to the chosen server so far.` : ''}
           </div>
@@ -106,7 +106,7 @@ export default function ForcedDns({ s, save, pickers, reload }) {
             </div>
           ))}
         </div>
-        {!adding && <button type="button" className="link small" style={{ textAlign: 'left' }} onClick={() => setAdding(true)}>Add an exception for a device or group</button>}
+        {!adding && <button type="button" className="link small leftalign" onClick={() => setAdding(true)}>Add an exception for a device or group</button>}
         {adding && (
           <div className="stack" style={{ gap: 'var(--space-3)' }}>
             <Field label="Device or group"><AddrPicker side="src" value={who} onChange={setWho} pickers={pickers} local reload={() => {}} /></Field>

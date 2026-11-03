@@ -60,7 +60,7 @@ export function IspReport() {
       actions={<a className="btn small" href={`/api/isp/report/print?month=${m}`} target="_blank" rel="noreferrer">Open to print</a>}>
       <div style={{ maxWidth: '16rem' }}><Select value={m} onChange={setM} options={months} /></div>
       {data && (
-        <div className="stack" style={{ marginTop: 'var(--space-2)' }}>
+        <div className="stack mt2">
           <div><strong>{data.up_pct.toFixed(2)}% up</strong> <span className="muted small">· down {dur(data.down_secs)} in {data.outages.length} outage{data.outages.length === 1 ? '' : 's'} (a minute or longer)</span></div>
           {data.links.length === 0 ? <span className="small muted">No speed tests this month. Turn on the daily test under Speed test to build this part.</span>
             : data.links.map((l) => <div key={l.link} className="small">{l.link}: {l.tests} test{l.tests === 1 ? '' : 's'}, average {l.avg_down_mbps.toFixed(0)} down / {l.avg_up_mbps.toFixed(0)} up Mb/s{l.plan_down_mbps ? `, plan ${l.plan_down_mbps} Mb/s, ${l.below_plan} test(s) under 80%` : ' (enter your plan speed to compare)'}</div>)}

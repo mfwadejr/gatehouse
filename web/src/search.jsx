@@ -77,7 +77,7 @@ const ROWS = [
   ['Settings', 'settings/general', 'Updates, restart and reset', 'update backup restore restart reboot reset power console port'],
   ['Check for updates', 'settings/general', 'Install a new version of Gatehouse', 'upgrade version install', 'Updates'],
   ['Console address (port)', 'settings/general', 'Change the port this console answers on', 'port 443 https address', 'Console address'],
-  ['Your place on the map', 'settings/general', 'Set where the lines on the Overview map start', 'map location home pin country', 'Your place on the map'],
+  ['Your place on the map', 'settings/general', 'Set where the lines on the Overview map start', 'map location home pin country zip postal code city address find lookup', 'Your place on the map'],
   ['Dark or light', 'settings/general', 'Choose the look of the console', 'appearance theme dark light', 'Appearance'],
   ['Backups', 'settings/backup', 'Save and restore your settings', 'backup restore export import', 'Backups'],
   ['Reset to default', 'settings/backup', 'Erase the settings and start again', 'factory reset wipe', 'Reset to default'],

@@ -20,13 +20,13 @@ function PortRow({ p, onSaved }) {
   };
   return (
     <div className="item">
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="fill">
         <div className="name">{p.label || p.name} {p.usb && <Pill>USB</Pill>}</div>
         {p.label && <div className="meta mono">{p.name}</div>}
         <div className="meta mono">{p.mac}</div>
         <div className="meta">{p.addrs?.length ? <>Address <span className="mono">{p.addrs.join(', ')}</span></> : 'No address'}</div>
         {editing && (
-          <div className="inline" style={{ marginTop: 'var(--space-2)' }}>
+          <div className="inline mt2">
             <Input value={name} onChange={setName} placeholder="For example: T-Mobile gateway" aria-label={`Name for ${p.name}`} maxLength={30}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); save(name); } }} />
             <Button small kind="primary" disabled={busy} onClick={() => save(name)}>Save</Button>
@@ -215,7 +215,7 @@ export default function Networks({ me }) {
           <div className="list">
             {nets.map((n) => (
               <div className="item" key={n.iface.id}>
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="fill">
                   <div className="name">{n.title} {!n.iface.enabled && <Pill>Off</Pill>}{!n.zone && <Pill tone="warn">Not assigned to a firewall network</Pill>}</div>
                   <div className="meta">{n.iface.ipv4 || 'no address'} · {n.iface.kind === 'vlan' ? `VLAN ${n.iface.vlan} on ${n.iface.parent}` : `port ${pn(n.iface.name)}`}</div>
                   <div className="meta">{dhcpText(n.scope)}{n.zone ? ` · ${n.online} device${n.online === 1 ? '' : 's'} online${n.total > n.online ? `, ${n.total} known` : ''}` : ''}</div>

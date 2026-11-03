@@ -24,7 +24,7 @@ Cards update on their own. If updates stop, a "Reconnecting" label appears at th
 1. To see why the internet is down, look at the first card. It says in words what is wrong and links to **Internet**.
 2. To find the busiest device, read **Busiest devices** and click it.
 3. To follow a suggestion, press **Open** beside it.
-4. To start the map's lines from your home, open Settings, General, **Your place on the map**.
+4. To start the map's lines from your home, open Settings, General, **Your place on the map** and use **Find a place** with a zip code, city or address.
 
 ## Example
 The **What happened** card shows a device contacting a known-bad address nine times. Click the row to open Protection, or **Open logs** to see exactly which destinations they were.

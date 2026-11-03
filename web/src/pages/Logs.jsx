@@ -1,4 +1,5 @@
-import { useHashTab } from '../hashtab.js';
+import { hashQuery, setHashQuery, useHashTab } from '../hashtab.js';
+import { Hit } from './AdminActivity.jsx';
 import AdminActivity from './AdminActivity.jsx';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { del, get, getWatched, post, put, setFailing, useData, useStream } from '../api.js';
@@ -129,7 +130,10 @@ export default function Logs({ me }) {
   if (preset.current === null) preset.current = takePreset();
   useEffect(() => { try { sessionStorage.removeItem(PRESET_KEY); } catch { /* ignore */ } }, []);
   const [tab, setTab] = useHashTab('logs', ['log','summary','activity','admin'], 'log');
-  const [q, setQ] = useState('');
+  const [q, setQ] = useState(() => hashQuery('q'));
+  useEffect(() => { setHashQuery('q', q.trim()); }, [q]);
+  const words = q.trim().split(/\s+/).filter(Boolean);
+  const { data: keepInfo } = useData('/api/logs/usage', { every: 300000 });
   const [kind, setKind] = useState('');
   const [verdict, setVerdict] = useState(preset.current.verdict || '');
   const [hours, setHours] = useState(preset.current.hours || '1');
@@ -243,6 +247,7 @@ export default function Logs({ me }) {
           )}
           {tab === 'log' && <Segmented value={kind} onChange={setKind} options={KINDS} />}
           {tab === 'log' && <label className="inline small" title="Gatehouse checks that its own DNS is answering every few seconds. These checks are hidden unless you tick this."><input type="checkbox" checked={own} onChange={(e) => chooseOwn(e.target.checked)} /> Show Gatehouse's own checks</label>}
+          {words.length > 0 && keepInfo && <p className="small muted">Searching the time range above, up to {keepInfo.days} days back, which is how long Gatehouse keeps its logs. {fmt.n(rows.length)} shown so far{more ? '; press Show older for more' : ''}.</p>}
           {chips.length > 0 && (
             <div className="chips">
               {chips.map(([k, v]) => (
@@ -283,17 +288,17 @@ export default function Logs({ me }) {
                     <React.Fragment key={g.key}>
                       <tr className={`logrow ${isOpen ? 'open' : ''}`} tabIndex={0} aria-expanded={isOpen} onClick={toggle} onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggle(); } }}>
                         {show('time') && <td className="mono nowrap" title={fmt.dt(r.ts)}>{fmt.time(r.ts)}</td>}
-                        {show('device') && <td><div className="l1">{r.who || <span className="muted">–</span>}</div>{r.addr && r.addr !== r.who && <div className="l2 small muted mono">{r.addr}</div>}</td>}
+                        {show('device') && <td><div className="l1">{r.who ? <Hit text={r.who} words={words} /> : <span className="muted">–</span>}</div>{r.addr && r.addr !== r.who && <div className="l2 small muted mono"><Hit text={r.addr} words={words} /></div>}</td>}
                         {show('what') && (
                           <td>
-                            <div className="l1" title={title}>{title}{n > 1 && <span className="count"> ×{n}</span>}</div>
-                            <div className="l2 small muted">{sub}</div>
+                            <div className="l1" title={title}><Hit text={title} words={words} />{n > 1 && <span className="count"> ×{n}</span>}</div>
+                            <div className="l2 small muted"><Hit text={sub} words={words} /></div>
                           </td>
                         )}
                         {show('where') && <td className="small">{(conn || r.from_zone) && r.to_zone ? <>{r.from_zone} → {r.to_zone}</> : <span className="muted">–</span>}</td>}
                         {show('via') && <td className="small">{r.via ? <Pill tone={r.via_kind === 'tunnel' ? 'good' : ''}>{r.via}</Pill> : <span className="muted">–</span>}</td>}
                         {show('result') && <td className="nowrap"><Pill tone={tone}>{label}</Pill></td>}
-                        {show('why') && <td className="small sec"><div className="l1">{r.why}</div></td>}
+                        {show('why') && <td className="small sec"><div className="l1"><Hit text={r.why} words={words} /></div></td>}
                         <td className="nowrap chev" aria-hidden="true">{isOpen ? '▾' : '▸'}</td>
                       </tr>
                       {isOpen && (

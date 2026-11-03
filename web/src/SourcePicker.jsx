@@ -23,7 +23,7 @@ export default function SourcePicker({ value, onChange }) {
   return (
     <div className="stack">
       <Field label="Whole networks">
-        <div className="stack" style={{ gap: 'var(--space-1)' }}>
+        <div className="stack gap1">
           {(ch?.networks || []).map((n) => (
             <label key={n.name} className="inline"><input type="checkbox" checked={sel.has(`network|${n.name}`)} onChange={() => toggle('network', n.name)} /> <span className="name">{n.name}</span> <span className="small muted mono">{n.subnets.join(', ')}</span></label>
           ))}

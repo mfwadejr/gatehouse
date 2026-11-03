@@ -57,6 +57,7 @@ type happenedItem struct {
 }
 
 func (a *App) registerHomeAndHappened() {
+	a.registerGeocode()
 	s := a.API
 	s.Handle("GET /api/overview/home", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		x, y, ok := a.homeMap()

@@ -1,5 +1,5 @@
-import { useHashTab } from '../hashtab.js';
-import React, { useMemo, useState } from 'react';
+import { hashQuery, setHashQuery, useHashTab } from '../hashtab.js';
+import React, { useEffect, useMemo, useState } from 'react';
 import { del, post, put, useData, useStream } from '../api.js';
 import ApplyBar from '../ApplyBar.jsx';
 import { confirmRemoval } from '../removal.js';
@@ -98,6 +98,16 @@ function Networks({ ov, presets, reload }) {
   const taken = {};
   zones.forEach((z) => z.ifaces?.forEach((n) => { taken[n] = z.name; }));
   const kindTitle = (k) => presets.find((p) => p.kind === k)?.title || k;
+  // A link such as #/firewall/networks?edit=Guests (from the Security check) opens that network's edit window.
+  const [wanted, setWanted] = useState(() => hashQuery('edit'));
+  useEffect(() => { const on = () => setWanted(hashQuery('edit')); window.addEventListener('hashchange', on); return () => window.removeEventListener('hashchange', on); }, []);
+  useEffect(() => {
+    if (!wanted || !ov) return;
+    const z = zones.find((x) => x.name.toLowerCase() === wanted.toLowerCase());
+    if (z) setEdit(z);
+    setHashQuery('edit', '');
+    setWanted('');
+  });
   return (
     <>
       {ov?.problems && zones.length > 0 && <Problems list={ov.problems} />}
@@ -166,10 +176,10 @@ function Protected({ reload }) {
         ))}
       </div>
       {edit && (
-        <div className="stack" style={{ marginTop: 'var(--space-3)' }}>
+        <div className="stack mt3">
           <Note title="Who may manage this device">Choose the networks or addresses allowed to open this console. Leave everything empty to allow every management network. If you pick something that does not include the address you are using now, Gatehouse refuses, so you cannot lock yourself out this way.</Note>
           <Field label="Networks">
-            <div className="stack" style={{ gap: 'var(--space-1)' }}>
+            <div className="stack gap1">
               {(data.networks || []).map((n) => (
                 <label key={n.name} className="inline"><input type="checkbox" checked={nets.includes(n.name)} onChange={() => toggle(n.name)} /> <span className="name">{n.name}</span> <span className="small muted mono">{n.subnets.join(', ')}</span></label>
               ))}
@@ -183,7 +193,7 @@ function Protected({ reload }) {
         </div>
       )}
       {res && (
-        <div className="stack" style={{ marginTop: 'var(--space-3)' }}>
+        <div className="stack mt3">
           <Note tone={res.ok ? 'good' : 'bad'} title={res.ok ? 'You can still manage this device' : 'Something needs attention'}>
             <ul>{res.checks.map((c, i) => <li key={i}>{c.ok ? '✓' : '✗'} {c.text}</li>)}</ul>
           </Note>

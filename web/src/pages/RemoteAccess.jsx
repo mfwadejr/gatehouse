@@ -20,7 +20,7 @@ export default function RemoteAccess({ onAddVPN, hasDevice }) {
   const step = (n, done, title, children) => (
     <div className="item" style={{ display: 'block' }}>
       <div className="name">{n}. {title} {done ? <Pill tone="good">Done</Pill> : <Pill>To do</Pill>}</div>
-      <div className="stack" style={{ marginTop: 'var(--space-2)' }}>{children}</div>
+      <div className="stack mt2">{children}</div>
     </div>
   );
   return (

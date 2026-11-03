@@ -33,7 +33,7 @@ function Multi({ m }) {
             </div>
             {c.rows.map((r) => (
               <div key={r.id} className="spread small">
-                <div style={{ flex: 1, minWidth: 0 }}><strong>{r.title}: </strong><span className="muted">{r.detail}</span></div>
+                <div className="fill"><strong>{r.title}: </strong><span className="muted">{r.detail}</span></div>
                 <Pill tone={tone[r.state]}>{word[r.state]}</Pill>
               </div>
             ))}
@@ -58,7 +58,7 @@ function InternetTest() {
           <div className="list">
             {res.steps.map((s, i) => (
               <div className="item" key={s.id}>
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="fill">
                   <div className="name">{i + 1}. {s.title}</div>
                   <div className="meta">{s.detail}</div>
                   {s.next && s.state !== 'ok' && <div className="small" style={{ marginTop: 'var(--space-1)' }}><strong>What to try: </strong>{s.next}</div>}

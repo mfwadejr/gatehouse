@@ -260,6 +260,10 @@ func (a *App) fwStatus() map[string]any {
 		st["error"] = err.Error()
 	}
 	st["dirty"] = err == nil && script != a.lastApplied()
+	if msg := a.setting("fw.last_error", ""); msg != "" {
+		st["last_error"] = msg
+		st["last_error_at"] = int64(a.settingFloat("fw.last_error_at", 0))
+	}
 	st["rev"] = fmt.Sprintf("%x", fnvSum([]byte(script)))
 	if a.FW != nil {
 		if tok, dl, ok := a.FW.Pending(); ok {
@@ -424,9 +428,11 @@ func (a *App) fwApply(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 			api.Error(w, http.StatusConflict, err.Error())
 			return
 		}
+		a.noteFWFailure(err, c.User.Username)
 		fail(w, err)
 		return
 	}
+	a.clearFWFailure()
 	summary := strings.Join(fw.Describe(m), " ")
 	if len(summary) > 500 {
 		summary = summary[:500]
@@ -470,4 +476,24 @@ func (a *App) fwConfirm(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 	a.fwSync()
 	a.publishFW()
 	ok(w)
+}
+
+// noteFWFailure keeps the last reason a firewall change did not apply, until a change applies, so
+// the console can show it on the menu and in Diagnostics, not only in the moment it happened.
+func (a *App) noteFWFailure(err error, who string) {
+	msg := err.Error()
+	if len(msg) > 300 {
+		msg = msg[:300]
+	}
+	a.Config.SetSetting("fw.last_error", msg)
+	a.Config.SetSetting("fw.last_error_at", strconv.FormatInt(time.Now().Unix(), 10))
+	a.event(who, "error", "A firewall change did not apply", msg)
+	a.publishFW()
+}
+
+func (a *App) clearFWFailure() {
+	if a.setting("fw.last_error", "") != "" {
+		a.Config.SetSetting("fw.last_error", "")
+		a.Config.SetSetting("fw.last_error_at", "0")
+	}
 }

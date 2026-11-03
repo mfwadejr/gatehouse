@@ -345,7 +345,7 @@ export function Modal({ title, onClose, children, footer }) {
       <div className="modal" ref={ref} onKeyDown={(e) => enterToPrimary(e, ref.current)}>
         <h2>{title}</h2>
         {children}
-        {footer && <div className="actions" style={{ justifyContent: 'flex-end' }}>{footer}</div>}
+        {footer && <div className="actions endalign">{footer}</div>}
       </div>
     </div>
   );

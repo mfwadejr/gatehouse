@@ -30,6 +30,7 @@ export function AttentionProvider({ children }) {
     const links = net?.links || {};
     if (net && !wanList.length) add('bad', 'No internet connection is set up yet', 'Devices cannot reach the internet until you add one.', 'internet');
     if (fw && !fw.zones?.length) add('warn', 'No networks defined in the firewall', 'Create your first network so devices are protected.', 'networks');
+    if (fw?.status?.last_error) add('bad', 'The last firewall change did not apply', `${fw.status.last_error} Open Diagnostics to see what else is wrong.`, 'firewall');
     if (fw?.status?.dirty) add('warn', 'Firewall changes are waiting to be applied', 'Review and apply them.', 'networks');
     if (net?.status?.dirty) add('warn', 'Internet settings are waiting to be applied', 'Review and apply them.', 'internet');
     (rogue || []).forEach((r) => add('warn', `Another DHCP server is answering on ${r.name}`, `${r.found.map((f) => f.server).join(', ')} hands out addresses too. Switch it off, or devices may get the wrong settings.`, 'dhcp'));

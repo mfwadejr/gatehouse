@@ -40,7 +40,7 @@ export default function Recipes({ bare }) {
               <Button small onClick={() => setOpen(open === r.id ? '' : r.id)}>{open === r.id ? 'Hide steps' : 'Show steps'}</Button>
             </div>
             {open === r.id && (
-              <div className="stack" style={{ marginTop: 'var(--space-2)' }}>
+              <div className="stack mt2">
                 <ol style={{ margin: 0, paddingLeft: '1.2rem' }}>{r.steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
                 <div><Button small kind="primary" onClick={() => { window.location.hash = `#/${r.page}`; }}>{r.go}</Button> {r.id === 'unifi' && <Pill>Built-in controller: planned</Pill>}</div>
               </div>

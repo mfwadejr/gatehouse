@@ -135,7 +135,7 @@ function GroupForm({ initial, wans, onClose, onSaved }) {
         <Field label="Name" hint="For example Cameras, Work, or Guests."><Input value={g.name} onChange={(v) => patch({ name: v })} placeholder="Work" /></Field>
         <Field label="Which connections does it use?">
           <Segmented value={g.mode} onChange={(m) => changeMode(m, g.members, patch)} options={MODES} />
-          <div style={{ marginTop: 'var(--space-3)' }}><Members mode={g.mode} all={wans} value={g.members} onChange={(members) => patch({ members })} /></div>
+          <div className="mt3"><Members mode={g.mode} all={wans} value={g.members} onChange={(members) => patch({ members })} /></div>
         </Field>
         <Field label="If none of them work">
           <Select value={g.fallback} onChange={(v) => patch({ fallback: v })} options={[
@@ -168,7 +168,7 @@ function DefaultForm({ def, wans, onClose, onSaved }) {
         <Field label="Name"><Input value={d.label} onChange={(v) => patch({ label: v })} /></Field>
         <Field label="How should it use your connections?">
           <Segmented value={d.mode} onChange={(m) => changeMode(m, d.members, patch)} options={MODES} />
-          <div style={{ marginTop: 'var(--space-3)' }}><Members fixed mode={d.mode} all={wans} value={d.members} onChange={(members) => patch({ members })} /></div>
+          <div className="mt3"><Members fixed mode={d.mode} all={wans} value={d.members} onChange={(members) => patch({ members })} /></div>
         </Field>
       </div>
     </Modal>

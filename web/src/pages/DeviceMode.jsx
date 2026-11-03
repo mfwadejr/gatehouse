@@ -162,7 +162,7 @@ function Walk({ data, start, onClose, onApplied }) {
           <div className="stack">
             <strong>2. Your devices</strong>
             <p className="small muted">Plug in each switch or computer, or tick the ports below.</p>
-            <div className="stack" style={{ gap: 'var(--space-1)' }}>
+            <div className="stack gap1">
               {wired.filter((p) => p.name !== outside && p.name !== oob).map((p) => (
                 <label key={p.name} className="inline"><input type="checkbox" checked={inside.includes(p.name)} onChange={() => toggleInside(p.name)} /> {pn(p.name)}{here.includes(p.name) ? ' (you are connected here)' : ''}</label>
               ))}
