@@ -233,14 +233,14 @@ func Load(db Queryer) (*Model, error) {
 		}
 	}
 
-	rrows, err := db.Query(`SELECT name,from_zone,to_zone,src,dst,service,action,limit_rate,log,enabled,ipver,ctstate,sched,descr,also_mac FROM fw_rules ORDER BY position,id`)
+	rrows, err := db.Query(`SELECT name,from_zone,to_zone,src,dst,service,action,limit_rate,log,enabled,ipver,ctstate,sched,descr,also_mac,paused_until FROM fw_rules ORDER BY position,id`)
 	if err != nil {
 		return nil, err
 	}
 	for rrows.Next() {
 		var r Rule
 		var lg, en, am int
-		rrows.Scan(&r.Name, &r.From, &r.To, &r.Src, &r.Dst, &r.Service, &r.Action, &r.Limit, &lg, &en, &r.IPVer, &r.CtState, &r.Sched, &r.Descr, &am)
+		rrows.Scan(&r.Name, &r.From, &r.To, &r.Src, &r.Dst, &r.Service, &r.Action, &r.Limit, &lg, &en, &r.IPVer, &r.CtState, &r.Sched, &r.Descr, &am, &r.PausedUntil)
 		r.Log, r.Enabled, r.AlsoMAC = lg == 1, en == 1, am == 1
 		m.Rules = append(m.Rules, r)
 	}
@@ -306,7 +306,7 @@ func Load(db Queryer) (*Model, error) {
 		e.Close()
 	}
 
-	frows, err := db.Query(`SELECT name,wan,proto,ext_port,int_addr,int_port,enabled,src,countries FROM nat_forwards ORDER BY id`)
+	frows, err := db.Query(`SELECT name,wan,proto,ext_port,int_addr,int_port,enabled,src,countries,paused_until,sched FROM nat_forwards ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -314,7 +314,7 @@ func Load(db Queryer) (*Model, error) {
 		var f Forward
 		var en int
 		var src, cc string
-		frows.Scan(&f.Name, &f.WAN, &f.Proto, &f.ExtPort, &f.IntAddr, &f.IntPort, &en, &src, &cc)
+		frows.Scan(&f.Name, &f.WAN, &f.Proto, &f.ExtPort, &f.IntAddr, &f.IntPort, &en, &src, &cc, &f.PausedUntil, &f.Sched)
 		f.Enabled = en == 1
 		f.Src, f.Countries = splitList(src), splitList(cc)
 		m.Forwards = append(m.Forwards, f)

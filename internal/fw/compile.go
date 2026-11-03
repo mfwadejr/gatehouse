@@ -583,6 +583,11 @@ func (c *compiler) explicit(indent int, r Rule, forward bool) {
 		now = time.Now()
 	}
 	times := sc.Clauses(loc, now)
+	if r.PausedUntil > now.Unix() {
+		for i := range times {
+			times[i] = strings.TrimSpace(times[i] + fmt.Sprintf(" meta time >= %d", r.PausedUntil))
+		}
+	}
 	tag := "rule:" + r.From + ":" + r.To + ":" + r.Name
 	for _, st := range srcT {
 		for _, dt := range dstT {
@@ -701,14 +706,19 @@ func (c *compiler) nat() {
 		default:
 			target = fmt.Sprintf("dnat ip6 to [%s]:%s", ip, f.IntPort)
 		}
+		times := c.timing(f.Sched, f.PausedUntil)
 		for _, from := range forwardSources(f, ip.To4() != nil) {
-			c.line(2, "iifname %s %s%s dport %s counter %s comment %s", ifSet(in), from, f.Proto, f.ExtPort, target, q("forward:"+f.Name))
+			for _, tc := range times {
+				c.line(2, "iifname %s %s%s dport %s%s counter %s comment %s", ifSet(in), from, f.Proto, f.ExtPort, tc, target, q("forward:"+f.Name))
+			}
 		}
 		// Hairpin: a device inside asking for the router's public address reaches the same
 		// server. Only public destinations that belong to the router qualify.
 		if hp := c.clientIfaces(); len(hp) > 0 && ip.To4() != nil {
-			c.line(2, "iifname %s fib daddr type local ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10, 127.0.0.0/8 } %s dport %s counter %s comment %s",
-				ifSet(hp), f.Proto, f.ExtPort, target, q("hairpin:"+f.Name))
+			for _, tc := range times {
+				c.line(2, "iifname %s fib daddr type local ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10, 127.0.0.0/8 } %s dport %s%s counter %s comment %s",
+					ifSet(hp), f.Proto, f.ExtPort, tc, target, q("hairpin:"+f.Name))
+			}
 		}
 	}
 	c.line(1, "}")
@@ -785,6 +795,31 @@ func forwardSources(f Forward, v4 bool) []string {
 		} else {
 			out = append(out, fmt.Sprintf("ip6 saddr @%s ", SetNameFor(r, 6)))
 		}
+	}
+	return out
+}
+
+// timing gives the extra match a schedule and a pause add to a rule, one per alternative, each
+// starting with a space (or empty for none). The firewall tests the clock itself.
+func (c *compiler) timing(sched string, pausedUntil int64) []string {
+	sc, _ := ParseSchedule(sched)
+	loc, now := c.m.Loc, c.m.Now
+	if loc == nil {
+		loc = time.UTC
+	}
+	if now.IsZero() {
+		now = time.Now()
+	}
+	times := sc.Clauses(loc, now)
+	out := make([]string, 0, len(times))
+	for _, tc := range times {
+		if tc != "" {
+			tc = " " + tc
+		}
+		if pausedUntil > now.Unix() {
+			tc += fmt.Sprintf(" meta time >= %d", pausedUntil)
+		}
+		out = append(out, tc)
 	}
 	return out
 }

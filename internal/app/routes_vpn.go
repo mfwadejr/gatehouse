@@ -75,35 +75,10 @@ func (a *App) registerVPNRoutes() {
 
 // vpnChoices lists what can be sent through a tunnel: networks and devices.
 func (a *App) vpnChoices(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-	type netChoice struct {
-		Name    string   `json:"name"`
-		Subnets []string `json:"subnets"`
-	}
-	var nets []netChoice
-	zs, err := fw.Zones(a.Config)
+	nets, err := a.pickerNetworks()
 	if err != nil {
 		fail(w, err)
 		return
-	}
-	for _, z := range zs {
-		if z.Kind == fw.KindWan || z.Kind == fw.KindVpn {
-			continue
-		}
-		if strings.HasPrefix(z.Name, "VPN") || z.Name == siteZoneName {
-			continue
-		}
-		nc := netChoice{Name: z.Name, Subnets: []string{}}
-		if rows, err := a.Config.Query(`SELECT ipv4_cidr FROM interfaces WHERE enabled=1 AND ipv4_cidr<>'' AND zone_id=?`, z.ID); err == nil {
-			for rows.Next() {
-				var cidr string
-				rows.Scan(&cidr)
-				if p, err := netip.ParsePrefix(strings.TrimSpace(cidr)); err == nil {
-					nc.Subnets = append(nc.Subnets, p.Masked().String())
-				}
-			}
-			rows.Close()
-		}
-		nets = append(nets, nc)
 	}
 	type devChoice struct {
 		MAC    string `json:"mac"`
@@ -116,9 +91,6 @@ func (a *App) vpnChoices(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		for _, d := range list {
 			devs = append(devs, devChoice{MAC: strings.ToLower(d.MAC), Name: deviceTitle(d), IP: d.IP, Online: d.Online})
 		}
-	}
-	if nets == nil {
-		nets = []netChoice{}
 	}
 	groups := []string{}
 	if rows, err := a.Config.Query(`SELECT name FROM device_groups ORDER BY name`); err == nil {
@@ -1056,3 +1028,38 @@ func (a *App) reserveForDevice(tx *sql.Tx, d devices.Device) error {
 }
 
 func parseInt(s string) (int64, error) { return strconv.ParseInt(s, 10, 64) }
+
+type netChoice struct {
+	Name    string   `json:"name"`
+	Subnets []string `json:"subnets"`
+}
+
+// pickerNetworks lists your own networks with their address ranges, for the pickers.
+func (a *App) pickerNetworks() ([]netChoice, error) {
+	nets := []netChoice{}
+	zs, err := fw.Zones(a.Config)
+	if err != nil {
+		return nets, err
+	}
+	for _, z := range zs {
+		if z.Kind == fw.KindWan || z.Kind == fw.KindVpn {
+			continue
+		}
+		if strings.HasPrefix(z.Name, "VPN") || z.Name == siteZoneName {
+			continue
+		}
+		nc := netChoice{Name: z.Name, Subnets: []string{}}
+		if rows, err := a.Config.Query(`SELECT ipv4_cidr FROM interfaces WHERE enabled=1 AND ipv4_cidr<>'' AND zone_id=?`, z.ID); err == nil {
+			for rows.Next() {
+				var cidr string
+				rows.Scan(&cidr)
+				if p, err := netip.ParsePrefix(strings.TrimSpace(cidr)); err == nil {
+					nc.Subnets = append(nc.Subnets, p.Masked().String())
+				}
+			}
+			rows.Close()
+		}
+		nets = append(nets, nc)
+	}
+	return nets, nil
+}

@@ -10,9 +10,9 @@ The picture is an example from a new, empty box; yours will show your own device
 ## What is on the page
 Tabs along the top:
 - **Networks**: **Your networks**, each with a type. For each: **Can reach the internet**, **Devices here can talk to each other**, **Can manage Gatehouse**, and under Advanced **Gatehouse is the gateway**, **Make devices here use the enforced DNS server** and **Allow remote login (SSH)**. **Test my access** shows whether a device can reach something. **In plain words** says what the firewall does right now.
-- **Rules**: your own rules, each with a name, who, what and the action. Deleting one can be undone for a few seconds.
+- **Rules**: your own rules, each with a name, who, what and the action. Each rule has **Pause…** (for a set time, or until you resume it), **Turn off**, **Edit** and **Remove**, the same controls routes, blocks and port forwards have. Deleting one can be undone for a few seconds. **Create policy**, at the top of every page, opens this form for you too.
 - **Groups & lists**: named groups of devices to use in rules.
-- **Open ports**: **Open a port** lets something outside reach an app on one of your devices, like Plex or a game server.
+- **Open ports**: **Open a port** lets something outside reach an app on one of your devices, like Plex or a game server. Each one can be paused, put on a schedule, turned off, edited or removed the same way as a rule. A paused rule or port is closed until the time runs out or you press **Resume now**; the change waits for **Review and apply** like any other.
 - **Countries**: block or allow whole countries.
 - **Discovery**: let devices on different networks find each other, such as casting and printers.
 - **Protection**: **Block encrypted DNS to other servers**, **Also block well-known encrypted-DNS websites**, **Ask for a code before changing the firewall** and **Log blocked traffic**.

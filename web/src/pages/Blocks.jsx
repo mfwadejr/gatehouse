@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { hashQuery, setHashQuery } from '../hashtab.js';
 import { del, post, put, useData } from '../api.js';
 import { Button, Card, Empty, Field, Input, Modal, Note, Pill, Segmented, Select, ToggleRow, useAction, confirmBox } from '../ui.jsx';
+import { PolicyControls } from '../policykit.jsx';
 
 // Block an app, a topic or a website name for everyone, a network, a profile or one device, always
 // or on a schedule. Today the blocking works by name. Thorough checking is shown but not on yet.
@@ -94,7 +96,8 @@ function BlockForm({ initial, data, onClose, onSaved }) {
 
 export default function Blocks() {
   const { data, reload } = useData('/api/blocks', { every: 15000 });
-  const [edit, setEdit] = useState(null);
+  const [edit, setEdit] = useState(() => (hashQuery('new') ? {} : null));
+  useEffect(() => { if (hashQuery('new')) setHashQuery('new', ''); }, []);
   const [run, busy] = useAction();
   const rules = data?.rules || [];
   return (
@@ -111,12 +114,11 @@ export default function Blocks() {
                 <div className="meta">{r.when}{r.method === 'thorough' ? ' · thorough, waiting for it to be switched on' : r.method === 'both' ? ' · by name now, thorough once it is on' : ' · by name'}</div>
               </div>
               <div className="actions">
-                {r.status === 'paused'
-                  ? <Button small disabled={busy} onClick={() => run(() => post(`/api/blocks/${r.id}/pause`, { minutes: 0 }), 'Resumed.').then(reload)}>Resume</Button>
-                  : r.enabled && <Button small disabled={busy} onClick={() => run(() => post(`/api/blocks/${r.id}/pause`, { minutes: 60 }), 'Paused for an hour.').then(reload)}>Pause 1 hour</Button>}
-                <Button small disabled={busy} onClick={() => run(() => post(`/api/blocks/${r.id}/enable`, { enabled: !r.enabled })).then(reload)}>{r.enabled ? 'Turn off' : 'Turn on'}</Button>
-                <Button small icon="edit" onClick={() => setEdit(r)}>Edit</Button>
-                <Button small kind="danger" icon="trash" onClick={async () => await confirmBox('Delete this block?') && run(() => del(`/api/blocks/${r.id}`)).then(reload)}>Delete</Button>
+                <PolicyControls name={r.name || 'this block'} enabled={r.enabled} pausedUntil={r.paused_until} busy={busy}
+                  onPause={(m) => run(() => post(`/api/blocks/${r.id}/pause`, { minutes: m }), m === 0 ? 'Resumed.' : 'Paused.').then(reload)}
+                  onToggle={() => run(() => post(`/api/blocks/${r.id}/enable`, { enabled: !r.enabled })).then(reload)}
+                  onEdit={() => setEdit(r)}
+                  onRemove={async () => await confirmBox('Delete this block?') && run(() => del(`/api/blocks/${r.id}`)).then(reload)} />
               </div>
             </div>
           );

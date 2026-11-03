@@ -289,6 +289,13 @@ func (a *App) addVPNToPlan(q querier, p *netd.Plan) error {
 func baseFingerprint(p *netd.Plan) string {
 	q := *p
 	q.Config.WireGuard, q.Config.Tunnels = nil, nil
+	// The connections a route keeps for itself are part of the route, which applies on its own.
+	q.Groups = nil
+	for _, g := range p.Groups {
+		if !strings.HasPrefix(g.Name, "route:") {
+			q.Groups = append(q.Groups, g)
+		}
+	}
 	return fingerprint(&q)
 }
 

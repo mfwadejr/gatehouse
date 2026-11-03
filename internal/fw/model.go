@@ -56,8 +56,11 @@ type Rule struct {
 	IPVer   string // "" for both, "4" or "6"
 	CtState string // "" for any, "new" for new connections only
 	Sched   string // stored schedule, empty for always
-	Descr   string
-	AlsoMAC bool // the device's MAC address must match too (local networks only)
+	// PausedUntil is a unix time. The rule does not apply before it; the firewall tests the clock
+	// itself, so the rule starts again on time with nothing to apply.
+	PausedUntil int64
+	Descr       string
+	AlsoMAC     bool // the device's MAC address must match too (local networks only)
 	// Not and Early are set only on the rules the countries page makes. Not matches every public
 	// address that is NOT in the listed countries. Early puts an internet-facing rule ahead of port
 	// forwards and VPN servers, so it covers those too.
@@ -80,6 +83,9 @@ type Forward struct {
 	IntAddr string
 	IntPort string // empty means same as ExtPort
 	Enabled bool
+	// PausedUntil and Sched work as they do on rules.
+	PausedUntil int64
+	Sched       string
 	// Only these sources may connect: addresses or networks, and countries (two-letter codes).
 	// Both empty means anyone.
 	Src       []string

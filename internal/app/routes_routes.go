@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 
 	"gatehouse/internal/api"
 	"gatehouse/internal/fw"
@@ -58,6 +59,19 @@ func (a *App) routeTargets(q querier) []routeTarget {
 			out = append(out, routeTarget{"wan", w.Name, w.Name, w.Enabled, ""})
 		}
 	}
+	if gs, err := a.listGroups(q); err == nil {
+		for _, g := range gs {
+			var names []string
+			for _, m := range g.Members {
+				names = append(names, m.Name)
+			}
+			note := "uses " + strings.Join(names, ", ") + ", in that order"
+			if g.Mode == "balance" {
+				note = "shares traffic across " + strings.Join(names, ", ")
+			}
+			out = append(out, routeTarget{"group", g.Name, g.Name + " (connection group)", len(g.Members) > 0, note})
+		}
+	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Kind > out[j].Kind }) // VPNs first
 	return out
 }
@@ -94,6 +108,21 @@ func (a *App) routesView() map[string]any {
 		v := routeView{RouteRow: r, Warnings: []string{}}
 		t, have := byKey[r.TargetKind+"|"+r.Target]
 		v.TargetLabel = labelOr(t.Label, r.Target)
+		if r.TargetKind == "links" {
+			names := strings.Split(r.Target, ",")
+			on := 0
+			for _, n := range names {
+				if byKey["wan|"+n].Enabled {
+					on++
+				}
+			}
+			have, t.Enabled = on > 0, on > 0
+			if r.Mode == "balance" && len(names) > 1 {
+				v.TargetLabel = "shared across " + strings.Join(names, ", ")
+			} else {
+				v.TargetLabel = strings.Join(names, ", then ")
+			}
+		}
 		var who []string
 		for _, u := range r.Uses {
 			switch u.Kind {
@@ -125,13 +154,28 @@ func (a *App) routesView() map[string]any {
 		} else if r.TargetKind == "tunnel" {
 			end = " (uses the normal connection if the VPN is down)"
 		}
+		if strings.TrimSpace(r.Service) != "" {
+			var sv []string
+			for _, x := range strings.Split(r.Service, ",") {
+				sv = append(sv, strings.TrimPrefix(x, "list:"))
+			}
+			if where == "everything" {
+				where = "all addresses"
+			}
+			where += " (" + strings.Join(sv, ", ") + ")"
+		}
 		v.Plain = fmt.Sprintf("%s: %s only through %s%s", whoText, where, v.TargetLabel, end)
 		if where == "everything" {
 			v.Plain = fmt.Sprintf("%s: everything through %s%s", whoText, v.TargetLabel, end)
 		}
+		if r.Sched != nil {
+			v.Plain += ", " + strings.ToLower(r.Sched.Describe())
+		}
 		switch {
 		case !r.Enabled:
 			v.State = "off"
+		case r.PausedUntil > time.Now().Unix():
+			v.State = "paused"
 		case !have:
 			v.State = "target-off"
 			v.Warnings = append(v.Warnings, "The VPN or connection this route uses no longer exists.")
@@ -140,7 +184,7 @@ func (a *App) routesView() map[string]any {
 			v.Warnings = append(v.Warnings, v.TargetLabel+" is switched off, so this route is not working.")
 		case len(r.Uses) == 0:
 			v.State = "nobody"
-		case r.TargetKind == "wan" && nOn < 2:
+		case (r.TargetKind == "wan" || r.TargetKind == "links") && nOn < 2:
 			v.State = "one-connection"
 			v.Warnings = append(v.Warnings, "Routing to one connection needs at least two internet connections turned on. Until then traffic uses the one you have.")
 		case !working[r.Name]:
@@ -206,8 +250,65 @@ func (a *App) registerRouteRoutes() {
 					return fmt.Errorf("there is no internet connection called %q", in.Target)
 				}
 			}
+			if in.TargetKind == "links" {
+				for _, n := range strings.Split(in.Target, ",") {
+					n = strings.TrimSpace(n)
+					if n == "" {
+						continue
+					}
+					var cnt int
+					tx.QueryRow(`SELECT count(*) FROM wan_links WHERE name=?`, n).Scan(&cnt)
+					if cnt == 0 {
+						return fmt.Errorf("there is no internet connection called %q", n)
+					}
+				}
+			}
+			if in.TargetKind == "group" {
+				var n int
+				tx.QueryRow(`SELECT count(*) FROM wan_groups WHERE name=?`, in.Target).Scan(&n)
+				if n == 0 {
+					return fmt.Errorf("there is no connection group called %q", in.Target)
+				}
+			}
+			if _, err := fw.ParseServices(in.Service, portListsOf(tx)); err != nil {
+				return err
+			}
 			_, err := fw.SaveRoute(tx, in)
 			return err
+		})
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		a.refreshVPN()
+		api.JSON(w, 200, a.routesView())
+	})
+	// Pause a route for a while: minutes 0 resumes it. The firewall holds the clock itself, so the
+	// route starts again on time with nothing to apply.
+	s.HandleAdmin("POST /api/routes/{id}/pause", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		id, good := pathID(r)
+		if !good {
+			fail(w, errBadID)
+			return
+		}
+		var in struct{ Minutes int }
+		if !api.Decode(w, r, &in) || !a.needHelper(w) {
+			return
+		}
+		until, err := pausePick(in.Minutes)
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		err = a.mutateVPN(c.User.Username, func(tx *sql.Tx) error {
+			res, err := tx.Exec(`UPDATE routes SET paused_until=? WHERE id=?`, until, id)
+			if err != nil {
+				return err
+			}
+			if n, _ := res.RowsAffected(); n == 0 {
+				return fmt.Errorf("that route no longer exists")
+			}
+			return nil
 		})
 		if err != nil {
 			fail(w, err)
@@ -245,4 +346,24 @@ func (a *App) registerRouteRoutes() {
 		}
 		ok(w)
 	})
+}
+
+// portListsOf gives the saved lists of ports by name, as the firewall reads them. It reads through
+// the open transaction, so it can be used while one is held.
+func portListsOf(q fw.Queryer) map[string][]string {
+	out := map[string][]string{}
+	rows, _ := fw.PortLists(q)
+	for _, p := range rows {
+		out[p.Name] = p.Ports
+	}
+	return out
+}
+
+// pausePick checks a pause choice from a policy screen and turns it into the time it ends: 0
+// resumes now, -1 pauses until the person resumes, and a number is minutes, up to 30 days.
+func pausePick(minutes int) (int64, error) {
+	if minutes < -1 || minutes > 60*24*30 {
+		return 0, fmt.Errorf("choose a pause of up to 30 days")
+	}
+	return pauseUntil(minutes, time.Now()), nil
 }

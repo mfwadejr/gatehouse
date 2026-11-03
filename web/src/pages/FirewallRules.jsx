@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { del, post, put, useData } from '../api.js';
 import { AddrPicker, Chip, NewDevice, ScheduleEditor, ServicePicker, tokens } from '../AddrPicker.jsx';
+import { PolicyControls, whenText } from '../policykit.jsx';
 import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Paged, Pill, Segmented, Select, ToggleRow, useAction, fmt, noticeBox, useUndoDelete } from '../ui.jsx';
 
 const ACTIONS = [{ value: 'accept', label: 'Allow' }, { value: 'drop', label: 'Block silently' }, { value: 'reject', label: 'Block and tell the sender' }];
 // Only the fields the server stores; it refuses anything else.
-const FIELDS = ['id', 'name', 'from', 'to', 'src', 'dst', 'service', 'action', 'limit', 'log', 'enabled', 'ipver', 'ctstate', 'sched', 'descr', 'also_mac'];
+const FIELDS = ['id', 'name', 'from', 'to', 'src', 'dst', 'service', 'action', 'limit', 'log', 'enabled', 'ipver', 'ctstate', 'sched', 'descr', 'also_mac', 'paused_until'];
 const ruleBody = (r) => Object.fromEntries(FIELDS.filter((k) => r[k] !== undefined).map((k) => [k, r[k]]));
 const actionWord = (a) => (a === 'accept' ? 'Allow' : a === 'drop' ? 'Block' : 'Reject');
 
@@ -213,6 +214,7 @@ export function RulesList({ ov, rules, countryRules, pickers, reloadPickers, rel
     [ids[a], ids[b]] = [ids[b], ids[a]];
     run(() => post('/api/fw/rules/order', { order: ids })).then(reload);
   };
+  const pauseFor = (r, m) => run(() => post(`/api/fw/rules/${r.id}/pause`, { minutes: m }), m === 0 ? 'Saved. Apply it to resume the rule.' : 'Saved. Apply it to start the pause.').then(reload);
   const toggle = (r) => run(() => put('/api/fw/rules', ruleBody({ ...r, sched: r.sched || null, enabled: !r.enabled })), 'Saved. Apply it to start using it.').then(reload);
   return (
     <Card title="Rules" desc="Special cases on top of your network types, such as keeping the kids' devices offline at night."
@@ -243,7 +245,7 @@ export function RulesList({ ov, rules, countryRules, pickers, reloadPickers, rel
         <Paged items={visible}>{(shownRules) => shownRules.map(({ r }, pos) => (
           <div className={`item rule ${r.enabled ? '' : 'off'}`} key={r.id}>
             <div className="rulemain">
-              <div className="name">{r.matrix ? `Matrix: ${r.from} to ${r.to}` : r.name} {!r.enabled && <Pill>Off</Pill>}{r.matrix && <Pill>From the matrix</Pill>}<Pill tone={r.action === 'accept' ? 'good' : 'bad'}>{actionWord(r.action)}</Pill>{r.when !== 'Always' && <Pill tone="warn">{r.when}</Pill>}</div>
+              <div className="name">{r.matrix ? `Matrix: ${r.from} to ${r.to}` : r.name} {!r.enabled && <Pill>Off</Pill>}{r.matrix && <Pill>From the matrix</Pill>}<Pill tone={r.action === 'accept' ? 'good' : 'bad'}>{actionWord(r.action)}</Pill>{r.when !== 'Always' && <Pill tone="warn">{r.when}</Pill>}{whenText(r.paused_until) && <Pill tone="warn">{whenText(r.paused_until)}</Pill>}</div>
               <div className="meta rulewho">
                 <RuleSide chips={r.src_chips || []} pickers={pickers} />
                 <span aria-label="goes to">→</span>
@@ -257,9 +259,8 @@ export function RulesList({ ov, rules, countryRules, pickers, reloadPickers, rel
             <div className="actions">
               <Button small aria-label="Move up" onClick={() => move(pos, -1)} disabled={pos === 0}>↑</Button>
               <Button small aria-label="Move down" onClick={() => move(pos, 1)} disabled={pos === visible.length - 1}>↓</Button>
-              <Button small onClick={() => toggle(r)}>{r.enabled ? 'Turn off' : 'Turn on'}</Button>
-              <Button small icon="edit" onClick={() => setEdit(r)}>Edit</Button>
-              <Button small kind="danger" icon="trash" onClick={() => undoDelete(`The rule "${r.name}"`, () => del(`/api/fw/rules/${r.id}`), () => put('/api/fw/rules', ruleBody({ ...r, id: undefined })), reload)}>Delete</Button>
+              <PolicyControls name={r.name} enabled={r.enabled} pausedUntil={r.paused_until} onPause={(m) => pauseFor(r, m)} onToggle={() => toggle(r)} onEdit={() => setEdit(r)}
+                onRemove={() => undoDelete(`The rule "${r.name}"`, () => del(`/api/fw/rules/${r.id}`), () => put('/api/fw/rules', ruleBody({ ...r, id: undefined })), reload)} />
             </div>
           </div>
         ))}</Paged>

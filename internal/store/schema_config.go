@@ -529,4 +529,16 @@ CREATE TABLE threat_trusted(
 DROP TABLE IF EXISTS wifi_radios;
 DROP TABLE IF EXISTS wifi_cards;
 DELETE FROM settings WHERE key LIKE 'wifi.%';
+`, `
+-- Routes can match one kind of traffic (v0.9.1): the same service words firewall rules use (names, lists, tcp/443); empty for all.
+ALTER TABLE routes ADD COLUMN service TEXT NOT NULL DEFAULT '';
+-- A route can pause for a while (paused_until, unix seconds) and follow a schedule (same JSON as firewall rules; empty means always).
+ALTER TABLE routes ADD COLUMN paused_until INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE routes ADD COLUMN sched TEXT NOT NULL DEFAULT '';
+-- A route can use several connections in an order (target_kind links, target a comma-separated list): failover or balance.
+ALTER TABLE routes ADD COLUMN mode TEXT NOT NULL DEFAULT 'failover';
+-- The same pause (and for port forwards, schedule) on firewall rules and port forwards.
+ALTER TABLE fw_rules ADD COLUMN paused_until INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE nat_forwards ADD COLUMN paused_until INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE nat_forwards ADD COLUMN sched TEXT NOT NULL DEFAULT '';
 `}

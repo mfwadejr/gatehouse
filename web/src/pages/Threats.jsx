@@ -42,46 +42,52 @@ function InstallPrompt({ data, reload }) {
   );
 }
 
-function AlertRow({ x, days, busy, run, reload }) {
+// One card for each kind of alert on each device: how many times, over what time, and one set of
+// buttons. The addresses involved are folded away under "Show the N addresses".
+function AlertCard({ g, days, busy, run, reload }) {
+  const [open, setOpen] = useState(false);
   const [more, setMore] = useState(false);
-  const who = x.started === 'device' ? 'your device started it' : x.started === 'remote' ? 'the other end started it' : '';
-  const remote = x.remote ? `${x.remote}${x.country ? ` (${x.country})` : ''}${x.port ? `, port ${x.port}${x.proto ? `/${x.proto}` : ''}` : ''}` : '';
-  const quiet = x.quiet;
+  const first = g.rows[0];
+  const times = g.rows.reduce((a, x) => a + (x.count || 1), 0);
+  const firstAt = Math.min(...g.rows.map((x) => x.first || x.last));
+  const lastAt = Math.max(...g.rows.map((x) => x.last));
+  // The same address and port seen twice is one line.
+  const seen = new Map();
+  g.rows.forEach((x) => {
+    const k = `${x.remote}|${x.port}|${x.proto}`;
+    const e = seen.get(k) || { x, n: 0 };
+    e.n += x.count || 1;
+    seen.set(k, e);
+  });
+  const lines = [...seen.values()];
+  const sids = [...new Set(g.rows.map((x) => x.sid))];
+  const allow = (mac, msg) => run(async () => { for (const sid of sids) await post('/api/threat/allow', { sid, mac, days: Number(days), note: g.rows.find((x) => x.sid === sid).signature }); return true; }, msg).then(reload);
+  const who = first.started === 'device' ? 'your device started it' : first.started === 'remote' ? 'the other end started it' : '';
   return (
-    <div className="item" key={x.key}>
+    <div className="item">
       <div className="fill">
-        <div className="name">{x.title}{x.count > 1 && <> <Pill>×{x.count}</Pill></>}</div>
-        <div className="meta">{[x.device, remote, who, x.count > 1 ? `${fmt.ago(x.first)} to ${fmt.ago(x.last)}` : fmt.ago(x.last)].filter(Boolean).join(' · ')}</div>
-        {more && <div className="small muted mt2">{x.explain} <span className="mono">{x.signature}</span></div>}
-        <button className="link small" onClick={() => setMore(!more)}>{more ? 'Hide details' : 'What does this mean?'}</button>
+        <div className="name">{g.title}{times > 1 && <> <Pill>×{fmt.n(times)}</Pill></>}</div>
+        <div className="meta">{[first.device, who, times > 1 ? `${fmt.ago(firstAt)} to ${fmt.ago(lastAt)}` : fmt.ago(lastAt)].filter(Boolean).join(' · ')}</div>
+        {lines.length === 1 && lines[0].x.remote && <div className="meta">{lines[0].x.remote}{lines[0].x.country ? ` (${lines[0].x.country})` : ''}{lines[0].x.port ? `, port ${lines[0].x.port}${lines[0].x.proto ? `/${lines[0].x.proto}` : ''}` : ''}</div>}
+        {lines.length > 1 && <button className="link small leftalign" onClick={() => setOpen(!open)}>{open ? 'Hide the addresses' : `Show the ${lines.length} addresses`}</button>}
+        {open && <ul className="small muted" style={{ margin: 0, paddingLeft: '1.2rem' }}>{lines.map(({ x, n }) => <li key={x.key} className="mono">{x.remote}{x.country ? ` (${x.country})` : ''}{x.port ? `:${x.port}${x.proto ? `/${x.proto}` : ''}` : ''}{n > 1 ? ` ×${n}` : ''}</li>)}</ul>}
+        {more && <div className="small muted mt2">{first.explain} <span className="mono">{first.signature}</span></div>}
+        <button className="link small leftalign" onClick={() => setMore(!more)}>{more ? 'Hide details' : 'What does this mean?'}</button>
       </div>
       <div className="actions">
-        <Button small disabled={busy} onClick={() => run(() => post('/api/threat/allow', { sid: x.sid, mac: x.mac, days: Number(days), note: x.signature }), 'This will not alert again for this device.').then(reload)} title="Let this through for this device">Allow for this device</Button>
-        <Button small disabled={busy} onClick={() => run(() => post('/api/threat/allow', { sid: x.sid, mac: '', days: Number(days), note: x.signature }), 'This will not alert again.').then(reload)}>Allow for all</Button>
-        {x.mac && !quiet && <Button small disabled={busy} onClick={() => run(() => post('/api/threat/trust', { mac: x.mac }), `${x.device} will not be checked.`).then(reload)} title={`Never check ${x.device}`}>Never check this device</Button>}
+        <Button small disabled={busy} onClick={() => allow(first.mac, 'This will not alert again for this device.')} title="Let this through for this device">Allow for this device</Button>
+        <Button small disabled={busy} onClick={() => allow('', 'This will not alert again.')}>Allow for all</Button>
+        {first.mac && !first.quiet && <Button small disabled={busy} onClick={() => run(() => post('/api/threat/trust', { mac: first.mac }), `${first.device} will not be checked.`).then(reload)} title={`Never check ${first.device}`}>Never check this device</Button>}
       </div>
     </div>
   );
 }
 
-// Rows with the same title sit together, with one line saying how many devices and times.
 function AlertGroups({ rows, ...p }) {
   const groups = [];
   const by = new Map();
-  rows.forEach((x) => { if (!by.has(x.title)) { const g = { title: x.title, rows: [] }; by.set(x.title, g); groups.push(g); } by.get(x.title).rows.push(x); });
-  return (
-    <Limited items={groups} n={10} noun="kinds of alert" render={(g) => {
-      if (g.rows.length === 1) return <AlertRow key={g.rows[0].key} x={g.rows[0]} {...p} />;
-      const devs = new Set(g.rows.map((x) => x.mac || x.device)).size;
-      const times = g.rows.reduce((a, x) => a + (x.count || 1), 0);
-      return (
-        <div key={g.title}>
-          <div className="small muted mt2">{g.title}: {fmt.n(times)} times, {devs} device{devs === 1 ? '' : 's'}</div>
-          {g.rows.map((x) => <AlertRow key={x.key} x={x} {...p} />)}
-        </div>
-      );
-    }} />
-  );
+  rows.forEach((x) => { const k = `${x.title}|${x.mac || x.device}`; if (!by.has(k)) { const g = { key: k, title: x.title, rows: [] }; by.set(k, g); groups.push(g); } by.get(k).rows.push(x); });
+  return <Limited items={groups} n={10} noun="kinds of alert" render={(g) => <AlertCard key={g.key} g={g} {...p} />} />;
 }
 
 function Alerts({ data, reload }) {

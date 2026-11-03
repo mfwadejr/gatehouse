@@ -248,7 +248,8 @@ export default function Firewall({ me }) {
   const [tab, setTab] = useHashTab('firewall', ['networks','rules','groups','ports','countries','discovery','protection','history'], 'networks');
   const [filter, setFilter] = useState({});
   const [pair, setPair] = useState(null);
-  const [newRule, setNewRule] = useState(null);
+  const [newRule, setNewRule] = useState(() => (hashQuery('new') && window.location.hash.includes('/rules') ? {} : null));
+  useEffect(() => { if (newRule && hashQuery('new')) setHashQuery('new', ''); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const countryRules = (rules || []).filter((r) => r.countries);
   const presets = pr?.presets || [];
   const all = () => { reload(); reloadRules(); reloadPickers(); };

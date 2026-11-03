@@ -1,6 +1,22 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.1',
+    title: 'One way to make every policy',
+    items: [
+      'Create policy: one button at the top of every page asks what you want to make (a route, a firewall rule, a block or a port forward) and opens the right form. They share the same pickers for who and where, the same list of services and ports, and the same wording.',
+      'Routes can now match any mix of websites, addresses, ranges, countries and ports (for example NNTPS or NTP) for a network, a device, a group or an address, and send it through a VPN, a connection group, or one or several of your internet connections in the order you choose, to fail over or to share. A connection kept only as a backup can be used alone. Up to 16 routes.',
+      'The same controls everywhere: every route, firewall rule, block and port forward can be turned on or off, paused (for a set time or until you resume), put on a schedule, edited and removed, and says in words what it does.',
+      'Admin activity now lists every policy change, including pause, resume, schedule edits and reordering.',
+      'Devices: Keep address and Release address on each row give a device a fixed DHCP address in one click.',
+      'Overview: the networks table says how to read its charts and shows each network\u2019s peak. More cards have a helper line.',
+      'Threat alerts are far less cluttered: each kind of alert on each device is now one card with a count and time range, one set of buttons, and its addresses folded under Show the addresses. Repeated identical rows are merged.',
+      'On a phone, the Create policy choices and the route type selector now wrap instead of cutting words off.',
+      'Backups, restore and reset include the new route, pause and schedule settings; old routes come back unchanged.',
+      'Behind the scenes: tests now fill routes, connection groups, countries and firewall sets to their limits and one past, and every read-only page of the console is called on a fresh box.',
+    ],
+  },
+  {
     version: '0.9.0',
     title: 'Find your place, and no silent failures',
     items: [

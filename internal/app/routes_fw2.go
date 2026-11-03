@@ -213,7 +213,8 @@ func (a *App) registerFWObjectRoutes() {
 		}
 		sort.Slice(out, func(i, j int) bool { return strings.ToLower(out[i].Name) < strings.ToLower(out[j].Name) })
 		lists, _ := fw.PortLists(a.Config)
-		api.JSON(w, 200, map[string]any{"devices": out, "groups": groups, "port_lists": lists, "services": fw.ServiceNames(), "catalog": fw.BuiltinServices()})
+		pickerNets, _ := a.pickerNetworks()
+		api.JSON(w, 200, map[string]any{"devices": out, "groups": groups, "port_lists": lists, "services": fw.ServiceNames(), "catalog": fw.BuiltinServices(), "networks": pickerNets})
 	})
 
 	s.HandleAdmin("PUT /api/fw/groups", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {

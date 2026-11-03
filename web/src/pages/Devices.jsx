@@ -239,6 +239,9 @@ export default function Devices({ me }) {
                       {d.source !== 'vpn' && (
                         <div className="actions endalign">
                           {d.mac && <Button small onClick={() => setOpening(d)}>Open a port</Button>}
+                          {d.mac && (d.reserved
+                            ? <Button small title="Stop handing this device the same address every time" onClick={() => run(() => put(`/api/devices/${d.id}/reservation`, { keep: false }), 'Address no longer fixed.').then(reload)}>Release address</Button>
+                            : d.ip && <Button small title={`Always give this device ${d.ip}`} onClick={() => run(() => put(`/api/devices/${d.id}/reservation`, { keep: true, ip: d.ip }), `This device will always get ${d.ip}.`).then(reload)}>Keep address</Button>)}
                           <Button small onClick={() => run(() => patch(`/api/devices/${d.id}`, { internet: !d.internet }), d.internet ? 'Paused.' : 'Back online.').then(reload)}>{d.internet ? 'Pause' : 'Resume'}</Button>
                           {!d.online && <Button small kind="danger" icon="trash" onClick={async () => await confirmBox('Forget this device?') && run(() => del(`/api/devices/${d.id}`), 'Forgotten.').then(reload)}>Forget</Button>}
                         </div>

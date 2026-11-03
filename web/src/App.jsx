@@ -7,6 +7,7 @@ import FailbackPrompt from './pages/FailbackPrompt.jsx';
 import Installer from './pages/Installer.jsx';
 import Wizard from './pages/Wizard.jsx';
 import { SearchBox, useSearchShortcut } from './search.jsx';
+import CreatePolicy from './CreatePolicy.jsx';
 import { ReleaseNotes } from './whatsnew.jsx';
 
 const Overview = lazy(() => import('./pages/Overview.jsx'));
@@ -67,6 +68,7 @@ function Shell({ me, onSignOut, reloadMe }) {
   const pending = (fw?.status?.pending || net?.status?.pending) ? true : false;
   const dirty = !!(fw?.status?.dirty || net?.status?.dirty);
   const [finding, setFinding] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [notes, setNotes] = useState(false);
   const { data: upd } = useData('/api/system/update', { every: 600000 });
   useSearchShortcut(useCallback(() => setFinding(true), []));
@@ -76,6 +78,7 @@ function Shell({ me, onSignOut, reloadMe }) {
       <aside className="side">
         <div className="brand"><Icon name="logo" size={24} /><span>Gatehouse</span></div>
         <button type="button" className="srchbtn" onClick={() => setFinding(true)} aria-label="Search"><Icon name="search" /><span>Search</span><kbd>/</kbd></button>
+        {me.user.role === 'admin' && !ha?.standby && <button type="button" className="srchbtn" onClick={() => setCreating(true)}><Icon name="plus" /><span>Create policy</span></button>}
         <nav className="nav" aria-label="Primary">
           {PAGES.map((p, i) => (
             <React.Fragment key={p.id}>
@@ -107,6 +110,7 @@ function Shell({ me, onSignOut, reloadMe }) {
       </main>
       {finding && <SearchBox onClose={() => setFinding(false)} go={go} />}
       {notes && <ReleaseNotes onClose={() => setNotes(false)} />}
+      {creating && <CreatePolicy onClose={() => setCreating(false)} />}
     </div>
   );
 }

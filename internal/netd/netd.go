@@ -33,6 +33,7 @@ type GroupSpec struct {
 	Block   bool          `json:"block"`
 	Members []GroupMember `json:"members"`
 	Sources []string      `json:"sources"`
+	Mark    int           `json:"mark,omitempty"`
 }
 
 // GroupMember is one connection in a group; the order of the list is the failover order.
@@ -42,7 +43,7 @@ type GroupMember struct {
 }
 
 func (g GroupSpec) group() wanmon.Group {
-	out := wanmon.Group{Name: g.Name, Table: g.Table, Prio: g.Prio, Mode: wanmon.Mode(g.Mode), Block: g.Block, Sources: g.Sources}
+	out := wanmon.Group{Name: g.Name, Table: g.Table, Prio: g.Prio, Mode: wanmon.Mode(g.Mode), Block: g.Block, Sources: g.Sources, Mark: g.Mark}
 	for _, m := range g.Members {
 		out.Members = append(out.Members, wanmon.Member{Link: m.Link, Weight: m.Weight})
 	}

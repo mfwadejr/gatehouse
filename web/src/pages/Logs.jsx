@@ -107,7 +107,7 @@ export function WorldMap({ countries }) {
 
 function TopList({ title, items, field, onPick, render }) {
   return (
-    <Card title={title}>
+    <Card title={title} desc="Most connections first. Click one to filter the list to it.">
       {!items?.length ? <Empty>Nothing yet</Empty> : (
         <ul className="toplist">
           {items.map((i) => (
@@ -343,9 +343,9 @@ function Summary({ params, pick }) {
   return (
     <div className="stack">
       <div className="tiles">
-        <Card title="Connections"><div className="big">{fmt.n(s.total)}</div></Card>
-        <Card title="Allowed"><div className="big">{fmt.n(s.allowed)}</div></Card>
-        <Card title="Blocked"><div className="big">{fmt.n(s.blocked)}</div></Card>
+        <Card title="Connections" desc="Every connection in the period you chose."><div className="big">{fmt.n(s.total)}</div></Card>
+        <Card title="Allowed" desc="Let through by a rule or by the default."><div className="big">{fmt.n(s.allowed)}</div></Card>
+        <Card title="Blocked" desc="Stopped by the firewall."><div className="big">{fmt.n(s.blocked)}</div></Card>
       </div>
       <Card title="Where connections go" desc="By the country of the address on the far side. Click a country to see its connections.">
         {geo && !geo.ready && <Note tone="warn" title="Country data not downloaded yet">Gatehouse downloads the country address lists the first time they are needed and keeps them up to date weekly. Until then the map stays empty.</Note>}

@@ -379,7 +379,7 @@ function NetworksCard({ fw, wanList, links, devs, h24 }) {
   const states = enabled.map((w) => linkState(links[w.name]));
   const ok = states.filter((s) => s.health === 'working').length;
   return (
-    <Card title="Your networks" desc="Same order as Who can reach whom. Speeds update every second; the chart is download speed over the last hour.">
+    <Card title="Your networks" desc="Same order as Who can reach whom. Speeds update every second. How to read the chart: each line is that network’s download speed over the last hour, oldest on the left and now on the right, scaled to its own busiest moment, which is printed underneath.">
       <div className="scroll"><table className="table">
           <thead><tr><th>Network</th><th>Ports</th><th className="num">Devices</th><th className="num">Download now</th><th className="num">Upload now</th><th>Last hour</th></tr></thead>
           <tbody>
@@ -392,7 +392,10 @@ function NetworksCard({ fw, wanList, links, devs, h24 }) {
                   <td className="num">{devs?.by_network?.[z.name] ?? 0}</td>
                   <td className="num">{sp ? fmtBits(sp.down) : '–'}</td>
                   <td className="num">{sp ? fmtBits(sp.up) : '–'}</td>
-                  <td style={{ minWidth: '9rem' }}><Chart series={miniSeries(h24, `net.${z.name}.down`)} from={h24?.from || 0} to={h24?.to || 1} kind="bits" height={30} compact label={`Download speed of ${z.name}, last hour`} /></td>
+                  <td style={{ minWidth: '9rem' }}>
+                    <Chart series={miniSeries(h24, `net.${z.name}.down`)} from={h24?.from || 0} to={h24?.to || 1} kind="bits" height={30} compact label={`Download speed of ${z.name}, last hour`} />
+                    <div className="small muted">{(() => { const pk = Math.max(0, ...(h24?.series?.[`net.${z.name}.down`] || []).map((p) => p[1])); return pk > 0 ? `Peak ${fmtBits(pk)}` : 'No traffic yet'; })()}</div>
+                  </td>
                 </tr>
               );
             })}

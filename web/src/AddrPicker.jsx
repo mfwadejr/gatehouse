@@ -26,6 +26,10 @@ export function labelFor(tok, pickers) {
     const d = pickers?.devices?.find((x) => x.mac === mac);
     return { kind: 'device', text: d?.name || mac, sub: d?.ip || '' };
   }
+  if (tok.startsWith('net:')) {
+    const n = pickers?.networks?.find((x) => x.name === tok.slice(4));
+    return { kind: 'network', text: tok.slice(4), sub: n?.subnets?.join(', ') || 'network' };
+  }
   if (tok.startsWith('grp:')) {
     const g = pickers?.groups?.find((x) => x.name === tok.slice(4));
     return { kind: 'group', text: tok.slice(4), sub: g ? `${g.members.length} devices` : '' };
@@ -36,7 +40,7 @@ export function labelFor(tok, pickers) {
   return { kind: 'address', text: tok, sub: '' };
 }
 
-const KIND_ICON = { device: '🖥', group: '👥', domain: '🌐', country: '🏳', mac: '🔖', address: '#' };
+const KIND_ICON = { network: '🏠', device: '🖥', group: '👥', domain: '🌐', country: '🏳', mac: '🔖', address: '#' };
 
 export function Chip({ tok, pickers, onRemove, warn }) {
   const l = labelFor(tok, pickers);
@@ -75,7 +79,7 @@ export function NewDevice({ initialMac, onClose, onCreated, seen = [] }) {
 
 // AddrPicker chooses the devices, groups or addresses a rule covers. value is the stored text.
 // side is 'src' or 'dst'; local says the traffic starts on one of your own networks.
-export function AddrPicker({ value, onChange, side, pickers, local = true, reload }) {
+export function AddrPicker({ value, onChange, side, pickers, local = true, reload, networks = false }) {
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(null);
@@ -86,6 +90,7 @@ export function AddrPicker({ value, onChange, side, pickers, local = true, reloa
   const needle = q.trim().toLowerCase();
   const devs = useMemo(() => (pickers?.devices || []).filter((d) => !has(`dev:${d.mac}`) && (!needle || `${d.name} ${d.ip} ${d.mac}`.toLowerCase().includes(needle))).slice(0, 8), [pickers, needle, value]);
   const groups = useMemo(() => (pickers?.groups || []).filter((g) => !has(`grp:${g.name}`) && (!needle || g.name.toLowerCase().includes(needle))).slice(0, 5), [pickers, needle, value]);
+  const nets = useMemo(() => (networks ? (pickers?.networks || []) : []).filter((n) => !has(`net:${n.name}`) && (!needle || n.name.toLowerCase().includes(needle))).slice(0, 6), [pickers, needle, value, networks]);
   const typed = q.trim();
   const isMac = reMAC.test(typed);
   const known = isMac && (pickers?.devices || []).some((d) => d.mac === typed.toLowerCase());
@@ -100,9 +105,14 @@ export function AddrPicker({ value, onChange, side, pickers, local = true, reloa
       </div>
       <div className="pick">
         <Input value={q} onChange={setQ} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)}
-          placeholder={side === 'src' ? 'Search a device or group, or type an address' : 'Search a device or group, type an address or a website'} aria-label="Find a device" />
+          placeholder={side === 'src' ? (networks ? 'Search a network, device or group, or type an address' : 'Search a device or group, or type an address') : 'Search a device or group, type an address or a website'} aria-label="Find a device" />
         {showList && (
           <div className="pickmenu" role="listbox">
+            {nets.map((n) => (
+              <button type="button" role="option" key={n.name} onMouseDown={(e) => e.preventDefault()} onClick={() => add(`net:${n.name}`)}>
+                <span aria-hidden="true">{KIND_ICON.network}</span> <span className="name">{n.name}</span> <span className="muted small mono">network · {n.subnets.join(', ') || 'no address yet'}</span>
+              </button>
+            ))}
             {devs.map((d) => (
               <button type="button" role="option" key={d.mac} onMouseDown={(e) => e.preventDefault()} onClick={() => add(`dev:${d.mac}`)}>
                 <span aria-hidden="true">{KIND_ICON.device}</span> <span className="name">{d.name}</span> <span className="muted small mono">{d.ip || 'no address yet'}</span>{d.groups?.length ? <span className="muted small"> · {d.groups.join(', ')}</span> : null}
@@ -123,7 +133,7 @@ export function AddrPicker({ value, onChange, side, pickers, local = true, reloa
             {isMac && side === 'dst' && <div className="muted small pad">A device address cannot be a destination. Pick the device by name instead.</div>}
             {isMac && !local && side === 'src' && <div className="muted small pad">Device addresses only work for devices on your own networks.</div>}
             {isDom && <button type="button" role="option" onMouseDown={(e) => e.preventDefault()} onClick={() => add(`dom:${typed.toLowerCase()}`)}>Use the website <span className="name">{typed.toLowerCase()}</span> and its subdomains</button>}
-            {!devs.length && !groups.length && !isAddr && !isMac && !isDom && (
+            {!nets.length && !devs.length && !groups.length && !isAddr && !isMac && !isDom && (
               <div className="muted small pad">{needle ? 'Nothing found. Type an address like 192.168.1.50, or ' + (side === 'dst' ? 'a website like example.com.' : 'a device address.') : 'No devices yet. Type an address.'}</div>
             )}
             {side === 'src' && local && !needle && <button type="button" role="option" onMouseDown={(e) => e.preventDefault()} onClick={() => setCreating('')}>+ Add a device that has not connected yet…</button>}

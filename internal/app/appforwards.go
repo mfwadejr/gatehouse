@@ -224,22 +224,24 @@ func (a *App) fwdWanDevices() (byName map[string]string, byDev map[string]string
 }
 
 type forwardView struct {
-	Group        string    `json:"group"`
-	ID           int64     `json:"id,omitempty"` // legacy single forwards only
-	Legacy       bool      `json:"legacy"`
-	App          string    `json:"app"`
-	Ports        []appPort `json:"ports"`
-	MAC          string    `json:"mac"`
-	IP           string    `json:"ip"`
-	DeviceName   string    `json:"device_name"`
-	Connections  []string  `json:"connections"` // empty means all
-	Src          []string  `json:"src"`
-	Countries    []string  `json:"countries"`
-	Enabled      bool      `json:"enabled"`
-	Text         string    `json:"text"`
-	Reserved     bool      `json:"reserved"`
-	ReserveScope int64     `json:"reserve_scope,omitempty"`
-	Blocked      string    `json:"blocked,omitempty"` // why it cannot work from outside, if so
+	Group        string       `json:"group"`
+	ID           int64        `json:"id,omitempty"` // legacy single forwards only
+	Legacy       bool         `json:"legacy"`
+	App          string       `json:"app"`
+	Ports        []appPort    `json:"ports"`
+	MAC          string       `json:"mac"`
+	IP           string       `json:"ip"`
+	DeviceName   string       `json:"device_name"`
+	Connections  []string     `json:"connections"` // empty means all
+	Src          []string     `json:"src"`
+	Countries    []string     `json:"countries"`
+	Enabled      bool         `json:"enabled"`
+	PausedUntil  int64        `json:"paused_until"`
+	Sched        *fw.Schedule `json:"sched"`
+	Text         string       `json:"text"`
+	Reserved     bool         `json:"reserved"`
+	ReserveScope int64        `json:"reserve_scope,omitempty"`
+	Blocked      string       `json:"blocked,omitempty"` // why it cannot work from outside, if so
 }
 
 func (a *App) fwdDeviceName(mac, ip string) string {
@@ -304,7 +306,7 @@ func (a *App) forwardViews() []forwardView {
 	for _, f := range rows {
 		if f.Group == "" {
 			v := forwardView{Group: f.Name, ID: f.ID, Legacy: true, Ports: []appPort{{Proto: f.Proto, Port: f.ExtPort, Inside: insideOf(f.ExtPort, f.IntPort)}}, IP: f.IntAddr, Connections: conns(f.WAN),
-				Src: f.Src, Countries: f.Countries, Enabled: f.Enabled}
+				Src: f.Src, Countries: f.Countries, Enabled: f.Enabled, PausedUntil: f.PausedUntil, Sched: f.Sched}
 			v.Text = fmt.Sprintf("%s: %s port %s goes to %s%s.", f.Name, strings.ToUpper(f.Proto), f.ExtPort, f.IntAddr, orWord(map[bool]string{true: ":" + f.IntPort}[f.IntPort != "" && f.IntPort != f.ExtPort], ""))
 			v.Blocked = blocked(v.Connections)
 			out = append(out, v)
@@ -312,7 +314,7 @@ func (a *App) forwardViews() []forwardView {
 		}
 		g := groups[f.Group]
 		if g == nil {
-			g = &forwardView{Group: f.Group, App: f.App, MAC: f.MAC, IP: f.IntAddr, Connections: conns(f.WAN), Src: f.Src, Countries: f.Countries, Enabled: f.Enabled}
+			g = &forwardView{Group: f.Group, App: f.App, MAC: f.MAC, IP: f.IntAddr, Connections: conns(f.WAN), Src: f.Src, Countries: f.Countries, Enabled: f.Enabled, PausedUntil: f.PausedUntil, Sched: f.Sched}
 			groups[f.Group] = g
 			order = append(order, f.Group)
 		}
@@ -380,6 +382,8 @@ type appForwardIn struct {
 	Src         []string `json:"src"`
 	Countries   []string `json:"countries"`
 	Enabled     bool     `json:"enabled"`
+	// Sched limits the forward to certain hours; nil means always.
+	Sched *fw.Schedule `json:"sched"`
 	// Outside and Inside change a port from the app's standard one. They are keyed by the standard
 	// port, such as "tcp/32400": Outside is the port people connect to from the internet, Inside is
 	// the port on the device. Nothing is chosen for the person; a port in use is refused.
@@ -517,6 +521,17 @@ func (a *App) saveAppForwardNotes(in appForwardIn) ([]string, error) {
 				return errors.New("a forward with that name already exists. Choose another name")
 			}
 		}
+		// An edit keeps a pause that is running.
+		var paused int64
+		tx.QueryRow(`SELECT COALESCE(MAX(paused_until),0) FROM nat_forwards WHERE grp=?`, old).Scan(&paused)
+		if in.Sched != nil && (in.Sched.Mode == "" || in.Sched.Mode == "always") {
+			in.Sched = nil
+		}
+		if in.Sched != nil {
+			if err := in.Sched.Check(time.UTC); err != nil {
+				return err
+			}
+		}
 		if _, err := tx.Exec(`DELETE FROM nat_forwards WHERE grp=?`, old); err != nil {
 			return err
 		}
@@ -530,7 +545,7 @@ func (a *App) saveAppForwardNotes(in appForwardIn) ([]string, error) {
 				intPort = maps[i].in
 			}
 			if _, err := fw.SaveForward(tx, fw.ForwardRow{Name: name, WAN: wan, Proto: p.Proto, ExtPort: maps[i].out, IntPort: intPort, IntAddr: ip, Enabled: in.Enabled,
-				Group: in.Name, App: in.App, MAC: mac, Src: src, Countries: cc}); err != nil {
+				Group: in.Name, App: in.App, MAC: mac, Src: src, Countries: cc, PausedUntil: paused, Sched: in.Sched}); err != nil {
 				return err
 			}
 		}
@@ -661,6 +676,39 @@ func (a *App) registerAppForwardRoutes() {
 			return e
 		}); err != nil {
 			fail(w, err)
+			return
+		}
+		a.markDirty()
+		ok(w)
+	})
+	// Pause a forward for a while, as routes and devices do: minutes 0 resumes, -1 pauses until
+	// resumed. The change is staged like any firewall change.
+	s.HandleAdmin("POST /api/fw/appforwards/pause", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		var in struct {
+			Group   string `json:"group"`
+			Minutes int    `json:"minutes"`
+		}
+		if !api.Decode(w, r, &in) {
+			return
+		}
+		until, err := pausePick(in.Minutes)
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		var n int64
+		if err := fw.Mutate(a.Config, func(tx *sql.Tx) error {
+			res, e := tx.Exec(`UPDATE nat_forwards SET paused_until=? WHERE (grp<>'' AND grp=?) OR (grp='' AND name=?)`, until, in.Group, in.Group)
+			if e == nil {
+				n, _ = res.RowsAffected()
+			}
+			return e
+		}); err != nil {
+			fail(w, err)
+			return
+		}
+		if n == 0 {
+			fail(w, errors.New("that port forward no longer exists"))
 			return
 		}
 		a.markDirty()

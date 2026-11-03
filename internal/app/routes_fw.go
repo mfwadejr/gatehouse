@@ -100,6 +100,41 @@ func (a *App) registerFWRoutes() {
 		a.markDirty()
 		api.JSON(w, 200, map[string]int64{"id": id})
 	})
+	// Pause a rule for a while: minutes 0 resumes, -1 pauses until resumed. Staged like any change.
+	s.HandleAdmin("POST /api/fw/rules/{id}/pause", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		id, good := pathID(r)
+		if !good {
+			fail(w, errBadID)
+			return
+		}
+		var in struct{ Minutes int }
+		if !api.Decode(w, r, &in) {
+			return
+		}
+		until, err := pausePick(in.Minutes)
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		var n int64
+		if err := fw.Mutate(a.Config, func(tx *sql.Tx) error {
+			res, e := tx.Exec(`UPDATE fw_rules SET paused_until=? WHERE id=?`, until, id)
+			if e == nil {
+				n, _ = res.RowsAffected()
+			}
+			return e
+		}); err != nil {
+			fail(w, err)
+			return
+		}
+		if n == 0 {
+			fail(w, errors.New("that rule no longer exists"))
+			return
+		}
+		a.fwSync()
+		a.markDirty()
+		ok(w)
+	})
 	s.HandleAdmin("DELETE /api/fw/rules/{id}", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		id, good := pathID(r)
 		if !good {

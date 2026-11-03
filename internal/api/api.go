@@ -2,6 +2,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"crypto/subtle"
 	"encoding/json"
@@ -29,6 +30,8 @@ const (
 type Server struct {
 	streams streamLog
 	Audit   func(actor, severity, title, detail string) // who signed in or out, from where; nil in tests
+	// Changed is told about every successful change an administrator made (method, path, request body); nil in tests.
+	Changed func(actor, method, path string, body []byte)
 	Auth    *auth.Service
 	Bus     *events.Bus
 	Static  http.Handler // the embedded console; nil in tests
@@ -119,6 +122,16 @@ func (s *Server) guard(h HandlerFunc, needFull, needAdmin bool) http.HandlerFunc
 				Error(w, http.StatusConflict, why)
 				return
 			}
+		}
+		if needAdmin && s.Changed != nil && r.Method != http.MethodGet && r.Method != http.MethodHead {
+			body, _ := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+			r.Body = io.NopCloser(io.MultiReader(bytes.NewReader(body), r.Body))
+			sw := &statusWriter{ResponseWriter: w, code: 200}
+			h(sw, r, c)
+			if sw.code < 300 {
+				s.Changed(c.User.Username, r.Method, r.URL.Path, body)
+			}
+			return
 		}
 		h(w, r, c)
 	}
@@ -568,4 +581,17 @@ func ConnContext(ctx context.Context, c net.Conn) context.Context {
 func ConnID(r *http.Request) uint64 {
 	v, _ := r.Context().Value(connKey{}).(uint64)
 	return v
+}
+
+// statusWriter remembers the response code so a change is logged only when it succeeded.
+type statusWriter struct {
+	http.ResponseWriter
+	code int
+}
+
+func (s *statusWriter) WriteHeader(c int) { s.code = c; s.ResponseWriter.WriteHeader(c) }
+func (s *statusWriter) Flush() {
+	if f, ok := s.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
 }

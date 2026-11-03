@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { hashQuery, setHashQuery } from '../hashtab.js';
 import { del, get, post, put, useData } from '../api.js';
 import { CODES, countryName } from '../AddrPicker.jsx';
+import { PolicyControls, WhenField, whenText } from '../policykit.jsx';
 import { Button, Card, Empty, Field, Input, Modal, Note, Pill, Select, ToggleRow, useAction, useToast, confirmBox } from '../ui.jsx';
 
 // Open a port for an app on a device. Pick the app, pick the device, tick the connection. The
@@ -38,7 +40,7 @@ export function OpenPortModal({ initial, preset, apps, connections, existing, on
   const [f, setF] = useState(() => {
     const o = {}; const i = {};
     (initial?.ports || []).forEach((p) => { o[keyOf(p)] = p.port; i[keyOf(p)] = p.inside || p.std || p.port; });
-    return { enabled: true, connections: [], src: [], countries: [], mac: '', outside: o, inside: i, ...preset, ...initial };
+    return { enabled: true, connections: [], src: [], countries: [], mac: '', sched: null, outside: o, inside: i, ...preset, ...initial };
   });
   const [adding, setAdding] = useState(false);
   const [more, setMore] = useState(editing);
@@ -216,6 +218,7 @@ export function OpenPortModal({ initial, preset, apps, connections, existing, on
               <Input value={srcText} onChange={setSrcText} className="in mono" />
             </Field>
             <Field label="Name" hint="Optional. Up to 24 characters."><Input value={f.name ?? (editing ? initial.group : '')} onChange={(v) => setF({ ...f, name: v })} /></Field>
+            <WhenField value={f.sched} onChange={(v) => setF({ ...f, sched: v })} hint="Always, or only during certain hours. Outside them the port is closed." />
             <ToggleRow title="Turned on" checked={f.enabled} onChange={(v) => setF({ ...f, enabled: v })} />
           </div>
         )}
@@ -247,7 +250,8 @@ export default function Forwards({ reload }) {
   const { data, reload: rf } = useData('/api/fw/appforwards');
   const { data: legacy, reload: rl } = useData('/api/fw/forwards');
   const { data: wans } = useData('/api/net/wans');
-  const [edit, setEdit] = useState(null);
+  const [edit, setEdit] = useState(() => (hashQuery('new') ? {} : null));
+  useEffect(() => { if (hashQuery('new')) setHashQuery('new', ''); }, []);
   const [old, setOld] = useState(null);
   const [run, busy] = useAction();
   const toast = useToast();
@@ -260,16 +264,18 @@ export default function Forwards({ reload }) {
         {items.map((g) => (
           <div className="item" key={`${g.group}-${g.id || ''}`}>
             <div className="fill">
-              <div className="name">{g.text} {!g.enabled && <Pill>Off</Pill>}</div>
+              <div className="name">{g.text} {!g.enabled && <Pill>Off</Pill>}{whenText(g.paused_until) && <Pill tone="warn">{whenText(g.paused_until)}</Pill>}</div>
               {g.ports?.some((p) => p.inside) && <div className="small muted">{g.ports.map((p) => `${p.proto} ${p.port} → ${p.inside || p.std || p.port}`).join(', ')}</div>}
               <div className="meta">{g.countries.length > 0 ? `Only from ${g.countries.map(countryName).join(', ')}. ` : ''}{g.src.length > 0 ? `Only from ${g.src.join(', ')}. ` : ''}{!g.countries.length && !g.src.length ? 'Anyone on the internet can try to connect.' : ''}</div>
               {g.blocked && <div className="small errtext">{g.blocked}</div>}
               {!g.legacy && g.mac && !g.reserved && g.reserve_scope > 0 && <div className="small">If {g.device_name} gets a different address, this follows it. <button type="button" className="link small" disabled={busy} onClick={() => fix(g)}>Give it a fixed address</button> so it never changes.</div>}
             </div>
             <div className="actions">
-              {!g.legacy && <Button small disabled={busy} onClick={() => run(() => post('/api/fw/appforwards/enable', { group: g.group, enabled: !g.enabled }), 'Saved. Apply the firewall to start using it.').then(refresh)}>{g.enabled ? 'Turn off' : 'Turn on'}</Button>}
-              <Button small icon="edit" onClick={() => g.legacy ? setOld((legacy || []).find((l) => l.id === g.id)) : setEdit({ group: g.group, name: g.group, ports: g.ports, app: g.app, mac: g.mac, device_name: g.device_name, ip: g.ip, connections: g.connections, src: g.src, countries: g.countries, enabled: g.enabled })}>Edit</Button>
-              <Button small kind="danger" icon="trash" onClick={async () => await confirmBox(`Delete "${g.group}"?`) && run(() => g.legacy ? del(`/api/fw/forwards/${g.id}`) : del(`/api/fw/appforwards/${encodeURIComponent(g.group)}`)).then(refresh)}>Delete</Button>
+              <PolicyControls name={g.group} enabled={g.enabled} pausedUntil={g.paused_until} busy={busy}
+                onPause={g.legacy ? undefined : (m) => run(() => post('/api/fw/appforwards/pause', { group: g.group, minutes: m }), m === 0 ? 'Saved. Apply the firewall to resume it.' : 'Saved. Apply the firewall to start the pause.').then(refresh)}
+                onToggle={g.legacy ? undefined : () => run(() => post('/api/fw/appforwards/enable', { group: g.group, enabled: !g.enabled }), 'Saved. Apply the firewall to start using it.').then(refresh)}
+                onEdit={() => g.legacy ? setOld((legacy || []).find((l) => l.id === g.id)) : setEdit({ group: g.group, name: g.group, ports: g.ports, app: g.app, mac: g.mac, device_name: g.device_name, ip: g.ip, connections: g.connections, src: g.src, countries: g.countries, enabled: g.enabled, sched: g.sched })}
+                onRemove={async () => await confirmBox(`Delete "${g.group}"?`) && run(() => g.legacy ? del(`/api/fw/forwards/${g.id}`) : del(`/api/fw/appforwards/${encodeURIComponent(g.group)}`)).then(refresh)} />
             </div>
           </div>
         ))}

@@ -20,7 +20,7 @@ import (
 // some connections and send chosen networks, devices or ranges through them instead.
 
 const (
-	maxWanGroups   = wanmon.GroupTableMax - wanmon.GroupTableMin + 1
+	maxWanGroups   = fw.MaxGroups
 	defaultLabelKV = "wan.default_label"
 )
 
@@ -115,9 +115,10 @@ func (a *App) addGroupsToPlan(q querier, p *netd.Plan) error {
 		on[l.Name] = true
 	}
 	idx := 0
-	for _, g := range gs {
+	for gi, g := range gs {
+		// The mark follows the group's place in the whole list, which is how routes find it.
 		spec := netd.GroupSpec{Name: g.Name, Table: wanmon.GroupTableMin + idx, Prio: wanmon.GroupPrioMin + idx,
-			Mode: g.Mode, Block: g.Fallback == "block", Sources: g.Resolved}
+			Mode: g.Mode, Block: g.Fallback == "block", Sources: g.Resolved, Mark: fw.GroupMarkBase + gi}
 		for _, m := range g.Members {
 			if on[m.Name] {
 				spec.Members = append(spec.Members, netd.GroupMember{Link: m.Name, Weight: max(m.Weight, 1)})
@@ -128,6 +129,29 @@ func (a *App) addGroupsToPlan(q querier, p *netd.Plan) error {
 		}
 		if spec.Sources == nil {
 			spec.Sources = []string{}
+		}
+		p.Groups = append(p.Groups, spec)
+		idx++
+	}
+	// A route that keeps its own list of connections gets a group of its own with no sources: only
+	// the traffic the route marks goes through it.
+	routes, err := fw.Routes(q)
+	if err != nil {
+		return err
+	}
+	for i, r := range routes {
+		if r.TargetKind != "links" || !r.Enabled {
+			continue
+		}
+		spec := netd.GroupSpec{Name: "route:" + r.Name, Table: wanmon.GroupTableMin + idx, Prio: wanmon.GroupPrioMin + idx,
+			Mode: r.Mode, Sources: []string{}, Mark: fw.RouteLinksMark(i)}
+		for _, n := range strings.Split(r.Target, ",") {
+			if on[n] {
+				spec.Members = append(spec.Members, netd.GroupMember{Link: n, Weight: 1})
+			}
+		}
+		if len(spec.Members) == 0 || idx >= wanmon.GroupTableMax-wanmon.GroupTableMin+1 {
+			continue
 		}
 		p.Groups = append(p.Groups, spec)
 		idx++

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/netip"
 	"strconv"
+	"strings"
 )
 
 // Group sends chosen sources through a chosen set of connections instead of the default
@@ -18,6 +19,9 @@ type Group struct {
 	Block   bool // when no member works: cut the sources off instead of using the default route
 	Members []Member
 	Sources []string // IPv4 prefixes
+	// Mark, when not zero, also sends traffic carrying that firewall mark through the group's table.
+	// Routes that name this group use it to pick one kind of traffic for the group.
+	Mark int
 }
 
 // Member is one connection in a group, in failover order.
@@ -38,10 +42,18 @@ type GroupRouter interface {
 // the way they arrived.
 const (
 	GroupTableMin = 320
-	GroupTableMax = 327
+	GroupTableMax = 343 // 8 named groups and up to 16 routes that keep their own list of connections
 	GroupPrioMin  = 1300
-	GroupPrioMax  = 1307
+	GroupPrioMax  = 1323
+	// Mark rules sit before the source rules, so a route that picks one kind of traffic wins over a
+	// group's wider source rule, and after the per-connection mark rules (1000 plus the table).
+	GroupMarkPrioMin = 1250
+	GroupMarkPrioMax = 1273
 )
+
+// MarkPrio is the priority of the group's mark rule: the same place in its range as the group's
+// source rule has in its own.
+func (g Group) MarkPrio() int { return GroupMarkPrioMin + (g.Prio - GroupPrioMin) }
 
 // GroupPlan chooses the nexthops for a group: working members only, in the order given.
 func GroupPlan(g Group, links []Link, st map[string]*State) []Nexthop {
@@ -91,6 +103,8 @@ func ValidateGroups(gs []Group, links []Link) error {
 			return fmt.Errorf("group %s: mode must be failover or balance", g.Name)
 		case len(g.Members) == 0:
 			return fmt.Errorf("group %s needs at least one connection", g.Name)
+		case g.Mark < 0:
+			return fmt.Errorf("group %s: invalid mark", g.Name)
 		}
 		names[g.Name], tables[g.Table], prios[g.Prio] = true, true, true
 		seen := map[string]bool{}
@@ -138,6 +152,7 @@ func (r *IPRouter) SetTable(table int, nh []Nexthop, block bool) error {
 }
 
 type ruleJSON struct {
+	Fwmark   string `json:"fwmark"`
 	Priority int    `json:"priority"`
 	Src      string `json:"src"`
 	SrcLen   int    `json:"srclen"`
@@ -168,6 +183,9 @@ func (rj ruleJSON) prefix() string {
 // SyncRules makes the group's source rules match exactly the wanted list.
 func (r *IPRouter) SyncRules(g Group) error {
 	t := strconv.Itoa(g.Table)
+	if err := r.syncMarkRule(g); err != nil {
+		return err
+	}
 	want := map[string]bool{}
 	for _, s := range g.Sources {
 		if p, err := netip.ParsePrefix(s); err == nil {
@@ -198,13 +216,56 @@ func (r *IPRouter) SyncRules(g Group) error {
 	return first
 }
 
+// syncMarkRule keeps exactly one mark rule for the group, or none when it has no mark.
+func (r *IPRouter) syncMarkRule(g Group) error {
+	prio := strconv.Itoa(g.MarkPrio())
+	want := ""
+	if g.Mark != 0 {
+		want = fmt.Sprintf("0x%x", g.Mark)
+	}
+	have := false
+	for _, ru := range r.rules() {
+		if ru.Priority != g.MarkPrio() {
+			continue
+		}
+		if want != "" && !have && sameMark(ru.Fwmark, g.Mark) {
+			have = true
+			continue
+		}
+		r.ip("rule", "del", "priority", prio)
+	}
+	if want != "" && !have {
+		if _, err := r.ip("rule", "add", "fwmark", want, "lookup", strconv.Itoa(g.Table), "priority", prio); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// sameMark compares a mark as the kernel prints it (0x1100, or 0x1100/0xffffffff) with a number.
+func sameMark(shown string, mark int) bool {
+	shown, _, _ = strings.Cut(shown, "/")
+	n, err := strconv.ParseInt(shown, 0, 64)
+	return err == nil && int(n) == mark
+}
+
 // Prune removes rules and routes left by groups that are gone.
 func (r *IPRouter) Prune(keep []Group) error {
 	prios, tables := map[int]bool{}, map[int]bool{}
 	for _, g := range keep {
 		prios[g.Prio], tables[g.Table] = true, true
 	}
+	markPrios := map[int]bool{}
+	for _, g := range keep {
+		if g.Mark != 0 {
+			markPrios[g.MarkPrio()] = true
+		}
+	}
 	for _, ru := range r.rules() {
+		if ru.Priority >= GroupMarkPrioMin && ru.Priority <= GroupMarkPrioMax && !markPrios[ru.Priority] {
+			r.ip("rule", "del", "priority", strconv.Itoa(ru.Priority))
+			continue
+		}
 		if ru.Priority >= GroupPrioMin && ru.Priority <= GroupPrioMax && !prios[ru.Priority] {
 			if p := ru.prefix(); p != "" {
 				r.ip("rule", "del", "priority", strconv.Itoa(ru.Priority), "from", p, "lookup", ru.Table)

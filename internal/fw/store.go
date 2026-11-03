@@ -152,26 +152,27 @@ func DeleteZone(tx *sql.Tx, id int64) error {
 
 // RuleRow is an exception rule as the console edits it.
 type RuleRow struct {
-	ID      int64     `json:"id"`
-	Name    string    `json:"name"`
-	From    string    `json:"from"`
-	To      string    `json:"to"`
-	Src     string    `json:"src"`
-	Dst     string    `json:"dst"`
-	Service string    `json:"service"`
-	Action  string    `json:"action"`
-	Limit   int       `json:"limit"`
-	Log     bool      `json:"log"`
-	Enabled bool      `json:"enabled"`
-	IPVer   string    `json:"ipver"`
-	CtState string    `json:"ctstate"`
-	Sched   *Schedule `json:"sched"`
-	Descr   string    `json:"descr"`
-	AlsoMAC bool      `json:"also_mac"`
+	ID          int64     `json:"id"`
+	Name        string    `json:"name"`
+	From        string    `json:"from"`
+	To          string    `json:"to"`
+	Src         string    `json:"src"`
+	Dst         string    `json:"dst"`
+	Service     string    `json:"service"`
+	Action      string    `json:"action"`
+	Limit       int       `json:"limit"`
+	Log         bool      `json:"log"`
+	Enabled     bool      `json:"enabled"`
+	IPVer       string    `json:"ipver"`
+	CtState     string    `json:"ctstate"`
+	Sched       *Schedule `json:"sched"`
+	Descr       string    `json:"descr"`
+	AlsoMAC     bool      `json:"also_mac"`
+	PausedUntil int64     `json:"paused_until"`
 }
 
 func Rules(db Queryer) ([]RuleRow, error) {
-	rows, err := db.Query(`SELECT id,name,from_zone,to_zone,src,dst,service,action,limit_rate,log,enabled,ipver,ctstate,sched,descr,also_mac FROM fw_rules ORDER BY position,id`)
+	rows, err := db.Query(`SELECT id,name,from_zone,to_zone,src,dst,service,action,limit_rate,log,enabled,ipver,ctstate,sched,descr,also_mac,paused_until FROM fw_rules ORDER BY position,id`)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +182,7 @@ func Rules(db Queryer) ([]RuleRow, error) {
 		var r RuleRow
 		var lg, en, am int
 		var sched string
-		if err := rows.Scan(&r.ID, &r.Name, &r.From, &r.To, &r.Src, &r.Dst, &r.Service, &r.Action, &r.Limit, &lg, &en, &r.IPVer, &r.CtState, &sched, &r.Descr, &am); err != nil {
+		if err := rows.Scan(&r.ID, &r.Name, &r.From, &r.To, &r.Src, &r.Dst, &r.Service, &r.Action, &r.Limit, &lg, &en, &r.IPVer, &r.CtState, &sched, &r.Descr, &am, &r.PausedUntil); err != nil {
 			return nil, err
 		}
 		r.Log, r.Enabled, r.AlsoMAC = lg == 1, en == 1, am == 1
@@ -211,8 +212,8 @@ func SaveRule(tx *sql.Tx, r RuleRow) (int64, error) {
 	if r.ID == 0 {
 		var pos int
 		tx.QueryRow(`SELECT COALESCE(MAX(position),0)+1 FROM fw_rules`).Scan(&pos)
-		res, err := tx.Exec(`INSERT INTO fw_rules(from_zone,to_zone,position,name,src,dst,service,action,limit_rate,log,enabled,ipver,ctstate,sched,descr,also_mac) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-			r.From, r.To, pos, r.Name, r.Src, r.Dst, r.Service, r.Action, r.Limit, b2i(r.Log), b2i(r.Enabled), r.IPVer, r.CtState, sched, r.Descr, b2i(r.AlsoMAC))
+		res, err := tx.Exec(`INSERT INTO fw_rules(from_zone,to_zone,position,name,src,dst,service,action,limit_rate,log,enabled,ipver,ctstate,sched,descr,also_mac,paused_until) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			r.From, r.To, pos, r.Name, r.Src, r.Dst, r.Service, r.Action, r.Limit, b2i(r.Log), b2i(r.Enabled), r.IPVer, r.CtState, sched, r.Descr, b2i(r.AlsoMAC), r.PausedUntil)
 		if err != nil {
 			if strings.Contains(err.Error(), "UNIQUE") {
 				return 0, errors.New("a rule with that name already exists between those networks")
@@ -221,8 +222,8 @@ func SaveRule(tx *sql.Tx, r RuleRow) (int64, error) {
 		}
 		return res.LastInsertId()
 	}
-	_, err := tx.Exec(`UPDATE fw_rules SET from_zone=?,to_zone=?,name=?,src=?,dst=?,service=?,action=?,limit_rate=?,log=?,enabled=?,ipver=?,ctstate=?,sched=?,descr=?,also_mac=? WHERE id=?`,
-		r.From, r.To, r.Name, r.Src, r.Dst, r.Service, r.Action, r.Limit, b2i(r.Log), b2i(r.Enabled), r.IPVer, r.CtState, sched, r.Descr, b2i(r.AlsoMAC), r.ID)
+	_, err := tx.Exec(`UPDATE fw_rules SET from_zone=?,to_zone=?,name=?,src=?,dst=?,service=?,action=?,limit_rate=?,log=?,enabled=?,ipver=?,ctstate=?,sched=?,descr=?,also_mac=?,paused_until=? WHERE id=?`,
+		r.From, r.To, r.Name, r.Src, r.Dst, r.Service, r.Action, r.Limit, b2i(r.Log), b2i(r.Enabled), r.IPVer, r.CtState, sched, r.Descr, b2i(r.AlsoMAC), r.PausedUntil, r.ID)
 	if err != nil && strings.Contains(err.Error(), "UNIQUE") {
 		return 0, errors.New("a rule with that name already exists between those networks")
 	}
@@ -261,10 +262,13 @@ type ForwardRow struct {
 	MAC       string   `json:"mac,omitempty"`
 	Src       []string `json:"src"`
 	Countries []string `json:"countries"`
+	// A pause (unix time) and a schedule, as on rules.
+	PausedUntil int64     `json:"paused_until"`
+	Sched       *Schedule `json:"sched"`
 }
 
 func Forwards(db Queryer) ([]ForwardRow, error) {
-	rows, err := db.Query(`SELECT id,name,wan,proto,ext_port,int_addr,int_port,enabled,grp,app,mac,src,countries FROM nat_forwards ORDER BY id`)
+	rows, err := db.Query(`SELECT id,name,wan,proto,ext_port,int_addr,int_port,enabled,grp,app,mac,src,countries,paused_until,sched FROM nat_forwards ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -273,10 +277,11 @@ func Forwards(db Queryer) ([]ForwardRow, error) {
 	for rows.Next() {
 		var f ForwardRow
 		var en int
-		var src, cc string
-		if err := rows.Scan(&f.ID, &f.Name, &f.WAN, &f.Proto, &f.ExtPort, &f.IntAddr, &f.IntPort, &en, &f.Group, &f.App, &f.MAC, &src, &cc); err != nil {
+		var src, cc, sched string
+		if err := rows.Scan(&f.ID, &f.Name, &f.WAN, &f.Proto, &f.ExtPort, &f.IntAddr, &f.IntPort, &en, &f.Group, &f.App, &f.MAC, &src, &cc, &f.PausedUntil, &sched); err != nil {
 			return nil, err
 		}
+		f.Sched, _ = ParseSchedule(sched)
 		f.Enabled = en == 1
 		f.Src, f.Countries = splitList(src), splitList(cc)
 		if f.Src == nil {
@@ -292,9 +297,14 @@ func Forwards(db Queryer) ([]ForwardRow, error) {
 
 func SaveForward(tx *sql.Tx, f ForwardRow) (int64, error) {
 	f.Name = strings.TrimSpace(f.Name)
+	sched := ""
+	if f.Sched != nil && f.Sched.Mode != "" && f.Sched.Mode != "always" {
+		b, _ := json.Marshal(f.Sched)
+		sched = string(b)
+	}
 	if f.ID == 0 {
-		res, err := tx.Exec(`INSERT INTO nat_forwards(name,wan,proto,ext_port,int_addr,int_port,enabled,grp,app,mac,src,countries) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`,
-			f.Name, f.WAN, f.Proto, f.ExtPort, f.IntAddr, f.IntPort, b2i(f.Enabled), f.Group, f.App, f.MAC, strings.Join(f.Src, ","), strings.Join(f.Countries, ","))
+		res, err := tx.Exec(`INSERT INTO nat_forwards(name,wan,proto,ext_port,int_addr,int_port,enabled,grp,app,mac,src,countries,paused_until,sched) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			f.Name, f.WAN, f.Proto, f.ExtPort, f.IntAddr, f.IntPort, b2i(f.Enabled), f.Group, f.App, f.MAC, strings.Join(f.Src, ","), strings.Join(f.Countries, ","), f.PausedUntil, sched)
 		if err != nil {
 			if strings.Contains(err.Error(), "UNIQUE") {
 				return 0, errors.New("a port forward with that name already exists")
@@ -303,8 +313,8 @@ func SaveForward(tx *sql.Tx, f ForwardRow) (int64, error) {
 		}
 		return res.LastInsertId()
 	}
-	_, err := tx.Exec(`UPDATE nat_forwards SET name=?,wan=?,proto=?,ext_port=?,int_addr=?,int_port=?,enabled=?,grp=?,app=?,mac=?,src=?,countries=? WHERE id=?`,
-		f.Name, f.WAN, f.Proto, f.ExtPort, f.IntAddr, f.IntPort, b2i(f.Enabled), f.Group, f.App, f.MAC, strings.Join(f.Src, ","), strings.Join(f.Countries, ","), f.ID)
+	_, err := tx.Exec(`UPDATE nat_forwards SET name=?,wan=?,proto=?,ext_port=?,int_addr=?,int_port=?,enabled=?,grp=?,app=?,mac=?,src=?,countries=?,paused_until=?,sched=? WHERE id=?`,
+		f.Name, f.WAN, f.Proto, f.ExtPort, f.IntAddr, f.IntPort, b2i(f.Enabled), f.Group, f.App, f.MAC, strings.Join(f.Src, ","), strings.Join(f.Countries, ","), f.PausedUntil, sched, f.ID)
 	return f.ID, err
 }
 

@@ -480,11 +480,15 @@ func (a *App) registerScopeRoutes() {
 		if !good || !api.Decode(w, r, &in) {
 			return
 		}
-		until := int64(0)
-		if in.Minutes > 0 {
-			until = time.Now().Add(time.Duration(in.Minutes) * time.Minute).Unix()
+		until, err := pausePick(in.Minutes)
+		if err != nil {
+			fail(w, err)
+			return
 		}
-		a.Config.Exec(`UPDATE scope_rules SET paused_until=? WHERE id=?`, until, id)
+		if _, err := a.Config.Exec(`UPDATE scope_rules SET paused_until=? WHERE id=?`, until, id); err != nil {
+			fail(w, err)
+			return
+		}
 		a.dropScopeCache()
 		ok(w)
 	})
