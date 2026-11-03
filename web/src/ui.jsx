@@ -26,6 +26,10 @@ export const ICONS = {
   refresh: 'M20 11a8 8 0 00-14-4M4 4v4h4M4 13a8 8 0 0014 4M20 20v-4h-4',
   routes: 'M5 5a2 2 0 100 4 2 2 0 000-4zM19 15a2 2 0 100 4 2 2 0 000-4zM7 7h6a4 4 0 014 4v2M12 17H9a4 4 0 01-4-4V9',
   search: 'M11 4a7 7 0 100 14 7 7 0 000-14zM21 21l-5-5',
+  policies: 'M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01',
+  sun: 'M12 8a4 4 0 100 8 4 4 0 000-8zM12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
+  moon: 'M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z',
+  menu: 'M4 6h16M4 12h16M4 18h16',
   logo: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM9 12h6',
 };
 
@@ -57,9 +61,9 @@ export function Card({ title, desc, actions, children, className = '', enter = f
   );
 }
 
-const HELP_PAGES = ['overview', 'internet', 'networks', 'dns', 'dhcp', 'firewall', 'services', 'vpn', 'routes', 'profiles', 'devices', 'logs', 'protection', 'diagnostics', 'settings'];
+const HELP_PAGES = ['overview', 'internet', 'networks', 'dns', 'dhcp', 'firewall', 'services', 'vpn', 'routes', 'policies', 'review', 'profiles', 'devices', 'logs', 'protection', 'diagnostics', 'settings'];
 function helpPage() {
-  const id = (window.location.hash.replace(/^#\/?/, '') || 'overview').split('/')[0];
+  const id = (window.location.hash.replace(/^#\/?/, '').split('?')[0] || 'overview').split('/')[0];
   return HELP_PAGES.includes(id) ? `${id}.html` : '';
 }
 
@@ -273,7 +277,7 @@ export function ToastHost({ children }) {
   // A message can offer Undo for a few seconds (opts.undo).
   const push = useCallback((text, tone = '', opts = {}) => {
     const id = Math.random();
-    setItems([{ id, text, tone, undo: opts.undo }]);
+    setItems([{ id, text: liveSaid(text), tone, undo: opts.undo }]);
     setTimeout(() => setItems((x) => x.filter((i) => i.id !== id)), opts.undo ? 9000 : tone === 'bad' ? 8000 : 4000);
   }, []);
   const gone = (id) => setItems((x) => x.filter((t) => t.id !== id));
@@ -384,25 +388,12 @@ function DialogHost() {
 }
 
 // Runs an async action, shows its error as a toast, and tracks busy state.
-// A Save that ends with "apply it" says what it really did. The console asks what the firewall
-// and the network would run, before and after, and whether either waits to be applied.
-const NEEDS_APPLY = /\bApply (it|the firewall)\b/;
-async function applyState() {
-  try {
-    const s = await get('/api/applystate');
-    return { rev: `${s.fw?.rev}|${s.net?.rev}`, dirty: !!(s.fw?.dirty || s.net?.dirty) };
-  } catch { return null; }
-}
-export function saveSaid(before, after, fallback) {
-  if (!before || !after) return fallback;
-  if (after.dirty) {
-    return before.rev === after.rev
-      ? 'Saved. Review and apply is already waiting at the bottom of the window.'
-      : 'Saved. Press Review and apply at the bottom of the window to start using it.';
-  }
-  return before.rev === after.rev
-    ? 'Saved. It makes no difference to what is running, so there is nothing to apply.'
-    : 'No changes. This is already in use, so there is nothing to apply.';
+// Saving something that goes live is applied straight away (see changes.jsx), so a message that
+// still says "apply it" is turned into what actually happens.
+export function liveSaid(text) {
+  if (typeof text !== 'string' || !/\b(Apply it|Apply the firewall|Review and apply|review and apply)\b/.test(text)) return text;
+  const head = text.split('.')[0];
+  return `${head}. It goes live in a moment; if anything needs a look, it waits on the Review page.`;
 }
 
 // A long list that starts short. Shows the first few and a button for the rest, so a page does
@@ -429,10 +420,8 @@ export function useAction() {
   const run = useCallback(async (fn, okText) => {
     setBusy(true);
     try {
-      const track = !!okText && NEEDS_APPLY.test(okText);
-      const before = track ? await applyState() : null;
       const r = await fn();
-      if (okText && r !== false) toast(track ? saveSaid(before, await applyState(), okText) : okText);
+      if (okText && r !== false) toast(liveSaid(okText));
       return r;
     } catch (e) { toast(e.message || 'Something went wrong.', 'bad'); return undefined; }
     finally { setBusy(false); }
@@ -517,4 +506,17 @@ export function usePortNames() {
     (Array.isArray(data) ? data : []).forEach((p) => { if (p.label) m[p.name] = p.label; });
     return (name) => (name && m[name] ? `${m[name]} (${name})` : name || '');
   }, [data]);
+}
+
+// Dots that count one, two, three, four and start again, to show something is still happening.
+// The width is fixed so the text next to them does not move. With reduced motion they stay still.
+export function Dots() {
+  const [n, setN] = useState(1);
+  const still = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  useEffect(() => {
+    if (still) return undefined;
+    const t = setInterval(() => setN((x) => (x % 4) + 1), 450);
+    return () => clearInterval(t);
+  }, [still]);
+  return <span className="dots" aria-hidden="true">{'.'.repeat(still ? 3 : n)}</span>;
 }

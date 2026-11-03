@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { hashQuery, setHashQuery } from '../hashtab.js';
+import { hashQuery, setHashQuery, useWantedEdit } from '../hashtab.js';
 import { del, get, post, put, useData } from '../api.js';
 import { CODES, countryName } from '../AddrPicker.jsx';
 import { PolicyControls, WhenField, whenText } from '../policykit.jsx';
@@ -127,7 +127,7 @@ export function OpenPortModal({ initial, preset, apps, connections, existing, on
             <Button onClick={() => { setResult(null); setMore(true); tried.current = true; }}>Change port</Button>
             <Button onClick={async () => { await run(() => del(`/api/fw/appforwards/${encodeURIComponent(result.group)}`), 'Undone.'); onSaved?.(); onClose(); }}>Undo</Button>
           </div>
-          <p className="small muted">Apply the firewall (bar at the bottom) to start using it.</p>
+          <p className="small muted">It goes live in a moment after you save.</p>
         </div>
       </Modal>
     );
@@ -257,6 +257,7 @@ export default function Forwards({ reload }) {
   const toast = useToast();
   const refresh = () => { rf(); rl(); reload?.(); };
   const items = data?.forwards || [];
+  useWantedEdit(data && items, (g, w) => String(g.legacy ? g.id : g.group) === w, (g) => (g.legacy ? setOld((legacy || []).find((l) => l.id === g.id)) : setEdit({ group: g.group, name: g.group, ports: g.ports, app: g.app, mac: g.mac, device_name: g.device_name, ip: g.ip, connections: g.connections, src: g.src, countries: g.countries, enabled: g.enabled, sched: g.sched })));
   const fix = (g) => run(() => post('/api/dhcp/reservations', { scope_id: g.reserve_scope, mac: g.mac, ip: g.ip, hostname: g.device_name }), `${g.device_name} will keep the address ${g.ip}.`).then(rf);
   return (
     <Card title="Open a port to the internet" desc="Let the internet reach an app on one of your devices." actions={<Button small icon="plus" onClick={() => setEdit({})}>Open a port</Button>}>

@@ -1,5 +1,6 @@
 import GetStarted from './GetStarted.jsx';
 import MapLocation from './MapLocation.jsx';
+import { useTheme } from '../theme.js';
 import React, { useEffect, useState } from 'react';
 import { del, get, post, put, useData } from '../api.js';
 import { Guard, Button, Card, Empty, Field, Form, Input, Modal, Note, Page, Pill, Segmented, Select, Tabs, ToggleRow, useAction, fmt, useStepUp, stepReady, StepUp } from '../ui.jsx';
@@ -54,8 +55,7 @@ function Sessions() {
 }
 
 function Appearance() {
-  const [theme, setTheme] = useState(() => { try { return localStorage.getItem('gh.theme') || 'dark'; } catch { return 'dark'; } });
-  useEffect(() => { document.documentElement.dataset.theme = theme; try { localStorage.setItem('gh.theme', theme); } catch { /* ignore */ } }, [theme]);
+  const [theme, setTheme] = useTheme();
   return (
     <Card title="Appearance" desc="How the console looks on this browser.">
       <Segmented value={theme} onChange={setTheme} options={[{ value: 'dark', label: 'Dark' }, { value: 'light', label: 'Light' }]} />
@@ -423,7 +423,7 @@ const TABS = [
 ];
 const TAB_KEY = 'gh.settings.tab';
 const readTab = () => {
-  const seg = window.location.hash.replace(/^#\/?/, '').split('/')[1];
+  const seg = window.location.hash.replace(/^#\/?/, '').split('?')[0].split('/')[1];
   if (TABS.some((t) => t.value === seg)) return seg;
   try { const v = localStorage.getItem(TAB_KEY); if (TABS.some((t) => t.value === v)) return v; } catch { /* ignore */ }
   return 'general';
@@ -435,7 +435,7 @@ export default function Settings({ me, reloadMe }) {
   const [tab, setTab] = useState(readTab);
   // Search and links can open a tab with #/settings/<tab>.
   useEffect(() => {
-    const on = () => { if (window.location.hash.replace(/^#\/?/, '').split('/')[0] === 'settings') setTab(readTab()); };
+    const on = () => { if (window.location.hash.replace(/^#\/?/, '').split('?')[0].split('/')[0] === 'settings') setTab(readTab()); };
     window.addEventListener('hashchange', on);
     return () => window.removeEventListener('hashchange', on);
   }, []);

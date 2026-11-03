@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { del, post, put, useData } from '../api.js';
+import { del, holdAnd, post, put, useData } from '../api.js';
+import { SAVED_LATER, SaveChoice } from '../changes.jsx';
+import { useWantedEdit } from '../hashtab.js';
 import { AddrPicker, Chip, NewDevice, ScheduleEditor, ServicePicker, tokens } from '../AddrPicker.jsx';
 import { PolicyControls, whenText } from '../policykit.jsx';
 import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Paged, Pill, Segmented, Select, ToggleRow, useAction, fmt, noticeBox, useUndoDelete } from '../ui.jsx';
@@ -7,8 +9,8 @@ import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Paged, Pil
 const ACTIONS = [{ value: 'accept', label: 'Allow' }, { value: 'drop', label: 'Block silently' }, { value: 'reject', label: 'Block and tell the sender' }];
 // Only the fields the server stores; it refuses anything else.
 const FIELDS = ['id', 'name', 'from', 'to', 'src', 'dst', 'service', 'action', 'limit', 'log', 'enabled', 'ipver', 'ctstate', 'sched', 'descr', 'also_mac', 'paused_until'];
-const ruleBody = (r) => Object.fromEntries(FIELDS.filter((k) => r[k] !== undefined).map((k) => [k, r[k]]));
-const actionWord = (a) => (a === 'accept' ? 'Allow' : a === 'drop' ? 'Block' : 'Reject');
+export const ruleBody = (r) => Object.fromEntries(FIELDS.filter((k) => r[k] !== undefined).map((k) => [k, r[k]]));
+export const actionWord = (a) => (a === 'accept' ? 'Allow' : a === 'drop' ? 'Block' : 'Reject');
 
 // ---------------------------------------------------------------- the rule form
 
@@ -24,13 +26,13 @@ export function RuleForm({ initial, zoneNames, pickers, reloadPickers, onClose, 
   const hasDevice = tokens(r.src).some((t) => t.startsWith('dev:') || t.startsWith('grp:'));
   const hasCountry = tokens(r.dst).some((t) => t.startsWith('geo:'));
   const toOptions = [...zoneNames.map((z) => ({ value: z, label: z })), { value: 'self', label: 'Gatehouse itself' }];
-  const save = async () => {
+  const save = async (later) => {
     const body = ruleBody({ ...r, service: r.service || 'any', also_mac: r.also_mac && hasDevice && local });
-    if (await run(() => put('/api/fw/rules', body), 'Saved. Apply it to start using it.')) { onSaved(); onClose(); }
+    if (await run(() => (later ? holdAnd(() => put('/api/fw/rules', body)) : put('/api/fw/rules', body)), later ? SAVED_LATER : 'Saved.')) { onSaved(); onClose(); }
   };
   return (
     <Modal title={r.id ? 'Edit rule' : 'Add a rule'} onClose={onClose}
-      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy || !r.name} onClick={save}>Save</Button></>}>
+      footer={<><Button onClick={onClose}>Cancel</Button><SaveChoice onSave={save} busy={busy} disabled={!r.name} /></>}>
       <p className="sec small">Rules are checked before the network types, top to bottom. The first match wins.</p>
       <Field label="Name"><Input value={r.name} onChange={set('name')} placeholder="Kids offline at night" /></Field>
       <div className="formgrid">
@@ -200,6 +202,7 @@ export function RulesList({ ov, rules, countryRules, pickers, reloadPickers, rel
   const { data: prot } = useData('/api/fw/protected');
   const { data: opened } = useData('/api/fw/appforwards');
   const names = (ov?.matrix_zones || []).map((z) => z.name);
+  useWantedEdit(rules, (r, w) => String(r.id) === w, setEdit);
   const fromNames = names;
   const needle = q.trim().toLowerCase();
   const text = (r) => [r.name, r.descr, r.from, r.to, r.src, r.dst, r.service, r.when, ...(r.src_chips || []).map((c) => c.label), ...(r.dst_chips || []).map((c) => c.label)].join(' ').toLowerCase();

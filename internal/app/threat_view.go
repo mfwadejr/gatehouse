@@ -3,6 +3,9 @@ package app
 import (
 	"sort"
 	"strings"
+	"sync"
+
+	"github.com/miekg/dns"
 )
 
 // How an alert is shown. The device name is worked out when the page is shown, from the devices
@@ -154,6 +157,7 @@ type threatGroup struct {
 	MAC       string `json:"mac"`
 	Remote    string `json:"remote"`
 	Country   string `json:"country,omitempty"`
+	Site      string `json:"site,omitempty"` // the name the device looked up for this address, when known
 	Port      int    `json:"port,omitempty"`
 	Proto     string `json:"proto,omitempty"`
 	Started   string `json:"started,omitempty"` // device, remote or empty
@@ -202,6 +206,7 @@ func (a *App) threatGroups(limit int) []threatGroup {
 				g.Started = "remote"
 			}
 			g.Country = a.country(remote)
+			g.Site = a.siteOf(remote)
 			idx[key] = g
 			order = append(order, g)
 		}
@@ -222,4 +227,55 @@ func (a *App) threatGroups(limit int) []threatGroup {
 		out = append(out, *g)
 	}
 	return out
+}
+
+// ptrCache remembers reverse lookups ("" means looked up, no name). They run in the background so a
+// page never waits on them; the name shows the next time the list is read.
+var ptrCache sync.Map
+
+// siteOf gives the name for an address, best source first: the website the device asked for when it
+// opened that connection (from the firewall log); for an address on your own networks, the device's
+// name or this firewall; otherwise the address's own reverse-DNS name (8.8.8.8 is dns.google).
+func (a *App) siteOf(addr string) string {
+	if a.Logs == nil || addr == "" {
+		return ""
+	}
+	var n string
+	a.Logs.QueryRow(`SELECT dst_name FROM fw_events WHERE to_addr=? AND dst_name<>'' ORDER BY ts DESC LIMIT 1`, addr).Scan(&n)
+	if n != "" {
+		return n
+	}
+	if privateAddr(addr) {
+		if a.Devices != nil {
+			if d := a.deviceName(addr); d != "" {
+				return d
+			}
+		}
+		var one int
+		if a.Config.QueryRow(`SELECT 1 FROM dhcp_scopes WHERE router=? LIMIT 1`, addr).Scan(&one) == nil {
+			return "this firewall"
+		}
+		return ""
+	}
+	if v, ok := ptrCache.Load(addr); ok {
+		return v.(string)
+	}
+	ptrCache.Store(addr, "")
+	go func() {
+		rev, err := dns.ReverseAddr(addr)
+		if err != nil {
+			return
+		}
+		resp, _, err := a.lookupName(rev, dns.TypePTR)
+		if err != nil || resp == nil {
+			return
+		}
+		for _, rr := range resp.Answer {
+			if p, ok := rr.(*dns.PTR); ok {
+				ptrCache.Store(addr, strings.TrimSuffix(p.Ptr, "."))
+				return
+			}
+		}
+	}()
+	return ""
 }

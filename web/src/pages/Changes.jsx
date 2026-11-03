@@ -17,7 +17,7 @@ export default function Changes({ me }) {
   const [run, busy] = useAction();
   if (!data) return null;
   const go = async () => {
-    const r = await run(() => post('/api/changes/revert', { name: pick.name, code, password: pw }), 'Reverted. Review and apply to put it live.');
+    const r = await run(() => post('/api/changes/revert', { name: pick.name, code, password: pw }), 'Reverted. Open the Review page to put it live.');
     if (r) { setPick(null); setCode(''); setPw(''); reload(); }
   };
   return (
@@ -35,7 +35,7 @@ export default function Changes({ me }) {
       {pick && (
         <Modal title="Go back to this point?" onClose={() => setPick(null)}
           footer={<><Button onClick={() => setPick(null)}>Cancel</Button><Button kind="primary" disabled={busy || !stepReady(su, code, pw)} onClick={go}>Revert settings</Button></>}>
-          <Note title="Nothing changes on the network yet">The settings go back to how they were before {when(pick.created)}. A copy of what you have now is saved first. Then review and apply as usual; if it goes wrong, the 60-second rollback brings the current settings back.</Note>
+          <Note title="Nothing changes on the network yet">The settings go back to how they were before {when(pick.created)}. A copy of what you have now is saved first. Then check it on the Review page and commit it; if it goes wrong, the 60-second rollback brings the current settings back.</Note>
           <StepUp su={su} code={code} setCode={setCode} password={pw} setPassword={setPw} />
         </Modal>
       )}

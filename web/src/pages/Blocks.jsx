@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { hashQuery, setHashQuery } from '../hashtab.js';
+import { hashQuery, setHashQuery, useWantedEdit } from '../hashtab.js';
 import { del, post, put, useData } from '../api.js';
 import { Button, Card, Empty, Field, Input, Modal, Note, Pill, Segmented, Select, ToggleRow, useAction, confirmBox } from '../ui.jsx';
 import { PolicyControls } from '../policykit.jsx';
@@ -100,6 +100,7 @@ export default function Blocks() {
   useEffect(() => { if (hashQuery('new')) setHashQuery('new', ''); }, []);
   const [run, busy] = useAction();
   const rules = data?.rules || [];
+  useWantedEdit(data && rules, (r, w) => String(r.id) === w, setEdit);
   return (
     <Card title="Block apps, topics and websites" desc="Choose what to block and for whom: everyone, a network, a profile or one device. Add hours if you like."
       actions={<Button small icon="plus" onClick={() => setEdit({})}>Add a block</Button>}>

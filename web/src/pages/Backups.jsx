@@ -74,7 +74,7 @@ function RestoreModal({ b, me, onClose, onDone }) {
   if (res) {
     return (
       <Modal title="Settings restored" onClose={() => { onDone(); onClose(); }} footer={<Button kind="primary" onClick={() => { onDone(); onClose(); }}>Close</Button>}>
-        <p>The settings from this backup are now saved. They are not live yet: go to the pending changes bar, review them, and apply them. If something goes wrong, Gatehouse puts the previous settings back by itself.</p>
+        <p>The settings from this backup are now saved. They are not live yet: open the Review page, check them, and commit them. If something goes wrong, Gatehouse puts the previous settings back by itself.</p>
         <p className="small muted">A backup of what was here before is in the list ({res.safety}). Accounts were taken from {res.accounts_from}.{res.key_changed ? ' This backup came from a different machine, so its sign-in accounts replaced the ones here. Sign in with the accounts from the backup.' : ''}</p>
       </Modal>
     );

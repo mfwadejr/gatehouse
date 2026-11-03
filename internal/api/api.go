@@ -32,10 +32,12 @@ type Server struct {
 	Audit   func(actor, severity, title, detail string) // who signed in or out, from where; nil in tests
 	// Changed is told about every successful change an administrator made (method, path, request body); nil in tests.
 	Changed func(actor, method, path string, body []byte)
-	Auth    *auth.Service
-	Bus     *events.Bus
-	Static  http.Handler // the embedded console; nil in tests
-	Issuer  string       // shown in authenticator apps
+	// Before is called just before an administrator's change runs (same requests as Changed).
+	Before func(method, path string)
+	Auth   *auth.Service
+	Bus    *events.Bus
+	Static http.Handler // the embedded console; nil in tests
+	Issuer string       // shown in authenticator apps
 	// Secure marks cookies Secure; true whenever the console is served over TLS.
 	Secure bool
 	// Gate, when set, may refuse a signed-in request before it runs. It is how the standby unit of a
@@ -127,6 +129,9 @@ func (s *Server) guard(h HandlerFunc, needFull, needAdmin bool) http.HandlerFunc
 			body, _ := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 			r.Body = io.NopCloser(io.MultiReader(bytes.NewReader(body), r.Body))
 			sw := &statusWriter{ResponseWriter: w, code: 200}
+			if s.Before != nil {
+				s.Before(r.Method, r.URL.Path)
+			}
 			h(sw, r, c)
 			if sw.code < 300 {
 				s.Changed(c.User.Username, r.Method, r.URL.Path, body)

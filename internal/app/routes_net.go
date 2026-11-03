@@ -658,7 +658,7 @@ func (a *App) netApply(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		return
 	}
 	if a.Config.Setting("fw.stepup", "0") == "1" && c.User.TOTPEnabled {
-		if err := a.Auth.VerifyStepUp(c.User.ID, in.Code); err != nil {
+		if err := a.everydayStepUp(c.User.ID, in.Code); err != nil {
 			api.Error(w, http.StatusForbidden, "enter a current code from your authenticator to apply network changes")
 			return
 		}

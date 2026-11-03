@@ -46,7 +46,6 @@ function InstallPrompt({ data, reload }) {
 // buttons. The addresses involved are folded away under "Show the N addresses".
 function AlertCard({ g, days, busy, run, reload }) {
   const [open, setOpen] = useState(false);
-  const [more, setMore] = useState(false);
   const first = g.rows[0];
   const times = g.rows.reduce((a, x) => a + (x.count || 1), 0);
   const firstAt = Math.min(...g.rows.map((x) => x.first || x.last));
@@ -63,18 +62,24 @@ function AlertCard({ g, days, busy, run, reload }) {
   const sids = [...new Set(g.rows.map((x) => x.sid))];
   const allow = (mac, msg) => run(async () => { for (const sid of sids) await post('/api/threat/allow', { sid, mac, days: Number(days), note: g.rows.find((x) => x.sid === sid).signature }); return true; }, msg).then(reload);
   const who = first.started === 'device' ? 'your device started it' : first.started === 'remote' ? 'the other end started it' : '';
+  const label = (x) => x.site ? `${x.site} (${x.remote})` : x.remote;
+  const where = lines.length === 1
+    ? `${lines[0].x.site || lines[0].x.remote}${lines[0].x.country ? `, ${lines[0].x.country}` : ''}${lines[0].x.port ? `, port ${lines[0].x.port}${lines[0].x.proto ? `/${lines[0].x.proto}` : ''}` : ''}`
+    : `${lines.length} addresses${lines.some((l) => l.x.site) ? `, such as ${[...new Set(lines.map((l) => l.x.site).filter(Boolean))].slice(0, 2).join(', ')}` : ''}`;
   return (
-    <div className="item">
+    <div className="item alertcard">
       <div className="fill">
         <div className="name">{g.title}{times > 1 && <> <Pill>×{fmt.n(times)}</Pill></>}</div>
-        <div className="meta">{[first.device, who, times > 1 ? `${fmt.ago(firstAt)} to ${fmt.ago(lastAt)}` : fmt.ago(lastAt)].filter(Boolean).join(' · ')}</div>
-        {lines.length === 1 && lines[0].x.remote && <div className="meta">{lines[0].x.remote}{lines[0].x.country ? ` (${lines[0].x.country})` : ''}{lines[0].x.port ? `, port ${lines[0].x.port}${lines[0].x.proto ? `/${lines[0].x.proto}` : ''}` : ''}</div>}
-        {lines.length > 1 && <button className="link small leftalign" onClick={() => setOpen(!open)}>{open ? 'Hide the addresses' : `Show the ${lines.length} addresses`}</button>}
-        {open && <ul className="small muted" style={{ margin: 0, paddingLeft: '1.2rem' }}>{lines.map(({ x, n }) => <li key={x.key} className="mono">{x.remote}{x.country ? ` (${x.country})` : ''}{x.port ? `:${x.port}${x.proto ? `/${x.proto}` : ''}` : ''}{n > 1 ? ` ×${n}` : ''}</li>)}</ul>}
-        {more && <div className="small muted mt2">{first.explain} <span className="mono">{first.signature}</span></div>}
-        <button className="link small leftalign" onClick={() => setMore(!more)}>{more ? 'Hide details' : 'What does this mean?'}</button>
+        <div className="meta">{[first.device, where, who, times > 1 ? `${fmt.ago(firstAt)} to ${fmt.ago(lastAt)}` : fmt.ago(lastAt)].filter(Boolean).join(' · ')}</div>
+        <button type="button" className="link small leftalign" onClick={() => setOpen(!open)}>{open ? 'Hide details' : 'Details'}</button>
+        {open && (
+          <div className="small muted">
+            <div>{first.explain} <span className="mono">{first.signature}</span></div>
+            <ul style={{ margin: 'var(--space-1) 0 0', paddingLeft: '1.2rem' }}>{lines.map(({ x, n }) => <li key={x.key}>{label(x)}{x.country ? ` (${x.country})` : ''}{x.port ? `, port ${x.port}${x.proto ? `/${x.proto}` : ''}` : ''}{n > 1 ? ` ×${n}` : ''}</li>)}</ul>
+          </div>
+        )}
       </div>
-      <div className="actions">
+      <div className="actions alertacts">
         <Button small disabled={busy} onClick={() => allow(first.mac, 'This will not alert again for this device.')} title="Let this through for this device">Allow for this device</Button>
         <Button small disabled={busy} onClick={() => allow('', 'This will not alert again.')}>Allow for all</Button>
         {first.mac && !first.quiet && <Button small disabled={busy} onClick={() => run(() => post('/api/threat/trust', { mac: first.mac }), `${first.device} will not be checked.`).then(reload)} title={`Never check ${first.device}`}>Never check this device</Button>}
@@ -103,7 +108,7 @@ function Alerts({ data, reload }) {
       {!loud.length && <Empty>Nothing suspicious has been seen.</Empty>}
       {quiet.length > 0 && (
         <div>
-          <button className="link" onClick={() => setShowQuiet(!showQuiet)}>{showQuiet ? 'Hide' : 'Show'} odd network behaviour and usually harmless traffic ({quiet.length})</button>
+          <button className="link small" onClick={() => setShowQuiet(!showQuiet)}>{showQuiet ? 'Hide' : 'Show'} odd network behaviour and usually harmless traffic ({quiet.length})</button>
           <p className="small muted">The engine noticed unusual packets. This is common and almost never a threat, so it is kept out of the way.</p>
           {showQuiet && <AlertGroups rows={quiet} days={days} busy={busy} run={run} reload={reload} />}
         </div>

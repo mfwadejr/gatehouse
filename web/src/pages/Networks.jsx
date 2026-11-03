@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { del, post, put, useData } from '../api.js';
+import { del, holdAnd, post, put, useData } from '../api.js';
+import { SAVED_LATER, SaveChoice } from '../changes.jsx';
 import { confirmRemoval } from '../removal.js';
-import ApplyBar from '../ApplyBar.jsx';
 import AddNetwork from '../AddNetwork.jsx';
 import { ScopeForm } from './DHCP.jsx';
 import { usePortWatch } from './Internet.jsx';
@@ -73,16 +73,17 @@ function EditNetwork({ n, zones, onClose, onSaved }) {
   };
   const movable = !isBridge;
   const moved = movable && (port !== (n.iface.kind === 'vlan' ? n.iface.parent : n.iface.name) || Number(vlan || 0) !== (n.iface.vlan || 0));
-  const save = async () => {
-    const ok = await run(async () => {
+  const save = async (later) => {
+    const go = async () => {
       await put('/api/net/interfaces', isBridge ? { ...f, members: mem } : f);
       if (moved) await post('/api/networks/move', { id: n.iface.id, port, vlan: Number(vlan || 0) });
-    }, 'Saved. Apply it to start using it.');
+    };
+    const ok = await run(later ? () => holdAnd(go) : go, later ? SAVED_LATER : 'Saved.');
     if (ok) { onSaved(); onClose(); }
   };
   return (
     <Modal title={`Edit ${n.title}`} onClose={onClose}
-      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" onClick={save} disabled={busy || (isBridge && mem.length === 0)}>Save</Button></>}>
+      footer={<><Button onClick={onClose}>Cancel</Button><SaveChoice onSave={save} busy={busy} disabled={isBridge && mem.length === 0} /></>}>
       <div className="stack">
         <Field label="Address of this router on the network" hint="With the size, like 192.168.10.1/24. Devices here use it as their gateway.">
           <Input value={f.ipv4 || ''} onChange={set('ipv4')} className="in mono" />
@@ -238,11 +239,9 @@ export default function Networks({ me }) {
         </div>
       </Card>
 
-      {adding && <AddNetwork onClose={() => setAdding(false)} onCreated={(n) => { setAdding(false); toast(`${n} added. Review and apply it below.`); all(); }} />}
+      {adding && <AddNetwork onClose={() => setAdding(false)} onCreated={(n) => { setAdding(false); toast(`${n} added. It goes live in a moment.`); all(); }} />}
       {edit && <EditNetwork n={edit} zones={zones || []} onClose={() => setEdit(null)} onSaved={all} />}
       {dhcp && <ScopeForm initial={dhcp} ifaces={ifs || []} onClose={() => setDhcp(null)} onSaved={all} />}
-      <ApplyBar kind="net" label="your network settings" status={stat} me={me} onChanged={all} />
-      {!stat?.dirty && !stat?.pending && fwo?.status && <ApplyBar kind="fw" label="the firewall" status={fwo.status} me={me} onChanged={rfw} />}
     </Page>
   );
 }

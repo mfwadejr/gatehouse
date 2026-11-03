@@ -1,6 +1,22 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.2',
+    title: 'Save and it is live, a Policies page, and tidier alerts',
+    items: [
+      'Saving is now one click for a signed-in administrator. Save and apply puts a change live after a moment, keeps it once Gatehouse sees you can still reach it, and undoes it on its own if you cannot. Save for later keeps it on a new Review page instead.',
+      'Review changes lists everything waiting in plain words, shows any warning or problem Gatehouse found, and one Verify and commit button puts it all live. Discard all changes puts everything back as it was running. A badge at the top of every page shows how many changes wait.',
+      'If Gatehouse finds something worth a second look, or other changes are already waiting, nothing goes live on its own. It waits on the Review page with the reason.',
+      'The authenticator code, when you asked for one before changing the firewall, is asked once and remembered for 15 minutes.',
+      'New Policies page, next to Routes: every firewall rule, route, block and open port in one list, in plain words, with Pause, Turn off, Edit and Remove. Create policy moved there from the left menu.',
+      'A sun and moon button by your name at the bottom of the menu switches between the dark and light look. The saved look now applies on every page and every visit (it used to apply only after opening Settings).',
+      'Phones: the top bar is short (logo, Search, Menu) and the menu opens as a list instead of running off the edge. Rows in lists stack their buttons instead of squeezing the text.',
+      'Threat alerts: each kind of alert on each device is one card with two lines of text, the website or name for each address, one Details link, and the buttons in a column on the right.',
+      'Overview, What happened: one line per kind of alert per device, with how many different addresses were involved.',
+      'Links are now the same size as the text around them everywhere, and the menu dots are all one size.',
+    ],
+  },
+  {
     version: '0.9.1',
     title: 'One way to make every policy',
     items: [

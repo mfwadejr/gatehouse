@@ -1,7 +1,7 @@
 import { hashQuery, setHashQuery, useHashTab } from '../hashtab.js';
 import React, { useEffect, useMemo, useState } from 'react';
-import { del, post, put, useData, useStream } from '../api.js';
-import ApplyBar from '../ApplyBar.jsx';
+import { del, holdAnd, post, put, useData, useStream } from '../api.js';
+import { SAVED_LATER, SaveChoice } from '../changes.jsx';
 import { confirmRemoval } from '../removal.js';
 import AddNetwork from '../AddNetwork.jsx';
 import { go } from '../App.jsx';
@@ -22,7 +22,7 @@ function ZoneForm({ initial, presets, ifaces, taken, onClose, onSaved }) {
   const pick = (p) => setZ((x) => ({ ...x, kind: p.kind, internet: p.internet, intra_allow: p.intra_allow, management: p.management }));
   return (
     <Modal title={z.id ? `Edit ${z.name}` : 'Add a network'} onClose={onClose}
-      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy || !z.name} onClick={async () => { if (await run(() => put('/api/fw/zones', z), 'Saved. Apply it to start using it.')) { onSaved(); onClose(); } }}>Save</Button></>}>
+      footer={<><Button onClick={onClose}>Cancel</Button><SaveChoice busy={busy} disabled={!z.name} onSave={async (later) => { if (await run(() => (later ? holdAnd(() => put('/api/fw/zones', z)) : put('/api/fw/zones', z)), later ? SAVED_LATER : 'Saved.')) { onSaved(); onClose(); } }} /></>}>
       <Field label="Name"><Input value={z.name} onChange={set('name')} placeholder="Guests" /></Field>
       <div className="field"><span className="lab">What kind of network is it?</span>
         <div className="stack">
@@ -132,7 +132,7 @@ function Networks({ ov, presets, reload }) {
           <ul className="stack" style={{ margin: 0, paddingLeft: '1.2rem' }}>{ov.summary.map((s, i) => <li key={i}>{s}</li>)}</ul>
         </Card>
       )}
-      {addNet && <AddNetwork onClose={() => setAddNet(false)} onCreated={(n) => { setAddNet(false); toast(`${n} added. Review and apply it on the Networks page.`); reload(); go('networks'); }} />}
+      {addNet && <AddNetwork onClose={() => setAddNet(false)} onCreated={(n) => { setAddNet(false); toast(`${n} added. It goes live in a moment.`); reload(); go('networks'); }} />}
       {edit && <ZoneForm initial={edit} presets={presets} ifaces={ifs || []} taken={taken} onClose={() => setEdit(null)} onSaved={reload} />}
     </>
   );
@@ -255,7 +255,7 @@ export default function Firewall({ me }) {
   const all = () => { reload(); reloadRules(); reloadPickers(); };
   const names = (ov?.matrix_zones || []).map((z) => z.name);
   return (
-    <Page title="Firewall" sub="Decide what each network may reach. Changes only take effect when you apply them.">
+    <Page title="Firewall" sub="Decide what each network may reach. A saved change goes live in a moment, or waits on the Review page if you choose Save for later.">
       <Protected reload={reload} />
       <Tabs value={tab} onChange={setTab} tabs={[{ value: 'networks', label: 'Networks' }, { value: 'rules', label: `Rules${(rules || []).filter((r) => !r.countries).length ? ` (${(rules || []).filter((r) => !r.countries).length})` : ''}` }, { value: 'groups', label: 'Groups & lists' }, { value: 'ports', label: 'Open ports' }, { value: 'countries', label: 'Countries' }, { value: 'discovery', label: 'Discovery' }, { value: 'protection', label: 'Protection' }, { value: 'history', label: 'History' }]} />
       {tab === 'networks' && <><Networks ov={ov} presets={presets} reload={reload} /><Matrix ov={ov} rules={(rules || []).filter((r) => !r.countries)} onPick={(from, to, p) => setPair({ from, to, p })} /></>}
@@ -271,8 +271,7 @@ export default function Firewall({ me }) {
           onShowRules={(from, to) => { setFilter({ from, to }); setTab('rules'); }}
           onAddRule={(from, to) => { setTab('rules'); setNewRule({ from, to }); }} />
       )}
-      {newRule && <RuleForm initial={newRule} zoneNames={names} pickers={pickers} reloadPickers={reloadPickers} onClose={() => setNewRule(null)} onSaved={all} />}
-      <ApplyBar kind="fw" label="the firewall" status={ov?.status} me={me} onChanged={all} />
+      {newRule && names.length > 0 && <RuleForm initial={newRule} zoneNames={names} pickers={pickers} reloadPickers={reloadPickers} onClose={() => setNewRule(null)} onSaved={all} />}
     </Page>
   );
 }

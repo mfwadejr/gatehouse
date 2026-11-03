@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { hashQuery, setHashQuery } from '../hashtab.js';
-import { del, post, put, useData } from '../api.js';
+import { hashQuery, setHashQuery, useWantedEdit } from '../hashtab.js';
+import { del, holdAnd, post, put, useData } from '../api.js';
+import { SAVED_LATER, SaveChoice } from '../changes.jsx';
 import { OnToggle, PolicyControls, ServiceField, usePickers, WhenField, WhereField, WhoField, whenText } from '../policykit.jsx';
 import { go } from '../App.jsx';
 import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, Select, ToggleRow, useAction, useUndoDelete } from '../ui.jsx';
@@ -33,13 +34,13 @@ function RouteForm({ initial, targets, onClose, onSaved }) {
   const moveLink = (i, d) => { const l = [...order]; const j = i + d; if (j < 0 || j >= l.length) return; [l[i], l[j]] = [l[j], l[i]]; setOrder(l); };
   const chooseKind = (k) => setF((x) => ({ ...x, target_kind: k, target: k === x.target_kind ? x.target : firstOf(k), kill: k === 'tunnel' ? x.kill : false }));
   const tgt = targets.find((t) => t.kind === f.target_kind && t.target === f.target);
-  const save = async () => {
-    const r = await run(() => put('/api/routes', f), 'Saved.');
+  const save = async (later) => {
+    const r = await run(() => (later ? holdAnd(() => put('/api/routes', f)) : put('/api/routes', f)), later ? SAVED_LATER : 'Saved.');
     if (r) { onSaved(); onClose(); }
   };
   return (
     <Modal title={initial ? 'Edit route' : 'Add a route'} onClose={onClose}
-      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy} onClick={save}>Save</Button></>}>
+      footer={<><Button onClick={onClose}>Cancel</Button><SaveChoice onSave={save} busy={busy} /></>}>
       <div className="stack">
         <Field label="Name"><Input value={f.name} onChange={set('name')} placeholder="Usenet through the backup line" /></Field>
         <Field label="Send the traffic through">
@@ -103,6 +104,7 @@ export default function Routes() {
   const [edit, setEdit] = useState(() => (hashQuery('new') ? {} : null));
   useEffect(() => { if (hashQuery('new')) setHashQuery('new', ''); }, []);
   const routes = data?.routes || [];
+  useWantedEdit(data && routes, (r, w) => String(r.id) === w, setEdit);
   const targets = data?.targets || [];
   const again = () => { reload(); };
   const move = (i, d) => {
@@ -156,7 +158,7 @@ export default function Routes() {
           </div>
         </Card>
       )}
-      {edit && <RouteForm initial={edit.id ? edit : undefined} targets={targets} onClose={() => setEdit(null)} onSaved={again} />}
+      {edit && targets.length > 0 && <RouteForm initial={edit.id ? edit : undefined} targets={targets} onClose={() => setEdit(null)} onSaved={again} />}
     </Page>
   );
 }

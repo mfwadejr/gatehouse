@@ -185,6 +185,7 @@ func New(cfg Config) (*App, error) {
 	a.Config.SetSetting("ssh.last_error", "")
 	a.API.Audit = func(actor, sev, title, detail string) { a.auditEvent(actor, sev, title, detail) }
 	a.API.Changed = a.policyChange
+	a.API.Before = a.stagedBefore
 	a.API.Secure = cfg.TLSCert != ""
 	a.API.Topic("dns.stats", "dns.live", "dns.upstreams", "dns.lists", "dhcp.leases", "dhcp.utilisation", "fw.status", "net.status", "vpn.status", "logs.live", "upnp.maps", "dhcp.alerts", "speedtest", "events")
 	a.FW = cfg.FW
@@ -203,6 +204,7 @@ func New(cfg Config) (*App, error) {
 	a.registerWhyRoutes()
 	a.registerSecurityRoutes()
 	a.registerChangeRoutes()
+	a.registerStagedRoutes()
 	a.registerBridgeRoutes()
 	a.registerModeRoutes()
 	a.registerHARoutes()

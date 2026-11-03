@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { del, get, post, put, useData } from '../api.js';
-import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, ToggleRow, useAction, fmt, Switch, confirmBox, noticeBox } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, ToggleRow, useAction, fmt, Switch, confirmBox, noticeBox, Dots } from '../ui.jsx';
 
 const STATE = {
   up: { tone: 'good', label: 'Working' },
@@ -461,7 +461,7 @@ function Header({ v }) {
   return (
     <div className="spread">
       <div className="inline"><span className="name" style={{ fontSize: 'var(--font-size-lg)' }}>{v.label}</span><span className="small muted">{v.kind === 'wireguard' ? 'WireGuard' : 'OpenVPN'} · {v.dev}</span></div>
-      <Pill tone={s.tone}>{s.label}</Pill>
+      <Pill tone={s.tone}>{s.label}{v.state === 'connecting' && <Dots />}</Pill>
     </div>
   );
 }
@@ -485,7 +485,7 @@ function Outbound({ v, reload, setModal }) {
       <div className="stack">
         <Header v={v} />
         <p className={v.state === 'up' ? 'sec' : ''} style={v.state === 'down' || v.state === 'degraded' ? { color: 'var(--color-status-serious)' } : undefined}>
-          {v.message}{v.state === 'up' && v.rtt_ms ? ` · ${v.rtt_ms} ms` : ''}
+          {v.state === 'connecting' ? v.message.replace(/[.…\s]+$/, '') : v.message}{v.state === 'connecting' && <Dots />}{v.state === 'up' && v.rtt_ms ? ` · ${v.rtt_ms} ms` : ''}
         </p>
         {(v.log || []).length > 0 && (
           <details>

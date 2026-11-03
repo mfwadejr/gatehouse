@@ -9,6 +9,7 @@ import (
 // policyChange puts every change to a rule-like item (firewall rules, routes, blocks, port forwards)
 // in Admin activity, in plain words: created or edited, turned on or off, paused, resumed, removed.
 func (a *App) policyChange(actor, method, path string, body []byte) {
+	a.stagedAfter(actor, method, path, body)
 	what, ok := describePolicyChange(method, path, body)
 	if !ok {
 		return

@@ -35,10 +35,8 @@ code, .mono { font-family: var(--font-family-mono); font-size: var(--font-size-s
   color: var(--color-text-secondary);
 }
 .navgroup { margin: var(--space-3) var(--space-3) var(--space-1); font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: .06em; color: var(--color-text-secondary); }
-@media (max-width: 52rem) { .navgroup { display: none; } }
 .nav a:hover { background: var(--color-state-hover); }
 .nav a.on { background: var(--color-accent-selected-bg); color: var(--color-text-primary); }
-.nav .badge-dot { margin-left: auto; }
 .navdot { margin-left: auto; width: .55rem; height: .55rem; border-radius: var(--radius-full); flex: none; --dotc: var(--color-accent-default); background: var(--dotc); animation: navdotpulse 2.4s ease-out 1; }
 .navdot.warn { --dotc: var(--color-status-warning); } .navdot.bad { --dotc: var(--color-status-serious); }
 @keyframes navdotpulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--dotc) 60%, transparent); } 100% { box-shadow: 0 0 0 .6rem transparent; } }
@@ -84,7 +82,8 @@ code, .mono { font-family: var(--font-family-mono); font-size: var(--font-size-s
 .btn.danger { color: var(--color-status-serious); border-color: var(--color-status-serious-border); }
 .btn.small { height: var(--size-control-sm); padding: 0 var(--space-2-5); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.link { background: none; border: 0; color: var(--color-text-link); padding: 0; cursor: pointer; }
+.link { background: none; border: 0; color: var(--color-text-link); padding: 0; cursor: pointer; font: inherit; }
+.link.small { font-size: var(--font-size-sm); }
 
 .field { display: flex; flex-direction: column; gap: var(--space-1-5); min-width: 0; }
 .field > label, .field > .lab { font-size: var(--font-size-base); color: var(--color-text-secondary); font-weight: var(--font-weight-medium); }
@@ -197,13 +196,9 @@ textarea.in { height: auto; padding: var(--space-2-5) var(--component-input-padd
 .spark path.area { fill: var(--color-chart-series-1); opacity: var(--chart-area-opacity); stroke: none; }
 .spark .gridline { stroke: var(--color-chart-grid); stroke-width: var(--border-width-thin); }
 .skeleton { height: var(--space-6); border-radius: var(--radius-sm); background: var(--color-chart-track); }
-@media (max-width: 52rem) {
-  .side { flex-basis: 100%; flex-direction: row; align-items: center; overflow-x: auto; padding: var(--space-3); gap: var(--space-3); }
-  .nav { flex-direction: row; }
-  .me { display: none; }
-  .brand span { display: none; }
-  .main { padding: var(--space-4); }
-}
+.menubtn { display: none; align-items: center; gap: var(--space-2); background: none; border: var(--border-width-thin) solid var(--color-border-default); border-radius: var(--radius-md); color: var(--color-text-secondary); font: inherit; padding: var(--space-2) var(--space-3); cursor: pointer; }
+.themebtn { margin-left: auto; order: 3; width: var(--size-avatar); height: var(--size-avatar); flex: none; display: flex; align-items: center; justify-content: center; background: none; border: var(--border-width-thin) solid var(--color-border-default); border-radius: var(--radius-full); color: var(--color-text-secondary); cursor: pointer; }
+.themebtn:hover { background: var(--color-state-hover); color: var(--color-text-primary); }
 
 .note strong { display: block; margin-bottom: var(--space-0-5); }
 .card > .ch { margin-bottom: var(--space-1); }
@@ -533,3 +528,39 @@ mark { background: color-mix(in srgb, var(--color-status-warning) 35%, transpare
 .leftalign { text-align: left; }
 .endalign { justify-content: flex-end; }
 .startalign { align-items: flex-start; }
+
+.alertcard { align-items: flex-start; }
+.alertcard .fill { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); }
+.alertacts { flex-wrap: wrap; justify-content: flex-end; max-width: 26rem; }
+
+.actions select { width: auto; min-width: 8rem; }
+@media (max-width: 40rem) {
+  .list > .item { flex-direction: column; align-items: stretch; }
+  .list > .item .actions, .item.rule .actions { flex-wrap: wrap; justify-content: flex-start; }
+}
+
+/* Changes: the countdown while a change is on trial, and the "changes waiting" badge */
+.confirmbar.floating { position: fixed; left: 50%; transform: translateX(-50%); bottom: var(--space-4); width: min(48rem, calc(100% - 2rem)); z-index: var(--z-modal, 60); box-shadow: var(--shadow-popover); }
+.waitbadge { display: inline-flex; align-items: center; gap: var(--space-2); align-self: flex-start; padding: var(--space-1) var(--space-3); border: var(--border-width-thin) solid var(--color-status-warning); border-radius: var(--radius-full); color: var(--color-text-primary); text-decoration: none; font-size: var(--font-size-sm); }
+.waitbadge:hover { background: var(--color-state-hover); }
+.waitbadge .navdot { margin-left: 0; animation: none; }
+.reviewlist { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.reviewlist li { display: flex; gap: var(--space-3); align-items: baseline; padding: var(--space-2) var(--space-3); border: var(--border-width-thin) solid var(--color-border-default); border-radius: var(--radius-md); }
+.reviewlist time { color: var(--color-text-muted); font-size: var(--font-size-sm); flex: none; }
+.dots { display: inline-block; width: 1.4em; text-align: left; }
+
+@media (max-width: 52rem) {
+  /* Phone: a short bar (logo, Search, Menu). The pages open as a list under it. */
+  .side { flex-basis: 100%; flex-direction: row; flex-wrap: wrap; align-items: center; padding: var(--space-2) var(--space-3); gap: var(--space-2); position: sticky; top: 0; z-index: 20; }
+  .brand { padding: 0; }
+  .brand span { display: none; }
+  .side .srchbtn { width: auto; flex: 1 1 8rem; min-width: 0; }
+  .side .srchbtn kbd { display: none; }
+  .side .menubtn { display: flex; }
+  .nav { display: none; flex-basis: 100%; flex-direction: column; max-height: 70vh; overflow-y: auto; }
+  .side.open .nav { display: flex; }
+  .me { display: none; flex-basis: 100%; margin-top: 0; }
+  .side.open .me { display: flex; }
+  .navgroup { display: block; }
+  .main { padding: var(--space-4); }
+}

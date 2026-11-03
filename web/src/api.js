@@ -12,13 +12,29 @@ export class ApiError extends Error {
 // Several cards asking for the same thing at the same moment share one request.
 const inflight = new Map();
 export function api(method, path, body) {
-  if (method !== 'GET') return apiCall(method, path, body);
+  if (method !== 'GET') return writeCall(method, path, body);
   if (inflight.has(path)) return inflight.get(path).then((d) => (d && typeof d === 'object' ? structuredClone(d) : d));
   const p = apiCall(method, path, body);
   inflight.set(path, p);
   const done = () => inflight.delete(path);
   p.then(done, done);
   return p;
+}
+
+// A change to the firewall, the network or a policy is staged by the server. The console is told
+// each time one is saved, so it can apply it at once (the default) or leave it for the Review page
+// when the person chose "Save for later" (holdAnd).
+const STAGING = /^\/api\/(fw|net|routes|vpn|dhcp|dns|wan)/;
+const NOT_STAGING = /\/(apply|confirm|rollback|preview|discard|check|test)$/;
+let hold = false;
+export async function holdAnd(fn) {
+  hold = true;
+  try { return await fn(); } finally { hold = false; }
+}
+async function writeCall(method, path, body) {
+  const r = await apiCall(method, path, body);
+  if (STAGING.test(path) && !NOT_STAGING.test(path.split('?')[0])) window.dispatchEvent(new CustomEvent('gh-staged', { detail: { hold } }));
+  return r;
 }
 
 async function apiCall(method, path, body) {

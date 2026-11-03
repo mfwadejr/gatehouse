@@ -698,6 +698,8 @@ func kindLabel(name string) string {
 		return "Before a restore"
 	case restorePointKind:
 		return "Before a change"
+	case stagedBaseKind:
+		return "Before staged changes"
 	case "before-update":
 		return "Before an update"
 	default:

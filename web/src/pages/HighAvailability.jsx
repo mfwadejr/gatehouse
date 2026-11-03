@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { get, post, put, useData } from '../api.js';
-import ApplyBar from '../ApplyBar.jsx';
 import FailbackPrompt from './FailbackPrompt.jsx';
 import { Button, Card, Field, Input, Note, Pill, Segmented, Select, ToggleRow, useAction, confirmBox } from '../ui.jsx';
 
@@ -93,8 +92,6 @@ export default function HighAvailability({ me }) {
           {!waiting && (
             <>
               <strong>{data.role === 'primary' ? '2' : '1'}. Apply the changes</strong>
-              <ApplyBar kind="net" label="your network settings" status={net?.status} me={me} onChanged={all} />
-              {!net?.status?.dirty && !net?.status?.pending && fwo?.status && <ApplyBar kind="fw" label="the firewall" status={fwo.status} me={me} onChanged={all} />}
               <strong>{data.role === 'primary' ? '3' : '2'}. Turn it on</strong>
               <div><Button kind="primary" disabled={busy || !data.joined || net?.status?.dirty || fwo?.status?.dirty || net?.status?.pending || fwo?.status?.pending} onClick={() => run(async () => { await post('/api/ha/activate', {}); all(); }, 'High availability is on.')}>Turn on high availability</Button></div>
             </>

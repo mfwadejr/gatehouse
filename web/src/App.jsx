@@ -7,7 +7,8 @@ import FailbackPrompt from './pages/FailbackPrompt.jsx';
 import Installer from './pages/Installer.jsx';
 import Wizard from './pages/Wizard.jsx';
 import { SearchBox, useSearchShortcut } from './search.jsx';
-import CreatePolicy from './CreatePolicy.jsx';
+import { useTheme } from './theme.js';
+import { ChangeProvider, WaitingBadge } from './changes.jsx';
 import { ReleaseNotes } from './whatsnew.jsx';
 
 const Overview = lazy(() => import('./pages/Overview.jsx'));
@@ -17,6 +18,8 @@ const DNS = lazy(() => import('./pages/DNS.jsx'));
 const DHCP = lazy(() => import('./pages/DHCP.jsx'));
 const VPN = lazy(() => import('./pages/VPN.jsx'));
 const Routes = lazy(() => import('./pages/Routes.jsx'));
+const Policies = lazy(() => import('./pages/Policies.jsx'));
+const Review = lazy(() => import('./pages/Review.jsx'));
 const Firewall = lazy(() => import('./pages/Firewall.jsx'));
 const Protection = lazy(() => import('./pages/Protection.jsx'));
 const Diagnostics = lazy(() => import('./pages/Diagnostics.jsx'));
@@ -33,6 +36,7 @@ export const PAGES = [
   { id: 'dns', label: 'DNS', icon: 'dns', el: DNS, group: 'Network' },
   { id: 'dhcp', label: 'DHCP', icon: 'dhcp', el: DHCP, group: 'Network' },
   { id: 'routes', label: 'Routes', icon: 'routes', el: Routes, group: 'Network' },
+  { id: 'policies', label: 'Policies', icon: 'policies', el: Policies, group: 'Network' },
   { id: 'firewall', label: 'Firewall', icon: 'firewall', el: Firewall, group: 'Security' },
   { id: 'protection', label: 'Protection', icon: 'protection', el: Protection, group: 'Security' },
   { id: 'services', label: 'Services', icon: 'services', el: Services, group: 'Security' },
@@ -42,10 +46,11 @@ export const PAGES = [
   { id: 'logs', label: 'Logs', icon: 'logs', el: Logs, group: 'System' },
   { id: 'diagnostics', label: 'Diagnostics', icon: 'diagnostics', el: Diagnostics, group: 'System' },
   { id: 'settings', label: 'Settings', icon: 'settings', el: Settings, group: 'System' },
+  { id: 'review', label: 'Review changes', icon: 'policies', el: Review, hidden: true },
 ];
 
 function useRoute() {
-  const read = () => (window.location.hash.replace(/^#\/?/, '') || 'overview').split('/')[0];
+  const read = () => (window.location.hash.replace(/^#\/?/, '').split('?')[0] || 'overview').split('/')[0];
   const [route, setRoute] = useState(read);
   useEffect(() => {
     const on = () => setRoute(read());
@@ -68,32 +73,35 @@ function Shell({ me, onSignOut, reloadMe }) {
   const pending = (fw?.status?.pending || net?.status?.pending) ? true : false;
   const dirty = !!(fw?.status?.dirty || net?.status?.dirty);
   const [finding, setFinding] = useState(false);
-  const [creating, setCreating] = useState(false);
   const [notes, setNotes] = useState(false);
+  const [theme, setTheme] = useTheme();
+  const [open, setOpen] = useState(false);
+  useEffect(() => { setOpen(false); }, [route]);
   const { data: upd } = useData('/api/system/update', { every: 600000 });
   useSearchShortcut(useCallback(() => setFinding(true), []));
   const initials = (me.user.username || '?').slice(0, 2).toUpperCase();
   return (
     <div className="shell">
-      <aside className="side">
+      <aside className={`side ${open ? 'open' : ''}`}>
         <div className="brand"><Icon name="logo" size={24} /><span>Gatehouse</span></div>
         <button type="button" className="srchbtn" onClick={() => setFinding(true)} aria-label="Search"><Icon name="search" /><span>Search</span><kbd>/</kbd></button>
-        {me.user.role === 'admin' && !ha?.standby && <button type="button" className="srchbtn" onClick={() => setCreating(true)}><Icon name="plus" /><span>Create policy</span></button>}
-        <nav className="nav" aria-label="Primary">
-          {PAGES.map((p, i) => (
+        <button type="button" className="menubtn" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls="primary-nav"><Icon name={open ? 'x' : 'menu'} /><span>Menu</span></button>
+        <nav className="nav" id="primary-nav" aria-label="Primary">
+          {PAGES.filter((p) => !p.hidden).map((p, i, vis) => (
             <React.Fragment key={p.id}>
-            {p.group && p.group !== PAGES[i - 1]?.group && <span className="navgroup">{p.group}</span>}
+            {p.group && p.group !== vis[i - 1]?.group && <span className="navgroup">{p.group}</span>}
             <a href={`#/${p.id}`} className={p.id === page.id ? 'on' : ''} aria-current={p.id === page.id ? 'page' : undefined}>
               <Icon name={p.icon} />
               <span>{p.label}</span>
               {(p.id === 'firewall' || p.id === 'internet' || p.id === 'networks') && (dirty || pending)
-                ? <span className={`dot ${pending ? 'bad' : 'warn'} badge-dot`} title={pending ? 'A change is waiting for your confirmation' : 'Changes not applied yet'} />
+                ? <span className={`navdot ${pending ? 'bad' : 'warn'}`} title={pending ? 'A change is waiting for your confirmation' : 'Changes not applied yet'} />
                 : attn.byPage[p.id] && <span className={`navdot ${attn.byPage[p.id]}`} role="img" aria-label={`${levelText[attn.byPage[p.id]]}: ${attn.items.filter((x) => x.to === p.id).map((x) => x.t).join('. ')}`} title={attn.items.filter((x) => x.to === p.id).map((x) => x.t).join('\n')} />}
             </a>
             </React.Fragment>
           ))}
         </nav>
         <div className="me">
+          <button type="button" className="themebtn" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} aria-label={theme === 'light' ? 'Switch to the dark look' : 'Switch to the light look'} title={theme === 'light' ? 'Switch to the dark look' : 'Switch to the light look'}><Icon name={theme === 'light' ? 'moon' : 'sun'} /></button>
           <div className="avatar">{initials}</div>
           <div className="who">
             <span>{me.user.username}</span>
@@ -106,11 +114,11 @@ function Shell({ me, onSignOut, reloadMe }) {
       <main className="main" id="main">
         {ha?.standby && <div className="note warn" role="status" style={{ margin: 'var(--space-3)' }}><div><strong>This is the standby unit.</strong> Settings are read-only here; make changes on the active unit{ha.peer_addr ? ` (${ha.peer_addr})` : ''}. <a href="#/settings">High availability</a></div></div>}
         <FailbackPrompt ha={ha} onChanged={reloadHa} />
+        <WaitingBadge />
         <Guard key={page.id} what="This page"><Suspense fallback={<Loading />}><Page me={me} reloadMe={reloadMe} /></Suspense></Guard>
       </main>
       {finding && <SearchBox onClose={() => setFinding(false)} go={go} />}
       {notes && <ReleaseNotes onClose={() => setNotes(false)} />}
-      {creating && <CreatePolicy onClose={() => setCreating(false)} />}
     </div>
   );
 }
@@ -154,5 +162,5 @@ export default function App() {
   if (state.kind === 'login') return <Login prefill={prefill} onSession={() => { setPrefill(null); boot(); }} />;
   if (state.kind === 'wizard') return <Wizard me={state.me} data={state.data} onDone={boot} />;
   if (state.kind === 'enrol') return <Enrol onDone={boot} />;
-  return <AttentionProvider><Shell me={state.me} onSignOut={signOut} reloadMe={boot} /></AttentionProvider>;
+  return <AttentionProvider><ChangeProvider me={state.me}><Shell me={state.me} onSignOut={signOut} reloadMe={boot} /></ChangeProvider></AttentionProvider>;
 }

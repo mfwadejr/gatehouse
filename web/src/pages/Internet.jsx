@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { del, put, useData } from '../api.js';
-import ApplyBar from '../ApplyBar.jsx';
+import { del, holdAnd, put, useData } from '../api.js';
+import { SAVED_LATER, SaveChoice } from '../changes.jsx';
 import WanGroups, { Traffic } from './WanGroups.jsx';
 import SpeedTest from './SpeedTest.jsx';
 import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, Tabs, ToggleRow, useAction, useToast, fmt, confirmBox, usePortNames } from '../ui.jsx';
@@ -46,14 +46,14 @@ function WanForm({ initial, ports, found, onClose, onSaved, wans }) {
   const [adv, setAdv] = useState(false);
   const [run, busy] = useAction();
   const set = (k) => (v) => setW((x) => ({ ...x, [k]: v }));
-  const save = async () => {
+  const save = async (later) => {
     const { preset, ...body } = w; // eslint-disable-line no-unused-vars
-    const ok = await run(() => put('/api/net/wans', body), 'Saved. Apply it to start using it.');
+    const ok = await run(() => (later ? holdAnd(() => put('/api/net/wans', body)) : put('/api/net/wans', body)), later ? SAVED_LATER : 'Saved.');
     if (ok) { onSaved(); onClose(); }
   };
   return (
     <Modal title={w.id ? `Edit ${w.name}` : 'Add an internet connection'} onClose={onClose}
-      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" onClick={save} disabled={busy}>Save</Button></>}>
+      footer={<><Button onClick={onClose}>Cancel</Button><SaveChoice onSave={save} busy={busy} /></>}>
       <Field label="Name" hint="For example the name of your provider."><Input value={w.name} onChange={set('name')} placeholder="My provider" /></Field>
       <Field label="Which port is the internet cable plugged into?"><PortPicker value={w.iface} onChange={set('iface')} ports={ports} found={found} /></Field>
       {!w.id && (
@@ -149,7 +149,7 @@ function QuickSetup({ ports, found, onDone }) {
 
 const TAB_KEY = 'gh.internet.tab';
 const readTab = (tabs) => {
-  const seg = window.location.hash.replace(/^#\/?/, '').split('/')[1];
+  const seg = window.location.hash.replace(/^#\/?/, '').split('?')[0].split('/')[1];
   if (tabs.some((t) => t.value === seg)) return seg;
   try { const v = localStorage.getItem(TAB_KEY); if (tabs.some((t) => t.value === v)) return v; } catch { /* ignore */ }
   return 'connections';
@@ -179,7 +179,7 @@ export default function Internet({ me }) {
   const [want, setWant] = useState(() => readTab([{ value: 'connections' }, { value: 'speed' }, { value: 'troubleshoot' }, { value: 'usage' }]));
   // Links can open a tab with #/internet/<tab>; a tab that is not available falls back to Connections.
   useEffect(() => {
-    const on = () => { if (window.location.hash.replace(/^#\/?/, '').split('/')[0] === 'internet') setWant(readTab([{ value: 'connections' }, { value: 'speed' }, { value: 'troubleshoot' }, { value: 'usage' }])); };
+    const on = () => { if (window.location.hash.replace(/^#\/?/, '').split('?')[0].split('/')[0] === 'internet') setWant(readTab([{ value: 'connections' }, { value: 'speed' }, { value: 'troubleshoot' }, { value: 'usage' }])); };
     window.addEventListener('hashchange', on);
     return () => window.removeEventListener('hashchange', on);
   }, []);
@@ -232,8 +232,6 @@ export default function Internet({ me }) {
       {showTabs && tab === 'usage' && <><DataUse /><IspReport /></>}
 
       {edit && <WanForm initial={edit} wans={wans} ports={ports} found={found} onClose={() => setEdit(null)} onSaved={all} />}
-      <ApplyBar kind="net" label="your network settings" status={stat} me={me} onChanged={all} />
-      {!stat?.dirty && !stat?.pending && fwo?.status && <ApplyBar kind="fw" label="the firewall" status={fwo.status} me={me} onChanged={rfw} />}
     </Page>
   );
 }

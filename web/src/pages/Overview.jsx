@@ -436,7 +436,7 @@ function HappenedCard({ items }) {
           {items.map((e, i) => (
             <div className={`ov-ev ${e.severity === 'warning' ? 'warn' : ''}`} key={i}>
               <time className="muted small">{new Date(e.ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>
-              <span>{e.to ? <button type="button" className="link leftalign" onClick={() => go(e.to)}>{e.title}</button> : e.title}</span>
+              <span>{e.to ? <button type="button" className="link leftalign" onClick={() => go(e.to)}>{e.title}</button> : e.title}{e.detail && <span className="muted small"> · {e.detail}</span>}</span>
               {e.count > 1 ? <Pill>×{e.count}</Pill> : e.tag ? <Pill>{e.tag}</Pill> : <span />}
             </div>
           ))}

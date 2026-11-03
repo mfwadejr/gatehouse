@@ -33,3 +33,15 @@ export function useHashTab(page, values, first, depth = 1) {
   }, [depth]);
   return [tab, choose];
 }
+
+// A link such as #/routes?edit=7 (the Policies page uses them) opens that item's edit window once
+// the list has loaded. `find` picks the item from the list; the address is cleaned afterwards.
+export function useWantedEdit(list, find, open) {
+  useEffect(() => {
+    const want = hashQuery('edit');
+    if (!want || !list) return;
+    const it = (list || []).find((x) => find(x, want));
+    if (it) open(it);
+    setHashQuery('edit', '');
+  }); // eslint-disable-line react-hooks/exhaustive-deps
+}

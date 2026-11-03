@@ -100,7 +100,7 @@ function Walk({ data, start, onClose, onApplied }) {
     }
     if (!internet || internet === data.wan?.iface) { toast('Nothing to change. Gatehouse is already set up this way.'); onClose(); return; }
     const r = await run(() => put('/api/mode/internet-port', { iface: internet }));
-    if (r) { toast('Saved. Press Review and apply at the top of the page to start using it; you can undo within 60 seconds.'); onApplied(); }
+    if (r) { toast('Saved. It goes live in a moment, and you can undo within 60 seconds.'); onApplied(); }
   };
 
   const title = `Device mode · Step ${step} of 3`;

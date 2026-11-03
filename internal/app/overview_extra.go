@@ -54,6 +54,7 @@ type happenedItem struct {
 	Count    int    `json:"count"`
 	Tag      string `json:"tag,omitempty"` // new, info
 	To       string `json:"to,omitempty"`
+	Detail   string `json:"detail,omitempty"`
 }
 
 func (a *App) registerHomeAndHappened() {
@@ -104,12 +105,37 @@ func (a *App) registerHomeAndHappened() {
 			}
 			rows.Close()
 		}
-		for _, g := range a.threatGroups(20) {
-			it := happenedItem{TS: g.Last, Severity: "warning", Title: g.Title, Count: g.Count, To: "protection"}
-			if g.Quiet {
-				it.Severity, it.Tag = "info", "info"
+		// One line per kind of alert per device, however many addresses were involved.
+		type fold struct {
+			it     happenedItem
+			places map[string]bool
+		}
+		folds := map[string]*fold{}
+		var order []string
+		for _, g := range a.threatGroups(200) {
+			k := fmt.Sprintf("%s|%v", g.Title, g.Quiet)
+			f := folds[k]
+			if f == nil {
+				it := happenedItem{TS: g.Last, Severity: "warning", Title: g.Title, To: "protection"}
+				if g.Quiet {
+					it.Severity, it.Tag = "info", "info"
+				}
+				f = &fold{it: it, places: map[string]bool{}}
+				folds[k] = f
+				order = append(order, k)
 			}
-			items = append(items, it)
+			f.it.Count += g.Count
+			if g.Last > f.it.TS {
+				f.it.TS = g.Last
+			}
+			f.places[g.Remote] = true
+		}
+		for _, k := range order {
+			f := folds[k]
+			if n := len(f.places); n > 1 {
+				f.it.Detail = fmt.Sprintf("%d different addresses", n)
+			}
+			items = append(items, f.it)
 		}
 		sort.SliceStable(items, func(i, j int) bool { return items[i].TS > items[j].TS })
 		if len(items) > 6 {
