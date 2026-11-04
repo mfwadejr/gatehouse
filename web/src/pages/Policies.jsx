@@ -73,7 +73,7 @@ export default function Policies() {
     <Page title="Policies" sub="Everything that allows, blocks, routes or opens something for your devices, in one list and in plain words."
       actions={<Button kind="primary" small icon="plus" onClick={() => setCreating(true)}>Create policy</Button>}>
       <Card title="Your policies" desc="Firewall rules, routes, blocks and open ports. Ordering and the finer settings stay on the Firewall, Routes and Protection pages.">
-        <div className="toolbar">
+        <div className="filterbar">
           <Select value={kind} onChange={setKind} aria-label="Show" options={[{ value: '', label: 'All kinds' }, ...KINDS.map((k) => ({ value: k.id, label: `${k.name}s` }))]} />
           <span className="small muted">{loaded ? `${shown.length} ${shown.length === 1 ? 'policy' : 'policies'}` : 'Loading…'}</span>
         </div>

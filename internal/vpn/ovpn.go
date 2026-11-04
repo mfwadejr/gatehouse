@@ -149,7 +149,7 @@ var allowed = map[string]bool{
 	"server-poll-timeout": true, "ignore-unknown-option": true, "lport": true, "rport": true, "topology": true,
 	"sndbuf": true, "rcvbuf": true, "mute-replay-warnings": true, "peer-fingerprint": true,
 	"remote-cert-ku": true, "remote-cert-eku": true, "ncp-ciphers": true, "tls-groups": true, "auth-retry": true,
-	"tls-timeout": true, "hand-window": true, "tran-window": true, "replay-window": true, "connect-timeout": true,
+	"tls-timeout": true, "disable-occ": true, "hand-window": true, "tran-window": true, "replay-window": true, "connect-timeout": true,
 }
 
 // ignored are accepted and dropped: the router decides routes, DNS and the device name.

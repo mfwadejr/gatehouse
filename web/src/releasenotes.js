@@ -1,6 +1,13 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.3.1',
+    title: 'Private Internet Access profiles can be imported',
+    items: [
+      'VPN: a profile with the disable-occ line (Private Internet Access files have it) was refused. It is now accepted. The line only turns off an OpenVPN warning about mismatched settings. Anything that could run a program or read another file is still refused.',
+    ],
+  },
+  {
     version: '0.9.3',
     title: 'Discard one change, Save for later in more places, and US time zones',
     items: [

@@ -273,6 +273,8 @@ details.more { margin-top: var(--space-3); }
 details.more > summary { cursor: pointer; color: var(--color-text-secondary); margin-bottom: var(--space-2); }
 .toolbar { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-3); }
 .toolbar > * { flex: 1 1 11rem; min-width: 0; }
+.filterbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3); }
+.filterbar select { width: auto; min-width: 11rem; max-width: 100%; flex: 0 0 auto; }
 .item.rule { align-items: flex-start; }
 .item.rule.off { opacity: .65; }
 .item.rule .rulemain { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: var(--space-1); }
