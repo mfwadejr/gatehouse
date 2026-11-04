@@ -1,6 +1,16 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.3.2',
+    title: 'VPN tunnels set their own packet size',
+    items: [
+      'A VPN to a provider could show Working while secure web pages stalled, because the tunnel was set to a larger packet size than the connection under it carries. Gatehouse now measures the size that gets through and sets it itself, for every VPN that goes out to a provider or another site, and measures again after every reconnect, when big packets stop getting through, and every 30 minutes.',
+      'Each provider VPN card shows the Packet size and where it came from (measured, from the profile, or default), and a Test packet size button measures it now and shows what each address answered.',
+      'A new Test addresses card lists the addresses used for the test (1.1.1.1, 8.8.8.8, 1.0.0.1, 8.8.4.4, 9.9.9.9) and the services asked what address the internet sees (Google, Amazon, Cloudflare). You can add, change, remove and reorder them, and restore the built-in lists.',
+      'Internet sees you as now fills in within about 20 seconds of a reconnect (a failed lookup used to wait ten minutes), and says why when it cannot be found.',
+    ],
+  },
+  {
     version: '0.9.3.1',
     title: 'Private Internet Access profiles can be imported',
     items: [

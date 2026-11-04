@@ -117,13 +117,16 @@ type fakeNetCtl struct {
 func (f *fakeNetCtl) Apply(netd.Plan, time.Duration) (string, time.Time, error) {
 	return "", time.Time{}, nil
 }
-func (f *fakeNetCtl) Confirm(string) error                          { return nil }
-func (f *fakeNetCtl) Rollback() error                               { return nil }
-func (f *fakeNetCtl) Pending() (string, time.Time, bool)            { return "", time.Time{}, false }
-func (f *fakeNetCtl) Status() map[string]wanmon.State               { return nil }
-func (f *fakeNetCtl) ResetNetwork() error                           { return nil }
-func (f *fakeNetCtl) ApplyVPN(netd.VPNPlan) error                   { return nil }
-func (f *fakeNetCtl) VPNStatus() netd.VPNStatus                     { return netd.VPNStatus{} }
+func (f *fakeNetCtl) Confirm(string) error               { return nil }
+func (f *fakeNetCtl) Rollback() error                    { return nil }
+func (f *fakeNetCtl) Pending() (string, time.Time, bool) { return "", time.Time{}, false }
+func (f *fakeNetCtl) Status() map[string]wanmon.State    { return nil }
+func (f *fakeNetCtl) ResetNetwork() error                { return nil }
+func (f *fakeNetCtl) ApplyVPN(netd.VPNPlan) error        { return nil }
+func (f *fakeNetCtl) VPNStatus() netd.VPNStatus          { return netd.VPNStatus{} }
+func (f *fakeNetCtl) VPNSizeTest(name string) (netd.SizeReport, error) {
+	return netd.SizeReport{Name: name, After: 1360}, nil
+}
 func (f *fakeNetCtl) FWEvents(uint64, int) ([]netd.FWEvent, uint64) { return nil, 7 }
 func (f *fakeNetCtl) SetSystem(string, string) error                { return nil }
 func (f *fakeNetCtl) UPnPApply([]netd.UPnPMapping) error            { return nil }
@@ -165,6 +168,9 @@ func TestEveryClientCallIsRouted(t *testing.T) {
 	}
 	if err := c.SetSystem("h", "UTC"); err != nil {
 		t.Fatalf("net.system: %v", err)
+	}
+	if rep, err := c.VPNSizeTest("tun2"); err != nil || rep.Name != "tun2" || rep.After != 1360 {
+		t.Fatalf("vpn.sizetest: %+v %v", rep, err)
 	}
 	r, err := c.SpeedTest(speedtest.Params{Dev: "eth0", Quick: true})
 	if err != nil || r.Server != "t" || nc.speed.Dev != "eth0" || !nc.speed.Quick {

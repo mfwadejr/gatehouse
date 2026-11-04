@@ -34,6 +34,7 @@ type NetController interface {
 	ApplyVPN(p netd.VPNPlan) error
 	ResetNetwork() error
 	VPNStatus() netd.VPNStatus
+	VPNSizeTest(name string) (netd.SizeReport, error)
 	FWEvents(since uint64, max int) ([]netd.FWEvent, uint64)
 	SetSystem(hostname, zone string) error
 	UPnPApply(ms []netd.UPnPMapping) error
@@ -301,6 +302,14 @@ func (s *Server) dispatchNet(r request) (any, error) {
 		return nil, s.Net.ApplyVPN(p)
 	case "vpn.status":
 		return s.Net.VPNStatus(), nil
+	case "vpn.sizetest":
+		var p struct {
+			Name string `json:"name"`
+		}
+		if err := json.Unmarshal(r.Params, &p); err != nil || p.Name == "" {
+			return nil, errors.New("bad parameters")
+		}
+		return s.Net.VPNSizeTest(p.Name)
 	case "diag.run":
 		var p struct {
 			Kind   string `json:"kind"`
@@ -618,6 +627,13 @@ func (c *Client) ApplyVPN(p netd.VPNPlan) error { return c.call("vpn.apply", p, 
 func (c *Client) VPNStatus() (netd.VPNStatus, error) {
 	var out netd.VPNStatus
 	err := c.call("vpn.status", nil, &out)
+	return out, err
+}
+
+// VPNSizeTest measures one tunnel's packet size now and applies the result.
+func (c *Client) VPNSizeTest(name string) (netd.SizeReport, error) {
+	var out netd.SizeReport
+	err := c.call("vpn.sizetest", map[string]string{"name": name}, &out)
 	return out, err
 }
 

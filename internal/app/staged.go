@@ -71,7 +71,7 @@ func (a *App) removeStagedSnap(name string) {
 
 // stagedPath says whether a request can stage a change to the firewall or the network.
 func stagedPath(path string) bool {
-	for _, end := range []string{"/apply", "/confirm", "/rollback", "/preview", "/discard"} {
+	for _, end := range []string{"/apply", "/confirm", "/rollback", "/preview", "/discard", "/test"} {
 		if strings.HasSuffix(path, end) {
 			return false
 		}
@@ -234,6 +234,8 @@ func stagedWords(method, path string, body []byte) string {
 		return verb + " an internet connection."
 	case strings.HasPrefix(path, "/api/net/"):
 		return verb + " network settings."
+	case path == "/api/vpn/test-lists":
+		return verb + " the VPN test addresses."
 	case strings.HasPrefix(path, "/api/vpn/"):
 		return verb + " VPN settings."
 	case strings.HasPrefix(path, "/api/dhcp/"):

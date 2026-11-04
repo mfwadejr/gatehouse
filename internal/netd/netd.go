@@ -303,6 +303,14 @@ func (s *Service) VPNStatus() VPNStatus {
 	return s.VPN.Status()
 }
 
+// VPNSizeTest measures one outbound tunnel's packet size now, sets it, and says what was found.
+func (s *Service) VPNSizeTest(name string) (SizeReport, error) {
+	if s.VPN == nil {
+		return SizeReport{}, errors.New("VPN support is not available")
+	}
+	return s.VPN.SizeTest(name)
+}
+
 // FWEvents returns firewall decisions recorded after seq.
 func (s *Service) FWEvents(since uint64, max int) ([]FWEvent, uint64) {
 	if s.Log == nil {

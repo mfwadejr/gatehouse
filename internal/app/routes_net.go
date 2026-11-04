@@ -35,6 +35,7 @@ type NetController interface {
 	WanStatus() (map[string]wanmon.State, error)
 	ApplyVPN(p netd.VPNPlan) error
 	VPNStatus() (netd.VPNStatus, error)
+	VPNSizeTest(name string) (netd.SizeReport, error)
 	FWEvents(since uint64, max int) ([]netd.FWEvent, uint64, error)
 	SetSystem(hostname, zone string) error
 	UPnPApply(ms []netd.UPnPMapping) error

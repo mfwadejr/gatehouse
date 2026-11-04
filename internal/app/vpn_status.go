@@ -133,38 +133,45 @@ type PeerView struct {
 }
 
 type VPNView struct {
-	ID         int64      `json:"id"`
-	Kind       string     `json:"kind"` // wireguard or openvpn
-	Dev        string     `json:"dev"`
-	Label      string     `json:"label"`
-	Role       string     `json:"role"` // server or client
-	Enabled    bool       `json:"enabled"`
-	State      string     `json:"state"`
-	Message    string     `json:"message"`
-	Address    string     `json:"address"`  // the tunnel's own address
-	ExitIP     string     `json:"exit_ip"`  // what the internet sees
-	Endpoint   string     `json:"endpoint"` // client: the provider; server: what devices connect to
-	Port       int        `json:"port"`
-	Proto      string     `json:"proto"`
-	Handshake  int64      `json:"handshake"`
-	Rx         int64      `json:"rx"`
-	Tx         int64      `json:"tx"`
-	RTTMs      int        `json:"rtt_ms"`
-	Check      string     `json:"check_target"`
-	CheckedAt  int64      `json:"checked_at"`
-	KillSwitch bool       `json:"killswitch"`
-	RouteAll   bool       `json:"route_all"`
-	Access     string     `json:"access"`   // full or internet
-	Site       bool       `json:"site"`     // a link to another site
-	Networks   []string   `json:"networks"` // site link: the networks at the other end
-	Subnet     string     `json:"subnet"`
-	Uses       []UseView  `json:"uses"`
-	Peers      []PeerView `json:"peers"`
-	Connected  int        `json:"connected"`
-	MTU        int        `json:"mtu"` // 0 means automatic
-	Warnings   []string   `json:"warnings,omitempty"`
-	Created    int64      `json:"created"`
-	Log        []string   `json:"log,omitempty"` // a client that is not working: OpenVPN's last messages
+	ID        int64  `json:"id"`
+	Kind      string `json:"kind"` // wireguard or openvpn
+	Dev       string `json:"dev"`
+	Label     string `json:"label"`
+	Role      string `json:"role"` // server or client
+	Enabled   bool   `json:"enabled"`
+	State     string `json:"state"`
+	Message   string `json:"message"`
+	Address   string `json:"address"`              // the tunnel's own address
+	ExitIP    string `json:"exit_ip"`              // what the internet sees
+	ExitError string `json:"exit_error,omitempty"` // why it could not be learned
+	// The packet size in use on the tunnel and where it came from (measured, profile, default).
+	PacketSize    int        `json:"packet_size,omitempty"`
+	PacketSource  string     `json:"packet_source,omitempty"`
+	PacketAt      int64      `json:"packet_at,omitempty"`
+	PacketNote    string     `json:"packet_note,omitempty"`
+	PacketPassing bool       `json:"packet_passing,omitempty"`
+	Endpoint      string     `json:"endpoint"` // client: the provider; server: what devices connect to
+	Port          int        `json:"port"`
+	Proto         string     `json:"proto"`
+	Handshake     int64      `json:"handshake"`
+	Rx            int64      `json:"rx"`
+	Tx            int64      `json:"tx"`
+	RTTMs         int        `json:"rtt_ms"`
+	Check         string     `json:"check_target"`
+	CheckedAt     int64      `json:"checked_at"`
+	KillSwitch    bool       `json:"killswitch"`
+	RouteAll      bool       `json:"route_all"`
+	Access        string     `json:"access"`   // full or internet
+	Site          bool       `json:"site"`     // a link to another site
+	Networks      []string   `json:"networks"` // site link: the networks at the other end
+	Subnet        string     `json:"subnet"`
+	Uses          []UseView  `json:"uses"`
+	Peers         []PeerView `json:"peers"`
+	Connected     int        `json:"connected"`
+	MTU           int        `json:"mtu"` // 0 means automatic
+	Warnings      []string   `json:"warnings,omitempty"`
+	Created       int64      `json:"created"`
+	Log           []string   `json:"log,omitempty"` // a client that is not working: OpenVPN's last messages
 }
 
 type vpnSnapshot struct {
@@ -355,6 +362,7 @@ func (a *App) computeVPN(st netd.VPNStatus) ([]VPNView, error) {
 			v.Handshake = hs
 			chk, haveChk := st.Checks[w.Name]
 			v.RTTMs, v.CheckedAt, v.ExitIP = chk.RTTMs, chk.At, chk.ExitIP
+			a.fillTunnelInfo(&v, st.Tunnels[v.Dev])
 			v.State, v.Message = clientHealth(healthIn{Enabled: w.Enabled, LinkUp: haveWG || st.Links[w.Name].Up, WG: true, Handshake: hs,
 				HasCheck: w.Check != "", CheckOK: haveChk && chk.OK, CheckAt: chk.At, Target: w.Check, Now: now, AppliedAt: applied})
 			v.Uses = a.usesOf(w.Name, nil)
@@ -428,6 +436,7 @@ func (a *App) computeVPN(st netd.VPNStatus) ([]VPNView, error) {
 			v.Address = link.Addr
 			chk, haveChk := st.Checks[o.Name]
 			v.RTTMs, v.CheckedAt, v.ExitIP = chk.RTTMs, chk.At, chk.ExitIP
+			a.fillTunnelInfo(&v, st.Tunnels[v.Dev])
 			v.State, v.Message = clientHealth(healthIn{Enabled: o.Enabled, LinkUp: link.Up && os.Active, HasCheck: o.Check != "", CheckOK: haveChk && chk.OK,
 				CheckAt: chk.At, Target: o.Check, Now: now, AppliedAt: applied})
 			if v.State == "degraded" || v.State == "down" {

@@ -43,6 +43,7 @@ func kindOf(r *http.Request) (string, bool) {
 }
 
 func (a *App) registerVPNRoutes() {
+	a.registerVPNSizeRoutes()
 	s := a.API
 	s.Handle("GET /api/vpn", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		snap := a.vpnSnapshot()

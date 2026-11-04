@@ -201,6 +201,9 @@ func (f *fakeNet) ApplyVPN(p netd.VPNPlan) error {
 	f.vpn, f.vpnCalls = p, f.vpnCalls+1
 	return nil
 }
+func (f *fakeNet) VPNSizeTest(name string) (netd.SizeReport, error) {
+	return netd.SizeReport{Name: name, Before: 1500, After: 1360, Source: "measured", Passing: true}, nil
+}
 func (f *fakeNet) VPNStatus() (netd.VPNStatus, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

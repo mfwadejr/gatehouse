@@ -40,6 +40,12 @@ type Check struct {
 type VPNPlan struct {
 	OpenVPN []OVPNInstance `json:"openvpn"`
 	Checks  []Check        `json:"checks"`
+	// Sizes lists the outbound tunnels whose packet size and exit address are kept right.
+	Sizes []SizeSpec `json:"sizes,omitempty"`
+	// PingAddrs are the shared addresses the size test sends to; ExitSources the services asked
+	// what address the internet sees. Empty means the built-in lists.
+	PingAddrs   []string `json:"ping_addrs,omitempty"`
+	ExitSources []string `json:"exit_sources,omitempty"`
 }
 
 type WGPeerStatus struct {
@@ -100,7 +106,9 @@ type VPNStatus struct {
 	OVPN   map[string]OVPNStatus  `json:"ovpn"`
 	Links  map[string]LinkInfo    `json:"links"`
 	Checks map[string]CheckResult `json:"checks"`
-	Now    int64                  `json:"now"`
+	// Tunnels is the packet size and exit address of each outbound tunnel.
+	Tunnels map[string]TunnelInfo `json:"tunnels,omitempty"`
+	Now     int64                 `json:"now"`
 }
 
 // VPN holds the OpenVPN and tunnel-health side of the helper.
@@ -115,6 +123,18 @@ type VPN struct {
 	Ping      func(dev, target string) (time.Duration, error)
 	ExitIP    func(dev string) (string, error)
 	Interval  time.Duration
+
+	// The size test (see vpn_size.go). Each can be replaced in tests.
+	PingSize   func(dev, target string, size int) bool
+	SetMTU     func(dev string, mtu int) error
+	IfaceInfo  func(dev string) (index, mtu int, up, ok bool)
+	ExitLookup func(dev, source string) (string, error)
+
+	mu2       sync.Mutex // the shared lists
+	pingAddrs []string
+	exitSrcs  []string
+	tunnels   map[string]TunnelInfo
+	reqs      map[string]chan sizeReq
 
 	mu       sync.Mutex // plan and process control
 	rmu      sync.Mutex // check results; never held while waiting on the checks
@@ -136,6 +156,8 @@ func NewVPN(stateDir string) *VPN {
 	return &VPN{
 		ServerDir: "/etc/openvpn/server", ClientDir: "/etc/openvpn/client", RunDir: "/run", StateDir: stateDir,
 		Interval: 20 * time.Second, results: map[string]CheckResult{},
+		PingSize: pingSize, SetMTU: setMTU, IfaceInfo: ifaceInfo, ExitLookup: exitLookup,
+		tunnels: map[string]TunnelInfo{}, reqs: map[string]chan sizeReq{},
 		Systemctl: func(args ...string) error {
 			if out, err := exec.Command("systemctl", args...).CombinedOutput(); err != nil {
 				return fmt.Errorf("systemctl %s: %s", strings.Join(args, " "), strings.TrimSpace(string(out)))
@@ -195,6 +217,27 @@ func (v *VPN) validate(p VPNPlan) error {
 		}
 		if !reTarget.MatchString(c.Target) {
 			return fmt.Errorf("check %s: %q is not an address or name", c.Name, c.Target)
+		}
+	}
+	for _, sz := range p.Sizes {
+		if !reTunName.MatchString(sz.Name) && !regexp.MustCompile(`^wg[0-9]{1,2}$`).MatchString(sz.Name) {
+			return fmt.Errorf("size %q: invalid device", sz.Name)
+		}
+		if sz.Check != "" && !reTarget.MatchString(sz.Check) {
+			return fmt.Errorf("size %s: %q is not an address or name", sz.Name, sz.Check)
+		}
+	}
+	if len(p.PingAddrs) > 8 || len(p.ExitSources) > 8 {
+		return errors.New("at most 8 test addresses and 8 lookup services")
+	}
+	for _, a := range p.PingAddrs {
+		if net.ParseIP(a) == nil {
+			return fmt.Errorf("%q is not an IP address", a)
+		}
+	}
+	for _, e := range p.ExitSources {
+		if !ValidExitSource(e) {
+			return fmt.Errorf("%q is not a lookup the helper can run", e)
 		}
 	}
 	return nil
@@ -271,6 +314,9 @@ func (v *VPN) Apply(p VPNPlan) error {
 		os.Remove(filepath.Join(v.ClientDir, "gatehouse-"+old.Name+".auth"))
 	}
 	v.plan = p
+	v.mu2.Lock()
+	v.pingAddrs, v.exitSrcs = p.PingAddrs, p.ExitSources
+	v.mu2.Unlock()
 	if err := v.saveState(p); err != nil {
 		return err
 	}
@@ -312,6 +358,9 @@ func (v *VPN) Start() {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	v.plan = v.loadState().Plan
+	v.mu2.Lock()
+	v.pingAddrs, v.exitSrcs = v.plan.PingAddrs, v.plan.ExitSources
+	v.mu2.Unlock()
 	v.restartChecks()
 }
 
@@ -346,6 +395,22 @@ func (v *VPN) restartChecks() {
 	for _, c := range v.plan.Checks {
 		v.wg.Add(1)
 		go v.watch(ctx, c)
+	}
+	v.rmu.Lock()
+	keepT := map[string]TunnelInfo{}
+	v.reqs = map[string]chan sizeReq{}
+	for _, sz := range v.plan.Sizes {
+		if t, ok := v.tunnels[sz.Name]; ok {
+			keepT[sz.Name] = t
+		}
+		v.reqs[sz.Name] = make(chan sizeReq)
+	}
+	v.tunnels = keepT
+	reqs := v.reqs
+	v.rmu.Unlock()
+	for _, sz := range v.plan.Sizes {
+		v.wg.Add(1)
+		go v.watchTunnel(ctx, sz, reqs[sz.Name])
 	}
 }
 
@@ -493,9 +558,13 @@ func (v *VPN) Status() VPNStatus {
 	for k, r := range v.results {
 		res[k] = r
 	}
+	tun := map[string]TunnelInfo{}
+	for k, t := range v.tunnels {
+		tun[k] = t
+	}
 	v.rmu.Unlock()
 
-	st := VPNStatus{WG: map[string]WGStatus{}, OVPN: map[string]OVPNStatus{}, Links: map[string]LinkInfo{}, Checks: res, Now: time.Now().Unix()}
+	st := VPNStatus{Tunnels: tun, WG: map[string]WGStatus{}, OVPN: map[string]OVPNStatus{}, Links: map[string]LinkInfo{}, Checks: res, Now: time.Now().Unix()}
 	if v.WGDump != nil {
 		if d, err := v.WGDump(); err == nil {
 			st.WG = ParseWGDump(d)

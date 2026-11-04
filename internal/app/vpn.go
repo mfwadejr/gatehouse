@@ -350,9 +350,15 @@ func (a *App) buildVPNPlan(q querier) (*netd.VPNPlan, error) {
 	}
 	plan := &netd.VPNPlan{}
 	lan := a.lanRoutes(q)
+	plan.PingAddrs, plan.ExitSources = a.vpnTestLists(q)
 	for _, w := range wgs {
-		if w.Enabled && w.Mode == "client" && w.Check != "" {
-			plan.Checks = append(plan.Checks, netd.Check{Name: w.Name, Target: w.Check, Exit: true})
+		if w.Enabled && w.Mode == "client" {
+			// The packet size and the exit address are kept right for every outbound tunnel,
+			// whether or not it has a check address of its own.
+			plan.Sizes = append(plan.Sizes, netd.SizeSpec{Name: w.Name, Start: w.MTU, FromProfile: w.MTU > 0, Check: w.Check})
+			if w.Check != "" {
+				plan.Checks = append(plan.Checks, netd.Check{Name: w.Name, Target: w.Check})
+			}
 		}
 	}
 	for _, o := range ovs {
@@ -392,8 +398,10 @@ func (a *App) buildVPNPlan(q querier) (*netd.VPNPlan, error) {
 				inst.Files["auth"] = o.AuthUser + "\n" + o.AuthPass + "\n"
 			}
 			inst.Conf = vpn.OVPNClientConfig(imp, o.Name, auth)
+			mtu := profileTunMTU(o.Profile)
+			plan.Sizes = append(plan.Sizes, netd.SizeSpec{Name: o.Name, Start: mtu, FromProfile: mtu > 0, Check: o.Check})
 			if o.Check != "" {
-				plan.Checks = append(plan.Checks, netd.Check{Name: o.Name, Target: o.Check, Exit: true})
+				plan.Checks = append(plan.Checks, netd.Check{Name: o.Name, Target: o.Check})
 			}
 		}
 		plan.OpenVPN = append(plan.OpenVPN, inst)

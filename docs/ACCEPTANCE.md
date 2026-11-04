@@ -35,3 +35,7 @@ Record the machine, the version (Settings, About) and the date at the top of eac
 | 28 | Authenticator memory | With two-factor on: the code is asked once when applying and not again for 15 minutes | | |
 | 29 | Time zones | Setup wizard (after a factory reset): the list starts with the United States zones in plain words; saving keeps the chosen zone | | |
 | 30 | Image name | The installer file name contains the version, and Settings, Updates shows the same version | | |
+| 31 | Packet size measured | Connect a provider VPN (try PIA, whose file sets no size): its card shows Packet size with "measured", and a secure web request through it, for example `curl --interface tunN https://checkip.amazonaws.com`, works | | |
+| 32 | Packet size after a reconnect | Turn the VPN off and on (or restart it): within about 30 seconds the card shows a size again, and the Internet sees you as address fills in without waiting ten minutes | | |
+| 33 | Test packet size button | Press Test packet size: it shows each size with the addresses that answered and applies the largest size two addresses agree on | | |
+| 34 | Test addresses | Change the order and add an entry in Test addresses, Save; the Review page shows "Changed the VPN test addresses."; Restore defaults puts the five addresses and four services back | | |

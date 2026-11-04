@@ -467,6 +467,102 @@ function Header({ v }) {
   );
 }
 
+// What the tile says about the packet size, and where the number came from.
+function packetText(v) {
+  if (!v.packet_size) return v.state === 'up' ? 'measuring…' : 'not measured yet';
+  const src = { measured: 'measured', profile: 'from the profile', default: 'default, could not confirm' }[v.packet_source] || '';
+  return `${v.packet_size}${src ? ` (${src})` : ''}`;
+}
+
+// Measure one tunnel now, set its packet size, and show what each address answered.
+function SizeTest({ v, onClose, onDone }) {
+  const [rep, setRep] = useState(null);
+  const [err, setErr] = useState('');
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    let live = true;
+    setRep(null); setErr('');
+    post(`/api/vpn/${v.kind}/${v.id}/packet/test`, {}).then((r) => { if (live) { setRep(r); onDone(); } }).catch((e) => { if (live) setErr(e.message || 'The test could not be run.'); });
+    return () => { live = false; };
+  }, [n]); // eslint-disable-line react-hooks/exhaustive-deps
+  const src = { measured: 'measured', profile: 'from the profile', default: 'default, could not confirm' };
+  return (
+    <Modal title={`Packet size for ${v.label}`} onClose={onClose} footer={<><Button onClick={() => setN(n + 1)} disabled={!rep && !err}>Test again</Button><Button kind="primary" onClick={onClose}>Close</Button></>}>
+      <div className="stack">
+        {!rep && !err && <p className="muted">Testing{'…'} this sends a few small test packets through the tunnel and takes a few seconds.</p>}
+        {err && <Note tone="warn" title="The test could not be run">{err}</Note>}
+        {rep && (
+          <>
+            <p>
+              {!rep.passing
+                ? rep.note || 'Nothing answered through the tunnel, so no size was measured.'
+                : rep.before === rep.after ? `The packet size stays at ${rep.after} (${src[rep.source] || rep.source}).` : `The packet size was ${rep.before} and is now ${rep.after} (${src[rep.source] || rep.source}).`}
+            </p>
+            {rep.passing && rep.note && <p className="small muted">{rep.note}</p>}
+            {rep.targets?.length > 0 && <p className="small muted">Addresses used: {rep.targets.join(', ')}.{rep.alive?.length < rep.targets.length ? ` Answering: ${rep.alive?.length ? rep.alive.join(', ') : 'none'}.` : ''}</p>}
+            {rep.rows?.length > 0 && (
+              <table className="table small">
+                <thead><tr><th>Size</th><th>Result</th><th>Answered by</th></tr></thead>
+                <tbody>{rep.rows.map((r) => (
+                  <tr key={r.size}><td>{r.size}</td><td>{r.ok ? 'passes' : 'dropped'}</td><td>{r.answered?.length ? r.answered.join(', ') : '–'}</td></tr>
+                ))}</tbody>
+              </table>
+            )}
+            <p className="small muted">The largest size that at least two addresses answered is used. It is measured again after every reconnect, when a big packet stops getting through, and every 30 minutes.</p>
+          </>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+// The addresses used to measure the packet size and the services asked what address the internet
+// sees. One list for every tunnel; the order is the order tried.
+function ListEditor({ title, hint, items, setItems, placeholder }) {
+  const move = (i, d) => { const a = [...items]; const j = i + d; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; setItems(a); };
+  return (
+    <div className="stack gap1">
+      <span className="name">{title}</span>
+      <span className="small muted">{hint}</span>
+      {items.map((x, i) => (
+        <div className="inline" key={i}>
+          <Input value={x} onChange={(val) => setItems(items.map((y, k) => (k === i ? val : y)))} placeholder={placeholder} aria-label={`${title} ${i + 1}`} />
+          <Button small disabled={i === 0} onClick={() => move(i, -1)} aria-label="Move up">Up</Button>
+          <Button small disabled={i === items.length - 1} onClick={() => move(i, 1)} aria-label="Move down">Down</Button>
+          <Button small kind="danger" icon="trash" onClick={() => setItems(items.filter((_, k) => k !== i))} aria-label="Remove">Remove</Button>
+        </div>
+      ))}
+      <div><Button small icon="plus" disabled={items.length >= 8} onClick={() => setItems([...items, ''])}>Add</Button></div>
+    </div>
+  );
+}
+
+function TestAddresses() {
+  const { data, reload } = useData('/api/vpn/test-lists');
+  const [run, busy] = useAction();
+  const [ping, setPing] = useState(null);
+  const [exit, setExit] = useState(null);
+  useEffect(() => { if (data && ping === null) { setPing(data.ping); setExit(data.exit); } }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!data || ping === null) return null;
+  const changed = JSON.stringify(ping) !== JSON.stringify(data.ping) || JSON.stringify(exit) !== JSON.stringify(data.exit);
+  const save = async () => { if (await run(() => put('/api/vpn/test-lists', { ping, exit }), 'Saved.')) reload(); };
+  const restore = async () => {
+    if (await run(() => put('/api/vpn/test-lists', { restore: true }), 'Back to the built-in lists.')) { const d = await get('/api/vpn/test-lists'); setPing(d.ping); setExit(d.exit); reload(); }
+  };
+  return (
+    <Card title="Test addresses" desc="Every VPN is checked with these. They set the packet size and find the address the internet sees. The order is the order they are tried.">
+      <div className="stack">
+        <ListEditor title="Addresses for the packet size test" hint="Plain IPv4 addresses that answer a ping, such as 1.1.1.1. They are all asked at once, and the largest size that at least two answer is used." items={ping} setItems={setPing} placeholder="1.1.1.1" />
+        <ListEditor title="Services that tell you your address" hint="Asked one after another until one answers. Use dns:google, dns:cloudflare, or web:https://host/path (a page that shows your address as plain text)." items={exit} setItems={setExit} placeholder="dns:google" />
+        <div className="actions">
+          <Button kind="primary" disabled={busy || !changed} onClick={save}>Save</Button>
+          <Button disabled={busy || !data.custom} onClick={restore}>Restore defaults</Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 function Outbound({ v, reload, setModal }) {
   const [run] = useAction();
   const sources = v.uses || [];
@@ -495,12 +591,13 @@ function Outbound({ v, reload, setModal }) {
           </details>
         )}
         <div className="grid">
-          <Fact label="Internet sees you as">{v.exit_ip || '–'}</Fact>
+          <Fact label="Internet sees you as">{v.exit_ip || '–'}{!v.exit_ip && v.exit_error && <div className="small muted">Could not ask the internet through this VPN: {v.exit_error}</div>}</Fact>
           <Fact label="Address inside the VPN">{v.address || '–'}</Fact>
           <Fact label="Provider">{v.endpoint || '–'}</Fact>
           {v.kind === 'wireguard' && <Fact label="Last contact">{v.handshake ? fmt.ago(v.handshake) : 'never'}</Fact>}
           {v.kind === 'wireguard' && <Fact label="Traffic">{`↓ ${bytes(v.rx)}  ↑ ${bytes(v.tx)}`}</Fact>}
           <Fact label="Checked">{v.checked_at ? `${fmt.ago(v.checked_at)} via ${v.check_target}` : 'waiting'}</Fact>
+          {v.enabled && <Fact label="Packet size">{packetText(v)}{v.packet_size > 0 && v.packet_at > 0 && <div className="small muted">checked {fmt.ago(v.packet_at)}</div>}{v.packet_note && <div className="small muted">{v.packet_note}</div>}</Fact>}
         </div>
         <div className="stack gap1">
           <span className="small muted">Used by</span>
@@ -530,6 +627,7 @@ function Outbound({ v, reload, setModal }) {
         <div className="actions">
           <Button kind="primary" icon="edit" onClick={() => setModal({ t: 'uses', v })}>Choose who uses it</Button>
           <Button onClick={() => run(() => put(`/api/vpn/${v.kind}/${v.id}`, { enabled: !v.enabled }), v.enabled ? 'Turned off.' : 'Turned on.').then(reload)}>{v.enabled ? 'Turn off' : 'Turn on'}</Button>
+          {v.enabled && <Button onClick={() => setModal({ t: 'size', v })}>Test packet size</Button>}
           <Button onClick={() => setModal({ t: 'settings', v })}>Settings</Button>
           <Button kind="danger" icon="trash" onClick={async () => await confirmBox(`Remove ${v.label}? Devices using it go back to your normal connection.`) && run(() => del(`/api/vpn/${v.kind}/${v.id}`), 'Removed.').then(reload)}>Remove</Button>
         </div>
@@ -632,6 +730,7 @@ export default function VPN() {
       {data && <RemoteAccess onAddVPN={() => setModal({ t: 'add' })} hasDevice={inn.some((v) => (v.peers || []).length > 0)} />}
       {out.length > 0 && <h2 className="sec">Through a VPN provider</h2>}
       {out.map((v) => <Outbound key={v.dev} v={v} reload={fresh} setModal={setModal} />)}
+      {out.length > 0 && <TestAddresses />}
       {inn.length > 0 && <h2 className="sec">Connect from outside</h2>}
       {inn.map((v) => <Inbound key={v.dev} v={v} reload={fresh} setModal={setModal} />)}
       {sites.length > 0 && <h2 className="sec">Linked sites</h2>}
@@ -641,6 +740,7 @@ export default function VPN() {
       {modal?.t === 'uses-new' && <UsesNew id={modal.id} kind={modal.kind} onClose={close} onSaved={reload} />}
       {modal?.t === 'uses' && <Uses v={modal.v} onClose={close} onSaved={reload} />}
       {modal?.t === 'settings' && <Settings v={modal.v} onClose={close} onSaved={reload} />}
+      {modal?.t === 'size' && <SizeTest v={modal.v} onClose={close} onDone={reload} />}
       {modal?.t === 'device' && <AddDevice v={modal.v} endpoint={data?.endpoint} onClose={close} onSaved={reload} />}
     </Page>
   );
