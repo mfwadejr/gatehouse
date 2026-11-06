@@ -4,7 +4,7 @@ The boot menu has three choices:
 
 1. **Install NopeWarden**: installs on this machine, using its own screen and keyboard.
 2. **Install NopeWarden (basic graphics)**: the same, for screens that show nothing with the first one.
-3. **Install with serial console (9600 8N1, VT100)**: for machines with no screen, over a serial cable. The speed in the name is the one speed for the whole menu and the installer; set your terminal program to it.
+3. **Install with serial console (115200 8N1, VT100)**: for machines with no screen, over a serial cable. The speed in the name is the one speed for the whole menu and the installer; set your terminal program to it.
 
 (The old "install from another computer" choice and its code are gone: the machine asks two questions on its own screen, and everything else is done in a browser after the restart.)
 
@@ -19,26 +19,26 @@ These are written in one place, `iso/serial.conf`, and read by the build. The de
 | Setting | Value (default build) | Where it is set |
 |---|---|---|
 | Port | first serial port (COM1, `ttyS0`) | `SERIAL_UNIT=0` |
-| Speed | 9600 baud | `SERIAL_SPEED=9600` |
+| Speed | 115200 baud (standard image) or 9600 baud (the `-serial9600` image) | `SERIAL_SPEED` |
 | Data bits / parity / stop bits | 8 / none / 1 (8N1) | `SERIAL_WORD`, `SERIAL_PARITY`, `SERIAL_STOP` |
 | Flow control | none | set the same on the device and in your terminal program |
 | Terminal type | VT100 (arrow keys are `Esc [ A`) | `SERIAL_TERM`; set the same on the device |
 
-To build for different settings, change `iso/serial.conf`, or set the same names for one build, for example `SERIAL_SPEED=115200 iso/build.sh ./nopewarden 0.9.4`.
+**Which image to download.** Like other firewall distributions, the standard image uses 115200. A device whose serial port only runs at 9600 needs the second image, `nopewarden-<version>-amd64-serial9600.iso`; its menu entry says 9600. Every release carries both, the speed is in the file name, and you never choose a speed in the menu. To build another speed, change `iso/serial.conf` or set the same names for one build, for example `SERIAL_SPEED=19200 iso/build.sh ./nopewarden 0.9.4` (the file name then ends `-serial19200`).
 
-There is one speed, and the menu names it: the serial choice reads "Install with serial console (9600 8N1, VT100)". The boot menu, the installer and the start-up messages all use that speed, so there is nothing to choose: set PuTTY, `screen` or minicom to the speed shown and it works on every choice.
+There is one speed, and the menu names it: the serial choice reads "Install with serial console (115200 8N1, VT100)". The boot menu, the installer and the start-up messages all use that speed, so there is nothing to choose: set PuTTY, `screen` or minicom to the speed shown and it works on every choice.
 
 If the menu shows but ignores your keys, or shows garbage, check in this order: speed, 8N1, no flow control, VT100 on the device and in your terminal program. In the menu `Ctrl-N` and `Ctrl-P` move down and up, and `Ctrl-X` boots while editing an entry; they work even when arrow keys do not.
 
 Examples from a computer with a USB serial adapter (use your speed):
 
 ```
-screen /dev/tty.usbserial-110 9600    # macOS; on Linux /dev/ttyUSB0
-minicom -D /dev/ttyUSB0 -b 9600
-sudo cu -l /dev/tty.usbserial-110 -s 9600     # raw, sends keys as typed; quit with ~.
+screen /dev/tty.usbserial-110 115200    # macOS; on Linux /dev/ttyUSB0 (use 9600 for the serial9600 image)
+minicom -D /dev/ttyUSB0 -b 115200
+sudo cu -l /dev/tty.usbserial-110 -s 115200     # raw, sends keys as typed; quit with ~.
 ```
 
-On Windows, PuTTY: Connection type *Serial*, line `COM3` (check Device Manager), speed 9600.
+On Windows, PuTTY: Connection type *Serial*, line `COM3` (check Device Manager), speed 115200 (or 9600 for the serial9600 image).
 
 The text installer answers on the machine's own screen and keyboard **and** on the serial port at the same time. Use whichever you have.
 

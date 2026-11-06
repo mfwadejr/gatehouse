@@ -14,7 +14,7 @@ NopeWarden is a working name.
 
 ## Try it
 
-1. Download `nopewarden-*.iso` from the latest release on the Releases page.
+1. Download `nopewarden-<version>-amd64.iso` from the latest release on the Releases page. If your device's serial port only runs at 9600 baud, download `nopewarden-<version>-amd64-serial9600.iso` instead. Over a serial cable, set your terminal to 115200 (standard image) or 9600 (the serial9600 image); the boot menu entry shows the speed.
 2. Write it to a USB stick (at least 4 GB) with [balenaEtcher](https://etcher.balena.io/) or `dd`.
 3. Boot the PC from the stick. If it will not start, turn off Secure Boot in the firmware settings (the image is not signed yet).
 4. The screen shows a web address and a one-time code. On another computer on the same network, open that address (accept the certificate warning), enter the code, choose the disk, and install.

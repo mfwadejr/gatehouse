@@ -40,7 +40,12 @@ ISO=$(ls "$WORK"/*.iso | head -n1)
 # Put the NopeWarden boot menus on the finished image and fail the build if anything else shows.
 sh "$SRC/brand-iso.sh" "$ISO" "$SRC/config/includes.binary/nopewarden-boot"
 mkdir -p "$OUT"
-NAME="nopewarden-$VERSION-amd64.iso"
+# The standard image runs its serial console at 115200. Any other speed is part of the file name,
+# so the speed to set in PuTTY or screen is always in the name of the file you downloaded.
+. "$SRC/serial.conf"
+SUFFIX=""
+[ "$SERIAL_SPEED" = "115200" ] || SUFFIX="-serial$SERIAL_SPEED"
+NAME="nopewarden-$VERSION-amd64$SUFFIX.iso"
 mv "$ISO" "$OUT/$NAME"
 (cd "$OUT" && sha256sum "$NAME" > "$NAME.sha256")
 echo "built $OUT/$NAME"

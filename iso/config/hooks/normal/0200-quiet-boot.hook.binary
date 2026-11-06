@@ -4,7 +4,7 @@
 set -e
 # Serial settings come from serial.conf (speed, port, data bits, parity, stop bits, terminal).
 if [ -f ./serial.conf ]; then . ./serial.conf; fi
-: "${SERIAL_UNIT:=0}" "${SERIAL_SPEED:=9600}" "${SERIAL_WORD:=8}" "${SERIAL_PARITY:=no}" "${SERIAL_STOP:=1}" "${SERIAL_TERM:=vt100}"
+: "${SERIAL_UNIT:=0}" "${SERIAL_SPEED:=115200}" "${SERIAL_WORD:=8}" "${SERIAL_PARITY:=no}" "${SERIAL_STOP:=1}" "${SERIAL_TERM:=vt100}"
 
 EXTRA="rd.udev.log_level=0 consoleblank=0 nopewarden.serial=$SERIAL_SPEED"
 
