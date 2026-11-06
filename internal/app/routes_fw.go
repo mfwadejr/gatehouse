@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/fw"
+	"nopewarden/internal/api"
+	"nopewarden/internal/fw"
 )
 
 const confirmWindow = 60 * time.Second
@@ -33,7 +33,7 @@ func (a *App) registerFWRoutes() {
 	// either is waiting to be applied. The console asks before and after a Save to tell the
 	// person what the Save really did.
 	s.Handle("GET /api/applystate", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-		api.JSON(w, 200, map[string]any{"fw": a.fwStatus(), "net": a.netStatus()})
+		api.JSON(w, 200, map[string]any{"fw": a.fwStatus(), "net": a.netStatus(), "dns": map[string]any{"dirty": a.dnsHeld()}})
 	})
 	s.Handle("GET /api/fw/presets", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		api.JSON(w, 200, map[string]any{"presets": fw.Presets(), "services": fw.ServiceNames()})
@@ -212,7 +212,7 @@ func (a *App) registerFWRoutes() {
 		}
 		in.DNSTarget = strings.TrimSpace(in.DNSTarget)
 		if ip := net.ParseIP(in.DNSTarget); in.DNSTarget != "" && (ip == nil || ip.To4() == nil || ip.IsLoopback() || ip.IsUnspecified() || ip.IsMulticast()) {
-			fail(w, errors.New("Enter the DNS server as an IPv4 address such as 192.168.1.2, or leave it empty to use Gatehouse."))
+			fail(w, errors.New("Enter the DNS server as an IPv4 address such as 192.168.1.2, or leave it empty to use NopeWarden."))
 			return
 		}
 		a.Config.SetSetting("fw.dns_target", in.DNSTarget)

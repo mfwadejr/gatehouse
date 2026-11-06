@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/fw"
+	"nopewarden/internal/api"
+	"nopewarden/internal/fw"
 )
 
 // Lock-out protection: the rules that keep this device manageable no matter what else is edited,

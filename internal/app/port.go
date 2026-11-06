@@ -15,9 +15,9 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/fw"
-	"gatehouse/internal/upnp"
+	"nopewarden/internal/api"
+	"nopewarden/internal/fw"
+	"nopewarden/internal/upnp"
 )
 
 // The console's port can be changed from the console itself. The new port is opened next to the
@@ -159,7 +159,7 @@ var reservedPorts = map[int]string{
 	upnp.ControlPort: "UPnP",
 }
 
-// event records something worth keeping in the Gatehouse log.
+// event records something worth keeping in the NopeWarden log.
 func (a *App) event(actor, sev, title, detail string) {
 	if a.Logs != nil {
 		a.Logs.Exec(`INSERT INTO events(ts,area,severity,actor,title,detail) VALUES(?,?,?,?,?,?)`, time.Now().Unix(), "system", sev, actor, title, detail)
@@ -343,7 +343,7 @@ func (a *App) registerPortRoutes() {
 
 func ok2(w http.ResponseWriter) { api.JSON(w, 200, map[string]bool{"ok": true}) }
 
-// LogEvent records something worth keeping in the Gatehouse log (used by the watchdog).
+// LogEvent records something worth keeping in the NopeWarden log (used by the watchdog).
 func (a *App) LogEvent(actor, sev, title, detail string) { a.event(actor, sev, title, detail) }
 
 func regexpMust(s string) *regexp.Regexp { return regexp.MustCompile(s) }

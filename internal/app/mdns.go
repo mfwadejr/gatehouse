@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/fw"
-	"gatehouse/internal/mdns"
+	"nopewarden/internal/api"
+	"nopewarden/internal/fw"
+	"nopewarden/internal/mdns"
 )
 
 // Devices finding each other across networks. The person picks pairs of networks; the reflector

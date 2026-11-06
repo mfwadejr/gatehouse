@@ -16,8 +16,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"gatehouse/internal/auth"
-	"gatehouse/internal/events"
+	"nopewarden/internal/auth"
+	"nopewarden/internal/events"
 )
 
 const (
@@ -34,10 +34,12 @@ type Server struct {
 	Changed func(actor, method, path string, body []byte)
 	// Before is called just before an administrator's change runs (same requests as Changed).
 	Before func(method, path string)
-	Auth   *auth.Service
-	Bus    *events.Bus
-	Static http.Handler // the embedded console; nil in tests
-	Issuer string       // shown in authenticator apps
+	// BeforeReq sees the whole request (its headers) at the same moment as Before.
+	BeforeReq func(r *http.Request)
+	Auth      *auth.Service
+	Bus       *events.Bus
+	Static    http.Handler // the embedded console; nil in tests
+	Issuer    string       // shown in authenticator apps
 	// Secure marks cookies Secure; true whenever the console is served over TLS.
 	Secure bool
 	// Gate, when set, may refuse a signed-in request before it runs. It is how the standby unit of a
@@ -49,7 +51,7 @@ type Server struct {
 }
 
 func New(a *auth.Service, bus *events.Bus) *Server {
-	s := &Server{Auth: a, Bus: bus, Issuer: "Gatehouse", topics: map[string]bool{}, mux: http.NewServeMux()}
+	s := &Server{Auth: a, Bus: bus, Issuer: "NopeWarden", topics: map[string]bool{}, mux: http.NewServeMux()}
 	s.routes()
 	return s
 }
@@ -131,6 +133,9 @@ func (s *Server) guard(h HandlerFunc, needFull, needAdmin bool) http.HandlerFunc
 			sw := &statusWriter{ResponseWriter: w, code: 200}
 			if s.Before != nil {
 				s.Before(r.Method, r.URL.Path)
+			}
+			if s.BeforeReq != nil {
+				s.BeforeReq(r)
 			}
 			h(sw, r, c)
 			if sw.code < 300 {

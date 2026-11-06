@@ -10,11 +10,11 @@ import (
 
 	"github.com/miekg/dns"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/fw"
+	"nopewarden/internal/api"
+	"nopewarden/internal/fw"
 )
 
-// "Why can't it reach that?" Pick a device and a place on the internet. Gatehouse goes through the
+// "Why can't it reach that?" Pick a device and a place on the internet. NopeWarden goes through the
 // things that can stop it, in the order they act, and says in plain words which one did. Each
 // answer can offer a fix. It only reads settings; it never sends traffic from the device.
 
@@ -223,7 +223,7 @@ func (a *App) whyCannotReach(deviceID int64, target string, port int, proto stri
 			}
 		}
 		if !ip.IsValid() && blocked == "" {
-			add(whyFinding{Stage: "dns", State: "unknown", Title: "The name did not resolve", Text: "Gatehouse could not find an address for " + target + ", so it may not exist, or your DNS upstream is not answering. Try the Internet test."})
+			add(whyFinding{Stage: "dns", State: "unknown", Title: "The name did not resolve", Text: "NopeWarden could not find an address for " + target + ", so it may not exist, or your DNS upstream is not answering. Try the Internet test."})
 		}
 	}
 
@@ -234,7 +234,7 @@ func (a *App) whyCannotReach(deviceID int64, target string, port int, proto stri
 	}
 	zone := a.deviceZone(lastIP)
 	if zone == "" {
-		add(whyFinding{Stage: "firewall", State: "unknown", Title: "Could not tell which network the device is on", Text: "It has not got an address from Gatehouse lately, so the firewall check was skipped."})
+		add(whyFinding{Stage: "firewall", State: "unknown", Title: "Could not tell which network the device is on", Text: "It has not got an address from NopeWarden lately, so the firewall check was skipped."})
 	} else {
 		var zf *fw.Zone
 		if z, ok := m.ZoneByName(zone); ok {
@@ -257,7 +257,7 @@ func (a *App) whyCannotReach(deviceID int64, target string, port int, proto stri
 			}
 			if !(ssure && dsure && vsure) {
 				add(whyFinding{Stage: "firewall", State: "unknown", Title: "A firewall rule might apply: " + r.Name,
-					Text: "It mentions something Gatehouse cannot check here (a country, a domain or a port you did not give)."})
+					Text: "It mentions something NopeWarden cannot check here (a country, a domain or a port you did not give)."})
 				continue
 			}
 			if r.Action == "accept" {
@@ -283,7 +283,7 @@ func (a *App) whyCannotReach(deviceID int64, target string, port int, proto stri
 			}
 		}
 		if zf != nil && zf.DNSForce && port == 53 {
-			add(whyFinding{Stage: "forced-dns", State: "unknown", Title: "Forced DNS is on", Text: "Anything this device sends to port 53 is redirected to Gatehouse, whatever server it asks."})
+			add(whyFinding{Stage: "forced-dns", State: "unknown", Title: "Forced DNS is on", Text: "Anything this device sends to port 53 is redirected to NopeWarden, whatever server it asks."})
 		}
 	}
 
@@ -298,7 +298,7 @@ func (a *App) whyCannotReach(deviceID int64, target string, port int, proto stri
 		}
 	default:
 		res.Verdict = "open"
-		res.Summary = "Nothing in Gatehouse blocks this. If it still fails, the problem is outside: the site may be down, or the device's own settings may be at fault. Run the Internet test."
+		res.Summary = "Nothing in NopeWarden blocks this. If it still fails, the problem is outside: the site may be down, or the device's own settings may be at fault. Run the Internet test."
 		for _, f := range res.Findings {
 			if f.State == "unknown" {
 				res.Verdict = "unclear"

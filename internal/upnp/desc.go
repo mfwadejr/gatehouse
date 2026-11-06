@@ -5,9 +5,9 @@ import "fmt"
 func rootDesc(name, uuid, base string) string {
 	return fmt.Sprintf(`<?xml version="1.0"?>
 <root xmlns="urn:schemas-upnp-org:device-1-0"><specVersion><major>1</major><minor>0</minor></specVersion><URLBase>%s</URLBase>
-<device><deviceType>urn:schemas-upnp-org:device:InternetGatewayDevice:1</deviceType><friendlyName>%s</friendlyName><manufacturer>Gatehouse</manufacturer><modelName>Gatehouse</modelName><UDN>uuid:%s</UDN>
-<deviceList><device><deviceType>urn:schemas-upnp-org:device:WANDevice:1</deviceType><friendlyName>WAN Device</friendlyName><manufacturer>Gatehouse</manufacturer><modelName>Gatehouse</modelName><UDN>uuid:%s-wan</UDN>
-<deviceList><device><deviceType>urn:schemas-upnp-org:device:WANConnectionDevice:1</deviceType><friendlyName>WAN Connection Device</friendlyName><manufacturer>Gatehouse</manufacturer><modelName>Gatehouse</modelName><UDN>uuid:%s-conn</UDN>
+<device><deviceType>urn:schemas-upnp-org:device:InternetGatewayDevice:1</deviceType><friendlyName>%s</friendlyName><manufacturer>NopeWarden</manufacturer><modelName>NopeWarden</modelName><UDN>uuid:%s</UDN>
+<deviceList><device><deviceType>urn:schemas-upnp-org:device:WANDevice:1</deviceType><friendlyName>WAN Device</friendlyName><manufacturer>NopeWarden</manufacturer><modelName>NopeWarden</modelName><UDN>uuid:%s-wan</UDN>
+<deviceList><device><deviceType>urn:schemas-upnp-org:device:WANConnectionDevice:1</deviceType><friendlyName>WAN Connection Device</friendlyName><manufacturer>NopeWarden</manufacturer><modelName>NopeWarden</modelName><UDN>uuid:%s-conn</UDN>
 <serviceList><service><serviceType>urn:schemas-upnp-org:service:WANIPConnection:1</serviceType><serviceId>urn:upnp-org:serviceId:WANIPConn1</serviceId><SCPDURL>/WANIPCn.xml</SCPDURL><controlURL>/ctl/IPConn</controlURL><eventSubURL>/evt/IPConn</eventSubURL></service></serviceList>
 </device></deviceList></device></deviceList></device></root>`, base, xmlEscape(name), uuid, uuid, uuid)
 }

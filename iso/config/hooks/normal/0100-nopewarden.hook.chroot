@@ -1,0 +1,139 @@
+#!/bin/sh
+# Runs inside the image while it is built.
+set -e
+
+# systemd-networkd is a separate package on some releases; install it if it exists.
+apt-get install -y --no-install-recommends systemd-networkd 2>/dev/null || true
+
+# Service account for the console process. The helper looks it up by name to verify the caller.
+getent group nopewarden >/dev/null || groupadd --system nopewarden
+id nopewarden >/dev/null 2>&1 || useradd --system --gid nopewarden --home-dir /var/lib/nopewarden --no-create-home --shell /usr/sbin/nologin nopewarden
+install -d -o nopewarden -g nopewarden -m 750 /var/lib/nopewarden
+install -d -m 755 /run/nopewarden
+# Home for the optional traffic-labelling program (see nopewarden-ndpi.service); recreated at boot by tmpfiles.d.
+systemd-sysusers 2>/dev/null || true
+
+# High availability programs stay off until the console pairs two units.
+for u in keepalived.service conntrackd.service; do systemctl disable "$u" 2>/dev/null || true; done
+
+# Unbound (for "Resolve directly") must never take over port 53, which NopeWarden's DNS server uses.
+# It only listens on 5335, stays off until the console turns it on, and does not touch resolv.conf.
+mkdir -p /etc/unbound/unbound.conf.d
+cat > /etc/unbound/unbound.conf.d/nopewarden.conf <<'EOU'
+# Written by NopeWarden. Changes made here are overwritten.
+server:
+    port: 5335
+    interface: 127.0.0.1
+    interface: ::1
+    access-control: 0.0.0.0/0 refuse
+    access-control: ::/0 refuse
+    access-control: 127.0.0.0/8 allow
+    access-control: ::1/128 allow
+    do-ip6: no
+    do-udp: yes
+    do-tcp: yes
+    hide-identity: yes
+    hide-version: yes
+    qname-minimisation: yes
+    harden-glue: yes
+    harden-dnssec-stripped: yes
+    prefetch: yes
+    prefetch-key: yes
+    num-threads: 2
+    msg-cache-size: 16m
+    rrset-cache-size: 32m
+    val-log-level: 2
+    module-config: "validator iterator"
+EOU
+systemctl disable unbound.service 2>/dev/null || true
+systemctl mask unbound-resolvconf.service 2>/dev/null || true
+
+# Use systemd-networkd for the network; we serve DNS and DHCP ourselves.
+systemctl enable systemd-networkd.service || true
+# No wireless support: the kernel's wireless stack is blocked from loading, so a Wi-Fi card that is
+# plugged in is never brought up, whatever drivers or firmware the hardware brings with it.
+mkdir -p /etc/modprobe.d
+cat > /etc/modprobe.d/nopewarden-no-wireless.conf <<'EOW'
+# NopeWarden has no wireless support. Remove this file to let Wi-Fi drivers load (they will not be configured).
+install cfg80211 /bin/false
+install mac80211 /bin/false
+EOW
+systemctl disable systemd-resolved.service 2>/dev/null || true
+systemctl mask systemd-resolved.service 2>/dev/null || true
+rm -f /etc/resolv.conf
+printf 'nameserver 127.0.0.1\n' > /etc/resolv.conf
+
+# Services: the live image runs the installer, an installed system runs the appliance.
+systemctl enable nopewarden-text-installer.service
+systemctl enable nopewarden-netd.service
+systemctl enable nopewarden.service
+systemctl enable nftables.service 2>/dev/null || true
+systemctl disable nftables.service 2>/dev/null || true # NopeWarden loads its own table
+
+# SSH is off unless the administrator turns it on.
+systemctl disable ssh.service ssh.socket 2>/dev/null || true
+
+# Quiet, fast boot. Nothing in the image needs these.
+systemctl disable apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
+
+# Default locale and keyboard.
+sed -i 's/^# *en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen
+locale-gen
+printf 'LANG=en_US.UTF-8\n' > /etc/default/locale
+
+# Debian updates come with NopeWarden updates (Settings, Updates). Name the release by its name,
+# trixie, never "stable", so the machine can never drift onto a newer Debian by itself. The
+# updater refuses to touch the system if any source names something else.
+cat > /etc/apt/sources.list.d/debian.sources <<'SRC'
+Types: deb
+URIs: http://deb.debian.org/debian
+Suites: trixie trixie-updates
+Components: main contrib non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+
+Types: deb
+URIs: http://security.debian.org/debian-security
+Suites: trixie-security
+Components: main contrib non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+SRC
+: > /etc/apt/sources.list
+
+# Keep the image small.
+apt-get clean
+rm -rf /var/lib/apt/lists/* /usr/share/doc/* /usr/share/man/* /var/cache/debconf/*-old
+
+# Start-up screen: the NopeWarden theme, in the boot image too.
+plymouth-set-default-theme nopewarden || true
+# Do not make the installer wait for a cable: the screen explains what to plug in.
+systemctl mask systemd-networkd-wait-online.service 2>/dev/null || true
+
+# Nothing the person sees should name another product.
+sed -i 's/^PRETTY_NAME=.*/PRETTY_NAME="NopeWarden"/' /etc/os-release
+printf '\nNopeWarden\n\n' > /etc/issue
+printf 'NopeWarden\n' > /etc/issue.net
+: > /etc/motd
+# Rebuild the boot image so it contains the splash theme. The splash package's boot-image
+# hook can fail on a minimal system; if it does, say why in the build log and carry on
+# without the early splash (the splash still starts with the rest of the system).
+if ! update-initramfs -u -k all >/tmp/initramfs.log 2>&1; then
+	echo "NOTE: building the boot image with the splash hook failed:"
+	cat /tmp/initramfs.log
+	rm -f /usr/share/initramfs-tools/hooks/plymouth /usr/share/initramfs-tools/scripts/init-premount/plymouth \
+		/usr/share/initramfs-tools/scripts/init-bottom/plymouth /usr/share/initramfs-tools/scripts/local-premount/plymouth
+	update-initramfs -u -k all
+else
+	cat /tmp/initramfs.log
+fi
+
+# One network tool only. A second one (ifupdown) also asked for an address on every port,
+# which gave each port two addresses.
+apt-get purge -y ifupdown 2>/dev/null || true
+systemctl mask networking.service 2>/dev/null || true
+mkdir -p /etc/network
+printf 'auto lo\niface lo inet loopback\n' > /etc/network/interfaces
+
+# An installed machine shows the NopeWarden status screen on its own display, never a login prompt.
+systemctl enable nopewarden-screen.service
+systemctl enable nopewarden-recovery.service
+systemctl mask getty@tty2.service autovt@tty2.service 2>/dev/null || true

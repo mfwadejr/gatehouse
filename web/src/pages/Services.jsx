@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { del, holdAnd, put, useData } from '../api.js';
 import { SAVED_LATER, SaveChoice } from '../changes.jsx';
-import { Button, Card, Empty, Field, Input, Modal, Page, Paged, useAction, confirmBox, useUndoDelete } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Page, Paged, useAction, useUndoDelete } from '../ui.jsx';
 
-// Services: the one place to see what Gatehouse knows by name and to make your own. A service is a
+// Services: the one place to see what NopeWarden knows by name and to make your own. A service is a
 // name for one or more ports. Rules pick services by searching for the name or a port.
 
 function ServiceForm({ initial, onClose, onSaved }) {
@@ -49,7 +49,7 @@ export default function Services() {
               </div>
               <div className="actions">
                 <Button small icon="edit" onClick={() => setEdit(s)}>Edit</Button>
-                <Button small kind="danger" icon="trash" onClick={async () => { if (s.used_by.length) { if (await confirmBox(`Delete "${s.name}"? It is used by ${s.used_by.join(', ')}; Gatehouse will refuse until those rules change.`)) { await run(() => del(`/api/fw/portlists/${s.id}`)); reload(); } } else undoDelete(`The service "${s.name}"`, () => del(`/api/fw/portlists/${s.id}`), () => put('/api/fw/portlists', { name: s.name, ports: s.ports }), reload); }}>Delete</Button>
+                <Button small kind="danger" icon="trash" onClick={() => (s.used_by.length ? run(() => del(`/api/fw/portlists/${s.id}`)).then(reload) : undoDelete(`The service "${s.name}"`, () => del(`/api/fw/portlists/${s.id}`), () => put('/api/fw/portlists', { name: s.name, ports: s.ports }), reload))}>Delete</Button>
               </div>
             </div>
           ))}
@@ -63,7 +63,7 @@ export default function Services() {
           </div>
         </Card>
       )}
-      <Card title="Built in" desc="Gatehouse already knows these by name. They cannot be changed.">
+      <Card title="Built in" desc="NopeWarden already knows these by name. They cannot be changed.">
         <div className="list">
           <Paged items={known}>{(shownKnown) => shownKnown.map((s) => (
             <div className="item" key={s.name}>

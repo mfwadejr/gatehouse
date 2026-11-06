@@ -29,11 +29,11 @@ type Plan struct {
 }
 
 const (
-	IncludeFile = "etc/gatehouse/suricata.yaml"
-	UnitFile    = "etc/systemd/system/gatehouse-suricata.service"
+	IncludeFile = "etc/nopewarden/suricata.yaml"
+	UnitFile    = "etc/systemd/system/nopewarden-suricata.service"
 	DisableConf = "etc/suricata/disable.conf"
-	UnitName    = "gatehouse-suricata.service"
-	// EveFile is where the engine writes what it notices. Gatehouse reads it and never writes to it.
+	UnitName    = "nopewarden-suricata.service"
+	// EveFile is where the engine writes what it notices. NopeWarden reads it and never writes to it.
 	EveFile = "/var/log/suricata/eve.json"
 )
 
@@ -85,7 +85,7 @@ func (p *Plan) Check() error {
 func Include() string {
 	return `%YAML 1.1
 ---
-# Written by Gatehouse. Watch only: the engine reads copies of packets and changes nothing.
+# Written by NopeWarden. Watch only: the engine reads copies of packets and changes nothing.
 vars:
   address-groups:
     HOME_NET: "[192.168.0.0/16,10.0.0.0/8,172.16.0.0/12]"
@@ -111,11 +111,11 @@ func Unit(p Plan) string {
 		args.WriteString(" -i " + i)
 	}
 	return fmt.Sprintf(`[Unit]
-Description=Gatehouse threat watching (Suricata, watch only)
+Description=NopeWarden threat watching (Suricata, watch only)
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/suricata -c /etc/suricata/suricata.yaml --include /etc/gatehouse/suricata.yaml --pidfile /run/gatehouse-suricata.pid%s
+ExecStart=/usr/bin/suricata -c /etc/suricata/suricata.yaml --include /etc/nopewarden/suricata.yaml --pidfile /run/nopewarden-suricata.pid%s
 Restart=on-failure
 RestartSec=30
 Nice=10
@@ -286,7 +286,7 @@ func Changes(preset string, wantOff map[string]bool) (on, off []string) {
 // the person switched off. Anything else stays on.
 func DisableList(p Plan) string {
 	var b strings.Builder
-	b.WriteString("# Written by Gatehouse\n")
+	b.WriteString("# Written by NopeWarden\n")
 	for _, g := range EffectiveOff(p) {
 		b.WriteString("group:emerging-" + g + ".rules\n")
 	}

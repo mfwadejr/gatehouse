@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/netcfg"
+	"nopewarden/internal/api"
+	"nopewarden/internal/netcfg"
 )
 
 // Throughput of each internet connection, sampled from the kernel's interface counters.
@@ -134,6 +134,7 @@ func (a *App) collectTraffic(ctx context.Context) {
 		case now := <-t.C:
 			a.traffic.sample(a.wanDevices(), now, readCounter)
 			a.sampleNetworks(now)
+			a.vpnTraffic.sample(a.vpnDevices(), now, readCounter)
 		}
 	}
 }
@@ -173,7 +174,63 @@ func (t *wanTraffic) latest() map[string][2]float64 {
 	return out
 }
 
+// vpnDevices maps each VPN's id (as text) to its network device, for the tunnels that are switched on.
+func (a *App) vpnDevices() map[string]string {
+	out := map[string]string{}
+	for _, v := range a.vpnSnapshot().Views {
+		if v.Enabled && v.Dev != "" {
+			out[strconv.FormatInt(v.ID, 10)] = v.Dev
+		}
+	}
+	return out
+}
+
 func (a *App) registerTrafficRoutes() {
+	// What each VPN is carrying right now. A client tunnel's received bytes are what you downloaded; a
+	// server tunnel's received bytes are what the connected devices sent, so the names swap there.
+	// The last fifteen minutes, once a second, for each VPN (kind=vpn) or each network (kind=net), so
+	// their pages can draw the same graphs as the internet connections. rx and tx are from the port or
+	// tunnel's side; a client VPN's rx is download, a network's rx is what its devices sent.
+	a.API.Handle("GET /api/traffic/live", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		src := &a.netTraffic
+		if r.URL.Query().Get("kind") == "vpn" {
+			src = &a.vpnTraffic
+		}
+		links, seq := src.tail(0)
+		out := map[string]map[string][]float64{}
+		for id, v := range links {
+			d, u := v.Tx, v.Rx // networks: down is what the devices received
+			if r.URL.Query().Get("kind") == "vpn" {
+				d, u = v.Rx, v.Tx
+			}
+			out[id] = map[string][]float64{"down": d, "up": u}
+		}
+		if r.URL.Query().Get("kind") == "vpn" {
+			for _, vv := range a.vpnSnapshot().Views {
+				if vv.Role == "server" {
+					if x, ok := out[strconv.FormatInt(vv.ID, 10)]; ok {
+						x["down"], x["up"] = x["up"], x["down"]
+					}
+				}
+			}
+		}
+		api.JSON(w, 200, map[string]any{"interval": int(trafficEvery / time.Second), "seq": seq, "series": out})
+	})
+	a.API.Handle("GET /api/vpn/speed", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		role := map[string]string{}
+		for _, v := range a.vpnSnapshot().Views {
+			role[strconv.FormatInt(v.ID, 10)] = v.Role
+		}
+		out := map[string]map[string]float64{}
+		for id, v := range a.vpnTraffic.latest() {
+			d, u := v[0], v[1]
+			if role[id] == "server" {
+				d, u = u, d
+			}
+			out[id] = map[string]float64{"down": d, "up": u}
+		}
+		api.JSON(w, 200, map[string]any{"vpns": out})
+	})
 	a.API.Handle("GET /api/net/zone-speed", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		// A port's received bytes are what the devices on it sent, so the names swap here.
 		out := map[string]map[string]float64{}

@@ -2,7 +2,7 @@ package devices
 
 import "strings"
 
-// Icons are the built-in pictures for a device. Gatehouse guesses one from the maker and the name;
+// Icons are the built-in pictures for a device. NopeWarden guesses one from the maker and the name;
 // the person can change it, or upload their own.
 var Icons = []string{"computer", "laptop", "phone", "tablet", "tv", "speaker", "printer", "camera", "game", "watch", "iot", "server", "network", "storage", "device"}
 

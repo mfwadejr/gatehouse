@@ -62,10 +62,19 @@ func TestShieldBecomesTheLogo(t *testing.T) {
 	if _, _, ok := e.findShield(); ok {
 		t.Fatal("the block shield should have been replaced")
 	}
-	// The middle of the shield is the dash, drawn in the logo's blue; the corner of the screen is background.
-	c := img.RGBAAt(27*16+8, 3*32+10)
-	if c.B < 150 || c.R > 120 {
-		t.Fatalf("no blue logo pixels at the centre: %+v", c)
+	// The logo is the purple-blue badge: somewhere inside the shield there are badge-coloured pixels,
+	// and the corner of the screen is background.
+	found := false
+	for y := 2 * 32; y < 12*32 && !found; y += 4 {
+		for x := 20 * 16; x < 40*16; x += 4 {
+			if c := img.RGBAAt(x, y); c.B > 200 && c.R > 60 && c.R < 170 && c.G > 100 && c.G < 160 {
+				found = true
+				break
+			}
+		}
+	}
+	if !found {
+		t.Fatal("no badge-coloured logo pixels where the shield was")
 	}
 	if bg := img.RGBAAt(2, 2); bg.R != 0x12 {
 		t.Fatalf("background %+v", bg)

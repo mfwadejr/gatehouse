@@ -144,7 +144,7 @@ func (p PortSpec) String() string {
 	return p.Proto + "/" + p.portExpr()
 }
 
-// BuiltinService is a service Gatehouse knows by name.
+// BuiltinService is a service NopeWarden knows by name.
 type BuiltinService struct {
 	Name  string   `json:"name"`
 	Ports []string `json:"ports"`

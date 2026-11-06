@@ -52,11 +52,11 @@ func response(st, location, uuid string) []byte {
 	if st == "uuid:"+uuid {
 		usn = st
 	}
-	return []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nCACHE-CONTROL: max-age=1800\r\nEXT:\r\nLOCATION: %s\r\nSERVER: Gatehouse UPnP/1.0\r\nST: %s\r\nUSN: %s\r\n\r\n", location, st, usn))
+	return []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nCACHE-CONTROL: max-age=1800\r\nEXT:\r\nLOCATION: %s\r\nSERVER: NopeWarden UPnP/1.0\r\nST: %s\r\nUSN: %s\r\n\r\n", location, st, usn))
 }
 
 func notify(st, location, uuid string) []byte {
-	return []byte(fmt.Sprintf("NOTIFY * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nCACHE-CONTROL: max-age=1800\r\nLOCATION: %s\r\nNT: %s\r\nNTS: ssdp:alive\r\nSERVER: Gatehouse UPnP/1.0\r\nUSN: uuid:%s::%s\r\n\r\n", location, st, uuid, st))
+	return []byte(fmt.Sprintf("NOTIFY * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nCACHE-CONTROL: max-age=1800\r\nLOCATION: %s\r\nNT: %s\r\nNTS: ssdp:alive\r\nSERVER: NopeWarden UPnP/1.0\r\nUSN: uuid:%s::%s\r\n\r\n", location, st, uuid, st))
 }
 
 // serveSSDP answers searches from one LAN until ctx ends. Searches from anywhere else are ignored,

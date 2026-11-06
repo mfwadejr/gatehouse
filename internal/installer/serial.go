@@ -11,7 +11,7 @@ import (
 
 // SerialMarker is where the installer leaves "ttyS0 115200" when the machine was installed over a
 // serial console, so the status screen keeps talking on that port.
-var SerialMarker = "/var/lib/gatehouse/serial-console"
+var SerialMarker = "/var/lib/nopewarden/serial-console"
 
 // serialConsole says which serial port the status screen should also use: the one the installer
 // left in the marker, or one the kernel was told about with console=ttyS0,115200 on its command line.

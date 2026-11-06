@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"gatehouse/internal/netd"
+	"nopewarden/internal/netd"
 )
 
 func viaTestApp(t *testing.T, state string) *App {

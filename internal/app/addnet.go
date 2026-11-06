@@ -11,9 +11,9 @@ import (
 	"strconv"
 	"strings"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/fw"
-	"gatehouse/internal/seed"
+	"nopewarden/internal/api"
+	"nopewarden/internal/fw"
+	"nopewarden/internal/seed"
 )
 
 // Adding a network used to mean three pages: a port or VLAN with an address, a DHCP scope, and a

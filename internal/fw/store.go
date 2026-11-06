@@ -6,7 +6,7 @@ import (
 	"errors"
 	"strings"
 
-	"gatehouse/internal/store"
+	"nopewarden/internal/store"
 )
 
 // Mutate runs fn in a transaction and only commits if the resulting configuration is valid.

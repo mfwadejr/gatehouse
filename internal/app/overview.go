@@ -14,7 +14,7 @@ import (
 	"syscall"
 	"time"
 
-	"gatehouse/internal/api"
+	"nopewarden/internal/api"
 )
 
 // Everything the Overview page needs that is not already served by another page: a short history
@@ -149,7 +149,7 @@ func dirBytes(path string) int64 {
 	return n
 }
 
-// diskBreakdown says what Gatehouse itself keeps on the disk, so a person running low can see
+// diskBreakdown says what NopeWarden itself keeps on the disk, so a person running low can see
 // what to trim: the logs, saved backups, the settings database and downloaded blocklists. The
 // rest of what is in use is the system itself.
 func (a *App) diskBreakdown(used int64) []diskPart {
@@ -165,7 +165,7 @@ func (a *App) diskBreakdown(used int64) []diskPart {
 		ours += p.Bytes
 	}
 	if rest := dirBytes(dir) - ours; rest > 0 {
-		parts = append(parts, diskPart{"Other Gatehouse data", rest})
+		parts = append(parts, diskPart{"Other NopeWarden data", rest})
 		ours += rest
 	}
 	if used > ours {
@@ -354,6 +354,21 @@ func (a *App) histPoints(now time.Time) []histPoint {
 	if h.Temp > 0 {
 		add("sys.temp", h.Temp)
 	}
+	// Each VPN's own traffic (its history key uses the VPN's id).
+	for id, v := range a.vpnTraffic.snapshot() {
+		role := ""
+		for _, vv := range a.vpnSnapshot().Views {
+			if strconv.FormatInt(vv.ID, 10) == id {
+				role = vv.Role
+			}
+		}
+		d, u := avgTail(v.Rx, n), avgTail(v.Tx, n)
+		if role == "server" {
+			d, u = u, d
+		}
+		add("vpn."+id+".down", d)
+		add("vpn."+id+".up", u)
+	}
 	// Each network's own traffic, from its ports' counters.
 	a.hist.mu.Lock()
 	if a.hist.zones == nil {
@@ -481,14 +496,14 @@ type mapCountry struct {
 
 // worldMap adds up connections by the country on the far side. Going out is the connections the
 // devices made; coming in is what the internet tried to reach, split into blocked and allowed.
-func (a *App) worldMap(dir string, hours int) map[string]any {
+func (a *App) worldMap(dir string, minutes int) map[string]any {
 	wans := a.wanZoneNames()
 	var names []any
 	for n := range wans {
 		names = append(names, n)
 	}
 	ph := strings.TrimSuffix(strings.Repeat("?,", len(names)), ",")
-	since := time.Now().Add(-time.Duration(hours) * time.Hour).Unix()
+	since := time.Now().Add(-time.Duration(minutes) * time.Minute).Unix()
 	var q string
 	args := []any{since}
 	incoming := dir == "in"
@@ -557,7 +572,7 @@ func (a *App) worldMap(dir string, hours int) map[string]any {
 	sort.Slice(list, func(i, j int) bool {
 		return list[i].N > list[j].N || list[i].N == list[j].N && list[i].Country < list[j].Country
 	})
-	return map[string]any{"dir": dir, "hours": hours, "top": top, "countries": list}
+	return map[string]any{"dir": dir, "minutes": minutes, "top": top, "countries": list}
 }
 
 // ---- devices ----
@@ -640,13 +655,17 @@ func (a *App) registerOverviewRoutes() {
 		if r.URL.Query().Get("dir") == "in" {
 			dir = "in"
 		}
-		hours := map[string]int{"1h": 1, "24h": 24, "7d": 168, "30d": 720}[r.URL.Query().Get("range")]
-		if hours == 0 {
-			hours = 24
+		mins := map[string]int{"5m": 5, "15m": 15, "1h": 60, "24h": 24 * 60, "7d": 7 * 24 * 60, "30d": 30 * 24 * 60}[r.URL.Query().Get("range")]
+		if mins == 0 {
+			mins = 24 * 60
 		}
 		a.geoEnsure()
-		key := "map:" + dir + ":" + strconv.Itoa(hours)
-		api.JSON(w, 200, a.cached(key, 60*time.Second, func() any { return a.worldMap(dir, hours) }))
+		key := "map:" + dir + ":" + strconv.Itoa(mins)
+		ttl := 60 * time.Second
+		if mins <= 15 {
+			ttl = 10 * time.Second
+		}
+		api.JSON(w, 200, a.cached(key, ttl, func() any { return a.worldMap(dir, mins) }))
 	})
 	s.Handle("GET /api/overview/security", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		api.JSON(w, 200, a.cached("sec", 10*time.Second, func() any {

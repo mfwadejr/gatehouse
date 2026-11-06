@@ -4,7 +4,7 @@ import (
 	"net/netip"
 	"testing"
 
-	"gatehouse/internal/netd"
+	"nopewarden/internal/netd"
 )
 
 func TestUPnPPolicyAndPush(t *testing.T) {

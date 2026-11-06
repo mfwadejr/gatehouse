@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/api"
-	dnssrv "gatehouse/internal/dns"
+	"nopewarden/internal/api"
+	dnssrv "nopewarden/internal/dns"
 )
 
 // Which connection a device's traffic leaves through. The firewall log already records the port

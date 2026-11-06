@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"gatehouse/internal/fw"
+	"nopewarden/internal/fw"
 )
 
 func TestDiscoveryPairsReachTheFirewall(t *testing.T) {

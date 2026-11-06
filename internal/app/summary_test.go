@@ -36,7 +36,7 @@ func TestTopologyPicture(t *testing.T) {
 			{Name: "Guests"}, {Name: "Lab"},
 		},
 	})
-	for _, want := range []string{"<svg", "Internet", "Gatehouse", "Home", "Cameras", "VLAN 20", "and 7 more", "Front door", "Guests", "Lab"} {
+	for _, want := range []string{"<svg", "Internet", "NopeWarden", "Home", "Cameras", "VLAN 20", "and 7 more", "Front door", "Guests", "Lab"} {
 		if !strings.Contains(svg, want) {
 			t.Fatalf("picture lacks %q", want)
 		}

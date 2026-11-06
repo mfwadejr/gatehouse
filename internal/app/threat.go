@@ -12,14 +12,14 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/api"
+	"nopewarden/internal/api"
 )
 
-// Threat protection. A detection engine (Suricata) writes what it notices to a log file; Gatehouse
+// Threat protection. A detection engine (Suricata) writes what it notices to a log file; NopeWarden
 // reads that file, drops what the person has let through, and turns the rest into plain-language
 // alerts in the Logs. It watches and tells; it does not block traffic yet.
 //
-// It fails open by construction: Gatehouse only reads the engine's log. If the engine is missing,
+// It fails open by construction: NopeWarden only reads the engine's log. If the engine is missing,
 // stopped or crashes, or this reader fails, traffic is not touched in any way.
 
 const (
@@ -138,7 +138,7 @@ func (a *App) threatIngest(line []byte, now time.Time) bool {
 	}
 	st.mu.Unlock()
 	if noisy {
-		a.Config.Exec(`INSERT INTO threat_allowed(sid,mac,until,note,auto) VALUES(?,?,?,?,1)`, e.Alert.SID, "", now.Add(7*24*time.Hour).Unix(), "Fired too often, so Gatehouse quieted it for a week")
+		a.Config.Exec(`INSERT INTO threat_allowed(sid,mac,until,note,auto) VALUES(?,?,?,?,1)`, e.Alert.SID, "", now.Add(7*24*time.Hour).Unix(), "Fired too often, so NopeWarden quieted it for a week")
 		a.Logs.Exec(`INSERT INTO events(ts,area,severity,actor,title,detail) VALUES(?,?,?,?,?,?)`, now.Unix(), "threat", "info", "system",
 			"Threat protection quieted a noisy check", e.Alert.Signature+" fired too often. You can see it under Firewall, Threat protection.")
 		return false
@@ -218,7 +218,7 @@ func (a *App) threatEngine() map[string]any {
 	case time.Since(fi.ModTime()) > 10*time.Minute:
 		return map[string]any{"state": "quiet", "text": "The engine has not written anything for a while. That is normal on a quiet network."}
 	}
-	return map[string]any{"state": "running", "text": "The engine is running and Gatehouse is reading what it sees."}
+	return map[string]any{"state": "running", "text": "The engine is running and NopeWarden is reading what it sees."}
 }
 
 func (a *App) registerThreatRoutes() {

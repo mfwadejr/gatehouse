@@ -13,7 +13,7 @@ export default function Syslog() {
   const save = () => run(async () => { await put('/api/syslog', { ...f, port: Number(f.port) }); reload(); }, 'Saved.');
   const st = data.status;
   return (
-    <Card title="Send logs elsewhere" desc="Copies Gatehouse's events to a syslog server you run, for example on a NAS or in a log tool. Off by default.">
+    <Card title="Send logs elsewhere" desc="Copies NopeWarden's events to a syslog server you run, for example on a NAS or in a log tool. Off by default.">
       <div className="stack">
         <ToggleRow title="Send logs" checked={f.on} onChange={set('on')} />
         {f.on && (

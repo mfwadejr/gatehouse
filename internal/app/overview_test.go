@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"gatehouse/internal/netd"
+	"nopewarden/internal/netd"
 )
 
 func TestHistoryRollsUpIntoSlowerTiers(t *testing.T) {
@@ -50,8 +50,8 @@ func TestWorldMapSplitsIncomingAndOutgoing(t *testing.T) {
 	})
 	a.Logs.Exec(`UPDATE fw_events SET from_zone='Internet',to_zone='Router' WHERE dport=22`)
 	a.Logs.Exec(`UPDATE fw_events SET from_zone='Home',to_zone='Internet' WHERE dport=443`)
-	in := a.worldMap("in", 1)
-	out := a.worldMap("out", 1)
+	in := a.worldMap("in", 60)
+	out := a.worldMap("out", 60)
 	if in["dir"] != "in" || out["dir"] != "out" {
 		t.Fatal("dir")
 	}

@@ -14,10 +14,10 @@ import (
 // the same answers instead of asking again.
 
 // InstallNetPath is where the choices are left on the installed system.
-var InstallNetPath = "/var/lib/gatehouse/install-net"
+var InstallNetPath = "/var/lib/nopewarden/install-net"
 
 // InstallNetFile is the same place, relative to the new system's root.
-const InstallNetFile = "var/lib/gatehouse/install-net"
+const InstallNetFile = "var/lib/nopewarden/install-net"
 
 // InstallNet is what the installer remembered.
 type InstallNet struct {

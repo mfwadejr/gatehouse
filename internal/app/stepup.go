@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"gatehouse/internal/api"
+	"nopewarden/internal/api"
 )
 
 // Serious actions (reset, restore, revert to an earlier point, turning on SSH, downloading a plain

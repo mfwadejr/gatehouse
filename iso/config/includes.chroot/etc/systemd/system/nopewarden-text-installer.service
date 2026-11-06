@@ -1,0 +1,18 @@
+[Unit]
+Description=NopeWarden text-mode installer
+ConditionKernelCommandLine=boot=live
+After=systemd-networkd.service getty@tty1.service
+Conflicts=getty@tty1.service serial-getty@ttyS0.service
+
+[Service]
+Type=simple
+ExecStartPre=-/usr/bin/plymouth quit
+ExecStart=/usr/local/bin/nopewarden textinstaller
+Restart=always
+RestartSec=2
+StandardInput=null
+StandardOutput=null
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

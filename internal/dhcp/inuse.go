@@ -33,7 +33,7 @@ func PingInUse(iface string, ip net.IP) bool {
 	}
 	defer conn.Close()
 	id := os.Getpid() & 0xffff
-	b, err := (&icmp.Message{Type: ipv4.ICMPTypeEcho, Body: &icmp.Echo{ID: id, Seq: 1, Data: []byte("gatehouse")}}).Marshal(nil)
+	b, err := (&icmp.Message{Type: ipv4.ICMPTypeEcho, Body: &icmp.Echo{ID: id, Seq: 1, Data: []byte("nopewarden")}}).Marshal(nil)
 	if err != nil {
 		return false
 	}

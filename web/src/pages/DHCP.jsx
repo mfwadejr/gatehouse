@@ -2,7 +2,7 @@ import { useHashTab } from '../hashtab.js';
 import React, { useState } from 'react';
 import { del, holdAnd, post, put, useData } from '../api.js';
 import { SAVED_LATER, SaveChoice } from '../changes.jsx';
-import { Bar, Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Select, Tabs, ToggleRow, useAction, fmt, confirmBox, usePortNames } from '../ui.jsx';
+import { Bar, Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Select, Tabs, ToggleRow, useAction, fmt, usePortNames, Limited , useDelayedDelete } from '../ui.jsx';
 
 const HOURS = [{ value: 3600, label: '1 hour' }, { value: 14400, label: '4 hours' }, { value: 43200, label: '12 hours' }, { value: 86400, label: '1 day' }, { value: 604800, label: '1 week' }];
 
@@ -25,7 +25,7 @@ export function ScopeForm({ initial, ifaces, onClose, onSaved }) {
         <Field label="Port or VLAN"><Select value={s.iface} onChange={set('iface')} options={[{ value: '', label: 'Choose…' }, ...ifaces.map((i) => i.name)]} /></Field>
       </div>
       <Field label="Who hands out addresses here?">
-        <Select value={s.mode} onChange={set('mode')} options={[{ value: 'serve', label: 'Gatehouse' }, { value: 'relay', label: 'Another router, relayed to Gatehouse' }, { value: 'off', label: 'Another device (Gatehouse stays out of it)' }]} />
+        <Select value={s.mode} onChange={set('mode')} options={[{ value: 'serve', label: 'NopeWarden' }, { value: 'relay', label: 'Another router, relayed to NopeWarden' }, { value: 'off', label: 'Another device (NopeWarden stays out of it)' }]} />
       </Field>
       <Field label="Network" hint="Like 192.168.1.0/24"><input className="in" value={s.subnet || ''} onChange={(e) => set('subnet')(e.target.value)} onBlur={fill} /></Field>
       {s.mode !== 'off' && (
@@ -45,6 +45,7 @@ export function ScopeForm({ initial, ifaces, onClose, onSaved }) {
 }
 
 function Scopes() {
+  const delayedDelete = useDelayedDelete();
   const pn = usePortNames();
   const { data: scopes, reload } = useData('/api/dhcp/scopes', { topics: ['dhcp.leases'] });
   const { data: util } = useData('/api/dhcp/utilisation', { topics: ['dhcp.utilisation'], every: 10000 });
@@ -72,9 +73,9 @@ function Scopes() {
                 <div className="meta">{pn(s.iface)} · {s.subnet}{s.mode !== 'off' ? ` · ${s.range_start} – ${s.range_end}` : ''}</div>
                 {result[s.id] && (
                   <Note tone={result[s.id].verdict === 'ok' ? 'good' : 'warn'} title={result[s.id].verdict === 'conflict' ? 'Another device is handing out addresses here' : result[s.id].verdict === 'none' ? 'Nothing is handing out addresses here' : 'No other servers found'}>
-                    {result[s.id].verdict === 'conflict' && `Devices may get an address from ${result[s.id].found.map((f) => f.server).join(', ')} instead of Gatehouse. Turn that server's address handing off, or switch this network to "Another device".`}
+                    {result[s.id].verdict === 'conflict' && `Devices may get an address from ${result[s.id].found.map((f) => f.server).join(', ')} instead of NopeWarden. Turn that server's address handing off, or switch this network to "Another device".`}
                     {result[s.id].verdict === 'none' && 'This network is set to use another device for addresses, but none answered. New devices will not get an address.'}
-                    {result[s.id].verdict === 'ok' && 'Only Gatehouse answered on this network.'}
+                    {result[s.id].verdict === 'ok' && 'Only NopeWarden answered on this network.'}
                   </Note>
                 )}
                 {u && s.mode === 'serve' && u.size > 0 && u.active / u.size > 0.8 && (
@@ -84,7 +85,7 @@ function Scopes() {
                 )}
                 {u && s.mode !== 'off' && <div className="stack" style={{ gap: 'var(--space-1)', marginTop: 'var(--space-2)', maxWidth: '24rem' }}><Bar pct={pct} thin /><span className="small muted">{u.active} of {u.size} addresses in use</span></div>}
               </div>
-              <div className="actions"><Button small icon="refresh" disabled={checking === s.id || s.mode === 'relay'} onClick={() => check(s)}>{checking === s.id ? 'Listening…' : 'Check for other servers'}</Button><Button small icon="edit" onClick={() => setEdit(s)}>Edit</Button><Button small kind="danger" icon="trash" onClick={async () => await confirmBox(`Delete ${s.name}?`) && run(() => del(`/api/dhcp/scopes/${s.id}`)).then(reload)}>Delete</Button></div>
+              <div className="actions"><Button small icon="refresh" disabled={checking === s.id || s.mode === 'relay'} onClick={() => check(s)}>{checking === s.id ? 'Listening…' : 'Check for other servers'}</Button><Button small icon="edit" onClick={() => setEdit(s)}>Edit</Button><Button small kind="danger" icon="trash" onClick={() => delayedDelete(`The network ${s.name}`, () => del(`/api/dhcp/scopes/${s.id}`), reload, 'Its reserved addresses go with it.')}>Delete</Button></div>
             </div>
           );
         })}
@@ -106,7 +107,7 @@ function Leases() {
         <table className="table">
           <thead><tr><th>Name</th><th>Address</th><th>Device (MAC)</th><th>Network</th><th>Until</th><th /></tr></thead>
           <tbody>
-            {(data || []).map((l) => (
+            {<Limited items={(data || [])} noun="reservations" render={(l) => (
               <tr key={`${l.scope_id}-${l.ip}`}>
                 <td>{l.hostname || <span className="muted">unnamed</span>}</td>
                 <td className="mono">{l.ip}</td><td className="mono">{l.mac}</td><td>{l.scope}</td>
@@ -116,7 +117,7 @@ function Leases() {
                   <Button small kind="danger" onClick={() => run(() => del(`/api/dhcp/leases/${l.scope_id}/${l.ip}`), 'Released.').then(reload)}>Release</Button>
                 </div></td>
               </tr>
-            ))}
+            )} />}
           </tbody>
         </table>
         {!data?.length && <Empty>No devices have asked for an address yet.</Empty>}
@@ -165,7 +166,7 @@ export default function DHCP() {
     <Page title="DHCP" sub="Gives every device an address when it joins the network.">
       {(rogue || []).map((r) => (
         <Note key={r.scope} tone="bad" title={`Another DHCP server is answering on ${r.name}`}>
-          {r.found.map((f) => f.server).join(', ')} hands out addresses here as well, so devices may get the wrong settings. Switch that device's DHCP off, or turn DHCP off for this network in Gatehouse.
+          {r.found.map((f) => f.server).join(', ')} hands out addresses here as well, so devices may get the wrong settings. Switch that device's DHCP off, or turn DHCP off for this network in NopeWarden.
         </Note>
       ))}
       <Tabs value={tab} onChange={setTab} tabs={[{ value: 'scopes', label: 'Address pools' }, { value: 'leases', label: 'Devices' }, { value: 'resv', label: 'Reservations' }]} />

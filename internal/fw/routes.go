@@ -246,7 +246,7 @@ func SaveRoute(tx *sql.Tx, r RouteRow) (int64, error) {
 		var pos, n int
 		tx.QueryRow(`SELECT COALESCE(MAX(position),0)+1, COUNT(*) FROM routes`).Scan(&pos, &n)
 		if n >= MaxRoutes {
-			return 0, fmt.Errorf("Gatehouse supports up to %d routes", MaxRoutes)
+			return 0, fmt.Errorf("NopeWarden supports up to %d routes", MaxRoutes)
 		}
 		res, err := tx.Exec(`INSERT INTO routes(name,enabled,target_kind,target,kill,srcs,dests,service,sched,paused_until,mode,position) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`,
 			r.Name, b2i(r.Enabled), r.TargetKind, r.Target, b2i(r.Kill), string(srcs), string(dests), r.Service, sched, r.PausedUntil, r.Mode, pos)

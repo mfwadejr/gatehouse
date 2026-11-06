@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"gatehouse/internal/api"
+	"nopewarden/internal/api"
 )
 
 // homeMapSetting is where the person put themselves on the Overview map, as a point on the map's

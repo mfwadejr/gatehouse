@@ -13,10 +13,10 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/threatcfg"
+	"nopewarden/internal/threatcfg"
 )
 
-// Threat watching: an optional detection engine (Suricata) that Gatehouse installs only when the
+// Threat watching: an optional detection engine (Suricata) that NopeWarden installs only when the
 // owner asks. It runs in watch-only mode on copies of packets, so it can never hold up traffic.
 // The package is deliberately not in the update package list: a bad package can never stop an
 // update, and nothing is installed unless a person pressed Install.
@@ -24,7 +24,7 @@ import (
 const (
 	threatBinary = "usr/bin/suricata"
 	threatRules  = "var/lib/suricata/rules/suricata.rules"
-	// the engine's own service, which the package turns on; Gatehouse turns it off and runs its own
+	// the engine's own service, which the package turns on; NopeWarden turns it off and runs its own
 	threatStockUnit = "suricata.service"
 )
 
@@ -238,7 +238,7 @@ func (s *Service) ThreatInstallPreview() (ThreatPreview, error) {
 }
 
 // ThreatInstallStart installs the engine in the background. It never starts the engine's own
-// service: Gatehouse runs it in its own limited, watch-only service when the owner turns it on.
+// service: NopeWarden runs it in its own limited, watch-only service when the owner turns it on.
 func (s *Service) ThreatInstallStart() error {
 	if err := onDebian13(); err != nil {
 		return err
@@ -365,9 +365,9 @@ func (s *Service) threatWhy() (why string, failing bool) {
 		return "It ran out of memory and was stopped. Raise its memory limit under Settings, or choose Light.", true
 	case st.Sub == "auto-restart" || st.Active == "failed" || (st.Active == "inactive" && st.Result != "success" && st.Result != ""):
 		if e := lastUnitError(threatcfg.UnitName); e != "" {
-			return "It keeps stopping and Gatehouse keeps restarting it. The last thing it said: " + e, true
+			return "It keeps stopping and NopeWarden keeps restarting it. The last thing it said: " + e, true
 		}
-		return "It keeps stopping and Gatehouse keeps restarting it, and it did not say why. See Advanced, Program log.", true
+		return "It keeps stopping and NopeWarden keeps restarting it, and it did not say why. See Advanced, Program log.", true
 	case st.Active == "activating":
 		return "It is starting. Loading the rules takes a minute or two.", false
 	}

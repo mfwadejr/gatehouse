@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"gatehouse/internal/ha"
+	"nopewarden/internal/ha"
 )
 
 func modePorts(t *testing.T) {

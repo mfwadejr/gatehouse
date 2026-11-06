@@ -84,7 +84,7 @@ func TestForcedDNSExceptions(t *testing.T) {
 func TestForcedDNSExceptionWorksWithTheSwitchOff(t *testing.T) {
 	m := dnsModel()
 	m.DNSRedirect = false
-	m.DNSExceptions = []DNSException{{Who: "dev:aa:bb:cc:00:00:01", Mode: DNSGatehouse}}
+	m.DNSExceptions = []DNSException{{Who: "dev:aa:bb:cc:00:00:01", Mode: DNSNopeWarden}}
 	out, err := Compile(m)
 	if err != nil {
 		t.Fatal(err)

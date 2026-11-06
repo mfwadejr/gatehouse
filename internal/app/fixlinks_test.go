@@ -15,7 +15,7 @@ func TestFixButtonsOpenRealPagesAndTabs(t *testing.T) {
 		"settings": {"general", "account", "alerts", "backup", "advanced"},
 		"profiles": nil, "networks": nil, "internet": nil, "dns": nil, "protection": nil,
 	}
-	re := regexp.MustCompile(`Page: "([a-z]+)(?:/([a-z]+))?"`)
+	re := regexp.MustCompile(`Page: "([a-z]+)(?:/([a-z]+))?[?"]`)
 	n := 0
 	for _, f := range []string{"security.go", "diag_why.go"} {
 		b, err := os.ReadFile(f)

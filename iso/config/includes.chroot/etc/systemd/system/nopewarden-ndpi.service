@@ -1,0 +1,33 @@
+[Unit]
+Description=NopeWarden traffic labels (names the application behind each connection)
+ConditionKernelCommandLine=!boot=live
+ConditionPathExists=/usr/lib/nopewarden/gh-ndpi
+ConditionPathExists=/etc/nopewarden/ndpi.conf
+After=nopewarden.service
+
+[Service]
+Type=simple
+User=nopewarden-ndpi
+Group=nopewarden-ndpi
+EnvironmentFile=/etc/nopewarden/ndpi.conf
+ExecStart=/usr/lib/nopewarden/gh-ndpi -s /run/nopewarden/ndpi/ndpi.sock $IFACES
+Restart=on-failure
+RestartSec=5
+# It only looks at copies of packets. It can open a capture socket and talk to NopeWarden, nothing else.
+AmbientCapabilities=CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_RAW
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_PACKET AF_UNIX
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+MemoryMax=256M
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

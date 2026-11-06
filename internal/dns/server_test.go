@@ -11,7 +11,7 @@ import (
 
 	"github.com/miekg/dns"
 
-	"gatehouse/internal/store"
+	"nopewarden/internal/store"
 )
 
 type fakeDir struct{ info ClientInfo }

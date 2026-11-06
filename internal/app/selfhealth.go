@@ -2,12 +2,12 @@ package app
 
 import (
 	"fmt"
-	"gatehouse/internal/store"
 	"net/http"
+	"nopewarden/internal/store"
 	"os"
 	"time"
 
-	"gatehouse/internal/api"
+	"nopewarden/internal/api"
 )
 
 // The Diagnostics verdict and self-health summary: one sentence first, problems first, details below.
@@ -79,10 +79,10 @@ func (a *App) selfHealth() map[string]any {
 	// Restarts: a process much younger than the machine was restarted on its own, or by an update.
 	proc := now.Sub(a.startedAt)
 	machine := time.Duration(h.Uptime) * time.Second
-	facts = append(facts, healthFact{Label: "Gatehouse has been running for", Value: agoSpan(proc)})
+	facts = append(facts, healthFact{Label: "NopeWarden has been running for", Value: agoSpan(proc)})
 	facts = append(facts, healthFact{Label: "The machine has been on for", Value: agoSpan(machine)})
 	if h.Uptime > 0 && machine-proc > 2*time.Minute && proc < 24*time.Hour {
-		issues = append(issues, healthIssue{"warn", "Gatehouse restarted " + agoSpan(proc) + " ago while the machine kept running. An update does this; if you did not update, look at the system log.", "diagnostics/log"})
+		issues = append(issues, healthIssue{"warn", "NopeWarden restarted " + agoSpan(proc) + " ago while the machine kept running. An update does this; if you did not update, look at the system log.", "diagnostics/log"})
 	}
 
 	// Firewall.

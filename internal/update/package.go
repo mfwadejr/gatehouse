@@ -33,7 +33,7 @@ type Manifest struct {
 	Date    string `json:"date"`
 	Notes   string `json:"notes"`
 	Files   []File `json:"files"`
-	// Packages are Debian packages this release needs, installed in the same run before Gatehouse
+	// Packages are Debian packages this release needs, installed in the same run before NopeWarden
 	// itself. The list is part of the signed package, so it cannot be changed from outside.
 	Packages []string `json:"packages,omitempty"`
 }
@@ -41,12 +41,12 @@ type Manifest struct {
 const (
 	maxPackage = 200 << 20
 	maxFile    = 150 << 20
-	BinaryDest = "/usr/local/bin/gatehouse"
+	BinaryDest = "/usr/local/bin/nopewarden"
 )
 
-var reUnit = regexp.MustCompile(`^/etc/systemd/system/gatehouse[a-z0-9@._-]*\.service$`)
+var reUnit = regexp.MustCompile(`^/etc/systemd/system/nopewarden[a-z0-9@._-]*\.service$`)
 
-// allowedDest says what an update may overwrite: the program and Gatehouse's own services.
+// allowedDest says what an update may overwrite: the program and NopeWarden's own services.
 func allowedDest(d string) bool { return d == BinaryDest || reUnit.MatchString(d) }
 
 // maxPackages keeps a signed package from asking for an unreasonable amount of software.

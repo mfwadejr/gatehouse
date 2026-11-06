@@ -5,11 +5,11 @@ import (
 	"net/http"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/update"
+	"nopewarden/internal/api"
+	"nopewarden/internal/update"
 )
 
-// Undo. Before every apply of firewall or network changes, Gatehouse keeps a restore point: a
+// Undo. Before every apply of firewall or network changes, NopeWarden keeps a restore point: a
 // complete, checked copy of the settings as they were. The Changes timeline lists them and each has
 // a Revert button. Reverting puts the settings back as changes that are not live yet, so you review
 // and apply them the usual way, with the usual 60-second way back.

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"gatehouse/internal/api"
+	"nopewarden/internal/api"
 )
 
 // sqlq is what both the database and a transaction can do; the removal helpers use either.
@@ -95,7 +95,7 @@ func ifaceImpact(q sqlq, id int64) (*removalImpact, error) {
 	case len(imp.OtherPorts) > 0:
 		imp.Kept = fmt.Sprintf("%s stays, because %s is still part of it.", zname, strings.Join(imp.OtherPorts, ", "))
 	case mgmt == 1:
-		imp.Kept = fmt.Sprintf("%s can manage Gatehouse, so its firewall network stays until you have another one that can. Remove it from Firewall > Networks when you do.", zname)
+		imp.Kept = fmt.Sprintf("%s can manage NopeWarden, so its firewall network stays until you have another one that can. Remove it from Firewall > Networks when you do.", zname)
 	default:
 		imp.RemoveZone = true
 		imp.Rules = zoneRules(q, zname)

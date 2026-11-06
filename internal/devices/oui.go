@@ -9,7 +9,7 @@ import (
 )
 
 // The maker of a network card is the first half of its address. The list is the IEEE's public
-// registry. It comes with Debian's ieee-data package, which Gatehouse installs and which updates
+// registry. It comes with Debian's ieee-data package, which NopeWarden installs and which updates
 // refresh, so there is nothing to download here. Without the file, makers are simply not shown.
 
 // OUIPath is where the registry file is read from.

@@ -52,7 +52,7 @@ func NewCA(now time.Time) (*CA, error) {
 	}
 	t := &x509.Certificate{
 		SerialNumber:          sn,
-		Subject:               pkix.Name{CommonName: "Gatehouse VPN CA"},
+		Subject:               pkix.Name{CommonName: "NopeWarden VPN CA"},
 		NotBefore:             now.Add(-time.Hour),
 		NotAfter:              now.AddDate(10, 0, 0),
 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
@@ -137,7 +137,7 @@ func (c *CA) issue(cn string, server bool, now time.Time) (*Issued, error) {
 
 // ServerCert issues the router's own certificate.
 func (c *CA) ServerCert(now time.Time) (*Issued, error) {
-	return c.issue("gatehouse-server", true, now)
+	return c.issue("nopewarden-server", true, now)
 }
 
 // ClientCert issues a certificate for one device.

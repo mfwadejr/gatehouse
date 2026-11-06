@@ -110,7 +110,7 @@ func describeRule(m *Model, r Rule) string {
 	to := r.To
 	switch {
 	case r.To == "self":
-		to = "Gatehouse itself"
+		to = "NopeWarden itself"
 	case strings.EqualFold(r.To, "internet"):
 		to = "the internet"
 	}

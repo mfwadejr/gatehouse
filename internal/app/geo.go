@@ -30,8 +30,6 @@ var rirFiles = []string{
 	"https://ftp.afrinic.net/pub/stats/afrinic/delegated-afrinic-extended-latest",
 }
 
-const geoMaxAge = 7 * 24 * time.Hour
-
 func (a *App) geoFile() string { return filepath.Join(a.Cfg.DataDir, "geo", "prefixes.txt") }
 
 // geoAge says how old the country data is; ok is false when there is none.
@@ -173,8 +171,7 @@ func (a *App) geoMaybeRefresh(ctx context.Context, needed bool) {
 	if !needed {
 		return
 	}
-	age, ok := a.geoAge()
-	if ok && age < geoMaxAge {
+	if _, ok := a.geoAge(); ok && !a.schedDue("geo") {
 		return
 	}
 	if !a.dyn.geoBusy.CompareAndSwap(false, true) {

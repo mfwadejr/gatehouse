@@ -3,15 +3,15 @@ package app
 import (
 	"encoding/csv"
 	"fmt"
-	"gatehouse/internal/appid"
 	"net/http"
+	"nopewarden/internal/appid"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
-	"gatehouse/internal/api"
+	"nopewarden/internal/api"
 )
 
 // Filters, summaries, export and retention for the connection log.
@@ -503,7 +503,7 @@ func (a *App) registerLogExtraRoutes() {
 		f.Limit = 50000
 		items := a.searchFWf(f)
 		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-		w.Header().Set("Content-Disposition", `attachment; filename="gatehouse-connections-`+time.Now().Format("2006-01-02")+`.csv"`)
+		w.Header().Set("Content-Disposition", `attachment; filename="nopewarden-connections-`+time.Now().Format("2006-01-02")+`.csv"`)
 		cw := csv.NewWriter(w)
 		cw.Write([]string{"time", "result", "device", "device address", "from network", "to network", "destination", "destination address", "country", "protocol", "port", "service", "reason"})
 		for _, it := range items {

@@ -51,7 +51,7 @@ func (s *Server) extIP() string { s.mu.Lock(); defer s.mu.Unlock(); return s.ext
 func (s *Server) WanDev() string { s.mu.Lock(); defer s.mu.Unlock(); return s.wan }
 
 func uuidFor(name string) string {
-	h := sha256.Sum256([]byte("gatehouse-upnp:" + name))
+	h := sha256.Sum256([]byte("nopewarden-upnp:" + name))
 	x := hex.EncodeToString(h[:16])
 	return x[0:8] + "-" + x[8:12] + "-" + x[12:16] + "-" + x[16:20] + "-" + x[20:32]
 }

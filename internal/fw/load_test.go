@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"gatehouse/internal/store"
+	"nopewarden/internal/store"
 )
 
 func TestLoadAndCompile(t *testing.T) {

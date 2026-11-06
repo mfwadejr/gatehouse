@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"gatehouse/internal/vpn"
+	"nopewarden/internal/vpn"
 )
 
 func TestOtherVendorSite(t *testing.T) {

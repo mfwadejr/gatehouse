@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/fw"
+	"nopewarden/internal/api"
+	"nopewarden/internal/fw"
 )
 
 // The security check: a short list of the things that most often leave a router exposed, each
@@ -83,7 +83,7 @@ func (a *App) securityCheck() secReport {
 		switch {
 		case len(mgmtBad) > 0:
 			add(secItem{ID: "console", Level: "bad", Title: "Guests can reach this console",
-				Text: names(mgmtBad) + " is allowed to open the Gatehouse console. Anyone on it can try to sign in.",
+				Text: names(mgmtBad) + " is allowed to open the NopeWarden console. Anyone on it can try to sign in.",
 				Fix:  &whyFix{Label: "Edit " + mgmtBad[0], Kind: "goto", Page: editPage(mgmtBad[0])}})
 		default:
 			add(secItem{ID: "console", Level: "ok", Title: "The console is only open to your own networks", Text: "Guest and isolated networks cannot reach it."})
@@ -112,15 +112,19 @@ func (a *App) securityCheck() secReport {
 			add(secItem{ID: "upnp", Level: "ok", Title: "UPnP is off", Text: "Nothing can open ports to the internet without you."})
 		}
 		var open []string
+		firstOpen := ""
 		for _, f := range m.Forwards {
 			if f.Enabled && len(f.Src) == 0 && len(f.Countries) == 0 {
 				open = append(open, fmt.Sprintf("%s (%s %s)", f.Name, f.Proto, f.ExtPort))
+				if firstOpen == "" {
+					firstOpen = f.Name
+				}
 			}
 		}
 		if len(open) > 0 {
 			add(secItem{ID: "forwards", Level: "warn", Title: "Open ports have no limit on who can use them",
 				Text: names(open) + " can be reached from anywhere in the world. Limit them to your own country or to the addresses that need them.",
-				Fix:  &whyFix{Label: "Open the Forwards list", Kind: "goto", Page: "firewall/ports"}})
+				Fix:  &whyFix{Label: "Limit " + firstOpen, Kind: "goto", Page: "firewall/ports?edit=" + url.QueryEscape(firstOpen)}})
 		} else {
 			add(secItem{ID: "forwards", Level: "ok", Title: "No open ports are wide open", Text: "Every forwarded port is limited, or you have none."})
 		}
@@ -133,7 +137,7 @@ func (a *App) securityCheck() secReport {
 
 	if u := a.updateStatus(); u.Available {
 		add(secItem{ID: "updates", Level: "warn", Title: "Updates are waiting",
-			Text: "There is a newer Gatehouse or there are system security updates to install.",
+			Text: "There is a newer NopeWarden or there are system security updates to install.",
 			Fix:  &whyFix{Label: "Open updates", Kind: "goto", Page: "settings/general"}})
 	} else {
 		add(secItem{ID: "updates", Level: "ok", Title: "Up to date", Text: "No updates are waiting."})
@@ -158,7 +162,7 @@ func (a *App) securityCheck() secReport {
 			Text: "Set up an email or a push message so you hear about outages and updates.",
 			Fix:  &whyFix{Label: "Set up alerts", Kind: "goto", Page: "settings/alerts"}})
 	} else {
-		add(secItem{ID: "alerts", Level: "ok", Title: "Alerts are set up", Text: "Gatehouse can reach you."})
+		add(secItem{ID: "alerts", Level: "ok", Title: "Alerts are set up", Text: "NopeWarden can reach you."})
 	}
 
 	bad, warn := 0, 0

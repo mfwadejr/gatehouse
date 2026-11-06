@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { get, post, setInstallCode } from '../api.js';
 import { Button, Field, Icon, Input, Note, Bar, enterToPrimary } from '../ui.jsx';
+import { Logo } from '../logo.jsx';
 
 const gb = (n) => `${Math.round(n / 1e9)} GB`;
 
@@ -15,7 +16,7 @@ function Shell({ title, children, step }) {
   return (
     <main className="auth">
       <section className="card" ref={ref} style={{ width: 'min(100%, 40rem)' }}>
-        <div className="brand" style={{ padding: 0 }}><Icon name="logo" size={24} /><span>Gatehouse installer</span></div>
+        <div className="brand" style={{ padding: 0 }}><Logo size={24} /><span>NopeWarden installer</span></div>
         {step && <div className="small muted">Step {step} of 2</div>}
         <h1>{title}</h1>
         {children}
@@ -25,7 +26,7 @@ function Shell({ title, children, step }) {
 }
 
 // The installer asks only for the disk. The administrator account, networks and the rest are set up in
-// the browser the first time Gatehouse starts, so there is nothing to write down or carry anywhere.
+// the browser the first time NopeWarden starts, so there is nothing to write down or carry anywhere.
 export default function Installer() {
   const [step, setStep] = useState(0);
   const [code, setCodeRaw] = useState('');
@@ -75,7 +76,7 @@ export default function Installer() {
   if (step === 0) {
     return (
       <Shell title="Welcome">
-        <p className="sec">This will install Gatehouse onto a disk in this machine. To make sure it is really you, type the code shown on the screen of the machine you are installing on.</p>
+        <p className="sec">This will install NopeWarden onto a disk in this machine. To make sure it is really you, type the code shown on the screen of the machine you are installing on.</p>
         <form className="stack" onSubmit={(e) => { e.preventDefault(); unlock(); }}>
           <Field label="Installer code"><Input className="codebox" value={code} onChange={setCode} placeholder="0000-0000" inputMode="numeric" autoComplete="off" autoFocus /></Field>
           {err && <Note tone="bad">{err}</Note>}
@@ -86,7 +87,7 @@ export default function Installer() {
   }
   if (step === 1) {
     return (
-      <Shell title="Where should Gatehouse be installed?" step={1}>
+      <Shell title="Where should NopeWarden be installed?" step={1}>
         <Note tone="warn" title="Everything on the chosen disk will be erased.">Pick the internal disk, not the USB stick you started from. The installer will not let you choose the stick.</Note>
         <div className="stack">
           {disks.map((d) => (
@@ -124,7 +125,7 @@ export default function Installer() {
       {status?.state === 'error' && <><Note tone="bad">{status.error}</Note><pre className="card mono" style={{ margin: 0, whiteSpace: 'pre-wrap', maxHeight: '16rem', overflow: 'auto' }}>{status.log}</pre><div className="actions"><Button onClick={() => setStep(2)}>Try again</Button></div></>}
       {status?.state === 'done' && (
         <>
-          <Note tone="good" title="Gatehouse is installed.">Click Restart, then take the USB stick out when the screen goes blank. When it has started, the machine&apos;s screen shows an address. Open it in a browser to create your administrator account and finish setup.</Note>
+          <Note tone="good" title="NopeWarden is installed.">Click Restart, then take the USB stick out when the screen goes blank. When it has started, the machine&apos;s screen shows an address. Open it in a browser to create your administrator account and finish setup.</Note>
           <div className="actions"><Button kind="primary" onClick={async () => { try { await post('/api/install/reboot'); } catch { /* going down */ } setRestarting(Date.now()); }}>Restart now</Button></div>
         </>
       )}
@@ -140,12 +141,12 @@ function Restarting({ since }) {
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 500); return () => clearInterval(t); }, []);
   const s = Math.max(0, (now - since) / 1000);
   const left = Math.max(0, Math.ceil(BOOT_SECONDS - s));
-  const phase = s < 10 ? 'Restarting this machine…' : left > 0 ? 'Starting Gatehouse…' : 'Still starting. This can take a little longer the first time.';
+  const phase = s < 10 ? 'Restarting this machine…' : left > 0 ? 'Starting NopeWarden…' : 'Still starting. This can take a little longer the first time.';
   return (
     <Shell title="Restarting">
       <Bar pct={Math.min(95, (100 * s) / BOOT_SECONDS)} />
       <p className="sec"><strong>{phase}</strong>{left > 0 ? ` About ${left} second${left === 1 ? '' : 's'} to go.` : ''}</p>
-      {s < 40 && <Note tone="warn" title="Take the USB stick out now">If it stays in, the machine may start the installer again instead of Gatehouse.</Note>}
+      {s < 40 && <Note tone="warn" title="Take the USB stick out now">If it stays in, the machine may start the installer again instead of NopeWarden.</Note>}
       <p className="sec">When it has started, this machine&apos;s screen shows an address like <span className="mono">https://192.168.1.20</span>. Open it from a computer on the same network to create your administrator account. Your browser will warn about the certificate the first time. That is expected: choose to continue.</p>
     </Shell>
   );

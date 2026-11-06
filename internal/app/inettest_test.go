@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"gatehouse/internal/netd"
-	"gatehouse/internal/wanmon"
+	"nopewarden/internal/netd"
+	"nopewarden/internal/wanmon"
 )
 
 func stepOf(ss []testStep, id string) testStep {
@@ -37,7 +37,7 @@ func TestInternetTestStopsAtTheFirstProblem(t *testing.T) {
 	if stepOf(ss, "provider").State != "warn" || stepOf(ss, "dns").State != "ok" {
 		t.Fatalf("%+v", ss)
 	}
-	// DNS fails while an upstream answers: Gatehouse's own setting is blamed.
+	// DNS fails while an upstream answers: NopeWarden's own setting is blamed.
 	ss = buildTest(testInput{Links: []testLink{{Name: "Fibre", Port: "eth0", PortKnown: true, Cable: true, Have: true, State: good}}, DNSErr: "NXDOMAIN", UpstreamOK: true, UpstreamBy: "Cloudflare"})
 	if d := stepOf(ss, "dns"); d.State != "bad" || !strings.Contains(d.Detail, "Cloudflare") {
 		t.Fatalf("%+v", d)

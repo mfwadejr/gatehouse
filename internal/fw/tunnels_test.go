@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"gatehouse/internal/store"
+	"nopewarden/internal/store"
 )
 
 func TestTunnelSourcesForGroup(t *testing.T) {

@@ -19,8 +19,8 @@ function Services() {
   if (!data) return null;
   return (
     <div className="stack">
-      <Card title="Services" desc={`Gatehouse ${data.version || ''}. Each part of the system, and how it is doing.`}
-        actions={<Button small onClick={() => run(async () => { const r = await fetch('/api/diag/bundle', { credentials: 'same-origin' }); if (!r.ok) throw new Error('The bundle could not be made.'); const u = URL.createObjectURL(await r.blob()); const a = document.createElement('a'); a.href = u; a.download = 'gatehouse-support-bundle.txt'; a.click(); URL.revokeObjectURL(u); }, 'Saved. Passwords and keys are hidden in it.')} disabled={busy}>Save a support bundle</Button>}>
+      <Card title="Services" desc={`NopeWarden ${data.version || ''}. Each part of the system, and how it is doing.`}
+        actions={<Button small onClick={() => run(async () => { const r = await fetch('/api/diag/bundle', { credentials: 'same-origin' }); if (!r.ok) throw new Error('The bundle could not be made.'); const u = URL.createObjectURL(await r.blob()); const a = document.createElement('a'); a.href = u; a.download = 'nopewarden-support-bundle.txt'; a.click(); URL.revokeObjectURL(u); }, 'Saved. Passwords and keys are hidden in it.')} disabled={busy}>Save a support bundle</Button>}>
         <div className="list">
           {(data.services || []).filter((s) => s.state !== 'missing').map((s) => (
             <div className="item" key={s.unit}>
@@ -74,7 +74,7 @@ function Verdict() {
   if (!data) return null;
   const to = (t) => { const [pg, tab] = t.split('/'); window.location.hash = `#/${pg}${tab ? `/${tab}` : ''}`; };
   return (
-    <Card title="Is Gatehouse itself working?" desc="How Gatehouse is running, not what your network is doing. For that, open Logs.">
+    <Card title="Is NopeWarden itself working?" desc="How NopeWarden is running, not what your network is doing. For that, open Logs.">
       <div className="stack">
         <div><Pill tone={data.level === 'good' ? 'good' : data.level === 'bad' ? 'bad' : 'warn'}>{data.text}</Pill></div>
         {data.issues.length > 0 && (
@@ -100,10 +100,10 @@ function Connections() {
   if (!data) return null;
   const reasons = Object.entries(data.by_reason || {});
   return (
-    <Card title="Console connections" desc="The live connection your browser keeps open to Gatehouse. If the browser reports dropped connections, this shows whether Gatehouse ended them or the network between ended them.">
+    <Card title="Console connections" desc="The live connection your browser keeps open to NopeWarden. If the browser reports dropped connections, this shows whether NopeWarden ended them or the network between ended them.">
       <div className="stack">
-        <p className="small muted">{data.open} open now, {fmt.n(data.opened)} opened and {fmt.n(data.closed)} closed since Gatehouse started.{reasons.length ? ` Closed because: ${reasons.map(([w, n]) => `${w} (${n})`).join(', ')}.` : ''} The browser going away is normal (a page closed or reloaded); a failed write usually means the network between you and the box dropped it.</p>
-        {!data.recent.length ? <Empty>No console has connected since Gatehouse started.</Empty> : (
+        <p className="small muted">{data.open} open now, {fmt.n(data.opened)} opened and {fmt.n(data.closed)} closed since NopeWarden started.{reasons.length ? ` Closed because: ${reasons.map(([w, n]) => `${w} (${n})`).join(', ')}.` : ''} The browser going away is normal (a page closed or reloaded); a failed write usually means the network between you and the box dropped it.</p>
+        {!data.recent.length ? <Empty>No console has connected since NopeWarden started.</Empty> : (
           <div className="scroll"><table className="table">
             <thead><tr><th>When</th><th>What</th><th>From</th><th>Lasted</th><th>Why</th></tr></thead>
             <tbody>{data.recent.slice(0, 30).map((e, i) => <tr key={i}><td className="small">{fmt.dt(e.at)}</td><td>{e.event === 'opened' ? 'Opened' : 'Closed'}</td><td className="mono small">{e.addr}</td><td className="small">{e.seconds ? `${e.seconds} s` : ''}</td><td className="small muted">{e.why || ''}</td></tr>)}</tbody>
@@ -151,7 +151,7 @@ function SystemLog() {
   const rows = (res?.log || '').split('\n').filter(Boolean).map((l) => ({ l, known: (KNOWN.find(([re]) => re.test(l)) || [])[1], noise: NOISE.some((re) => re.test(l)) })).filter((x) => everything || !x.noise);
   const opts = [...SOURCES, ...(svc?.services || []).filter((s) => s.state !== 'missing').map((s) => ({ value: s.unit, label: s.title }))];
   return (
-    <Card title="System log" desc="Messages from Gatehouse and the machine it runs on. By default only warnings and errors are shown; switch on Everything to see all of it. Anything that looks like a password or key is hidden.">
+    <Card title="System log" desc="Messages from NopeWarden and the machine it runs on. By default only warnings and errors are shown; switch on Everything to see all of it. Anything that looks like a password or key is hidden.">
       <div className="stack">
         <div className="formgrid">
           <Field label="From"><Select value={unit} onChange={setUnit} options={opts} /></Field>
@@ -177,7 +177,7 @@ function SystemLog() {
 export default function Diagnostics() {
   const [tab, setTab] = useHashTab('diagnostics', ['services','log','tools','terminal'], 'services');
   return (
-    <Page title="Diagnostics" sub="How Gatehouse itself is running: its services, its system log, and tools to test the connection. Looking for what your network did? Open Logs.">
+    <Page title="Diagnostics" sub="How NopeWarden itself is running: its services, its system log, and tools to test the connection. Looking for what your network did? Open Logs.">
       <Tabs value={tab} onChange={setTab} tabs={[{ value: 'services', label: 'Health & services' }, { value: 'log', label: 'System log' }, { value: 'tools', label: 'Network tools' }, { value: 'terminal', label: 'Terminal' }]} />
       {tab === 'services' && <><Verdict /><Services /><Connections /></>}
       {tab === 'log' && <SystemLog />}

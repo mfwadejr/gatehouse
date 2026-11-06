@@ -1,4 +1,4 @@
-module gatehouse
+module nopewarden
 
 go 1.24
 

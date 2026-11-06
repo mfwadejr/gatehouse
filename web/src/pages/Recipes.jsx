@@ -8,7 +8,7 @@ const RECIPES = [
   {
     id: 'guest', title: 'Guest network', page: 'networks', go: 'Start on Networks',
     what: 'Visitors get internet, but cannot see your computers, cameras or this console.',
-    steps: ['On Networks, add a network and choose the type Guest.', 'Give it its own address range and turn on DHCP so devices get addresses.', 'Plug an access point (a separate Wi-Fi device) into that network\'s port, or into a VLAN, and set up its guest Wi-Fi name and password. Gatehouse has no Wi-Fi of its own.', 'Apply. Test by joining the guest Wi-Fi from a phone.'],
+    steps: ['On Networks, add a network and choose the type Guest.', 'Give it its own address range and turn on DHCP so devices get addresses.', 'Plug an access point (a separate Wi-Fi device) into that network\'s port, or into a VLAN, and set up its guest Wi-Fi name and password. NopeWarden has no Wi-Fi of its own.', 'Apply. Test by joining the guest Wi-Fi from a phone.'],
   },
   {
     id: 'cameras', title: 'Cameras on their own network', page: 'networks', go: 'Start on Networks',
@@ -22,8 +22,8 @@ const RECIPES = [
   },
   {
     id: 'unifi', title: 'Use my UniFi access points', page: 'networks', go: 'Start on Networks',
-    what: 'Wi-Fi comes from access points you add. Gatehouse has no wireless support, so it stays the router, and the access points broadcast Wi-Fi.',
-    steps: ['Put the access points on a network of their own (a Trusted network on a PoE switch port is fine).', 'Set them up with the UniFi mobile app in its stand-alone mode, or with a UniFi controller you already run.', 'Match each Wi-Fi name to a network or VLAN you made on Networks.', 'Gatehouse does not manage UniFi access points by itself yet; this is the recipe that works today.'],
+    what: 'Wi-Fi comes from access points you add. NopeWarden has no wireless support, so it stays the router, and the access points broadcast Wi-Fi.',
+    steps: ['Put the access points on a network of their own (a Trusted network on a PoE switch port is fine).', 'Set them up with the UniFi mobile app in its stand-alone mode, or with a UniFi controller you already run.', 'Match each Wi-Fi name to a network or VLAN you made on Networks.', 'NopeWarden does not manage UniFi access points by itself yet; this is the recipe that works today.'],
   },
 ];
 

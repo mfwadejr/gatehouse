@@ -7,22 +7,22 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"gatehouse/internal/bridgemode"
 	"net"
 	"net/http"
+	"nopewarden/internal/bridgemode"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/fw"
-	"gatehouse/internal/netcfg"
-	"gatehouse/internal/netd"
-	"gatehouse/internal/speedtest"
-	"gatehouse/internal/threatcfg"
-	"gatehouse/internal/wanmon"
+	"nopewarden/internal/api"
+	"nopewarden/internal/fw"
+	"nopewarden/internal/netcfg"
+	"nopewarden/internal/netd"
+	"nopewarden/internal/speedtest"
+	"nopewarden/internal/threatcfg"
+	"nopewarden/internal/wanmon"
 )
 
 // NetController is the privileged network side; privsep.Client implements it.
@@ -46,6 +46,8 @@ type NetController interface {
 	SpeedTest(p speedtest.Params) (speedtest.Result, error)
 	Diag(kind, target string) (string, error)
 	SSHApply(p netd.SSHPlan) error
+	UnboundStatus() netd.UnboundInfo
+	UnboundApply(p netd.UnboundPlan) error
 	SSHLog(since int64) ([]string, error)
 	HAApply(p netd.HAPlan) error
 	NDPIApply(p netd.NDPIPlan) error
@@ -234,7 +236,7 @@ func fingerprint(p *netd.Plan) string {
 	q := *p
 	q.Seconds = 0
 	b, _ := json.Marshal(q)
-	// A change in what Gatehouse writes for a tunnel device (not in the settings themselves) must
+	// A change in what NopeWarden writes for a tunnel device (not in the settings themselves) must
 	// still show as "waiting to be applied", or an update could never reach a machine that
 	// already has tunnels. Change tunnelFiles when the generated tunnel file changes.
 	if len(p.Config.Tunnels) > 0 {
@@ -302,7 +304,7 @@ func (a *App) netStatus() map[string]any {
 func (a *App) publishNet() { a.Bus.Publish("net.status", a.netStatus()) }
 
 // ports lists network ports a person can plug a cable into: built-in, PCIe and USB adapters.
-// Virtual devices (bridges, VPNs, containers, loopback) and wireless cards are left out: Gatehouse has no wireless support.
+// Virtual devices (bridges, VPNs, containers, loopback) and wireless cards are left out: NopeWarden has no wireless support.
 func ports() []map[string]any {
 	ents, _ := os.ReadDir("/sys/class/net")
 	out := []map[string]any{}

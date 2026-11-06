@@ -27,7 +27,7 @@ func TestPlaceLookup(t *testing.T) {
 		t.Fatalf("%d %s", rc, raw)
 	}
 	res := m["results"].([]any)
-	if len(res) != 1 || gotQ != "10001" || !strings.Contains(gotUA, "Gatehouse") {
+	if len(res) != 1 || gotQ != "10001" || !strings.Contains(gotUA, "NopeWarden") {
 		t.Fatalf("results %v q=%q ua=%q", res, gotQ, gotUA)
 	}
 	if rc, _, _ := c.call("POST", "/api/overview/find", map[string]string{"q": "x"}); rc == 200 {

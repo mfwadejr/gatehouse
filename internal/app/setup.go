@@ -12,13 +12,13 @@ import (
 	"strings"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/installer"
-	"gatehouse/internal/seed"
+	"nopewarden/internal/api"
+	"nopewarden/internal/installer"
+	"nopewarden/internal/seed"
 )
 
 // First-run setup. A freshly installed device has no account. The first person to open it from
-// their own network creates the administrator account, then a short wizard sets up how Gatehouse
+// their own network creates the administrator account, then a short wizard sets up how NopeWarden
 // is used on the network. There is no default login anywhere. Until the account exists the
 // page only answers devices on private addresses, never the internet side, and once it exists
 // the page is closed for good. The machine's own screen says "setup not finished" until
@@ -63,7 +63,7 @@ func (a *App) prepareSetup() {
 
 // ensureSetupScope hands out addresses on the management port until the wizard is finished, so a
 // computer plugged into it can open the setup page. The installer chose the port and its address;
-// Gatehouse's own DHCP service does the handing out (the system's DHCP server cannot, because
+// NopeWarden's own DHCP service does the handing out (the system's DHCP server cannot, because
 // this service already holds the DHCP port). The wizard replaces this with the real network.
 func (a *App) ensureSetupScope() {
 	a.Config.Exec(`DELETE FROM dhcp_scopes WHERE name=?`, seed.SetupScope)
@@ -152,7 +152,7 @@ func (a *App) registerSetupRoutes() {
 			api.Error(w, http.StatusForbidden, "first-time setup is only available from your own network")
 			return
 		}
-		// The installer asked which port the person would manage Gatehouse from; until the account
+		// The installer asked which port the person would manage NopeWarden from; until the account
 		// exists, only that port answers setup, so a cable plugged in somewhere else cannot reach it.
 		if mp := installer.MgmtPort(); mp != "" {
 			if name, _ := localPort(r); name != "" && name != "lo" && name != mp {
@@ -190,7 +190,7 @@ func (a *App) registerSetupRoutes() {
 		api.JSON(w, 200, map[string]string{"status": "ok"})
 	})
 
-	// The wizard that follows: how Gatehouse is used on the network.
+	// The wizard that follows: how NopeWarden is used on the network.
 	s.HandleAdmin("GET /api/setup/wizard", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		here, hereAddr := localPort(r)
 		var used []netip.Prefix
@@ -283,7 +283,7 @@ func (a *App) registerSetupRoutes() {
 		a.Config.SetSetting(wizardSetting, "done")
 		a.Config.SetSetting(setupModeKey, in.Network.LAN.Mode)
 		a.writeSetupState()
-		// The change moves this very connection when Gatehouse becomes the router, so it is
+		// The change moves this very connection when NopeWarden becomes the router, so it is
 		// applied a moment after the answer has gone out.
 		go func() {
 			time.Sleep(2 * time.Second)

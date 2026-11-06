@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"gatehouse/internal/dhcp"
-	dnssrv "gatehouse/internal/dns"
-	"gatehouse/internal/store"
+	"nopewarden/internal/dhcp"
+	dnssrv "nopewarden/internal/dns"
+	"nopewarden/internal/store"
 )
 
 func TestDirectory(t *testing.T) {

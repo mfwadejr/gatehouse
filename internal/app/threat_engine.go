@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"nopewarden/internal/sched"
 	"os"
 	"regexp"
 	"sort"
@@ -15,8 +16,8 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/threatcfg"
+	"nopewarden/internal/api"
+	"nopewarden/internal/threatcfg"
 )
 
 // The owner-facing side of threat watching: install on request, presets, rule updates, limits, and
@@ -31,7 +32,7 @@ const (
 	threatOffSetting    = "threat.off"        // single rules switched off, comma-separated numbers
 	threatGroupsOnSet   = "threat.groups_on"  // groups switched on although the preset has them off
 	threatGroupsOffSet  = "threat.groups_off" // groups switched off although the preset has them on
-	threatWhySetting    = "threat.paused"     // why Gatehouse switched it off by itself, shown until dismissed
+	threatWhySetting    = "threat.paused"     // why NopeWarden switched it off by itself, shown until dismissed
 	threatRulesFile     = "/var/lib/suricata/rules/suricata.rules"
 )
 
@@ -148,7 +149,7 @@ func (a *App) threatWatchTick(info netdThreat, now time.Time) {
 		w.hot, w.lastAt = 0, time.Time{}
 		w.stopped++
 		if w.stopped == 3 {
-			a.event("system", "warning", "Threat watching is not running", "The engine stopped. Your traffic is not affected, because it only watches. Gatehouse keeps trying to start it.")
+			a.event("system", "warning", "Threat watching is not running", "The engine stopped. Your traffic is not affected, because it only watches. NopeWarden keeps trying to start it.")
 		}
 		return
 	}
@@ -183,7 +184,7 @@ func (a *App) threatWatchLoop(ctx context.Context) {
 	if a.threatMode() == "watch" && a.Net != nil && a.Net.ThreatStatus().Installed {
 		a.threatSync()
 	}
-	last := time.Now()
+	last, failN := time.Time{}, 0
 	for ctx.Err() == nil {
 		select {
 		case <-ctx.Done():
@@ -194,11 +195,14 @@ func (a *App) threatWatchLoop(ctx context.Context) {
 			continue
 		}
 		a.threatWatchTick(a.Net.ThreatStatus(), time.Now())
-		// rules refresh once a day while watching
-		if a.threatMode() == "watch" && time.Since(last) >= 24*time.Hour {
+		// rules refresh on the shared schedule while watching; after a failure wait before trying again
+		if a.threatMode() == "watch" && a.schedDue("threat") && time.Since(last) >= sched.RetryDelay(failN) {
 			last = time.Now()
-			if err := a.Net.ThreatUpdateRules(); err != nil {
+			if err := a.threatRulesUpdate(); err != nil {
+				failN++
 				a.event("system", "info", "Threat rules could not be updated", err.Error())
+			} else {
+				failN = 0
 			}
 		}
 	}
@@ -342,8 +346,8 @@ func (a *App) registerThreatEngineRoutes() {
 			"paused_reason": a.Config.Setting(threatWhySetting, ""),
 			"program":       info, "engine": a.threatEngine(), "eve_path": a.threatEvePath(), "default_eve": defaultEve,
 			"ports": a.ndpiIfaces(), "alerts": a.threatGroups(60), "allowed": al, "trusted": tr,
-			"blocking":  "Blocking is not switched on. Gatehouse watches and tells you; it never holds up your traffic.",
-			"fail_open": "If the program stops, crashes or is removed, your traffic is not touched. It only reads copies of what passes by, and Gatehouse switches it off by itself if it uses too much of the machine.",
+			"blocking":  "Blocking is not switched on. NopeWarden watches and tells you; it never holds up your traffic.",
+			"fail_open": "If the program stops, crashes or is removed, your traffic is not touched. It only reads copies of what passes by, and NopeWarden switches it off by itself if it uses too much of the machine.",
 			"limits":    "Most traffic is encrypted, so this finds known bad servers and attack patterns, not everything.",
 		})
 	})
@@ -366,7 +370,7 @@ func (a *App) registerThreatEngineRoutes() {
 			warns = append(warns, fmt.Sprintf("This machine has %d MB of memory. Watching works best with 2 GB or more; you can lower its memory limit under Advanced.", info.MemoryMB))
 		}
 		if info.CPUs > 0 && info.CPUs < 2 {
-			warns = append(warns, "This machine has one processor core. Watching could slow it down; Gatehouse limits it and switches it off if it struggles.")
+			warns = append(warns, "This machine has one processor core. Watching could slow it down; NopeWarden limits it and switches it off if it struggles.")
 		}
 		api.JSON(w, 200, map[string]any{"preview": p, "warnings": warns, "disk_free_mb": info.DiskFreeMB, "memory_mb": info.MemoryMB, "cpus": info.CPUs})
 	})
@@ -471,7 +475,7 @@ func (a *App) registerThreatEngineRoutes() {
 			fail(w, errNoHelper)
 			return
 		}
-		if err := a.Net.ThreatUpdateRules(); err != nil {
+		if err := a.threatRulesUpdate(); err != nil {
 			fail(w, err)
 			return
 		}
@@ -628,15 +632,15 @@ func (a *App) registerThreatEngineRoutes() {
 			rows.Close()
 		}
 		gon, goff := a.threatGroupChanges()
-		out, _ := json.MarshalIndent(map[string]any{"gatehouse_threat_tuning": 1, "preset": a.threatPreset(), "cpu_percent": a.threatInt(threatCPUSetting, 50, 10, 400),
+		out, _ := json.MarshalIndent(map[string]any{"nopewarden_threat_tuning": 1, "preset": a.threatPreset(), "cpu_percent": a.threatInt(threatCPUSetting, 50, 10, 400),
 			"memory_mb": a.threatInt(threatMemSetting, 2048, 256, 16384), "off_sids": a.threatOffSIDs(), "groups_on": gon, "groups_off": goff, "allowed": al, "trusted": tr}, "", "  ")
 		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Content-Disposition", `attachment; filename="gatehouse-threat-tuning.json"`)
+		w.Header().Set("Content-Disposition", `attachment; filename="nopewarden-threat-tuning.json"`)
 		w.Write(out)
 	})
 	s.HandleAdmin("POST /api/threat/import", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		var in struct {
-			Version   int      `json:"gatehouse_threat_tuning"`
+			Version   int      `json:"nopewarden_threat_tuning"`
 			Preset    string   `json:"preset"`
 			CPU       int      `json:"cpu_percent"`
 			Mem       int      `json:"memory_mb"`
@@ -655,7 +659,7 @@ func (a *App) registerThreatEngineRoutes() {
 			return
 		}
 		if in.Version != 1 {
-			fail(w, errors.New("that is not a Gatehouse threat tuning file"))
+			fail(w, errors.New("that is not a NopeWarden threat tuning file"))
 			return
 		}
 		plan := threatcfg.Plan{Preset: in.Preset, CPUPercent: in.CPU, MemoryMB: in.Mem, OffSIDs: in.Off, GroupsOn: in.GroupsOn, GroupsOff: in.GroupsOff}

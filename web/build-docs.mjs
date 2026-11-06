@@ -44,10 +44,10 @@ rmSync(dir, { recursive: true, force: true });
 mkdirSync(dir, { recursive: true });
 const have = ORDER.filter(([id]) => existsSync(`../docs/help/${id}.md`));
 const nav = (cur) => `<nav aria-label="Help chapters"><a href="./" class="home">Help</a>${have.map(([id, t]) => `<a href="${id}.html"${id === cur ? ' aria-current="page"' : ''}>${esc(t)}</a>`).join('')}</nav>`;
-const page = (title, cur, body) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)} - Gatehouse help</title><link rel="stylesheet" href="help.css"></head><body>${nav(cur)}<main>${body}<p class="back"><a href="../">Back to the console</a></p></main></body></html>`;
+const page = (title, cur, body) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)} - NopeWarden help</title><link rel="stylesheet" href="help.css"></head><body>${nav(cur)}<main>${body}<p class="back"><a href="../">Back to the console</a></p></main></body></html>`;
 for (const [id, title] of have) writeFileSync(join(dir, `${id}.html`), page(title, id, render(readFileSync(`../docs/help/${id}.md`, 'utf8'))));
 const cards = have.map(([id, t]) => `<li><a href="${id}.html">${esc(t)}</a></li>`).join('');
-writeFileSync(join(dir, 'index.html'), page('Help', '', `<h1>Gatehouse help</h1><p>Start with <strong>Getting started</strong>. If you cannot sign in, open <strong>If you are locked out</strong>. Every page of the console has its own chapter.</p><ul class="chapters">${cards}</ul>`));
+writeFileSync(join(dir, 'index.html'), page('Help', '', `<h1>NopeWarden help</h1><p>Start with <strong>Getting started</strong>. If you cannot sign in, open <strong>If you are locked out</strong>. Every page of the console has its own chapter.</p><ul class="chapters">${cards}</ul>`));
 if (existsSync('../docs/help/img')) { mkdirSync(join(dir, 'img'), { recursive: true }); for (const f of readdirSync('../docs/help/img')) copyFileSync(join('../docs/help/img', f), join(dir, 'img', f)); }
 writeFileSync(join(dir, 'help.css'), `
 body{margin:0;font:16px/1.55 system-ui,-apple-system,Segoe UI,sans-serif;color:#1c2330;background:#f6f8fb;display:flex;min-height:100vh}

@@ -86,7 +86,7 @@ func (a *Applier) LoadSets(fills map[string]SetFill) error {
 	return a.run(script, false)
 }
 
-// setNames lists the sets in the loaded gatehouse table.
+// setNames lists the sets in the loaded nopewarden table.
 func (a *Applier) setNames() (map[string]bool, error) {
 	c := a.nftCmd("-j", "list", "sets", "table", "inet", tableName)
 	out, err := c.Output()
@@ -341,7 +341,7 @@ func (a *Applier) rollbackLocked() error {
 
 // ConsolePortFile holds the console's saved port, kept up to date by the console so the
 // starting rules and the machine's screens follow it.
-var ConsolePortFile = "/var/lib/gatehouse/console.port"
+var ConsolePortFile = "/var/lib/nopewarden/console.port"
 
 // SavedConsolePort reads the saved console port, or 443 when none is saved.
 func SavedConsolePort() int {
@@ -377,7 +377,7 @@ func FirstBootBaselineFor(port int) string {
 }
 
 // InstallNetPath is where the installer left the network it chose.
-var InstallNetPath = "/var/lib/gatehouse/install-net"
+var InstallNetPath = "/var/lib/nopewarden/install-net"
 
 // setupNetwork is the management network the installer chose, like 192.168.51.0/24, or "".
 func setupNetwork() string {
@@ -408,9 +408,9 @@ func (a *Applier) Boot() error {
 }
 
 // emptyBaseline only keeps the machine itself reachable on every port, used when nothing else is known.
-const emptyBaseline = `add table inet gatehouse
-delete table inet gatehouse
-table inet gatehouse {
+const emptyBaseline = `add table inet nopewarden
+delete table inet nopewarden
+table inet nopewarden {
 	chain input {
 		type filter hook input priority filter; policy accept;
 	}
@@ -420,9 +420,9 @@ table inet gatehouse {
 // FirstBootBaseline protects a freshly installed machine until the first ruleset is confirmed:
 // nothing is forwarded, and the machine itself answers only replies, ping, DHCP client traffic
 // and the console, so setup can proceed from the network it was plugged into.
-const FirstBootBaseline = `add table inet gatehouse
-delete table inet gatehouse
-table inet gatehouse {
+const FirstBootBaseline = `add table inet nopewarden
+delete table inet nopewarden
+table inet nopewarden {
 	chain input {
 		type filter hook input priority filter; policy drop;
 		iif "lo" accept
@@ -458,15 +458,15 @@ func RunWatchdog(dir string, deadline time.Time, token string, a *Applier) error
 	return a.rollbackLocked()
 }
 
-// StartWatchdogProcess launches "gatehouse rollback" detached from the caller, so it survives
+// StartWatchdogProcess launches "nopewarden rollback" detached from the caller, so it survives
 // the daemon and the helper being stopped or hanging.
 func StartWatchdogProcess(dir string, deadline time.Time, token string) error {
 	self, err := os.Executable()
 	if err != nil {
 		return err
 	}
-	if _, err := exec.LookPath("systemd-run"); err == nil && os.Getenv("GATEHOUSE_NO_SYSTEMD") == "" {
-		unit := "gatehouse-rollback"
+	if _, err := exec.LookPath("systemd-run"); err == nil && os.Getenv("NOPEWARDEN_NO_SYSTEMD") == "" {
+		unit := "nopewarden-rollback"
 		exec.Command("systemctl", "stop", unit+".service").Run()
 		out, err := exec.Command("systemd-run", "--unit="+unit, "--collect",
 			fmt.Sprintf("--on-active=%ds", int(time.Until(deadline).Seconds())+1),

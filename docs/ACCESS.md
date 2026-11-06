@@ -1,9 +1,9 @@
 # Keeping access: watchdog, console port, lock-out protection
 
 ## Watchdog
-- `gatehouse.service` is `Type=notify` with `WatchdogSec=60`. The program says "alive" every 10 seconds only while the console answers on its port and nothing refuses connections on the DNS port. If that stops, systemd restarts it. A slow or offline DNS upstream is not a failure.
+- `nopewarden.service` is `Type=notify` with `WatchdogSec=60`. The program says "alive" every 10 seconds only while the console answers on its port and nothing refuses connections on the DNS port. If that stops, systemd restarts it. A slow or offline DNS upstream is not a failure.
 - The console now `Wants=` the network helper instead of `Requires=` it, so a helper restart no longer takes the console down. Neither service has a start limit; both restart after 2 seconds.
-- Each automatic restart is written to the Gatehouse log ("The console restarted by itself"). After 3 restarts without the console answering, the machine's screen says "The console keeps stopping" and points to Alt+F2, option 4.
+- Each automatic restart is written to the NopeWarden log ("The console restarted by itself"). After 3 restarts without the console answering, the machine's screen says "The console keeps stopping" and points to Alt+F2, option 4.
 - The firewall lives in the kernel and keeps protecting the network while the program restarts. No hardware watchdog is used.
 
 ## Changeable console port

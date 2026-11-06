@@ -4,7 +4,7 @@ import { SAVED_LATER, SaveChoice } from '../changes.jsx';
 import { Button, Card, Empty, Note, Select, useAction } from '../ui.jsx';
 
 // Devices finding each other across networks: printers, casting, AirPlay, Home Assistant. Pick
-// pairs of networks. Gatehouse copies the announcements; what the devices may then do is still
+// pairs of networks. NopeWarden copies the announcements; what the devices may then do is still
 // decided by the firewall rules between the two networks.
 
 export default function Discovery({ reload }) {
@@ -27,7 +27,7 @@ export default function Discovery({ reload }) {
   const save = (later) => run(async () => { await (later ? holdAnd(() => put('/api/fw/discovery', { pairs, kinds })) : put('/api/fw/discovery', { pairs, kinds })); await again(); reload?.(); }, later ? SAVED_LATER : 'Saved.');
   const tick = (id, v) => setKinds(v ? [...kinds, id] : kinds.filter((k) => k !== id));
   return (
-    <Card title="Let networks see each other's devices" desc="Printers, Chromecast, AirPlay and Home Assistant find each other by announcing themselves, which normally stops at the edge of a network. Pair two networks and Gatehouse passes those announcements across.">
+    <Card title="Let networks see each other's devices" desc="Printers, Chromecast, AirPlay and Home Assistant find each other by announcing themselves, which normally stops at the edge of a network. Pair two networks and NopeWarden passes those announcements across.">
       <div className="stack">
         {data.networks.length < 2 ? <Empty>You need at least two networks. Add another on the Networks page.</Empty> : (
           <>

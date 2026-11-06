@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"gatehouse/internal/store"
+	"nopewarden/internal/store"
 )
 
 // Scope is one DHCP scope as the engine uses it.
@@ -71,7 +71,7 @@ type Engine struct {
 // conflictHold is how long an address that something else was found using is left alone.
 const conflictHold = 15 * time.Minute
 
-// free reports whether a candidate address is not already taken by a device that Gatehouse did
+// free reports whether a candidate address is not already taken by a device that NopeWarden did
 // not hand it to. An address found in use is set aside for a while, so it is not asked about again
 // for every new device.
 func (e *Engine) free(s *Scope, ip net.IP) bool {

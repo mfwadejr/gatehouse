@@ -5,12 +5,12 @@ import (
 	"sort"
 	"strings"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/appid"
+	"nopewarden/internal/api"
+	"nopewarden/internal/appid"
 )
 
-// Application names. Gatehouse names the app behind a connection from the website name the
-// device asked for through Gatehouse's DNS. It never looks inside traffic. The owner can turn it
+// Application names. NopeWarden names the app behind a connection from the website name the
+// device asked for through NopeWarden's DNS. It never looks inside traffic. The owner can turn it
 // off, because it shows which apps each person uses.
 
 func (a *App) appsOn() bool { return a.Config.Setting("apps.enabled", "1") == "1" }

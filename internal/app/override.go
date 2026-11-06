@@ -12,14 +12,14 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/devices"
-	"gatehouse/internal/netd"
+	"nopewarden/internal/api"
+	"nopewarden/internal/devices"
+	"nopewarden/internal/netd"
 )
 
 // Virtual Network Override (H38) and new-device approval (H62).
 //
-// A device is placed on a VLAN network by its hardware address. Gatehouse does this at its own
+// A device is placed on a VLAN network by its hardware address. NopeWarden does this at its own
 // port (see netd.OverrideCommands), so the device's DHCP, DNS, firewall rules and logs are those of
 // the VLAN network, as if a managed switch had put it there. Approval uses the same move: a device
 // never seen before waits on a holding network until the person decides.

@@ -1,4 +1,4 @@
-# Gatehouse boot menu
+# NopeWarden boot menu
 desktop-image: "background.png"
 desktop-image-scale-method: "crop"
 desktop-image-h-align: "center"

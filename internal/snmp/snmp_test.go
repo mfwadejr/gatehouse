@@ -73,7 +73,7 @@ func parse(t *testing.T, b []byte) answer {
 
 func agent() *Agent {
 	return &Agent{Community: "s3cret-comm", Vars: func() []Var {
-		return MIBVars(System{Descr: "Gatehouse test", Name: "gate", Uptime: 12345}, []Iface{
+		return MIBVars(System{Descr: "NopeWarden test", Name: "gate", Uptime: 12345}, []Iface{
 			{Index: 1, Name: "lo", Type: 24, MTU: 65536, Oper: 1, Up: true},
 			{Index: 2, Name: "eth0", Type: 6, MTU: 1500, SpeedMbps: 1000, MAC: []byte{1, 2, 3, 4, 5, 6}, Oper: 1, Up: true, InOct: 5000000000, OutOct: 7},
 		})
@@ -193,7 +193,7 @@ func TestServeOverUDP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := parse(t, buf[:n]); string(got.vars[0].Val.Bytes) != "Gatehouse test" {
+	if got := parse(t, buf[:n]); string(got.vars[0].Val.Bytes) != "NopeWarden test" {
 		t.Fatalf("%+v", got)
 	}
 }

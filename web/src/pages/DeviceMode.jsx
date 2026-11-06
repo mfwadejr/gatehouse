@@ -98,7 +98,7 @@ function Walk({ data, start, onClose, onApplied }) {
       if (ok) { toast('Going back to routing. You have 60 seconds to keep it; otherwise it goes back by itself.'); onApplied(); }
       return;
     }
-    if (!internet || internet === data.wan?.iface) { toast('Nothing to change. Gatehouse is already set up this way.'); onClose(); return; }
+    if (!internet || internet === data.wan?.iface) { toast('Nothing to change. NopeWarden is already set up this way.'); onClose(); return; }
     const r = await run(() => put('/api/mode/internet-port', { iface: internet }));
     if (r) { toast('Saved. It goes live in a moment, and you can undo within 60 seconds.'); onApplied(); }
   };
@@ -112,7 +112,7 @@ function Walk({ data, start, onClose, onApplied }) {
     </>
   );
   const hereNote = here.length > 0 && (
-    <Note tone="good" title="Leave this cable plugged in">You are connected to Gatehouse through {sentenceList(here.map(pn))}. It is never used for the internet or the other router.</Note>
+    <Note tone="good" title="Leave this cable plugged in">You are connected to NopeWarden through {sentenceList(here.map(pn))}. It is never used for the internet or the other router.</Note>
   );
 
   return (
@@ -123,17 +123,17 @@ function Walk({ data, start, onClose, onApplied }) {
           {data.paired && <Note tone="warn" title="This box is in a pair">Mode changes are not allowed while it is part of a high-availability pair. Take it out of the pair first (Settings, Advanced, High availability).</Note>}
           <button type="button" className={`preset ${mode === 'router' ? 'on' : ''}`} aria-pressed={mode === 'router'} onClick={() => setMode('router')}>
             <span className="t">Router {data.mode === 'router' && <Pill tone="info">current</Pill>}</span>
-            <span className="d">Gatehouse connects you to the internet, hands out addresses (DHCP), runs DNS and the firewall.</span>
+            <span className="d">NopeWarden connects you to the internet, hands out addresses (DHCP), runs DNS and the firewall.</span>
           </button>
           <button type="button" className={`preset ${mode === 'bridge' ? 'on' : ''}`} aria-pressed={mode === 'bridge'} onClick={() => setMode('bridge')}>
             <span className="t">Bridge {data.mode === 'bridge' && <Pill tone="info">current</Pill>}</span>
-            <span className="d">Gatehouse sits between your existing router and your devices and filters what passes. Your other router keeps handing out addresses.</span>
+            <span className="d">NopeWarden sits between your existing router and your devices and filters what passes. Your other router keeps handing out addresses.</span>
           </button>
         </div>
       )}
       {step === 2 && mode === 'router' && data.mode === 'bridge' && (
         <div className="stack">
-          <p className="sec">Gatehouse goes back to routing with the settings you had before bridge mode. They were kept.</p>
+          <p className="sec">NopeWarden goes back to routing with the settings you had before bridge mode. They were kept.</p>
           <Note title="Cables for a router">
             {data.wan ? `Plug your modem or provider into ${pn(data.wan.iface)} (${data.wan.name}).` : 'No internet connection is saved. After this, add one on the Internet page.'}{' '}
             {data.lans.length > 0 && `Plug your switch or devices into ${sentenceList(data.lans.map(pn))}.`}
@@ -143,7 +143,7 @@ function Walk({ data, start, onClose, onApplied }) {
       )}
       {step === 2 && mode === 'router' && data.mode === 'router' && (
         <div className="stack">
-          <p className="sec">Plug the cable from your modem or provider into the port you want for the internet. Gatehouse notices which port it is.</p>
+          <p className="sec">Plug the cable from your modem or provider into the port you want for the internet. NopeWarden notices which port it is.</p>
           {hereNote}
           {internet ? <Note tone="good" title="Internet port">{pn(internet)}{internet === data.wan?.iface ? ' (the same as now)' : ''}</Note> : <Note title="Waiting for a cable">Nothing new plugged in yet. Keep the current port by pressing Next, or pick the port below if the cable is already in.</Note>}
           <PortList ports={wired} value={internet || data.wan?.iface} onPick={setInternet} off={here} pn={pn} here={here} />
@@ -155,7 +155,7 @@ function Walk({ data, start, onClose, onApplied }) {
           {hereNote}
           <div className="stack">
             <strong>1. The cable from your other router</strong>
-            <p className="small muted">Plug it in now and Gatehouse notices the port.</p>
+            <p className="small muted">Plug it in now and NopeWarden notices the port.</p>
             {outside ? <Note tone="good" title="Faces your other router">{pn(outside)}</Note> : <Note title="Waiting for a cable">{target === 'outside' ? 'Listening…' : ''}</Note>}
             <PortList ports={wired} value={outside} onPick={(n) => { setOutside(n); setInside((x) => x.filter((v) => v !== n)); setOob((x) => (x === n ? '' : x)); setTarget('inside'); }} off={here} pn={pn} here={here} />
           </div>
@@ -199,8 +199,8 @@ function Walk({ data, start, onClose, onApplied }) {
           )}
           {mode === 'bridge' && (
             <>
-              <Note title="Addresses (DHCP) stay with your other router">Bridge mode does not hand out addresses. Your other router keeps doing that, so nothing on your network changes. Gatehouse itself needs one address to be managed at.</Note>
-              <Field label="Gatehouse's own address"><Segmented value={addr.mode} onChange={(v) => setAddr((x) => ({ ...x, mode: v }))} options={[{ value: 'static', label: 'Fixed (recommended)' }, { value: 'dhcp', label: 'From your other router' }]} /></Field>
+              <Note title="Addresses (DHCP) stay with your other router">Bridge mode does not hand out addresses. Your other router keeps doing that, so nothing on your network changes. NopeWarden itself needs one address to be managed at.</Note>
+              <Field label="NopeWarden's own address"><Segmented value={addr.mode} onChange={(v) => setAddr((x) => ({ ...x, mode: v }))} options={[{ value: 'static', label: 'Fixed (recommended)' }, { value: 'dhcp', label: 'From your other router' }]} /></Field>
               {addr.mode === 'static' && (
                 <div className="formgrid">
                   <Field label="Address" hint="An unused address on your network, with its size."><Input value={addr.addr} onChange={(v) => setAddr((x) => ({ ...x, addr: v }))} placeholder="192.168.1.2/24" className="in mono" /></Field>

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"gatehouse/internal/bridgemode"
+	"nopewarden/internal/bridgemode"
 )
 
 func bridgeCfg() *bridgemode.Config {
@@ -27,8 +27,8 @@ func TestCompileBridgeShape(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{
-		"table bridge gatehouse_br",
-		"delete table bridge gatehouse_br",
+		"table bridge nopewarden_br",
+		"delete table bridge nopewarden_br",
 		`iifname "gbo" ip saddr 10.8.0.0/24 tcp dport 443 accept`,
 		`iifname "gbo" tcp dport 443 counter drop`,
 		`iifname "gbo" ip daddr 10.9.0.50 tcp dport 8443 counter accept`,
@@ -56,7 +56,7 @@ func TestBridgeOffUsesRoutingRuleset(t *testing.T) {
 	m := sample()
 	m.Bridge = &bridgemode.Config{Enabled: false}
 	out, err := Compile(m)
-	if err != nil || strings.Contains(out, "gatehouse_br") {
+	if err != nil || strings.Contains(out, "nopewarden_br") {
 		t.Fatalf("a disabled bridge setup must compile the normal ruleset: %v", err)
 	}
 }
@@ -168,14 +168,14 @@ func TestNetnsBridgeMode(t *testing.T) {
 
 	// Leaving bridge mode removes the bridge filter, also on a rollback to a script that never mentioned it.
 	a := &Applier{Dir: t.TempDir(), NFT: "nft", Netns: "ghbfw"}
-	if out, err := l.sh("ghbfw", "nft list table bridge gatehouse_br"); err != nil {
+	if out, err := l.sh("ghbfw", "nft list table bridge nopewarden_br"); err != nil {
 		t.Fatalf("bridge table should exist: %s", out)
 	}
 	apply(bridgeModel(bridgeCfg()))
-	if err := a.run(a.withBridgeCleanup("add table inet gatehouse\n"), false); err != nil {
+	if err := a.run(a.withBridgeCleanup("add table inet nopewarden\n"), false); err != nil {
 		t.Fatal(err)
 	}
-	if out, err := l.sh("ghbfw", "nft list table bridge gatehouse_br"); err == nil {
+	if out, err := l.sh("ghbfw", "nft list table bridge nopewarden_br"); err == nil {
 		t.Fatalf("the bridge table was left behind:\n%s", out)
 	}
 }

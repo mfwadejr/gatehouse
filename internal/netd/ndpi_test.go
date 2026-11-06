@@ -39,7 +39,7 @@ func TestNDPIApply(t *testing.T) {
 		t.Fatal(err)
 	}
 	b, _ := os.ReadFile(filepath.Join(root, ndpiConf))
-	if string(b) != "# Written by Gatehouse\nIFACES=lan0 lan1.20\n" {
+	if string(b) != "# Written by NopeWarden\nIFACES=lan0 lan1.20\n" {
 		t.Fatalf("conf: %q", b)
 	}
 	if !strings.Contains(strings.Join(calls, "|"), "restart "+ndpiUnit) {

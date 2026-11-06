@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/fw"
+	"nopewarden/internal/api"
+	"nopewarden/internal/fw"
 )
 
 // chip is one thing a rule names, ready to show: a device, a group, a domain, a country or a plain address.
@@ -180,7 +180,7 @@ func anyIfEmpty(s string) string {
 func (a *App) registerFWObjectRoutes() {
 	s := a.API
 	// Everything the rule form needs to offer: devices (with their current address), groups,
-	// saved port lists and the services Gatehouse knows by name.
+	// saved port lists and the services NopeWarden knows by name.
 	s.Handle("GET /api/fw/pickers", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		devs, _ := a.Devices.List()
 		type dev struct {
@@ -354,7 +354,7 @@ func (a *App) registerFWObjectRoutes() {
 		a.markDirty()
 		ok(w)
 	})
-	// The services page: what Gatehouse knows by name, and the person's own, with where each is used.
+	// The services page: what NopeWarden knows by name, and the person's own, with where each is used.
 	s.Handle("GET /api/fw/services", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		lists, err := fw.PortLists(a.Config)
 		if err != nil {

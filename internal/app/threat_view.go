@@ -3,9 +3,6 @@ package app
 import (
 	"sort"
 	"strings"
-	"sync"
-
-	"github.com/miekg/dns"
 )
 
 // How an alert is shown. The device name is worked out when the page is shown, from the devices
@@ -229,10 +226,6 @@ func (a *App) threatGroups(limit int) []threatGroup {
 	return out
 }
 
-// ptrCache remembers reverse lookups ("" means looked up, no name). They run in the background so a
-// page never waits on them; the name shows the next time the list is read.
-var ptrCache sync.Map
-
 // siteOf gives the name for an address, best source first: the website the device asked for when it
 // opened that connection (from the firewall log); for an address on your own networks, the device's
 // name or this firewall; otherwise the address's own reverse-DNS name (8.8.8.8 is dns.google).
@@ -257,25 +250,5 @@ func (a *App) siteOf(addr string) string {
 		}
 		return ""
 	}
-	if v, ok := ptrCache.Load(addr); ok {
-		return v.(string)
-	}
-	ptrCache.Store(addr, "")
-	go func() {
-		rev, err := dns.ReverseAddr(addr)
-		if err != nil {
-			return
-		}
-		resp, _, err := a.lookupName(rev, dns.TypePTR)
-		if err != nil || resp == nil {
-			return
-		}
-		for _, rr := range resp.Answer {
-			if p, ok := rr.(*dns.PTR); ok {
-				ptrCache.Store(addr, strings.TrimSuffix(p.Ptr, "."))
-				return
-			}
-		}
-	}()
-	return ""
+	return a.ptrName(addr)
 }

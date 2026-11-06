@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { get, post } from './api.js';
+import { get, holdAnd, post } from './api.js';
+import { SaveChoice } from './changes.jsx';
 import { Button, Field, Input, Modal, Note, Segmented, Select, ToggleRow, useAction } from './ui.jsx';
 
 // One form for a new network: the port, its address, DHCP and what it may reach. Everything has a
@@ -52,10 +53,10 @@ export default function AddNetwork({ onClose, onCreated }) {
     setF((x) => ({ ...x, vlan: vlanOn ? (Number(x.vlan) || sug.vlan) : 0, no_address: vlanOn ? x.no_address : false }));
   }, [vlanOn]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const save = async () => {
+  const save = async (later) => {
     const body = { ...f, vlan: vlanOn ? Number(f.vlan) || 0 : 0 };
-    const r = await run(() => post('/api/networks/add', body));
-    if (r) onCreated?.(f.name);
+    const r = await run(() => (later ? holdAnd(() => post('/api/networks/add', body)) : post('/api/networks/add', body)));
+    if (r) onCreated?.(f.name, later);
   };
 
   const portOptions = (sug?.ports || []).map((p) => ({
@@ -65,7 +66,7 @@ export default function AddNetwork({ onClose, onCreated }) {
 
   return (
     <Modal title="Add a network" onClose={onClose}
-      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" onClick={save} disabled={busy || !f.name.trim() || !f.port || (!f.no_address && chk?.ok === false)}>Add network</Button></>}>
+      footer={<><Button onClick={onClose}>Cancel</Button><SaveChoice busy={busy} label="Add and apply" onSave={save} disabled={!f.name.trim() || !f.port || (!f.no_address && chk?.ok === false)} /></>}>
       <div className="stack">
         {sugFailed && <Note tone="warn" title="Couldn't load suggestions">Enter the port and address by hand, or close this window and try again.</Note>}
         {sug?.first && <Note tone="good" title="This is your first network">It will also be allowed to manage this device, so you can always reach this console from it. You can change that later under Firewall.</Note>}
@@ -86,17 +87,17 @@ export default function AddNetwork({ onClose, onCreated }) {
             <Input value={f.vlan} onChange={set('vlan')} inputMode="numeric" style={{ maxWidth: '8rem' }} />
           </Field>
         )}
-        {vlanOn && <ToggleRow title="No address, no DHCP" desc="For a link to a switch or access point that gives out the addresses itself. Gatehouse makes the VLAN and its firewall network, and nothing else." checked={f.no_address} onChange={(v) => setF((x) => ({ ...x, no_address: v }))} />}
+        {vlanOn && <ToggleRow title="No address, no DHCP" desc="For a link to a switch or access point that gives out the addresses itself. NopeWarden makes the VLAN and its firewall network, and nothing else." checked={f.no_address} onChange={(v) => setF((x) => ({ ...x, no_address: v }))} />}
         {!f.no_address && (
           <Field label="Address of this router on the network" hint={chk?.ok === false ? undefined : chk?.summary?.text}>
             <Input value={f.address} onChange={set('address')} className="in mono" placeholder="192.168.10.1/24" />
           </Field>
         )}
         {!f.no_address && chk?.ok === false && <Note tone="warn">{chk.problem}</Note>}
-        {!f.no_address && chkFailed && <Note tone="warn" title="Couldn't check this address just now">Gatehouse checks it again when you add the network, and tells you then if there is a problem.</Note>}
+        {!f.no_address && chkFailed && <Note tone="warn" title="Couldn't check this address just now">NopeWarden checks it again when you add the network, and tells you then if there is a problem.</Note>}
 
         {!f.no_address && <Field label="Give devices addresses (DHCP)">
-          <Segmented value={f.dhcp} onChange={set('dhcp')} options={[{ value: 'server', label: 'Gatehouse does' }, { value: 'off', label: 'Off' }, { value: 'relay', label: 'Pass on to another server' }]} />
+          <Segmented value={f.dhcp} onChange={set('dhcp')} options={[{ value: 'server', label: 'NopeWarden does' }, { value: 'off', label: 'Off' }, { value: 'relay', label: 'Pass on to another server' }]} />
         </Field>}
         {!f.no_address && f.dhcp === 'relay' && (
           <Field label="DHCP server to pass requests to" hint="Its address, for example 10.0.0.5.">
@@ -114,7 +115,7 @@ export default function AddNetwork({ onClose, onCreated }) {
         {!f.no_address && <Field label="IPv6">
           <Segmented value={f.ipv6} onChange={set('ipv6')} options={[{ value: 'off', label: 'Off' }, { value: 'auto', label: 'Automatic' }]} />
         </Field>}
-        <Note>Gatehouse checks that an address is free before it hands it out, and warns you if another DHCP server answers on this network.</Note>
+        <Note>NopeWarden checks that an address is free before it hands it out, and warns you if another DHCP server answers on this network.</Note>
       </div>
     </Modal>
   );

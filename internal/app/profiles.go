@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"gatehouse/internal/api"
-	dnssrv "gatehouse/internal/dns"
-	"gatehouse/internal/fw"
+	"nopewarden/internal/api"
+	dnssrv "nopewarden/internal/dns"
+	"nopewarden/internal/fw"
 )
 
 // Profiles are the friendly face of the DNS groups: a name for a kind of person or device (Kids,

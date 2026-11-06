@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button, Card, Modal } from './ui.jsx';
 import { RELEASES } from './releasenotes.js';
 
-const KEY = 'gatehouse.seenRelease';
+const KEY = 'nopewarden.seenRelease';
 const seen = () => { try { return localStorage.getItem(KEY) || ''; } catch { return ''; } };
 const remember = (v) => { try { localStorage.setItem(KEY, v); } catch { /* fine */ } };
 

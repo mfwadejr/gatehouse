@@ -39,3 +39,17 @@ Record the machine, the version (Settings, About) and the date at the top of eac
 | 32 | Packet size after a reconnect | Turn the VPN off and on (or restart it): within about 30 seconds the card shows a size again, and the Internet sees you as address fills in without waiting ten minutes | | |
 | 33 | Test packet size button | Press Test packet size: it shows each size with the addresses that answered and applies the largest size two addresses agree on | | |
 | 34 | Test addresses | Change the order and add an entry in Test addresses, Save; the Review page shows "Changed the VPN test addresses."; Restore defaults puts the five addresses and four services back | | |
+| 35 | One schedule | Settings: set updates to every 6 hours, lists to daily 04:10; the sentence beside each says when the next run is; Off disables | | |
+| 36 | Resolve directly | DNS, Servers: turn on Resolve directly; names resolve; `dig @127.0.0.1 -p 5335 example.com` answers; port 53 is still NopeWarden's | | |
+| 37 | DNSSEC failure | Look up dnssec-failed.org with DNSSEC on: it fails and the query log explains why in plain words | | |
+| 38 | Fallback | With Resolve directly on, block outbound port 53/UDP+TCP to the internet; within a minute lookups work via encrypted forwarders and an alert appears; unblock and it returns | | |
+| 39 | DNS staged | Add a DNS list with Save for later; Review shows a DNS item; nothing live; Discard puts DNS back | | |
+| 40 | DNS follows route | Device on a VPN route: its lookups leave through the tunnel (check the tunnel counter) | | |
+| 41 | Threat name lookup | A threat alert shows a name for the address (or "no name"), and Look up again retries | | |
+| 42 | View names / custom names | Protection: View names on a topic lists them; a per-profile custom name blocks | | |
+| 43 | Show more | A page with over 15 rows shows 15 and Show more | | |
+| 44 | Security fix buttons | Each fix button opens the exact edit window | | |
+| 45 | Map and VPN traffic | 5 minute range, hover popout, Your VPNs card, a VPN traffic graph, grey Idle on a quiet tunnel | | |
+| 46 | Edit a route | Edit a route and Save: it saves (no invalid request body) | | |
+| 47 | VPN import | Import the PIA and several other providers' .ovpn files | | |
+| 48 | Rename | Console, installer, services and folders all say NopeWarden | | |

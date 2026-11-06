@@ -1,6 +1,6 @@
 #!/bin/sh
 # Builds gh-ndpi as a program with no runtime dependencies (the libraries are linked in), or
-# builds nothing. A failure here is not an error: the image is made without it and Gatehouse
+# builds nothing. A failure here is not an error: the image is made without it and NopeWarden
 # keeps naming applications from website names. Usage: build.sh OUTPUT_DIR
 out="${1:?output directory}"
 here="$(cd "$(dirname "$0")" && pwd)"

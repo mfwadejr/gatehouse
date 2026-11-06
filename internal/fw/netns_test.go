@@ -229,7 +229,7 @@ func TestNetnsPolicy(t *testing.T) {
 	// A second apply replaces the first atomically and leaves other tables alone.
 	l.must("ghfw", "nft add table ip bystander")
 	l.apply(labModel())
-	if out, _ := l.sh("ghfw", "nft list tables"); !strings.Contains(out, "bystander") || strings.Count(out, "gatehouse") != 1 {
+	if out, _ := l.sh("ghfw", "nft list tables"); !strings.Contains(out, "bystander") || strings.Count(out, "nopewarden") != 1 {
 		t.Errorf("unexpected tables after re-apply:\n%s", out)
 	}
 	if !l.reach("ghhome", "192.168.1.1", 443) {
@@ -365,7 +365,7 @@ except Exception:
 	}
 	// Control: with the marking removed, a brand new connection on the second link fails,
 	// which proves the check above measures the marks and not luck.
-	l.must("mwfw", "nft flush chain inet gatehouse wanmark")
+	l.must("mwfw", "nft flush chain inet nopewarden wanmark")
 	if from("mwisp2", "192.0.2.92", "203.0.114.2", 8444) {
 		t.Error("control: the second link answered without marks, so the test proves nothing")
 	}

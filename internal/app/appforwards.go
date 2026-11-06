@@ -13,12 +13,12 @@ import (
 	"strings"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/fw"
+	"nopewarden/internal/api"
+	"nopewarden/internal/fw"
 )
 
 // Port forwarding by app and device. A person picks an app (a short built-in list plus their own on
-// the Services page), a device, and the internet connections. Gatehouse writes one forward for each
+// the Services page), a device, and the internet connections. NopeWarden writes one forward for each
 // port the app uses, keeps them pointing at the device's current address, and says in one line what
 // is open.
 
@@ -71,7 +71,7 @@ func (a *App) appPorts(name string) ([]appPort, error) {
 		}
 	}
 	if len(texts) == 0 {
-		return nil, fmt.Errorf("Gatehouse does not know an app called %q. Add it as a new app first", name)
+		return nil, fmt.Errorf("NopeWarden does not know an app called %q. Add it as a new app first", name)
 	}
 	var out []appPort
 	for _, t := range texts {
@@ -421,7 +421,7 @@ func (a *App) routerPortNotes(proto string, lo, hi int, device string) []string 
 	if proto == "tcp" {
 		for _, p := range a.consolePorts() {
 			if has(p) {
-				out = append(out, fmt.Sprintf("Port %d is also where the Gatehouse console answers on your own networks. From the internet it will go to %s. The console itself stays closed to the internet.", p, device))
+				out = append(out, fmt.Sprintf("Port %d is also where the NopeWarden console answers on your own networks. From the internet it will go to %s. The console itself stays closed to the internet.", p, device))
 				break
 			}
 		}
@@ -430,7 +430,7 @@ func (a *App) routerPortNotes(proto string, lo, hi int, device string) []string 
 		}
 	}
 	if has(53) {
-		out = append(out, fmt.Sprintf("Port 53 is DNS, which Gatehouse also answers on your own networks. From the internet it will go to %s, so anyone could use it. Only go on if you mean to run a public DNS server.", device))
+		out = append(out, fmt.Sprintf("Port 53 is DNS, which NopeWarden also answers on your own networks. From the internet it will go to %s, so anyone could use it. Only go on if you mean to run a public DNS server.", device))
 	}
 	if proto == "udp" && (has(67) || has(68)) {
 		out = append(out, "Ports 67 and 68 are DHCP, which hands out addresses on your own networks. Opening them to the internet is almost never what you want.")
@@ -463,7 +463,7 @@ func (a *App) saveAppForwardNotes(in appForwardIn) ([]string, error) {
 		}
 	}
 	if ip == "" {
-		return nil, errors.New("Gatehouse has not seen that device yet. Turn it on and connect it, then try again")
+		return nil, errors.New("NopeWarden has not seen that device yet. Turn it on and connect it, then try again")
 	}
 	if net.ParseIP(ip) == nil {
 		return nil, errors.New("choose the device this should go to")

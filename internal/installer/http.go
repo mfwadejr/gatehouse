@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/seed"
+	"nopewarden/internal/seed"
 )
 
 // Server exposes the installer over HTTP. Every call except /info needs the code that is

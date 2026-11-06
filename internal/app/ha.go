@@ -16,10 +16,10 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/ha"
-	"gatehouse/internal/netcfg"
-	"gatehouse/internal/netd"
-	"gatehouse/internal/update"
+	"nopewarden/internal/ha"
+	"nopewarden/internal/netcfg"
+	"nopewarden/internal/netd"
+	"nopewarden/internal/update"
 )
 
 // High availability. Two units hold the same settings. The primary is where changes are made; the

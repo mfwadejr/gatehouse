@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Virtual Network Override. Gatehouse puts one device's traffic on a chosen VLAN by its hardware
+// Virtual Network Override. NopeWarden puts one device's traffic on a chosen VLAN by its hardware
 // address, at its own port: frames from that address are tagged on the way in, so they arrive on
 // the VLAN network (DHCP, DNS, firewall and logs all see it there), and frames going back to it
 // have the tag removed. Only that one address is matched; nothing else on the port is touched.

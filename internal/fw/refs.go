@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-// A rule's From/To device fields hold plain addresses and also references that Gatehouse keeps up
+// A rule's From/To device fields hold plain addresses and also references that NopeWarden keeps up
 // to date by itself:
 //
 //	dev:aa:bb:cc:dd:ee:ff   a device, wherever it currently is

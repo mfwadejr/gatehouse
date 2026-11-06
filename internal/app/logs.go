@@ -11,10 +11,10 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/api"
-	dnssrv "gatehouse/internal/dns"
-	"gatehouse/internal/fw"
-	"gatehouse/internal/netd"
+	"nopewarden/internal/api"
+	dnssrv "nopewarden/internal/dns"
+	"nopewarden/internal/fw"
+	"nopewarden/internal/netd"
 )
 
 // One log for everything. DNS questions, firewall decisions about new connections, and
@@ -77,7 +77,7 @@ func fwReason(verdict, tag, from, to string) string {
 		return "Allowed by a port forward."
 	case "default":
 		if rest == "dot" {
-			return "Not a problem: this device asked the router for encrypted DNS (DNS over TLS). Gatehouse answers DNS on the normal port, so the device uses that instead."
+			return "Not a problem: this device asked the router for encrypted DNS (DNS over TLS). NopeWarden answers DNS on the normal port, so the device uses that instead."
 		}
 		if rest == "in" {
 			return fmt.Sprintf("Blocked: nothing allows %s to connect to the router itself on this port.", orAny(from))
@@ -159,13 +159,13 @@ func (a *App) storeFW(evs []netd.FWEvent) {
 	a.syslogFW(evs)
 }
 
-// collectFW pulls firewall decisions from the helper about once a second.
+// collectFW pulls firewall decisions from the helper twice a second.
 func (a *App) collectFW(ctx context.Context) {
 	if a.Net == nil {
 		return
 	}
 	var cursor uint64
-	t := time.NewTicker(time.Second)
+	t := time.NewTicker(500 * time.Millisecond)
 	defer t.Stop()
 	for {
 		select {
@@ -221,7 +221,7 @@ func dnsItem(r dnssrv.Row) LogItem {
 	case "cached":
 		it.Why = "Answered from memory. Not on any block list."
 	case "local":
-		it.Why = "One of your own names, answered by Gatehouse."
+		it.Why = "One of your own names, answered by NopeWarden."
 	case "rate_limited":
 		it.Verdict = "warning"
 		it.Why = "Slowed down: this device asked too many times a second."
@@ -323,14 +323,14 @@ func (a *App) logSearch(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 					it.Via, it.ViaKind = a.viaOf(r.Via)
 				}
 				// Which network asked, and where the lookup went: out to the internet when
-				// Gatehouse had to ask a DNS server, otherwise answered by Gatehouse itself.
+				// NopeWarden had to ask a DNS server, otherwise answered by NopeWarden itself.
 				z, ok := zones[r.Client]
 				if !ok {
 					z = a.deviceZone(r.Client)
 					zones[r.Client] = z
 				}
 				if z != "" {
-					it.FromZone, it.ToZone = z, "Gatehouse"
+					it.FromZone, it.ToZone = z, "NopeWarden"
 					if it.Via != "" {
 						it.ToZone = "Internet"
 					}

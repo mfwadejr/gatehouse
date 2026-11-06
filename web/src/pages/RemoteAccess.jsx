@@ -31,7 +31,7 @@ export default function RemoteAccess({ onAddVPN, hasDevice }) {
       <div className="list">
         {step(1, named, 'A web name that always finds your home', (
           <>
-            <span className="small muted">Your provider changes your home's address now and then. A free web name from DuckDNS, No-IP or similar follows it. Gatehouse updates it every 10 minutes.</span>
+            <span className="small muted">Your provider changes your home's address now and then. A free web name from DuckDNS, No-IP or similar follows it. NopeWarden updates it every 10 minutes.</span>
             <div className="formgrid">
               <Field label="Service"><Select value={f.provider} onChange={set('provider')} options={[{ value: '', label: 'Not set up' }, { value: 'duckdns', label: 'DuckDNS' }, { value: 'dyndns2', label: 'No-IP, Dynu or similar' }]} /></Field>
               {f.provider && <Field label="Web name"><Input value={f.host} onChange={set('host')} placeholder={f.provider === 'duckdns' ? 'myhome' : 'myhome.ddns.net'} /></Field>}

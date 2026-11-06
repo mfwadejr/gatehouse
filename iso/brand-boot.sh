@@ -1,5 +1,5 @@
 #!/bin/sh
-# Lays the Gatehouse boot menus over a boot-loader tree.
+# Lays the NopeWarden boot menus over a boot-loader tree.
 #
 #   brand-boot.sh DIR ARTDIR
 #
@@ -11,7 +11,7 @@ ART=${2:?usage: brand-boot.sh DIR ARTDIR}
 EXTRA="rd.udev.log_level=0 consoleblank=0"
 # What an earlier run added; stripped so a second run does not stack it up.
 # Boot-menu variables (like findiso=${iso_path}) are dropped too: the new menu does not set them.
-unextra() { sed -E 's/ (rd\.udev\.log_level=0|consoleblank=0|gatehouse\.text|nomodeset)//g; s/ [^ ]*\$\{[^ ]*\}//g'; }
+unextra() { sed -E 's/ (rd\.udev\.log_level=0|consoleblank=0|nopewarden\.text|nomodeset)//g; s/ [^ ]*\$\{[^ ]*\}//g'; }
 
 [ -d "$D/isolinux" ] && cp "$ART/splash.png" "$D/isolinux/splash.png"
 if [ -d "$D/boot/grub" ]; then
@@ -40,7 +40,7 @@ prompt 0
 noescape 1
 timeout 0
 ui vesamenu.c32
-default gatehouse
+default nopewarden
 menu title
 menu background splash.png
 menu margin 0
@@ -63,17 +63,17 @@ menu color tabmsg 0 #ff898781 #00000000 none
 menu color cmdmark 0 #00000000 #00000000 none
 menu color cmdline 0 #00000000 #00000000 none
 
-label gatehouse
-  menu label Install Gatehouse  (press Enter to start)
+label nopewarden
+  menu label Install NopeWarden  (press Enter to start)
   linux $K
   initrd $I
-  append $A $EXTRA gatehouse.text
+  append $A $EXTRA nopewarden.text
 
 label basic
-  menu label Install Gatehouse (basic graphics)
+  menu label Install NopeWarden (basic graphics)
   linux $K
   initrd $I
-  append $SAFE $EXTRA nomodeset gatehouse.text
+  append $SAFE $EXTRA nomodeset nopewarden.text
 
 label serial
   menu label Install with serial console (115200 8N1)
@@ -84,7 +84,7 @@ label serial
   endtext
   linux $K
   initrd $I
-  append $SAFE $EXTRA nomodeset gatehouse.text console=tty0 console=ttyS0,115200n8
+  append $SAFE $EXTRA nomodeset nopewarden.text console=tty0 console=ttyS0,115200n8
 CFG
 	fi
 fi
@@ -122,16 +122,16 @@ if serial --unit=0 --speed=115200 --word=8 --parity=no --stop=1; then
 fi
 set theme=/boot/grub/theme/theme.txt
 
-menuentry "Install Gatehouse  (press Enter to start)" {
-  linux $L $EXTRA gatehouse.text
+menuentry "Install NopeWarden  (press Enter to start)" {
+  linux $L $EXTRA nopewarden.text
   initrd $I
 }
-menuentry "Install Gatehouse (basic graphics)" {
-  linux $SAFE $EXTRA nomodeset gatehouse.text
+menuentry "Install NopeWarden (basic graphics)" {
+  linux $SAFE $EXTRA nomodeset nopewarden.text
   initrd $I
 }
 menuentry "Install with serial console (115200 8N1)" {
-  linux $SAFE $EXTRA nomodeset gatehouse.text console=tty0 console=ttyS0,115200n8
+  linux $SAFE $EXTRA nomodeset nopewarden.text console=tty0 console=ttyS0,115200n8
   initrd $I
 }
 CFG

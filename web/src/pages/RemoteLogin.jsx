@@ -30,7 +30,7 @@ export default function RemoteLogin({ me }) {
             {addrs.length ? addrs.map((n) => <div key={n.network + n.address}><code className="mono">ssh {example}@{n.address}</code> <span className="small muted">on {n.network}</span></div>) : <code className="mono">ssh {example}@&lt;this machine's address&gt;</code>}
             <p className="small muted">Then type your console password. Two-factor sign-in is a console feature, so SSH asks for the password only.</p>
           </>
-        ) : <p className="small muted">Turning it on opens SSH from the networks that can manage Gatehouse, and nowhere else. It is never reachable from the internet side.</p>}
+        ) : <p className="small muted">Turning it on opens SSH from the networks that can manage NopeWarden, and nowhere else. It is never reachable from the internet side.</p>}
         {(data.users || []).some((u) => !u.usable) && (
           <Note tone="warn" title="Some accounts cannot use SSH">
             {(data.users || []).filter((u) => !u.usable).map((u) => u.name).join(', ')}: a login name can only have lower-case letters, digits, dash and underscore. Make a new administrator with a simple name to use SSH.
@@ -53,7 +53,7 @@ export default function RemoteLogin({ me }) {
         <Modal title={ask === 'on' ? 'Turn on remote login?' : 'Turn off remote login?'} onClose={() => setAsk(null)}
           footer={<><Button onClick={() => setAsk(null)}>Cancel</Button><Button kind="primary" disabled={busy || (needStep && !stepReady(su, code, pw))} onClick={set}>{ask === 'on' ? 'Turn on' : 'Turn off'}</Button></>}>
           {ask === 'on'
-            ? <p>Administrators will be able to sign in over SSH from the networks that may manage Gatehouse. The firewall opens port 22 for them and limits how fast anyone can try.</p>
+            ? <p>Administrators will be able to sign in over SSH from the networks that may manage NopeWarden. The firewall opens port 22 for them and limits how fast anyone can try.</p>
             : <p>The SSH server stops and port 22 closes. Anyone signed in is disconnected.</p>}
           {needStep && <StepUp su={su} code={code} setCode={setCode} password={pw} setPassword={setPw} />}
         </Modal>

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"gatehouse/internal/threatcfg"
+	"nopewarden/internal/threatcfg"
 )
 
 // fakeThreatBox points the service at a temporary root and fakes the commands it would run.
@@ -56,7 +56,7 @@ func TestThreatApplyWritesLimitedWatchOnlyService(t *testing.T) {
 		t.Fatal(err)
 	}
 	unit := readOrEmpty(s.rootPath(threatcfg.UnitFile))
-	for _, want := range []string{"-i lan0 -i lan1.20", "CPUQuota=40%", "MemoryMax=512M", "--include /etc/gatehouse/suricata.yaml"} {
+	for _, want := range []string{"-i lan0 -i lan1.20", "CPUQuota=40%", "MemoryMax=512M", "--include /etc/nopewarden/suricata.yaml"} {
 		if !strings.Contains(unit, want) {
 			t.Errorf("unit lacks %q:\n%s", want, unit)
 		}
@@ -69,7 +69,7 @@ func TestThreatApplyWritesLimitedWatchOnlyService(t *testing.T) {
 		t.Errorf("balanced preset groups wrong:\n%s", dis)
 	}
 	joined := strings.Join(*calls, "\n")
-	if !strings.Contains(joined, "suricata-update --no-reload --disable-conf") || !strings.Contains(joined, "systemctl restart gatehouse-suricata.service") {
+	if !strings.Contains(joined, "suricata-update --no-reload --disable-conf") || !strings.Contains(joined, "systemctl restart nopewarden-suricata.service") {
 		t.Errorf("expected a rule update and a start:\n%s", joined)
 	}
 	// Turning it off stops it and leaves the program installed.
@@ -77,7 +77,7 @@ func TestThreatApplyWritesLimitedWatchOnlyService(t *testing.T) {
 	if err := s.ThreatApply(threatcfg.Plan{Enabled: false}); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(strings.Join(*calls, "\n"), "disable --now gatehouse-suricata.service") {
+	if !strings.Contains(strings.Join(*calls, "\n"), "disable --now nopewarden-suricata.service") {
 		t.Errorf("not stopped: %v", *calls)
 	}
 	if !s.threatInstalled() {

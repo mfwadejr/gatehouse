@@ -17,11 +17,11 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/api"
+	"nopewarden/internal/api"
 )
 
 // Alerts in plain words, by email or ntfy: a new device joined, the internet went down and came
-// back, a watched device went offline, Gatehouse repaired or updated something itself. Each kind
+// back, a watched device went offline, NopeWarden repaired or updated something itself. Each kind
 // can be switched off, quiet hours hold messages until the morning, and a test button proves the
 // channel works.
 
@@ -62,11 +62,11 @@ var alertKinds = []struct {
 	Label string `json:"label"`
 	Desc  string `json:"desc"`
 }{
-	{"new_device", "A new device joins", "A device Gatehouse has never seen gets an address."},
+	{"new_device", "A new device joins", "A device NopeWarden has never seen gets an address."},
 	{"internet", "The internet goes down or comes back", "Sent after the connection has been down for a minute."},
 	{"device_offline", "A device I choose goes offline", "Pick the devices below. Sent when one has been gone for 10 minutes."},
 	{"usage", "I am close to my data limit", "Only if you set a monthly limit (Overview, Data use). Sent at the levels you choose."},
-	{"repaired", "Gatehouse repaired or updated something", "For example it restarted a stuck service or installed an update."},
+	{"repaired", "NopeWarden repaired or updated something", "For example it restarted a stuck service or installed an update."},
 }
 
 func defaultAlerts() alertCfg {
@@ -154,7 +154,7 @@ func (a *App) localNow() time.Time {
 	return time.Now().In(loc)
 }
 
-// alert is how the rest of Gatehouse says something. It checks the kind is on, honours quiet hours
+// alert is how the rest of NopeWarden says something. It checks the kind is on, honours quiet hours
 // and limits the rate so a flapping connection cannot flood a phone.
 func (a *App) alert(kind, title, body string) {
 	c := a.alertConfig()
@@ -267,7 +267,7 @@ func (a *App) sendNtfy(n alertNtfy, title, body string) error {
 
 func emailMessage(from, to, title, body string) []byte {
 	clean := func(s string) string { return strings.NewReplacer("\r", " ", "\n", " ").Replace(s) }
-	return []byte("From: " + clean(from) + "\r\nTo: " + clean(to) + "\r\nSubject: " + clean("Gatehouse: "+title) +
+	return []byte("From: " + clean(from) + "\r\nTo: " + clean(to) + "\r\nSubject: " + clean("NopeWarden: "+title) +
 		"\r\nDate: " + time.Now().Format(time.RFC1123Z) + "\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n" +
 		strings.ReplaceAll(body, "\n", "\r\n") + "\r\n")
 }
@@ -338,10 +338,10 @@ func (a *App) sendEmail(e alertEmail, title, body string) error {
 	return cl.Quit()
 }
 
-// repairEvent says whether an event is Gatehouse repairing or updating something itself.
+// repairEvent says whether an event is NopeWarden repairing or updating something itself.
 func repairEvent(actor, title string) bool {
 	switch title {
-	case "Gatehouse was updated", "System updates were installed", "An update did not work and was undone":
+	case "NopeWarden was updated", "System updates were installed", "An update did not work and was undone":
 		return true
 	}
 	return false
@@ -396,7 +396,7 @@ func (a *App) alertTick(now time.Time) {
 		case down && !a.alerts.downTold && now.Sub(a.alerts.wasDown) >= time.Minute:
 			a.alerts.downTold = true
 			a.alerts.mu.Unlock()
-			a.alert("internet", "The internet is down", "Gatehouse cannot reach the internet. It will tell you when it is back.")
+			a.alert("internet", "The internet is down", "NopeWarden cannot reach the internet. It will tell you when it is back.")
 			a.alerts.mu.Lock()
 		case !down && !a.alerts.wasDown.IsZero():
 			was, told := a.alerts.wasDown, a.alerts.downTold
@@ -605,7 +605,7 @@ func (a *App) registerAlertRoutes() {
 			return
 		}
 		cfg := a.alertConfig()
-		title, body := "Test alert", "If you can read this, Gatehouse can reach you."
+		title, body := "Test alert", "If you can read this, NopeWarden can reach you."
 		var err error
 		switch in.Channel {
 		case "email":

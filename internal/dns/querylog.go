@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"gatehouse/internal/store"
+	"nopewarden/internal/store"
 )
 
 // LogEntry is one query as it is stored.
@@ -129,7 +129,7 @@ type Filter struct {
 	BeforeTS int64
 	// NotResult leaves out one result, such as "blocked".
 	NotResult string
-	// HideHealth leaves out Gatehouse's own health check (the watchdog asking this server for
+	// HideHealth leaves out NopeWarden's own health check (the watchdog asking this server for
 	// HealthName from 127.0.0.1), which is noise to a person reading the log.
 	HideHealth bool
 	Limit      int
@@ -137,7 +137,7 @@ type Filter struct {
 
 // HealthName is the made-up name the watchdog looks up to prove DNS is answering. The .invalid
 // ending can never exist on the internet, so it is answered here and never sent anywhere.
-const HealthName = "health.gatehouse.invalid"
+const HealthName = "health.nopewarden.invalid"
 
 const notHealth = `NOT (client IN ('127.0.0.1','::1') AND qname='` + HealthName + `')`
 

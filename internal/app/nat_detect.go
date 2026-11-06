@@ -6,11 +6,11 @@ import (
 	"net/netip"
 	"strings"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/fw"
+	"nopewarden/internal/api"
+	"nopewarden/internal/fw"
 )
 
-// Spotting an internet connection that cannot be reached from outside: the address Gatehouse
+// Spotting an internet connection that cannot be reached from outside: the address NopeWarden
 // gets from the provider is either in the shared carrier range (CGNAT) or an ordinary private
 // address, which means another router (a provider gateway, a UniFi) sits in front.
 
@@ -55,7 +55,7 @@ type natLink struct {
 	Forwards []natForward `json:"forwards,omitempty"`
 }
 
-// buildNat turns what Gatehouse knows about each connection into plain-language findings. The
+// buildNat turns what NopeWarden knows about each connection into plain-language findings. The
 // ports listed for a double NAT are the ones already set up here, so they can be copied to the
 // upstream router as they are.
 func buildNat(links []natInput, fwds []fw.ForwardRow) []natLink {
@@ -75,12 +75,12 @@ func buildNat(links []natInput, fwds []fw.ForwardRow) []natLink {
 			}
 		case "private":
 			n.Blocked = true
-			n.Title = "Another router sits in front of Gatehouse"
-			n.Text = fmt.Sprintf("%s has the private address %s, so it is behind another router (%s), such as a provider gateway or a UniFi. Devices on your networks can use the internet, but connections from outside stop at that router before they reach Gatehouse. Port forwards and UPnP do not work from outside until that router passes the traffic on.", l.Name, l.Address, orWord(l.Gateway, "its address is not known"))
+			n.Title = "Another router sits in front of NopeWarden"
+			n.Text = fmt.Sprintf("%s has the private address %s, so it is behind another router (%s), such as a provider gateway or a UniFi. Devices on your networks can use the internet, but connections from outside stop at that router before they reach NopeWarden. Port forwards and UPnP do not work from outside until that router passes the traffic on.", l.Name, l.Address, orWord(l.Gateway, "its address is not known"))
 			n.Options = []string{
-				"Best: put the other router in bridge mode (or IP passthrough) so Gatehouse gets the public address directly. Your provider's help page will name the setting.",
-				fmt.Sprintf("Or: on the other router, send the ports you need to Gatehouse's address on that network, %s, using the list below.", l.Address),
-				"Or: in the other router, place Gatehouse as its \"DMZ\" or \"exposed host\" device.",
+				"Best: put the other router in bridge mode (or IP passthrough) so NopeWarden gets the public address directly. Your provider's help page will name the setting.",
+				fmt.Sprintf("Or: on the other router, send the ports you need to NopeWarden's address on that network, %s, using the list below.", l.Address),
+				"Or: in the other router, place NopeWarden as its \"DMZ\" or \"exposed host\" device.",
 			}
 			for _, f := range fwds {
 				if !f.Enabled || (f.WAN != "" && f.WAN != l.Name) {

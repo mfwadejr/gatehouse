@@ -29,12 +29,12 @@ func NotifyScriptFor(warm bool) string {
 
 // NotifyScriptWarm is the warm-standby version of NotifyScript.
 const NotifyScriptWarm = `#!/bin/sh
-# Written by Gatehouse. Called by keepalived as: ha-notify GROUP|INSTANCE name STATE priority
+# Written by NopeWarden. Called by keepalived as: ha-notify GROUP|INSTANCE name STATE priority
 state="$3"
-log() { logger -t gatehouse-ha "$*"; }
+log() { logger -t nopewarden-ha "$*"; }
 each() { [ -r "$1" ] && while read -r a b; do [ -n "$a" ] && "$2" "$a" "$b"; done < "$1"; }
 silent() {
-  printf '# Written by Gatehouse (standby)\n[Match]\nName=%s\n[Link]\nUnmanaged=yes\n' "$1" > "/run/systemd/network/00-gh-warm-$1.network"
+  printf '# Written by NopeWarden (standby)\n[Match]\nName=%s\n[Link]\nUnmanaged=yes\n' "$1" > "/run/systemd/network/00-gh-warm-$1.network"
 }
 go_silent() {
   silent "$1"
@@ -60,21 +60,21 @@ case "$state" in
     conntrackd -C /etc/conntrackd/conntrackd.conf -f 2>/dev/null
     conntrackd -C /etc/conntrackd/conntrackd.conf -R 2>/dev/null
     conntrackd -C /etc/conntrackd/conntrackd.conf -B 2>/dev/null
-    touch /run/gatehouse-ha-active
+    touch /run/nopewarden-ha-active
     # Let the unit that was active go silent first.
     sleep 1
-    each /etc/gatehouse/ha-wan-warm go_loud
-    each /etc/gatehouse/ha-wan-macs set_mac
-    each /etc/gatehouse/ha-wan-warm bring_up
+    each /etc/nopewarden/ha-wan-warm go_loud
+    each /etc/nopewarden/ha-wan-macs set_mac
+    each /etc/nopewarden/ha-wan-warm bring_up
     networkctl reload 2>/dev/null
-    each /etc/gatehouse/ha-wan bring_up
-    each /etc/gatehouse/ha-wan-static announce
+    each /etc/nopewarden/ha-wan bring_up
+    each /etc/nopewarden/ha-wan-static announce
     ;;
   BACKUP|FAULT|STOP)
     log "this unit is now standby ($state)"
-    rm -f /run/gatehouse-ha-active
-    each /etc/gatehouse/ha-wan go_down
-    each /etc/gatehouse/ha-wan-warm go_silent
+    rm -f /run/nopewarden-ha-active
+    each /etc/nopewarden/ha-wan go_down
+    each /etc/nopewarden/ha-wan-warm go_silent
     conntrackd -C /etc/conntrackd/conntrackd.conf -t 2>/dev/null
     conntrackd -C /etc/conntrackd/conntrackd.conf -n 2>/dev/null
     ;;

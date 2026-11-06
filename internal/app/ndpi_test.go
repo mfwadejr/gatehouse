@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"gatehouse/internal/ndpi"
+	"nopewarden/internal/ndpi"
 )
 
 func TestTrafficLabels(t *testing.T) {

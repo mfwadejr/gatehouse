@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"gatehouse/internal/update"
+	"nopewarden/internal/update"
 )
 
-// The operating system half of an update. Gatehouse and Debian update together: a release names
+// The operating system half of an update. NopeWarden and Debian update together: a release names
 // the Debian packages it needs, and the Debian updates for the release the machine is on come
 // with it. The machine stays on Debian 13 ("trixie"): the installed image names that release in
 // its apt sources, and nothing here runs unless every source still does, so a source that says
@@ -145,7 +145,7 @@ func rebootLikely(names []string) bool {
 // noAutoUpgrade makes sure Debian's own unattended upgrades are off, so the machine has one
 // update path and it is this one.
 func noAutoUpgrade() {
-	conf := "// Written by Gatehouse. System updates are installed together with Gatehouse updates.\n" +
+	conf := "// Written by NopeWarden. System updates are installed together with NopeWarden updates.\n" +
 		"APT::Periodic::Update-Package-Lists \"1\";\n" +
 		"APT::Periodic::Unattended-Upgrade \"0\";\n" +
 		"Unattended-Upgrade::Automatic-Reboot \"false\";\n"
@@ -211,9 +211,28 @@ func SystemUpgrade(required []string) (update.SystemResult, error) {
 		// off until the administrator turns it on in the console.
 		_, errSSH := aptRun(time.Minute, "dpkg-query", "-W", "-f=${Status}", "openssh-server")
 		hadSSH := errSSH == nil
+		// Unbound must never take over port 53 (NopeWarden's own DNS server uses it): its settings file
+		// is put in place first, so it can only listen on 5335, and it stays off until the console turns
+		// on "Resolve directly".
+		_, errUB := aptRun(time.Minute, "dpkg-query", "-W", "-f=${Status}", "unbound")
+		hadUnbound := errUB == nil
+		wantUnbound := false
+		for _, p := range required {
+			if p == "unbound" {
+				wantUnbound = true
+			}
+		}
+		if wantUnbound && !hadUnbound {
+			os.MkdirAll("/etc/unbound/unbound.conf.d", 0o755)
+			writeFileAtomic("/"+unboundConf, []byte(UnboundConfig(UnboundPlan{DNSSEC: true})), 0o644)
+		}
 		b, err := aptRun(30*time.Minute, "apt-get", aptArgs(append([]string{"install", "--no-install-recommends"}, required...)...)...)
 		if err != nil {
 			return res, fmt.Errorf("could not install %s: %s", strings.Join(required, ", "), lastLine(b, err))
+		}
+		if wantUnbound && !hadUnbound {
+			aptRun(time.Minute, "systemctl", "disable", "--now", unboundUnit)
+			aptRun(time.Minute, "systemctl", "mask", "unbound-resolvconf.service") // it would rewrite /etc/resolv.conf
 		}
 		if !hadSSH {
 			aptRun(time.Minute, "systemctl", "disable", "--now", "ssh.socket")

@@ -16,11 +16,11 @@ type NDPIPlan struct {
 }
 
 const (
-	ndpiConf   = "etc/gatehouse/ndpi.conf"
-	ndpiBinary = "usr/lib/gatehouse/gh-ndpi"
-	ndpiUnit   = "gatehouse-ndpi.service"
-	// NDPISocketDir is where the program and Gatehouse meet; tmpfiles.d creates it at boot.
-	NDPISocketDir = "/run/gatehouse/ndpi"
+	ndpiConf   = "etc/nopewarden/ndpi.conf"
+	ndpiBinary = "usr/lib/nopewarden/gh-ndpi"
+	ndpiUnit   = "nopewarden-ndpi.service"
+	// NDPISocketDir is where the program and NopeWarden meet; tmpfiles.d creates it at boot.
+	NDPISocketDir = "/run/nopewarden/ndpi"
 )
 
 // NDPIInstalled reports whether this system has the program (only ISO builds that could compile it do).
@@ -54,7 +54,7 @@ func (s *Service) NDPIApply(p NDPIPlan) error {
 		return err
 	}
 	old, _ := os.ReadFile(conf)
-	nw := "# Written by Gatehouse\nIFACES=" + b.String() + "\n"
+	nw := "# Written by NopeWarden\nIFACES=" + b.String() + "\n"
 	if err := writeFileAtomic(conf, []byte(nw), 0o644); err != nil {
 		return err
 	}

@@ -36,27 +36,27 @@ func TestSSHOnWritesSettingsAndPutsTheCheckFirst(t *testing.T) {
 	calls := recordRun(t, func(name string, args []string) (string, error) {
 		switch name {
 		case "getent":
-			return "gatehouse-ssh:x:900:oldadmin\n", nil
+			return "nopewarden-ssh:x:900:oldadmin\n", nil
 		case "id":
 			return "", os.ErrNotExist // no such login yet
 		}
 		return "", nil
 	})
-	if err := s.SSHApply(SSHPlan{Enabled: true, Users: []string{"Marvin", "bad name!"}, Binary: "/usr/local/bin/gatehouse"}); err != nil {
+	if err := s.SSHApply(SSHPlan{Enabled: true, Users: []string{"Marvin", "bad name!"}, Binary: "/usr/local/bin/nopewarden"}); err != nil {
 		t.Fatal(err)
 	}
 	pam, _ := os.ReadFile(filepath.Join(s.Root, "etc/pam.d/sshd"))
-	if !strings.HasPrefix(string(pam), "auth [success=done default=die] pam_exec.so expose_authtok quiet /usr/local/bin/gatehouse ssh-auth") {
+	if !strings.HasPrefix(string(pam), "auth [success=done default=die] pam_exec.so expose_authtok quiet /usr/local/bin/nopewarden ssh-auth") {
 		t.Fatalf("the check must be the first line:\n%s", pam)
 	}
 	conf, _ := os.ReadFile(filepath.Join(s.Root, sshDropIn))
-	for _, want := range []string{"PermitRootLogin no", "AllowGroups gatehouse-ssh", "MaxAuthTries 3"} {
+	for _, want := range []string{"PermitRootLogin no", "AllowGroups nopewarden-ssh", "MaxAuthTries 3"} {
 		if !strings.Contains(string(conf), want) {
 			t.Errorf("missing %q", want)
 		}
 	}
 	all := strings.Join(*calls, "\n")
-	if !strings.Contains(all, "useradd -m -s /bin/bash -G gatehouse-ssh,systemd-journal -p ! marvin") {
+	if !strings.Contains(all, "useradd -m -s /bin/bash -G nopewarden-ssh,systemd-journal -p ! marvin") {
 		t.Errorf("the login was not made:\n%s", all)
 	}
 	if strings.Contains(all, "bad name") {
@@ -66,9 +66,9 @@ func TestSSHOnWritesSettingsAndPutsTheCheckFirst(t *testing.T) {
 		t.Error("a login for someone who is no longer an administrator was kept")
 	}
 	// Applying again does not stack a second line.
-	s.SSHApply(SSHPlan{Enabled: true, Users: []string{"marvin"}, Binary: "/usr/local/bin/gatehouse"})
+	s.SSHApply(SSHPlan{Enabled: true, Users: []string{"marvin"}, Binary: "/usr/local/bin/nopewarden"})
 	pam, _ = os.ReadFile(filepath.Join(s.Root, "etc/pam.d/sshd"))
-	if strings.Count(string(pam), "gatehouse-ssh") != 1 {
+	if strings.Count(string(pam), "nopewarden-ssh") != 1 {
 		t.Fatalf("the line was added twice:\n%s", pam)
 	}
 }
@@ -76,12 +76,12 @@ func TestSSHOnWritesSettingsAndPutsTheCheckFirst(t *testing.T) {
 func TestSSHOffRemovesEverythingAndStopsTheServer(t *testing.T) {
 	s := sshRoot(t)
 	calls := recordRun(t, nil)
-	s.SSHApply(SSHPlan{Enabled: true, Users: []string{"marvin"}, Binary: "/usr/local/bin/gatehouse"})
+	s.SSHApply(SSHPlan{Enabled: true, Users: []string{"marvin"}, Binary: "/usr/local/bin/nopewarden"})
 	if err := s.SSHApply(SSHPlan{Enabled: false}); err != nil {
 		t.Fatal(err)
 	}
 	pam, _ := os.ReadFile(filepath.Join(s.Root, "etc/pam.d/sshd"))
-	if strings.Contains(string(pam), "gatehouse") {
+	if strings.Contains(string(pam), "nopewarden") {
 		t.Fatalf("the check line was left behind:\n%s", pam)
 	}
 	if _, err := os.Stat(filepath.Join(s.Root, sshDropIn)); err == nil {
@@ -100,11 +100,11 @@ func TestSSHRejectedSettingsAreNeverLeftInPlace(t *testing.T) {
 		}
 		return "", nil
 	})
-	if err := s.SSHApply(SSHPlan{Enabled: true, Binary: "/usr/local/bin/gatehouse"}); err == nil {
+	if err := s.SSHApply(SSHPlan{Enabled: true, Binary: "/usr/local/bin/nopewarden"}); err == nil {
 		t.Fatal("expected an error")
 	}
 	pam, _ := os.ReadFile(filepath.Join(s.Root, "etc/pam.d/sshd"))
-	if strings.Contains(string(pam), "gatehouse") {
+	if strings.Contains(string(pam), "nopewarden") {
 		t.Fatal("the check line stayed after sshd rejected the settings")
 	}
 }
@@ -112,13 +112,13 @@ func TestSSHRejectedSettingsAreNeverLeftInPlace(t *testing.T) {
 func TestSSHRefusesToRunWithoutAnUsableProgramPath(t *testing.T) {
 	s := sshRoot(t)
 	recordRun(t, nil)
-	if err := s.SSHApply(SSHPlan{Enabled: true, Binary: "gatehouse; rm -rf /"}); err == nil {
+	if err := s.SSHApply(SSHPlan{Enabled: true, Binary: "nopewarden; rm -rf /"}); err == nil {
 		t.Fatal("a path with shell characters was accepted")
 	}
 }
 
 func TestSSHNamesThatCannotHaveALogin(t *testing.T) {
-	for _, n := range []string{"root", "Bad Name", "a.b", "", "gatehouse"} {
+	for _, n := range []string{"root", "Bad Name", "a.b", "", "nopewarden"} {
 		if _, ok := SSHUserName(n); ok {
 			t.Errorf("%q was accepted", n)
 		}
@@ -137,7 +137,7 @@ func TestSSHMakesMissingHostKeysAndLeavesExistingOnes(t *testing.T) {
 		}
 		return "", nil
 	})
-	if err := s.SSHApply(SSHPlan{Enabled: true, Users: []string{"marvin"}, Binary: "/usr/local/bin/gatehouse"}); err != nil {
+	if err := s.SSHApply(SSHPlan{Enabled: true, Users: []string{"marvin"}, Binary: "/usr/local/bin/nopewarden"}); err != nil {
 		t.Fatal(err)
 	}
 	all := strings.Join(*calls, "\n")
@@ -148,7 +148,7 @@ func TestSSHMakesMissingHostKeysAndLeavesExistingOnes(t *testing.T) {
 	// with keys present nothing is made
 	os.WriteFile(filepath.Join(s.Root, "etc/ssh/ssh_host_ed25519_key"), []byte("k"), 0o600)
 	*calls = nil
-	s.SSHApply(SSHPlan{Enabled: true, Users: []string{"marvin"}, Binary: "/usr/local/bin/gatehouse"})
+	s.SSHApply(SSHPlan{Enabled: true, Users: []string{"marvin"}, Binary: "/usr/local/bin/nopewarden"})
 	if strings.Contains(strings.Join(*calls, "\n"), "ssh-keygen") {
 		t.Fatal("made keys that already existed")
 	}
@@ -161,7 +161,7 @@ func TestSSHMakesMissingHostKeysAndLeavesExistingOnes(t *testing.T) {
 		}
 		return "", nil
 	})
-	err := s2.SSHApply(SSHPlan{Enabled: true, Users: nil, Binary: "/usr/local/bin/gatehouse"})
+	err := s2.SSHApply(SSHPlan{Enabled: true, Users: nil, Binary: "/usr/local/bin/nopewarden"})
 	if err == nil || !strings.Contains(err.Error(), "no SSH identity") {
 		t.Fatalf("%v", err)
 	}

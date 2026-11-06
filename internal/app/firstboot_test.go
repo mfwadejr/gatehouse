@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"gatehouse/internal/dhcp"
-	"gatehouse/internal/installer"
-	"gatehouse/internal/seed"
+	"nopewarden/internal/dhcp"
+	"nopewarden/internal/installer"
+	"nopewarden/internal/seed"
 )
 
 // The network chosen in the installer is applied by itself on the first start.
@@ -55,7 +55,7 @@ func TestFirstBootAppliesInstallerChoices(t *testing.T) {
 }
 
 // Until the wizard is finished, a computer plugged into the management port gets an address and
-// DNS from Gatehouse itself, using what the installer chose. Once the wizard has run, the
+// DNS from NopeWarden itself, using what the installer chose. Once the wizard has run, the
 // temporary pool is gone.
 func TestSetupPortHandsOutAddressesUntilTheWizardIsDone(t *testing.T) {
 	dir := t.TempDir()
@@ -64,8 +64,8 @@ func TestSetupPortHandsOutAddressesUntilTheWizardIsDone(t *testing.T) {
 	os.WriteFile(installer.InstallNetPath, []byte("wan enp1s0 aa:aa\nmgmt 192.168.50.1/24\n"), 0o644)
 	os.WriteFile(installer.MgmtPortPath, []byte("enp2s0 bb:bb\n"), 0o644)
 	defer func() {
-		installer.InstallNetPath = "/var/lib/gatehouse/install-net"
-		installer.MgmtPortPath = "/var/lib/gatehouse/mgmt-port"
+		installer.InstallNetPath = "/var/lib/nopewarden/install-net"
+		installer.MgmtPortPath = "/var/lib/nopewarden/mgmt-port"
 	}()
 	web, dnsAddr := freeAddr(t), freeAddr(t)
 	a, err := New(Config{DataDir: t.TempDir(), WebAddr: web, DNSAddrs: []string{dnsAddr}, Net: &fakeNet{}, FW: &fakeFW{}})

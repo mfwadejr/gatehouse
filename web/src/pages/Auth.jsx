@@ -2,12 +2,13 @@ import React, { useEffect, useState } from 'react';
 import qrcode from 'qrcode-generator';
 import { get, post, setCsrf } from '../api.js';
 import { Button, Field, Icon, Input, Note } from '../ui.jsx';
+import { Logo } from '../logo.jsx';
 
 function Frame({ title, children }) {
   return (
     <main className="auth">
       <section className="card">
-        <div className="brand" style={{ padding: 0 }}><Icon name="logo" size={24} /><span>Gatehouse</span></div>
+        <div className="brand" style={{ padding: 0 }}><Logo size={24} /><span>NopeWarden</span></div>
         <h1>{title}</h1>
         {children}
       </section>

@@ -268,15 +268,16 @@ const mapLegend = (dir) => (dir === 'out'
   ? 'linear-gradient(90deg, var(--color-border-strong), var(--color-chart-series-1), var(--color-chart-series-3))'
   : 'linear-gradient(90deg, var(--color-border-strong), var(--color-status-warning), var(--color-status-serious))');
 
-const RANGE_HOURS = { '1h': '1', '24h': '24', '7d': '168', '30d': '720' };
+const RANGE_HOURS = { '5m': '1', '15m': '1', '1h': '1', '24h': '24', '7d': '168', '30d': '720' };
 
 function WorldCard() {
   const [dir, setDir] = useState('out');
   const [range, setRange] = useState('24h');
-  const { data } = useData(`/api/overview/map?dir=${dir}&range=${range}`, { every: 60000 });
+  const { data } = useData(`/api/overview/map?dir=${dir}&range=${range}`, { every: range === '5m' || range === '15m' ? 10000 : 60000 });
   const { data: geo, reload: reloadGeo } = useData('/api/fw/geo', { every: 5000 });
   const [dl, dlBusy] = useAction();
   const [hover, setHover] = useState(null);
+  const [mouse, setMouse] = useState(null); // where the pointer is inside the map, so the details sit next to it
   const { data: homePt } = useData('/api/overview/home');
   const by = useMemo(() => Object.fromEntries((data?.countries || []).map((c) => [c.country, c])), [data]);
   const top = data?.top || 0;
@@ -301,14 +302,14 @@ function WorldCard() {
     <div className="ov-gm">
       <Card title="Where connections go"
         desc={dir === 'out' ? 'Where your devices are connecting' : 'Where connection attempts from the internet come from'}
-        actions={<div className="inline"><Segmented value={dir} onChange={setDir} options={[{ value: 'out', label: 'Outgoing' }, { value: 'in', label: 'Incoming' }]} /><Segmented value={range} onChange={setRange} options={[{ value: '1h', label: '1 h' }, { value: '24h', label: '24 h' }, { value: '7d', label: '7 d' }, { value: '30d', label: '30 d' }]} /></div>}>
+        actions={<div className="inline"><Segmented value={dir} onChange={setDir} options={[{ value: 'out', label: 'Outgoing' }, { value: 'in', label: 'Incoming' }]} /><Segmented value={range} onChange={setRange} options={[{ value: '5m', label: '5 min' }, { value: '15m', label: '15 min' }, { value: '1h', label: '1 h' }, { value: '24h', label: '24 h' }, { value: '7d', label: '7 d' }, { value: '30d', label: '30 d' }]} /></div>}>
         {geo && !geo.ready && (
           <Note tone={geo.error ? 'warn' : ''} title="Country data not downloaded yet">
-            {geo.busy ? 'Downloading the country address lists now. The map fills in once they arrive.' : geo.error ? `The last try failed: ${geo.error}` : 'Gatehouse needs the country address lists to place connections on the map.'}
+            {geo.busy ? 'Downloading the country address lists now. The map fills in once they arrive.' : geo.error ? `The last try failed: ${geo.error}` : 'NopeWarden needs the country address lists to place connections on the map.'}
             {' '}<Button small disabled={geo.busy || dlBusy} onClick={() => dl(async () => { await post('/api/fw/geo/refresh', {}); reloadGeo(); })}>{geo.busy ? 'Downloading…' : 'Download now'}</Button>
           </Note>
         )}
-        <div className="ov-map" onMouseLeave={() => setHover(null)}>
+        <div className="ov-map" onMouseLeave={() => { setHover(null); setMouse(null); }} onMouseMove={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMouse({ x: e.clientX - r.left, y: e.clientY - r.top, w: r.width, h: r.height }); }}>
           <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} role="img" aria-label={`${dir === 'out' ? 'Outgoing connections' : 'Incoming attempts'} by country`}>
             {Object.entries(COUNTRIES).filter(([cc]) => cc !== 'AQ').map(([cc, c]) => {
               const n = by[cc]?.n || 0;
@@ -335,7 +336,7 @@ function WorldCard() {
             )}
           </svg>
           {tip && (
-            <div className="ov-maptip small">
+            <div className="ov-maptip small" style={mouse ? { left: mouse.x, top: mouse.y, transform: `translate(${mouse.x > mouse.w * 0.6 ? 'calc(-100% - 14px)' : '14px'}, ${mouse.y > mouse.h * 0.6 ? 'calc(-100% - 14px)' : '14px'})`, maxWidth: '16rem' } : undefined}>
               <b>{regionName(hover)}</b><br />
               {fmt.n(tip.n)} {word}{tip.up + tip.down > 0 ? <><br />{fmtBytes(tip.up)} sent · {fmtBytes(tip.down)} received</> : null}
               <><br />{fmt.n(tip.blocked || 0)} blocked · {fmt.n(tip.allowed || 0)} allowed</>
@@ -410,6 +411,42 @@ function NetworksCard({ fw, wanList, links, devs, h24 }) {
   );
 }
 
+// "Your VPNs": the busiest few, never more than five rows however many tunnels there are. The rest are
+// one click away on the VPN page, where each has its own speed, graph and totals.
+const VPN_ROWS = 5;
+function VpnsCard({ h24 }) {
+  const { data } = useData('/api/vpn', { topics: ['vpn.status'], every: 15000 });
+  const { data: sp } = useData('/api/vpn/speed', { every: 2000 });
+  const all = (data?.vpns || []).filter((v) => !v.site);
+  if (!all.length) return null;
+  const rate = (v) => sp?.vpns?.[String(v.id)] || { down: 0, up: 0 };
+  const rows = [...all].sort((a, b) => (b.enabled - a.enabled) || ((rate(b).down + rate(b).up) - (rate(a).down + rate(a).up)));
+  const shown = rows.slice(0, VPN_ROWS);
+  const quiet = (v) => v.enabled && v.state === 'up' && rate(v).down + rate(v).up < 1000;
+  return (
+    <Card title="Your VPNs" desc={`${all.filter((v) => v.enabled && v.state === 'up').length} of ${all.length} connected. Speeds update every couple of seconds; the line is the last hour.`}>
+      <div className="scroll"><table className="table">
+        <thead><tr><th>VPN</th><th className="num">Download now</th><th className="num">Upload now</th><th>Last hour</th></tr></thead>
+        <tbody>
+          {shown.map((v) => {
+            const r = rate(v);
+            const st = !v.enabled ? <Pill>Off</Pill> : v.state !== 'up' ? <Pill tone="bad">{v.state === 'connecting' ? 'Connecting' : 'Down'}</Pill> : quiet(v) ? <Pill>Idle</Pill> : <Pill tone="good">Active</Pill>;
+            return (
+              <tr key={v.id}>
+                <td><b>{v.label}</b> {st}<div className="small muted">{v.role === 'server' ? 'Connect from outside' : 'Through a VPN provider'}</div></td>
+                <td className="num">{v.enabled && v.state === 'up' ? fmtBits(r.down) : '–'}</td>
+                <td className="num">{v.enabled && v.state === 'up' ? fmtBits(r.up) : '–'}</td>
+                <td style={{ minWidth: '9rem' }}><Chart series={miniSeries(h24, `vpn.${v.id}.down`)} from={h24?.from || 0} to={h24?.to || 1} kind="bits" height={30} compact label={`Download speed of ${v.label}, last hour`} /></td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table></div>
+      <button type="button" className="link small leftalign" onClick={() => go('vpn')}>{rows.length > shown.length ? `Show all ${rows.length} VPNs →` : 'Open VPN →'}</button>
+    </Card>
+  );
+}
+
 function BusiestCard({ rows }) {
   const max = rows?.[0]?.total || 1;
   return (
@@ -470,7 +507,7 @@ function MachineCard({ sys, upd }) {
   const cpuText = sys?.cores ? `${Math.round(sys.cpu || 0)} % · ${sys.cores} core${sys.cores === 1 ? '' : 's'}` : `${Math.round(sys?.cpu || 0)} %`;
   const loadTip = sys?.cores ? `Load average: ${sys.load1?.toFixed(2)} (1 min) · ${sys.load5?.toFixed(2)} (5 min) · ${sys.load15?.toFixed(2)} (15 min). Around ${sys.cores} or less is comfortable.` : undefined;
   return (
-    <Card title="This machine" desc={`Gatehouse ${upd?.current || ''}${upd?.needs_reboot ? ' · restart needed' : ''}${sys?.uptime ? ` · up ${upText(sys.uptime)}` : ''}`}>
+    <Card title="This machine" desc={`NopeWarden ${upd?.current || ''}${upd?.needs_reboot ? ' · restart needed' : ''}${sys?.uptime ? ` · up ${upText(sys.uptime)}` : ''}`}>
       <div className="ov-gauges">
         {g('Processor', sys?.cpu, cpuText, loadTip)}
         {g('Memory', sys?.mem, memText, 'Memory in use, not counting what the system keeps as a speed-up cache')}
@@ -552,6 +589,7 @@ export default function Overview() {
         <MachineCard sys={sys} upd={upd} />
       </section>
       <NetworksCard fw={fw} wanList={wanList} links={links} devs={devs} h24={h1} />
+      <VpnsCard h24={h1} />
     </Page>
   );
 }

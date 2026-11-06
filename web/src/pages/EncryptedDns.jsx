@@ -2,7 +2,7 @@ import React from 'react';
 import { post, put, useData } from '../api.js';
 import { Button, Card, Note, Segmented, Select, useAction } from '../ui.jsx';
 
-// Encrypted DNS as one switch for Gatehouse's own lookups. It writes the same list of DNS servers
+// Encrypted DNS as one switch for NopeWarden's own lookups. It writes the same list of DNS servers
 // shown below it; Custom leaves your own list alone. The previous list is kept for one-click undo.
 export default function EncryptedDns({ onChanged }) {
   const { data, reload } = useData('/api/dns/encrypted');

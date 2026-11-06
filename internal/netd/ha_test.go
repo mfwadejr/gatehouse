@@ -6,16 +6,16 @@ import (
 	"strings"
 	"testing"
 
-	"gatehouse/internal/ha"
+	"nopewarden/internal/ha"
 )
 
 func TestHAApplyRefusesUnknownText(t *testing.T) {
 	s := &Service{Root: t.TempDir()}
 	for name, p := range map[string]HAPlan{
-		"not ours":       {Enabled: true, Keepalived: "global_defs {}", Conntrackd: "# Written by Gatehouse\n"},
+		"not ours":       {Enabled: true, Keepalived: "global_defs {}", Conntrackd: "# Written by NopeWarden\n"},
 		"empty":          {Enabled: true},
-		"nul":            {Enabled: true, Keepalived: "# Written by Gatehouse\x00", Conntrackd: "# Written by Gatehouse\n"},
-		"bad port names": {Enabled: true, Keepalived: "# Written by Gatehouse\n", Conntrackd: "# Written by Gatehouse\n", WanDevs: []string{"eth0; reboot"}},
+		"nul":            {Enabled: true, Keepalived: "# Written by NopeWarden\x00", Conntrackd: "# Written by NopeWarden\n"},
+		"bad port names": {Enabled: true, Keepalived: "# Written by NopeWarden\n", Conntrackd: "# Written by NopeWarden\n", WanDevs: []string{"eth0; reboot"}},
 	} {
 		if err := s.HAApply(p); err == nil {
 			t.Errorf("%s: accepted", name)
@@ -73,7 +73,7 @@ func TestHeartApplyWritesAndRemovesTheCableFile(t *testing.T) {
 
 func TestHAApplyWarmWritesTheListsAndTheWarmScript(t *testing.T) {
 	s := &Service{Root: t.TempDir()}
-	base := HAPlan{Enabled: true, Keepalived: "# Written by Gatehouse\n", Conntrackd: "# Written by Gatehouse\n"}
+	base := HAPlan{Enabled: true, Keepalived: "# Written by NopeWarden\n", Conntrackd: "# Written by NopeWarden\n"}
 	bad := base
 	bad.WanMACs = []string{"eth0 not-a-mac"}
 	if err := s.HAApply(bad); err == nil {
@@ -107,23 +107,23 @@ func TestHAApplyWarmWritesTheListsAndTheWarmScript(t *testing.T) {
 
 func TestHAConfOnlyNeverRestartsAndRefusesWithoutAPair(t *testing.T) {
 	s := &Service{Root: t.TempDir()}
-	p := HAPlan{Enabled: true, ConfOnly: true, Keepalived: "# Written by Gatehouse\n"}
+	p := HAPlan{Enabled: true, ConfOnly: true, Keepalived: "# Written by NopeWarden\n"}
 	if err := s.HAApply(p); err == nil {
 		t.Fatal("a priority change on a unit with no high availability set up must be refused")
 	}
 	if _, err := os.Stat(filepath.Join(s.Root, haKeepalived)); err == nil {
 		t.Fatal("nothing may be written when high availability is not set up")
 	}
-	// Not in Gatehouse's own form: refused before anything is touched.
+	// Not in NopeWarden's own form: refused before anything is touched.
 	p.Keepalived = "vrrp_instance X {}"
 	if err := s.HAApply(p); err == nil {
-		t.Fatal("text that Gatehouse did not write was accepted")
+		t.Fatal("text that NopeWarden did not write was accepted")
 	}
 	// With the same text already in place there is nothing to do and nothing is restarted.
 	f := filepath.Join(s.Root, haKeepalived)
 	os.MkdirAll(filepath.Dir(f), 0o755)
-	os.WriteFile(f, []byte("# Written by Gatehouse\n"), 0o600)
-	p.Keepalived = "# Written by Gatehouse\n"
+	os.WriteFile(f, []byte("# Written by NopeWarden\n"), 0o600)
+	p.Keepalived = "# Written by NopeWarden\n"
 	if err := s.HAApply(p); err != nil {
 		t.Fatal(err)
 	}

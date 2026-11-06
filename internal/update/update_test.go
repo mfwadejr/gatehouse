@@ -75,11 +75,11 @@ func makePkg(t *testing.T, version string, mutate func(files map[string]string))
 	priv, _ := ParsePrivateKey(testPriv)
 	pub, _ = ParsePublicKey(testPub)
 	dir := t.TempDir()
-	bin := filepath.Join(dir, "gatehouse")
+	bin := filepath.Join(dir, "nopewarden")
 	os.WriteFile(bin, fakeProgram(), 0o755)
-	unit := filepath.Join(dir, "gatehouse.service")
+	unit := filepath.Join(dir, "nopewarden.service")
 	os.WriteFile(unit, []byte("[Unit]\nDescription=new\n"), 0o644)
-	files := map[string]string{BinaryDest: bin, "/etc/systemd/system/gatehouse.service": unit}
+	files := map[string]string{BinaryDest: bin, "/etc/systemd/system/nopewarden.service": unit}
 	if mutate != nil {
 		mutate(files)
 	}
@@ -152,7 +152,7 @@ func (f *fakeBox) env(t *testing.T) Env {
 		},
 		Sleep:    func(d time.Duration) { f.now = f.now.Add(d) },
 		Now:      func() time.Time { return f.now },
-		Services: []string{"gatehouse-netd", "gatehouse"},
+		Services: []string{"nopewarden-netd", "nopewarden"},
 		Wait:     30 * time.Second, RollbackWait: 30 * time.Second,
 	}
 }
@@ -162,8 +162,8 @@ func setupBox(t *testing.T, healthy bool) *fakeBox {
 	os.MkdirAll(filepath.Join(root, "usr/local/bin"), 0o755)
 	os.MkdirAll(filepath.Join(root, "etc/systemd/system"), 0o755)
 	os.WriteFile(filepath.Join(root, BinaryDest), []byte("\x7fELFold"), 0o755)
-	os.WriteFile(filepath.Join(root, "etc/systemd/system/gatehouse.service"), []byte("[Unit]\nDescription=old\n"), 0o644)
-	os.WriteFile(filepath.Join(root, "etc/gatehouse-release"), []byte("0.9.0\n"), 0o644)
+	os.WriteFile(filepath.Join(root, "etc/systemd/system/nopewarden.service"), []byte("[Unit]\nDescription=old\n"), 0o644)
+	os.WriteFile(filepath.Join(root, "etc/nopewarden-release"), []byte("0.9.0\n"), 0o644)
 	return &fakeBox{root: root, healthy: healthy, now: time.Unix(1000, 0)}
 }
 
@@ -176,14 +176,14 @@ func TestApplySucceeds(t *testing.T) {
 		t.Fatalf("%+v", res)
 	}
 	b, _ := os.ReadFile(filepath.Join(box.root, BinaryDest))
-	rel, _ := os.ReadFile(filepath.Join(box.root, "etc/gatehouse-release"))
+	rel, _ := os.ReadFile(filepath.Join(box.root, "etc/nopewarden-release"))
 	if !strings.Contains(string(b), "program body") || strings.TrimSpace(string(rel)) != "1.0.0" {
 		t.Fatal("files not installed")
 	}
 	if fi, _ := os.Stat(filepath.Join(box.root, BinaryDest)); fi.Mode().Perm() != 0o755 {
 		t.Fatalf("mode %v", fi.Mode())
 	}
-	if len(box.runs) < 3 || !strings.Contains(strings.Join(box.runs, "|"), "restart gatehouse-netd|systemctl restart gatehouse") {
+	if len(box.runs) < 3 || !strings.Contains(strings.Join(box.runs, "|"), "restart nopewarden-netd|systemctl restart nopewarden") {
 		t.Fatalf("services: %v", box.runs)
 	}
 	if r, ok := ReadResult(box.env(t).StateDir); !ok || !r.OK {
@@ -200,8 +200,8 @@ func TestApplyRollsBackWhenConsoleStaysDown(t *testing.T) {
 		t.Fatalf("%+v", res)
 	}
 	b, _ := os.ReadFile(filepath.Join(box.root, BinaryDest))
-	u, _ := os.ReadFile(filepath.Join(box.root, "etc/systemd/system/gatehouse.service"))
-	rel, _ := os.ReadFile(filepath.Join(box.root, "etc/gatehouse-release"))
+	u, _ := os.ReadFile(filepath.Join(box.root, "etc/systemd/system/nopewarden.service"))
+	rel, _ := os.ReadFile(filepath.Join(box.root, "etc/nopewarden-release"))
 	if string(b) != "\x7fELFold" || !strings.Contains(string(u), "old") || strings.TrimSpace(string(rel)) != "0.9.0" {
 		t.Fatalf("not restored: %q %q %q", b, u, rel)
 	}
@@ -212,7 +212,7 @@ func TestApplyRollsBackWhenConsoleStaysDown(t *testing.T) {
 
 func TestApplyRollsBackWhenRestartFails(t *testing.T) {
 	box := setupBox(t, true)
-	box.failWhen = "restart gatehouse-netd"
+	box.failWhen = "restart nopewarden-netd"
 	data, sig, pub := makePkg(t, "1.0.0", nil)
 	p, _ := Open(data, sig, pub)
 	if res := Apply(box.env(t), p, "0.9.0"); res.OK || !res.RolledBack {
@@ -225,9 +225,9 @@ func TestReleaseLookup(t *testing.T) {
 	var base string
 	mux.HandleFunc("/latest", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"tag_name":"v1.2.0","body":"What changed","published_at":"2026-10-23T00:00:00Z","assets":[
-		 {"name":"gatehouse-1.2.0-amd64.iso","browser_download_url":"` + base + `/iso","size":1},
-		 {"name":"gatehouse-update-1.2.0.tar.gz","browser_download_url":"` + base + `/pkg","size":5},
-		 {"name":"gatehouse-update-1.2.0.tar.gz.sig","browser_download_url":"` + base + `/sig","size":5}]}`))
+		 {"name":"nopewarden-1.2.0-amd64.iso","browser_download_url":"` + base + `/iso","size":1},
+		 {"name":"nopewarden-update-1.2.0.tar.gz","browser_download_url":"` + base + `/pkg","size":5},
+		 {"name":"nopewarden-update-1.2.0.tar.gz.sig","browser_download_url":"` + base + `/sig","size":5}]}`))
 	})
 	mux.HandleFunc("/pkg", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("PKG")) })
 	mux.HandleFunc("/sig", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("SIG")) })
@@ -258,7 +258,7 @@ func TestPackagesInTheManifest(t *testing.T) {
 	priv, _ := ParsePrivateKey(testPriv)
 	pub, _ := ParsePublicKey(testPub)
 	dir := t.TempDir()
-	bin := filepath.Join(dir, "gatehouse")
+	bin := filepath.Join(dir, "nopewarden")
 	os.WriteFile(bin, fakeProgram(), 0o755)
 	build := func(pk []string) *Package {
 		data, err := BuildWith("1.0.0", "n", "2026-10-24", pk, map[string]string{BinaryDest: bin}, map[string]uint32{BinaryDest: 0o755})
@@ -301,13 +301,13 @@ func systemEnv(box *fakeBox, t *testing.T, sys func([]string) (SystemResult, err
 	return e
 }
 
-func TestSystemUpdatesRunFirstAndGatehouseSecond(t *testing.T) {
+func TestSystemUpdatesRunFirstAndNopeWardenSecond(t *testing.T) {
 	box := setupBox(t, true)
 	data, sig, pub := makePkg(t, "1.0.0", nil)
 	p, _ := Open(data, sig, pub)
 	var order []string
 	e := systemEnv(box, t, func(req []string) (SystemResult, error) {
-		// at this point Gatehouse must still be the old program
+		// at this point NopeWarden must still be the old program
 		b, _ := os.ReadFile(filepath.Join(box.root, BinaryDest))
 		order = append(order, "system:"+strings.Join(req, ","), "program:"+string(b[4:]))
 		return SystemResult{Packages: 7, RebootNeeded: true}, nil
@@ -322,11 +322,11 @@ func TestSystemUpdatesRunFirstAndGatehouseSecond(t *testing.T) {
 	}
 	b, _ := os.ReadFile(filepath.Join(box.root, BinaryDest))
 	if !strings.Contains(string(b), "program body") {
-		t.Fatal("Gatehouse was not installed after the system step")
+		t.Fatal("NopeWarden was not installed after the system step")
 	}
 }
 
-func TestSystemFailureLeavesGatehouseUntouched(t *testing.T) {
+func TestSystemFailureLeavesNopeWardenUntouched(t *testing.T) {
 	box := setupBox(t, true)
 	data, sig, pub := makePkg(t, "1.0.0", nil)
 	p, _ := Open(data, sig, pub)
@@ -336,9 +336,9 @@ func TestSystemFailureLeavesGatehouseUntouched(t *testing.T) {
 		t.Fatalf("%+v", res)
 	}
 	b, _ := os.ReadFile(filepath.Join(box.root, BinaryDest))
-	rel, _ := os.ReadFile(filepath.Join(box.root, "etc/gatehouse-release"))
+	rel, _ := os.ReadFile(filepath.Join(box.root, "etc/nopewarden-release"))
 	if string(b) != "\x7fELFold" || strings.TrimSpace(string(rel)) != "0.9.0" || len(box.runs) != 0 {
-		t.Fatalf("Gatehouse was touched: %q %q %v", b, rel, box.runs)
+		t.Fatalf("NopeWarden was touched: %q %q %v", b, rel, box.runs)
 	}
 	if ReadState(e.StateDir) != "idle" {
 		t.Fatal("state left busy")

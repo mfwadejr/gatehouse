@@ -3,7 +3,7 @@ import { del, post, put, useData } from '../api.js';
 import { PolicyControls, whenText } from '../policykit.jsx';
 import CreatePolicy from '../CreatePolicy.jsx';
 import { actionWord, ruleBody } from './FirewallRules.jsx';
-import { Button, Card, Empty, Page, Pill, Select, confirmBox, useAction, useUndoDelete } from '../ui.jsx';
+import { Button, Card, Empty, Page, Pill, Select, useAction, useUndoDelete , useDelayedDelete } from '../ui.jsx';
 
 // Every policy in one list, in plain words. Firewall rules, routes, blocks and open ports are four
 // kinds of the same thing: who it covers, where to, what for, when. Each kind keeps its own page for
@@ -19,12 +19,13 @@ const labels = (chips) => (chips || []).filter((c) => c.kind !== 'any').map((c) 
 
 function ruleWords(r) {
   const who = labels(r.src_chips) || `everything on ${r.from}`;
-  const to = labels(r.dst_chips) || (r.to === 'self' ? 'Gatehouse' : `anywhere on ${r.to}`);
+  const to = labels(r.dst_chips) || (r.to === 'self' ? 'NopeWarden' : `anywhere on ${r.to}`);
   const what = r.service === 'any' ? '' : ` for ${r.service.replace(/list:/g, 'list ')}`;
   return `${actionWord(r.action)} ${who} to ${to}${what}.`;
 }
 
 export default function Policies() {
+  const delayedDelete = useDelayedDelete();
   const { data: rules, reload: rr } = useData('/api/fw/rules', { every: 20000 });
   const { data: routes, reload: rt } = useData('/api/routes', { topics: ['vpn.status', 'net.status'], every: 20000 });
   const { data: blocks, reload: rb } = useData('/api/blocks', { every: 20000 });
@@ -58,14 +59,14 @@ export default function Policies() {
       tone: r.status === 'blocking' || r.status === 'allowing' ? 'good' : '', state: r.status,
       pause: (m) => run(() => post(`/api/blocks/${r.id}/pause`, { minutes: m }), m === 0 ? 'Resumed.' : 'Paused.').then(again),
       toggle: () => run(() => post(`/api/blocks/${r.id}/enable`, { enabled: !r.enabled }), r.enabled ? 'Turned off.' : 'Turned on.').then(again),
-      remove: async () => { if (await confirmBox('Delete this block?')) run(() => del(`/api/blocks/${r.id}`)).then(again); },
+      remove: () => undoDelete('The block', () => del(`/api/blocks/${r.id}`), () => put('/api/blocks', { kind: r.kind, value: r.value, scope: r.scope, target: r.target, allow: r.allow, method: r.method, schedule: r.schedule, enabled: r.enabled }), again),
     })),
     ...(ports?.forwards || []).map((g) => ({
       k: 'port', key: `port${g.group}${g.id || ''}`, id: g.legacy ? g.id : g.group, name: g.text, words: g.countries?.length ? `Only from ${g.countries.join(', ')}.` : g.src?.length ? `Only from ${g.src.join(', ')}.` : 'Anyone on the internet can try to connect.',
       when: '', enabled: g.enabled, paused: g.paused_until, warn: g.blocked ? [g.blocked] : [], tone: g.enabled ? 'good' : '', state: g.enabled ? 'Open' : 'Off',
       pause: g.legacy ? undefined : (m) => run(() => post('/api/fw/appforwards/pause', { group: g.group, minutes: m }), m === 0 ? 'Resumed.' : 'Paused.').then(again),
       toggle: g.legacy ? undefined : () => run(() => post('/api/fw/appforwards/enable', { group: g.group, enabled: !g.enabled }), g.enabled ? 'Turned off.' : 'Turned on.').then(again),
-      remove: async () => { if (await confirmBox(`Delete "${g.group}"?`)) run(() => (g.legacy ? del(`/api/fw/forwards/${g.id}`) : del(`/api/fw/appforwards/${encodeURIComponent(g.group)}`))).then(again); },
+      remove: () => delayedDelete(`The port forward "${g.group}"`, () => (g.legacy ? del(`/api/fw/forwards/${g.id}`) : del(`/api/fw/appforwards/${encodeURIComponent(g.group)}`)), again),
     })),
   ];
   const shown = items.filter((x) => !kind || x.k === kind);

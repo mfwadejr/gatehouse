@@ -37,21 +37,43 @@ def shield_points():
     pts += [(4, 6), (12, 3)]
     return pts
 
-def logo(size, color=BLUE, width=1.6):
-    """The shield as a transparent RGBA image, drawn at 4x and reduced for smooth edges."""
+def _bez(p0, p1, p2, p3, n=48):
+    out = []
+    for i in range(1, n + 1):
+        t = i / n
+        u = 1 - t
+        out.append((u**3*p0[0] + 3*u*u*t*p1[0] + 3*u*t*t*p2[0] + t**3*p3[0],
+                    u**3*p0[1] + 3*u*u*t*p1[1] + 3*u*t*t*p2[1] + t**3*p3[1]))
+    return out
+
+def logo(size, color=None, width=None):
+    """The NopeWarden badge: the purple-blue filled shield with a white bar, the same artwork as
+    the website's tab icon and the console. A transparent RGBA image, drawn at 4x and reduced."""
     s = 4
-    k = size * s / 24.0
-    im = Image.new("RGBA", (size * s, size * s), (0, 0, 0, 0))
+    n = size * s
+    k = n / 32.0
+    pts = [(16, 2.5), (5, 6.5), (5, 14.7)]
+    pts += _bez((5, 14.7), (5, 21.3), (9.5, 26.9), (16, 29.5))
+    pts += _bez((16, 29.5), (22.5, 26.9), (27, 21.3), (27, 14.7))
+    pts += [(27, 6.5)]
+    mask = Image.new("L", (n, n), 0)
+    ImageDraw.Draw(mask).polygon([(x * k, y * k) for x, y in pts], fill=255)
+    # diagonal gradient #4d8dff -> #9a82ff, top-left to bottom-right
+    a, b = (0x4d, 0x8d, 0xff), (0x9a, 0x82, 0xff)
+    grad = Image.new("RGB", (n, n))
+    px = grad.load()
+    for y in range(n):
+        for x in range(n):
+            t = (x + y) / (2.0 * (n - 1))
+            px[x, y] = tuple(int(a[c] + (b[c] - a[c]) * t) for c in range(3))
+    im = Image.new("RGBA", (n, n), (0, 0, 0, 0))
+    im.paste(grad, (0, 0), mask)
     d = ImageDraw.Draw(im)
-    pts = [(x * k, y * k) for x, y in shield_points()]
-    d.line(pts, fill=color, width=int(width * k), joint="curve")
-    for x, y in pts[:: max(1, len(pts) // 40)]:
-        r = width * k / 2
-        d.ellipse((x - r, y - r, x + r, y + r), fill=color)
-    d.line([(9 * k, 12 * k), (15 * k, 12 * k)], fill=color, width=int(width * k))
-    for x in (9, 15):
-        r = width * k / 2
-        d.ellipse((x * k - r, 12 * k - r, x * k + r, 12 * k + r), fill=color)
+    w = int(2.6 * k)
+    d.line([(11 * k, 15.5 * k), (21 * k, 15.5 * k)], fill=(255, 255, 255, 255), width=w)
+    for x in (11, 21):
+        r = w / 2
+        d.ellipse((x * k - r, 15.5 * k - r, x * k + r, 15.5 * k + r), fill=(255, 255, 255, 255))
     return im.resize((size, size), Image.LANCZOS)
 
 def centered(d, w, y, text, f, fill):
@@ -67,7 +89,7 @@ def background(w, h, path, menu_top):
     mark = logo(sz)
     top = int(h * 0.17)
     im.paste(mark, ((w - sz) // 2, top), mark)
-    centered(d, w, top + sz + int(18 * u), "Gatehouse", font(int(46 * u), True), TEXT)
+    centered(d, w, top + sz + int(18 * u), "NopeWarden", font(int(46 * u), True), TEXT)
     centered(d, w, top + sz + int(80 * u), "Firewall, DNS and DHCP in one box", font(int(20 * u)), DIM)
     im.save(path, optimize=True)
 
@@ -92,7 +114,7 @@ def splash(outdir):
             d.text(((im.width - (b[2] - b[0])) / 2 - b[0], y - b[1] + 2), t, font=f, fill=c)
             y += h_
         im.save(os.path.join(outdir, name), optimize=True)
-    text_img("msg.png", ["Starting Gatehouse", "This can take a minute when starting from a USB stick."])
+    text_img("msg.png", ["Starting NopeWarden", "This can take a minute when starting from a USB stick."])
     # Progress track and the light that travels along it.
     track = Image.new("RGBA", (360, 6), (0, 0, 0, 0))
     ImageDraw.Draw(track).rounded_rectangle((0, 0, 359, 5), radius=3, fill=(44, 44, 42, 255))
@@ -118,17 +140,17 @@ if __name__ == "__main__":
     root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "iso", "config")
     # Kept under a name of our own: the build copies these into place after the stock boot
     # loader files, so nothing of the stock artwork can win.
-    bi = os.path.join(root, "includes.binary", "gatehouse-boot")
+    bi = os.path.join(root, "includes.binary", "nopewarden-boot")
     os.makedirs(os.path.join(bi, "theme"), exist_ok=True)
     background(640, 480, os.path.join(bi, "splash.png"), 0)
     background(1920, 1080, os.path.join(bi, "theme", "background.png"), 0)
     shutil.copy(os.path.join(os.path.dirname(os.path.abspath(__file__)), "grub-theme.txt"), os.path.join(bi, "theme", "theme.txt"))
     selection(os.path.join(bi, "theme"))
-    splash(os.path.join(root, "includes.chroot", "usr", "share", "plymouth", "themes", "gatehouse"))
+    splash(os.path.join(root, "includes.chroot", "usr", "share", "plymouth", "themes", "nopewarden"))
     print("ok")
 
     # The same menu theme is kept inside the system image so the installer can put it on the disk.
     src = os.path.join(bi, "theme")
-    dst = os.path.join(root, "includes.chroot", "usr", "share", "gatehouse", "grub-theme")
+    dst = os.path.join(root, "includes.chroot", "usr", "share", "nopewarden", "grub-theme")
     shutil.rmtree(dst, ignore_errors=True)
     shutil.copytree(src, dst)

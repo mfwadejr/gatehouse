@@ -13,15 +13,16 @@ import (
 
 	"github.com/miekg/dns"
 
-	"gatehouse/internal/auth"
+	"nopewarden/internal/auth"
 )
 
 type client struct {
-	t    *testing.T
-	base string
-	hc   *http.Client
-	csrf string
-	app  *App // set by the boxes that build their own app, for tests that need to reach inside
+	t     *testing.T
+	base  string
+	hc    *http.Client
+	csrf  string
+	stage bool // send the console's staging header
+	app   *App // set by the boxes that build their own app, for tests that need to reach inside
 }
 
 func (c *client) call(method, path string, body any) (int, map[string]any, []byte) {
@@ -33,6 +34,9 @@ func (c *client) call(method, path string, body any) (int, map[string]any, []byt
 	req, _ := http.NewRequest(method, c.base+path, bytes.NewReader(b))
 	if c.csrf != "" {
 		req.Header.Set("X-CSRF-Token", c.csrf)
+	}
+	if c.stage {
+		req.Header.Set("X-Stage", "1")
 	}
 	resp, err := c.hc.Do(req)
 	if err != nil {

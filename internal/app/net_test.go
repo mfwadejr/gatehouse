@@ -15,16 +15,17 @@ import (
 	"testing"
 	"time"
 
-	"gatehouse/internal/auth"
-	"gatehouse/internal/netcfg"
-	"gatehouse/internal/netd"
-	"gatehouse/internal/speedtest"
-	"gatehouse/internal/threatcfg"
-	"gatehouse/internal/wanmon"
+	"nopewarden/internal/auth"
+	"nopewarden/internal/netcfg"
+	"nopewarden/internal/netd"
+	"nopewarden/internal/speedtest"
+	"nopewarden/internal/threatcfg"
+	"nopewarden/internal/wanmon"
 )
 
 type fakeNet struct {
 	mu      sync.Mutex
+	wan     map[string]wanmon.State // what the demo console shows for each internet connection
 	plan    netd.Plan
 	pending bool
 
@@ -45,30 +46,47 @@ type fakeNet struct {
 	speedCalls []speedtest.Params
 	speedErr   error
 
-	powerSave   map[string]bool
-	sshPlans    []netd.SSHPlan
-	sshLines    []string
-	haPlans     []netd.HAPlan
-	ndpiPlans   []netd.NDPIPlan
-	ndpiHave    bool
-	threatInfo  netd.ThreatInfo
-	threatPlans []threatcfg.Plan
-	threatErr   error
-	threatCalls []string
-	diagUnits   []netd.DiagService
-	restarted   string
-	termOpened  int
-	termWrote   string
-	termGone    bool
-	ovPlans     []netd.OverridePlan
-	ovErr       error
-	flowAcct    []bool
-	flowDump    string
-	sqmPlans    []netd.SQMPlan
-	sqmErr      error
+	powerSave    map[string]bool
+	sshPlans     []netd.SSHPlan
+	unbound      netd.UnboundInfo
+	unboundPlans []netd.UnboundPlan
+	unboundErr   error
+	sshLines     []string
+	haPlans      []netd.HAPlan
+	ndpiPlans    []netd.NDPIPlan
+	ndpiHave     bool
+	threatInfo   netd.ThreatInfo
+	threatPlans  []threatcfg.Plan
+	threatErr    error
+	threatCalls  []string
+	diagUnits    []netd.DiagService
+	restarted    string
+	termOpened   int
+	termWrote    string
+	termGone     bool
+	ovPlans      []netd.OverridePlan
+	ovErr        error
+	flowAcct     []bool
+	flowDump     string
+	sqmPlans     []netd.SQMPlan
+	sqmErr       error
 }
 
 func (f *fakeNet) Diag(kind, target string) (string, error) { return kind + " " + target, nil }
+
+func (f *fakeNet) UnboundStatus() netd.UnboundInfo {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.unbound
+}
+
+func (f *fakeNet) UnboundApply(p netd.UnboundPlan) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.unboundPlans = append(f.unboundPlans, p)
+	f.unbound.Running = p.Enabled && f.unbound.Installed
+	return f.unboundErr
+}
 
 func (f *fakeNet) SSHApply(p netd.SSHPlan) error {
 	f.mu.Lock()
@@ -194,7 +212,15 @@ func (f *fakeNet) NetPending() (string, time.Time, bool) {
 	defer f.mu.Unlock()
 	return "ntok", time.Now().Add(time.Minute), f.pending
 }
-func (f *fakeNet) WanStatus() (map[string]wanmon.State, error) { return map[string]wanmon.State{}, nil }
+func (f *fakeNet) WanStatus() (map[string]wanmon.State, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := map[string]wanmon.State{}
+	for k, v := range f.wan {
+		out[k] = v
+	}
+	return out, nil
+}
 func (f *fakeNet) ApplyVPN(p netd.VPNPlan) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -408,7 +434,7 @@ func (f *fakeNet) Power(action string) error {
 	return nil
 }
 
-// A change in the tunnel file Gatehouse writes must show as waiting to be applied on a machine
+// A change in the tunnel file NopeWarden writes must show as waiting to be applied on a machine
 // that has tunnels, and must not touch one that has none.
 func TestFingerprintNoticesTunnelFileVersion(t *testing.T) {
 	plain := &netd.Plan{}

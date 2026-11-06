@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"gatehouse/internal/fw"
+	"nopewarden/internal/fw"
 )
 
 func TestDeviceRulesFollowAddresses(t *testing.T) {

@@ -2,14 +2,14 @@
  * gh-ndpi: names the application behind each network flow using the nDPI library.
  *
  * It listens on the LAN ports it is told about, runs nDPI on the first packets of every flow, and
- * sends one short JSON line per flow to Gatehouse over a local socket. It never stores or sends
+ * sends one short JSON line per flow to NopeWarden over a local socket. It never stores or sends
  * packet contents, only: addresses, ports, the application name, its category and any warnings.
  *
- *   gh-ndpi -s /run/gatehouse/ndpi.sock eth1 eth2     (live)
+ *   gh-ndpi -s /run/nopewarden/ndpi.sock eth1 eth2     (live)
  *   gh-ndpi -r capture.pcap                           (read a capture, print the lines; for testing)
  *
  * It is a separate program, run by systemd with almost no rights, so a fault in the inspection
- * library can never reach the router's settings. If it is not installed, Gatehouse carries on.
+ * library can never reach the router's settings. If it is not installed, NopeWarden carries on.
  */
 #include <arpa/inet.h>
 #include <errno.h>

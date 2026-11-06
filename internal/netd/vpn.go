@@ -178,15 +178,17 @@ const (
 	ClientBase = "/etc/openvpn/client"
 )
 
-func ServerKeyDir(name string) string   { return filepath.Join(ServerBase, "gatehouse-"+name) }
-func ClientAuthPath(name string) string { return filepath.Join(ClientBase, "gatehouse-"+name+".auth") }
-func unitFor(i OVPNInstance) string     { return "openvpn-" + i.Role + "@gatehouse-" + i.Name + ".service" }
+func ServerKeyDir(name string) string   { return filepath.Join(ServerBase, "nopewarden-"+name) }
+func ClientAuthPath(name string) string { return filepath.Join(ClientBase, "nopewarden-"+name+".auth") }
+func unitFor(i OVPNInstance) string {
+	return "openvpn-" + i.Role + "@nopewarden-" + i.Name + ".service"
+}
 func (v *VPN) confPath(i OVPNInstance) string {
 	d := v.ServerDir
 	if i.Role == "client" {
 		d = v.ClientDir
 	}
-	return filepath.Join(d, "gatehouse-"+i.Name+".conf")
+	return filepath.Join(d, "nopewarden-"+i.Name+".conf")
 }
 
 func (v *VPN) validate(p VPNPlan) error {
@@ -273,9 +275,9 @@ func (v *VPN) Apply(p VPNPlan) error {
 		for n, b := range i.Files {
 			var path string
 			if i.Role == "server" {
-				path = filepath.Join(v.ServerDir, "gatehouse-"+i.Name, n)
+				path = filepath.Join(v.ServerDir, "nopewarden-"+i.Name, n)
 			} else {
-				path = filepath.Join(v.ClientDir, "gatehouse-"+i.Name+".auth")
+				path = filepath.Join(v.ClientDir, "nopewarden-"+i.Name+".auth")
 			}
 			c, err := writeIfChanged(path, b, vpnFiles[n])
 			if err != nil {
@@ -310,8 +312,8 @@ func (v *VPN) Apply(p VPNPlan) error {
 		}
 		v.Systemctl("disable", "--now", unitFor(old))
 		os.Remove(v.confPath(old))
-		os.RemoveAll(filepath.Join(v.ServerDir, "gatehouse-"+old.Name))
-		os.Remove(filepath.Join(v.ClientDir, "gatehouse-"+old.Name+".auth"))
+		os.RemoveAll(filepath.Join(v.ServerDir, "nopewarden-"+old.Name))
+		os.Remove(filepath.Join(v.ClientDir, "nopewarden-"+old.Name+".auth"))
 	}
 	v.plan = p
 	v.mu2.Lock()
@@ -578,7 +580,7 @@ func (v *VPN) Status() VPNStatus {
 		names[i.Name] = true
 		o := OVPNStatus{Clients: []OVPNClientStatus{}}
 		o.Active = v.Systemctl != nil && v.isActive(unitFor(i))
-		file := filepath.Join(v.RunDir, "openvpn-server", "status-gatehouse-"+i.Name+".log")
+		file := filepath.Join(v.RunDir, "openvpn-server", "status-nopewarden-"+i.Name+".log")
 		if i.Role == "server" {
 			if b, err := os.ReadFile(file); err == nil {
 				o.Clients = ParseOVPNStatus(string(b))

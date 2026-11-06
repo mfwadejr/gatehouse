@@ -17,7 +17,7 @@ Each side of a rule (the devices it starts from, and where it goes) can hold any
 
 A rule keeps a reference to the device, not a copy of its address. When DHCP gives the device a new
 address the rule follows it, within a couple of seconds, with nothing to apply or confirm. Behind the
-scenes each reference is a named nftables set; the ruleset only names the set and Gatehouse fills it
+scenes each reference is a named nftables set; the ruleset only names the set and NopeWarden fills it
 from DHCP leases and reservations. A device with no address yet matches nothing, and the rule list
 shows a warning.
 
@@ -45,7 +45,7 @@ Devices are IPv4 for now (from DHCP). Typed IPv6 addresses, websites and countri
 A rule can be always on, every day between two times, on chosen days, or once between two moments.
 The firewall does the time check itself, so schedules keep working if the console is down.
 
-The kernel evaluates schedules in UTC. Gatehouse converts your local times (the time zone set on the
+The kernel evaluates schedules in UTC. NopeWarden converts your local times (the time zone set on the
 machine) when it builds the ruleset, and builds it again when summer time starts or ends. It does that
 automatically only when nothing else about the firewall has changed since the live ruleset was made, so
 it never puts anyone's unfinished edits live. If other changes are waiting, the usual apply bar appears.
@@ -54,7 +54,7 @@ it never puts anyone's unfinished edits live. If other changes are waiting, the 
 
 For `dom:` the DNS server notes the addresses it hands out for the domain (and any CNAME chain behind
 it) and puts them into the rule's set, with a timeout based on the record's lifetime. This works for
-devices that use Gatehouse for DNS, which is every device when DNS enforcement is on. A device that
+devices that use NopeWarden for DNS, which is every device when DNS enforcement is on. A device that
 already had the address cached before the rule existed is matched from its next lookup.
 
 ## Countries
@@ -72,7 +72,7 @@ physically is.
 ## Hit counts
 
 Each rule counts how many new matches it has had and when it last matched. The kernel counters restart
-whenever the firewall is loaded, so Gatehouse adds what it sees to a running total that survives reloads.
+whenever the firewall is loaded, so NopeWarden adds what it sees to a running total that survives reloads.
 A rule that is renamed or moved to other networks starts counting from zero.
 
 ## The matrix
@@ -88,7 +88,7 @@ counts the rules written for that pair. Selecting a box lets you:
 * See the rules for that pair, or add one with the networks already filled in.
 
 Rules you wrote by hand are never touched by the matrix and still apply first. The built-in protected
-rules that keep you able to manage Gatehouse stay above everything. Nothing is live until you apply.
+rules that keep you able to manage NopeWarden stay above everything. Nothing is live until you apply.
 The Internet row can only be blocked or reset from the matrix; to let the internet reach a device, open a
 port. The matrix does not offer Replies only to or from the Internet.
 

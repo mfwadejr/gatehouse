@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import TrafficPanel from '../TrafficPanel.jsx';
 import { del, get, holdAnd, post, put, useData } from '../api.js';
 import { SAVED_LATER, SaveChoice } from '../changes.jsx';
-import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, ToggleRow, useAction, fmt, Switch, confirmBox, noticeBox, Dots } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, ToggleRow, useAction, fmt, Switch, noticeBox, Dots, Limited , useDelayedDelete } from '../ui.jsx';
 
 const STATE = {
   up: { tone: 'good', label: 'Working' },
@@ -62,13 +63,13 @@ function OtherResult({ r, onClose }) {
   const [copied, setCopied] = useState(false);
   const text = [
     '[Interface]',
-    '# Use the private key you made on your router. Gatehouse never sees it.',
+    '# Use the private key you made on your router. NopeWarden never sees it.',
     `Address = ${r.their_address}`,
     '',
     '[Peer]',
     `PublicKey = ${r.our_public_key}`,
     `PresharedKey = ${r.psk}`,
-    r.our_endpoint ? `Endpoint = ${r.our_endpoint}` : '# Endpoint: not needed if this router has a fixed address you gave Gatehouse',
+    r.our_endpoint ? `Endpoint = ${r.our_endpoint}` : '# Endpoint: not needed if this router has a fixed address you gave NopeWarden',
     `AllowedIPs = ${(r.their_allowed_ips || []).join(', ')}`,
     `PersistentKeepalive = ${r.keepalive}`,
   ].join('\n');
@@ -76,11 +77,11 @@ function OtherResult({ r, onClose }) {
     <Modal title="Enter this on the other router" onClose={onClose} footer={<Button kind="primary" onClick={onClose}>Done</Button>}>
       <div className="stack">
         <Note tone="warn" title="Shown only once">The pre-shared key below protects the link. Copy it now.</Note>
-        <p className="sec small">Add a peer on the other router with these details. The names differ between makers, but the values are the same. Gatehouse has set up its side, including the routes and firewall rules.</p>
+        <p className="sec small">Add a peer on the other router with these details. The names differ between makers, but the values are the same. NopeWarden has set up its side, including the routes and firewall rules.</p>
         <textarea className="in mono" rows={11} readOnly value={text} onFocus={(e) => e.target.select()} />
         <div className="actions">
           <Button onClick={() => { navigator.clipboard?.writeText(text); setCopied(true); }}>{copied ? 'Copied' : 'Copy'}</Button>
-          <Button onClick={() => download('gatehouse-peer.conf', text)}>Download</Button>
+          <Button onClick={() => download('nopewarden-peer.conf', text)}>Download</Button>
         </div>
       </div>
     </Modal>
@@ -92,7 +93,7 @@ function DeviceResult({ res, onClose }) {
   return (
     <Modal title={`${res.name} is ready`} onClose={onClose} footer={<Button kind="primary" onClick={onClose}>Done</Button>}>
       <div className="stack">
-        <Note tone="warn" title="Shown only once">This contains the device's secret key. Import it now; Gatehouse cannot show it again.</Note>
+        <Note tone="warn" title="Shown only once">This contains the device's secret key. Import it now; NopeWarden cannot show it again.</Note>
         {res.qr && (
           <div className="stack" style={{ alignItems: 'center' }}>
             <img src={res.qr} alt="QR code for the WireGuard app" width="240" height="240" style={{ background: 'var(--color-qr-bg)', padding: 'var(--space-2)', borderRadius: 'var(--radius-md)' }} />
@@ -186,7 +187,7 @@ function AddVPN({ endpoint, onClose, onDone }) {
           </button>
           <button className="preset" onClick={() => { setGoal('site'); setTech('wireguard'); }}>
             <span className="t">Join two sites together</span>
-            <span className="d">Link this network to another Gatehouse, like a second home or an office. Each side can reach the other automatically.</span>
+            <span className="d">Link this network to another NopeWarden, like a second home or an office. Each side can reach the other automatically.</span>
           </button>
           <button className="preset" onClick={() => { setGoal('other'); setTech('wireguard'); }}>
             <span className="t">Join a router from another maker</span>
@@ -203,7 +204,7 @@ function AddVPN({ endpoint, onClose, onDone }) {
         <Modal title="Take this code to the other site" onClose={onClose} footer={<Button kind="primary" onClick={onClose}>Done</Button>}>
           <div className="stack">
             <Note tone="warn" title="Shown only once">The code contains the secret keys for the link. Anyone who has it can join the link, so send it privately.</Note>
-            <p className="sec">On the other Gatehouse, open VPN, choose Add a VPN, then Join two sites together, pick I have a code, and paste this in. The link then works in both directions with nothing else to set up.</p>
+            <p className="sec">On the other NopeWarden, open VPN, choose Add a VPN, then Join two sites together, pick I have a code, and paste this in. The link then works in both directions with nothing else to set up.</p>
             <textarea className="in mono" rows={6} readOnly value={made.code} onFocus={(e) => e.target.select()} />
             <div className="actions">
               <Button onClick={() => { navigator.clipboard?.writeText(made.code); setCopied(true); }}>{copied ? 'Copied' : 'Copy'}</Button>
@@ -237,11 +238,11 @@ function AddVPN({ endpoint, onClose, onDone }) {
               <Field label="Address the other site connects to" hint="Your public IP address or a name like home.example.com.">
                 <Input value={f.endpoint} onChange={set('endpoint')} placeholder="home.example.com" />
               </Field>
-              <p className="small muted">Both sites will be able to reach each other's devices. Gatehouse makes the routes and firewall rules on both sides for you.</p>
+              <p className="small muted">Both sites will be able to reach each other's devices. NopeWarden makes the routes and firewall rules on both sides for you.</p>
             </>
           ) : (
             <Field label="Code from the first site" hint="Paste the whole code.">
-              <textarea className="in mono" rows={6} value={f.code} onChange={(e) => set('code')(e.target.value)} spellCheck={false} placeholder="GATEHOUSE-SITE-1:…" />
+              <textarea className="in mono" rows={6} value={f.code} onChange={(e) => set('code')(e.target.value)} spellCheck={false} placeholder="NOPEWARDEN-SITE-1:…" />
             </Field>
           )}
         </div>
@@ -254,14 +255,14 @@ function AddVPN({ endpoint, onClose, onDone }) {
       <Modal title="Join a router from another maker" onClose={onClose}
         footer={<><Button onClick={() => setGoal('')}>Back</Button><Button kind="primary" disabled={busy || !f.other_key.trim() || !f.other_lans.trim()} onClick={save}>Create the link</Button></>}>
         <div className="stack">
-          <p className="sec small">Create a WireGuard tunnel on the other router first, and copy its public key and networks here. Gatehouse then shows what to enter on that router.</p>
+          <p className="sec small">Create a WireGuard tunnel on the other router first, and copy its public key and networks here. NopeWarden then shows what to enter on that router.</p>
           <Field label="Name"><Input value={f.label} onChange={set('label')} placeholder="Office" /></Field>
           <Field label="Their public key" hint="44 characters, ending in =."><Input value={f.other_key} onChange={set('other_key')} className="mono" spellCheck={false} /></Field>
           <Field label="Networks at the other site" hint="Separate several with commas, like 192.168.50.0/24, 192.168.60.0/24."><Input value={f.other_lans} onChange={set('other_lans')} placeholder="192.168.50.0/24" /></Field>
-          <Field label="Address of the other router" hint="Only if it has a fixed address Gatehouse can connect to, like 203.0.113.9:51820. Leave empty if it will connect to you."><Input value={f.other_ep} onChange={set('other_ep')} placeholder="203.0.113.9:51820" /></Field>
+          <Field label="Address of the other router" hint="Only if it has a fixed address NopeWarden can connect to, like 203.0.113.9:51820. Leave empty if it will connect to you."><Input value={f.other_ep} onChange={set('other_ep')} placeholder="203.0.113.9:51820" /></Field>
           <Field label="Address the other router connects to" hint="Your public IP address or a name like home.example.com."><Input value={f.endpoint} onChange={set('endpoint')} placeholder="home.example.com" /></Field>
           <details className="more"><summary>More options</summary>
-            <Field label="Pre-shared key" hint="Only if the other router already has one. Otherwise Gatehouse makes one."><Input value={f.other_psk} onChange={set('other_psk')} className="mono" spellCheck={false} /></Field>
+            <Field label="Pre-shared key" hint="Only if the other router already has one. Otherwise NopeWarden makes one."><Input value={f.other_psk} onChange={set('other_psk')} className="mono" spellCheck={false} /></Field>
           </details>
         </div>
       </Modal>
@@ -300,7 +301,7 @@ function AddVPN({ endpoint, onClose, onDone }) {
                 <Field label="Password"><Input type="password" value={f.password} onChange={set('password')} autoComplete="new-password" /></Field>
               </div>
             )}
-            <Field label="Test address" hint="Gatehouse checks the VPN is really working by reaching this address through it. Leave empty for 1.1.1.1."><Input value={f.check} onChange={set('check')} placeholder="1.1.1.1" /></Field>
+            <Field label="Test address" hint="NopeWarden checks the VPN is really working by reaching this address through it. Leave empty for 1.1.1.1."><Input value={f.check} onChange={set('check')} placeholder="1.1.1.1" /></Field>
             <Field label="Who uses it?">
               <Segmented value={f.scope} onChange={set('scope')} options={[{ value: 'all', label: 'Everything on my network' }, { value: 'pick', label: 'Only what I pick' }, { value: 'later', label: 'Nobody yet' }]} />
             </Field>
@@ -362,7 +363,7 @@ function Uses({ v, onClose, onSaved }) {
             </div>
           </Field>
         )}
-        <Field label="Individual devices" hint="Gatehouse keeps the device's address fixed so it stays in the VPN.">
+        <Field label="Individual devices" hint="NopeWarden keeps the device's address fixed so it stays in the VPN.">
           <Input value={q} onChange={setQ} placeholder="Search devices" aria-label="Search devices" />
           <div className="stack" style={{ gap: 'var(--space-1)', maxHeight: '14rem', overflow: 'auto', marginTop: 'var(--space-2)' }}>
             {devs.map((d) => (
@@ -411,7 +412,7 @@ function Settings({ v, onClose, onSaved }) {
         )}
         {v.kind === 'wireguard' && (
           <details className="more"><summary>More options</summary>
-            <Field label="Packet size (MTU)" hint="Leave at 0 for automatic, which suits nearly every connection. Gatehouse already trims connections to fit. Only set a number between 1280 and 1500 if your provider asks for one.">
+            <Field label="Packet size (MTU)" hint="Leave at 0 for automatic, which suits nearly every connection. NopeWarden already trims connections to fit. Only set a number between 1280 and 1500 if your provider asks for one.">
               <Input type="number" min="0" max="1500" value={f.mtu} onChange={(x) => setF({ ...f, mtu: x })} />
             </Field>
           </details>
@@ -455,6 +456,17 @@ function AddDevice({ v, endpoint, onClose, onSaved }) {
 
 function Warnings({ v }) {
   return (v.warnings || []).map((w) => <Note key={w} tone="warn" title="Needs attention">{w}</Note>);
+}
+
+// Speed, graph and totals for this VPN, opened on request so a closed card costs nothing.
+function VpnTraffic({ v }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div>
+      <button type="button" className="link small leftalign" onClick={() => setOpen(!open)}>{open ? 'Hide traffic' : 'Show traffic'}</button>
+      {open && <TrafficPanel kind="vpn" id={String(v.id)} title={`${v.label} traffic`} sub={v.role === 'server' ? 'What the devices connected from outside are downloading and uploading.' : 'What is flowing through this VPN right now.'} />}
+    </div>
+  );
 }
 
 function Header({ v }) {
@@ -564,6 +576,7 @@ function TestAddresses() {
 }
 
 function Outbound({ v, reload, setModal }) {
+  const delayedDelete = useDelayedDelete();
   const [run] = useAction();
   const sources = v.uses || [];
   const [checkMac, setCheckMac] = useState('');
@@ -580,7 +593,7 @@ function Outbound({ v, reload, setModal }) {
   return (
     <Card>
       <div className="stack">
-        <Header v={v} />
+        <Header v={v} /><VpnTraffic v={v} />
         <p className={v.state === 'up' ? 'sec' : ''} style={v.state === 'down' || v.state === 'degraded' ? { color: 'var(--color-status-serious)' } : undefined}>
           {v.state === 'connecting' ? v.message.replace(/[.…\s]+$/, '') : v.message}{v.state === 'connecting' && <Dots />}{v.state === 'up' && v.rtt_ms ? ` · ${v.rtt_ms} ms` : ''}
         </p>
@@ -629,7 +642,7 @@ function Outbound({ v, reload, setModal }) {
           <Button onClick={() => run(() => put(`/api/vpn/${v.kind}/${v.id}`, { enabled: !v.enabled }), v.enabled ? 'Turned off.' : 'Turned on.').then(reload)}>{v.enabled ? 'Turn off' : 'Turn on'}</Button>
           {v.enabled && <Button onClick={() => setModal({ t: 'size', v })}>Test packet size</Button>}
           <Button onClick={() => setModal({ t: 'settings', v })}>Settings</Button>
-          <Button kind="danger" icon="trash" onClick={async () => await confirmBox(`Remove ${v.label}? Devices using it go back to your normal connection.`) && run(() => del(`/api/vpn/${v.kind}/${v.id}`), 'Removed.').then(reload)}>Remove</Button>
+          <Button kind="danger" icon="trash" onClick={() => delayedDelete(v.label, () => del(`/api/vpn/${v.kind}/${v.id}`), reload, 'Devices using it go back to your normal connection.')}>Remove</Button>
         </div>
       </div>
     </Card>
@@ -639,11 +652,12 @@ function Outbound({ v, reload, setModal }) {
 const PEER = { connected: { tone: 'good', label: 'Connected' }, idle: { tone: '', label: 'Idle' }, never: { tone: '', label: 'Not connected yet' } };
 
 function Inbound({ v, reload, setModal }) {
+  const delayedDelete = useDelayedDelete();
   const [run] = useAction();
   return (
     <Card>
       <div className="stack">
-        <Header v={v} />
+        <Header v={v} /><VpnTraffic v={v} />
         <Warnings v={v} />
         <p className="sec">{v.message}</p>
         <div className="grid">
@@ -653,24 +667,24 @@ function Inbound({ v, reload, setModal }) {
           <Fact label="Can reach home devices">{v.access === 'full' ? 'Yes' : 'No, internet only'}</Fact>
         </div>
         <div className="list">
-          {v.peers.map((p) => {
+          {<Limited items={v.peers} noun="devices" render={(p) => {
             const s = PEER[p.state] || PEER.never;
             return (
               <div className="item" key={p.id}>
                 <div><div className="name">{p.name}</div><div className="meta">{p.address || ''}{p.real ? ` · from ${p.real}` : ''}{p.state === 'connected' ? ` · ↓ ${bytes(p.rx)} ↑ ${bytes(p.tx)}` : p.last_seen ? ` · last seen ${fmt.ago(p.last_seen)}` : ''}</div></div>
                 <div className="inline">{p.paused ? <Pill tone="">Paused</Pill> : <Pill tone={s.tone}>{s.label}</Pill>}
                   <Switch checked={!p.paused} label={`${p.name} allowed to connect`} onChange={(on) => run(() => put(`/api/vpn/${v.kind}/${v.id}/peers/${p.id}`, { enabled: on }), on ? 'Allowed again.' : 'Paused.').then(reload)} />
-                  <Button small kind="danger" icon="trash" onClick={async () => await confirmBox(`Remove ${p.name}? It will no longer be able to connect.`) && run(() => del(`/api/vpn/${v.kind}/${v.id}/peers/${p.id}`), 'Removed.').then(reload)}>Remove</Button></div>
+                  <Button small kind="danger" icon="trash" onClick={() => delayedDelete(p.name, () => del(`/api/vpn/${v.kind}/${v.id}/peers/${p.id}`), reload, 'It will no longer be able to connect.')}>Remove</Button></div>
               </div>
             );
-          })}
+          }} />}
           {!v.peers.length && <Empty>No devices yet. Add your phone or laptop.</Empty>}
         </div>
         <div className="actions">
           <Button kind="primary" icon="plus" onClick={() => setModal({ t: 'device', v })}>Add a device</Button>
           <Button onClick={() => run(() => put(`/api/vpn/${v.kind}/${v.id}`, { enabled: !v.enabled }), v.enabled ? 'Turned off.' : 'Turned on.').then(reload)}>{v.enabled ? 'Turn off' : 'Turn on'}</Button>
           <Button onClick={() => setModal({ t: 'settings', v })}>Settings</Button>
-          <Button kind="danger" icon="trash" onClick={async () => await confirmBox(`Remove ${v.label}? Every device on it will be disconnected.`) && run(() => del(`/api/vpn/${v.kind}/${v.id}`), 'Removed.').then(reload)}>Remove</Button>
+          <Button kind="danger" icon="trash" onClick={() => delayedDelete(v.label, () => del(`/api/vpn/${v.kind}/${v.id}`), reload, 'Every device on it will be disconnected.')}>Remove</Button>
         </div>
       </div>
     </Card>
@@ -678,6 +692,7 @@ function Inbound({ v, reload, setModal }) {
 }
 
 function Site({ v, reload, setModal }) {
+  const delayedDelete = useDelayedDelete();
   const [run] = useAction();
   const p = v.peers[0];
   const s = STATE[v.state] || STATE.down;
@@ -698,7 +713,7 @@ function Site({ v, reload, setModal }) {
         <div className="actions">
           <Button onClick={() => run(() => put(`/api/vpn/${v.kind}/${v.id}`, { enabled: !v.enabled }), v.enabled ? 'Turned off.' : 'Turned on.').then(reload)}>{v.enabled ? 'Turn off' : 'Turn on'}</Button>
           <Button onClick={() => setModal({ t: 'settings', v })}>Rename</Button>
-          <Button kind="danger" icon="trash" onClick={async () => await confirmBox(`Remove the link ${v.label}? The two sites will no longer reach each other.`) && run(() => del(`/api/vpn/${v.kind}/${v.id}`), 'Removed.').then(reload)}>Remove</Button>
+          <Button kind="danger" icon="trash" onClick={() => delayedDelete(`The link ${v.label}`, () => del(`/api/vpn/${v.kind}/${v.id}`), reload, 'The two sites will no longer reach each other.')}>Remove</Button>
         </div>
       </div>
     </Card>

@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/api"
+	"nopewarden/internal/api"
 )
 
 // geocodeBase is the place-search service used by "Find" in Your place on the map. It is a variable
@@ -41,7 +41,7 @@ func lookupPlace(q string) ([]geoHit, error) {
 	geoLast = time.Now()
 	geoMu.Unlock()
 	req, _ := http.NewRequest("GET", geocodeBase+"?format=jsonv2&limit=5&q="+url.QueryEscape(q), nil)
-	req.Header.Set("User-Agent", "Gatehouse-firewall/1.0 (place lookup)")
+	req.Header.Set("User-Agent", "NopeWarden-firewall/1.0 (place lookup)")
 	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("could not reach the place search. Check the internet connection, or type the latitude and longitude instead")

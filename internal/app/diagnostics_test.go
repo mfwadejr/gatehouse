@@ -6,20 +6,20 @@ import (
 	"testing"
 	"time"
 
-	"gatehouse/internal/netd"
+	"nopewarden/internal/netd"
 )
 
 func TestDiagnosticsShowServicesLogsAndRestart(t *testing.T) {
 	c, fn, _ := siteBoxWith(t, "192.168.1.1/24", nil)
 	fn.mu.Lock()
-	fn.diagUnits = []netd.DiagService{{Unit: "gatehouse-suricata", Title: "Threat watching", State: "failing", Reason: "It keeps stopping and being restarted."}}
+	fn.diagUnits = []netd.DiagService{{Unit: "nopewarden-suricata", Title: "Threat watching", State: "failing", Reason: "It keeps stopping and being restarted."}}
 	fn.mu.Unlock()
 	rc, m, raw := c.call("GET", "/api/diag/services", nil)
 	if rc != 200 || len(m["services"].([]any)) != 1 {
 		t.Fatalf("services: %d %s", rc, raw)
 	}
-	rc, m, _ = c.call("GET", "/api/diag/log?unit=gatehouse-suricata&lines=50", nil)
-	if rc != 200 || !strings.Contains(m["log"].(string), "log of gatehouse-suricata") {
+	rc, m, _ = c.call("GET", "/api/diag/log?unit=nopewarden-suricata&lines=50", nil)
+	if rc != 200 || !strings.Contains(m["log"].(string), "log of nopewarden-suricata") {
 		t.Fatalf("log: %d %v", rc, m)
 	}
 	if rc, _, _ := c.call("GET", "/api/diag/log?unit=bogus", nil); rc == 200 {

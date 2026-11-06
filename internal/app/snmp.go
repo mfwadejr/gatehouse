@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/snmp"
+	"nopewarden/internal/api"
+	"nopewarden/internal/snmp"
 )
 
 // SNMP: lets a monitoring tool on a management network read this device's status (name, uptime, and
@@ -58,7 +58,7 @@ func (a *App) snmpAgent(c snmpCfg) *snmp.Agent {
 		boot := a.snmp.boot
 		a.snmp.mu.Unlock()
 		return snmp.MIBVars(snmp.System{
-			Descr: "Gatehouse " + a.Cfg.Version, Name: host, Contact: c.Contact, Location: c.Location,
+			Descr: "NopeWarden " + a.Cfg.Version, Name: host, Contact: c.Contact, Location: c.Location,
 			Uptime: uint64(time.Since(boot) / (10 * time.Millisecond)),
 		}, snmp.ReadIfaces("/"))
 	}}

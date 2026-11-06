@@ -284,7 +284,7 @@ type portAsk struct {
 // always required. The management port needs a cable, unless the person insists on one without;
 // the internet port may be unplugged for now.
 //
-// With fewer than two wired ports the question cannot be answered: Gatehouse needs one port for
+// With fewer than two wired ports the question cannot be answered: NopeWarden needs one port for
 // the internet and one for the network, so the screen says so and waits for an adapter.
 func (t *Term) pickPort(env *TextEnv, a portAsk) (Port, error) {
 	type lineRes struct {
@@ -310,7 +310,7 @@ func (t *Term) pickPort(env *TextEnv, a portAsk) (Port, error) {
 		t.banner(env, a.step, steps, a.title)
 		short = len(all) < 2
 		if short {
-			t.p("  %sGatehouse needs at least two network ports.%s One carries\n", amber, reset)
+			t.p("  %sNopeWarden needs at least two network ports.%s One carries\n", amber, reset)
 			t.p("  the internet, one carries your own network. This machine has %d.\n\n", len(all))
 			for i, p := range all {
 				t.p("    %d) %s\n", i+1, portLine(p))
@@ -439,8 +439,8 @@ func (t *Term) askMgmtAddr(env *TextEnv, mgmt Port) (string, error) {
 	}
 	used := usedNetworks(others)
 	def := SuggestMgmtAddr(used)
-	t.p("\n  This is the address of Gatehouse on your own network, and the\n")
-	t.p("  one you open in a browser. A computer plugged into %s%s%s gets\n  its address from Gatehouse.\n\n", bold, mgmt.Name, reset)
+	t.p("\n  This is the address of NopeWarden on your own network, and the\n")
+	t.p("  one you open in a browser. A computer plugged into %s%s%s gets\n  its address from NopeWarden.\n\n", bold, mgmt.Name, reset)
 	v, err := t.ask("Address", def, func(s string) error {
 		p, err := ParseMgmtAddr(s)
 		if err != nil {
@@ -500,7 +500,7 @@ func textOnce(t *Term, env *TextEnv) error {
 	// Welcome
 	w := NewScreen(t.W, t.H)
 	w.header("Installer")
-	w.mid(bold + "Install Gatehouse on this machine" + reset)
+	w.mid(bold + "Install NopeWarden on this machine" + reset)
 	w.blank()
 	w.mid(fg + "This erases the disk you choose. Nothing changes until you confirm." + reset)
 	w.blank()
@@ -526,7 +526,7 @@ func textOnce(t *Term, env *TextEnv) error {
 	}
 
 	// 2. The management port and its address
-	mp, err := t.pickPort(env, portAsk{step: 2, title: "Which port will you manage Gatehouse from?",
+	mp, err := t.pickPort(env, portAsk{step: 2, title: "Which port will you manage NopeWarden from?",
 		intro: []string{"This port is your own network. Plug it into your",
 			"computer or a switch, not into another router.",
 			"After the restart you finish setup from a computer on it."},
@@ -542,7 +542,7 @@ func textOnce(t *Term, env *TextEnv) error {
 	// 3. Disk
 	var disk Disk
 	for {
-		t.banner(env, 3, steps, "Where should Gatehouse be installed?")
+		t.banner(env, 3, steps, "Where should NopeWarden be installed?")
 		disks, err := env.In.Disks()
 		if err != nil {
 			t.p("\n  %s%v%s\n", red, err, reset)
@@ -592,7 +592,7 @@ func textOnce(t *Term, env *TextEnv) error {
 			wanState = "cable connected"
 		}
 		t.p("  Internet     %s%s%s  %s(%s)%s\n", bold, wan.Name, reset, dim, wanState, reset)
-		t.p("  Your network %s%s%s  %s(Gatehouse is at %s)%s\n", bold, mp.Name, reset, dim, strings.Split(mgmtAddr, "/")[0], reset)
+		t.p("  Your network %s%s%s  %s(NopeWarden is at %s)%s\n", bold, mp.Name, reset, dim, strings.Split(mgmtAddr, "/")[0], reset)
 		t.p("  Disk         %s%s %s%s  %s(everything on it will be erased)%s\n", bold, disk.Path, humanSize(disk.Size), reset, red, reset)
 		t.p("\n  To go ahead, type %s%s%s below.\n  %sAnything else cancels.%s\n\n", bold, disk.Path, reset, dim, reset)
 		c, err := t.ask("Disk name", "", nil)

@@ -3,7 +3,7 @@ import { get, post, put, useData } from '../api.js';
 import FailbackPrompt from './FailbackPrompt.jsx';
 import { Button, Card, Field, Input, Note, Pill, Segmented, Select, ToggleRow, useAction, confirmBox } from '../ui.jsx';
 
-// High availability: two Gatehouse machines, one active at a time. The first-time setup is a short
+// High availability: two NopeWarden machines, one active at a time. The first-time setup is a short
 // list of steps; once it runs, this card is the status page.
 const guess = (cidr, n) => { const m = /^(\d+\.\d+\.\d+)\.\d+\/\d+$/.exec(cidr || ''); return m ? `${m[1]}.${n}` : ''; };
 const ago = (t) => (t ? `${Math.max(0, Math.round(Date.now() / 1000 - t))} seconds ago` : 'not yet');
@@ -27,7 +27,7 @@ export default function HighAvailability({ me }) {
 
   if (!data.paired) {
     return (
-      <Card title="High availability" desc="Run two Gatehouse machines as a pair. If the active one fails, the other takes over in a few seconds, and your devices keep the same gateway.">
+      <Card title="High availability" desc="Run two NopeWarden machines as a pair. If the active one fails, the other takes over in a few seconds, and your devices keep the same gateway.">
         <div className="stack">
           {data.bridge_on && <Note tone="warn" title="Bridge mode is on">Bridge mode and a pair cannot be used together yet. Switch bridge mode off first.</Note>}
           <Segmented value={side} onChange={(v) => { setSide(v); setLook(null); }} options={[{ value: 'main', label: 'This is the main unit' }, { value: 'backup', label: 'This is the backup' }]} />
@@ -43,7 +43,7 @@ export default function HighAvailability({ me }) {
           )}
           {side === 'backup' && (
             <>
-              <Field label="Pairing code" hint="Shown on the main unit."><Input value={code} onChange={setCode} className="in mono" placeholder="GATEHOUSE-PAIR-1:..." /></Field>
+              <Field label="Pairing code" hint="Shown on the main unit."><Input value={code} onChange={setCode} className="in mono" placeholder="NOPEWARDEN-PAIR-1:..." /></Field>
               <div><Button disabled={busy || !code} onClick={() => run(async () => { setLook(await post('/api/ha/discover', { code })); setKeep({}); })}>Check the main unit</Button></div>
               {look && (
                 <div className="stack">

@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/fw"
-	"gatehouse/internal/store"
-	"gatehouse/internal/update"
+	"nopewarden/internal/api"
+	"nopewarden/internal/fw"
+	"nopewarden/internal/store"
+	"nopewarden/internal/update"
 )
 
 // Reset to default. Two levels: network settings (networks, firewall, DHCP, DNS, VPN and Wi-Fi go

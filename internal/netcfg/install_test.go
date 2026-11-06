@@ -45,7 +45,7 @@ func TestApplyConfirmRollback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(e.in.NetworkdDir, "gatehouse-eth1.network")); err != nil {
+	if _, err := os.Stat(filepath.Join(e.in.NetworkdDir, "nopewarden-eth1.network")); err != nil {
 		t.Fatal("network file not written")
 	}
 	sec, _ := os.ReadFile(e.in.PPPSecrets)
@@ -76,7 +76,7 @@ func TestApplyConfirmRollback(t *testing.T) {
 	if _, _, err := e.in.Apply(o2, time.Minute); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(e.in.NetworkdDir, "gatehouse-eth1.20.netdev")); err == nil {
+	if _, err := os.Stat(filepath.Join(e.in.NetworkdDir, "nopewarden-eth1.20.netdev")); err == nil {
 		t.Fatal("stale file not removed")
 	}
 	sec, _ = os.ReadFile(e.in.PPPSecrets)
@@ -86,7 +86,7 @@ func TestApplyConfirmRollback(t *testing.T) {
 	if err := e.in.Rollback(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(e.in.NetworkdDir, "gatehouse-eth1.20.netdev")); err != nil {
+	if _, err := os.Stat(filepath.Join(e.in.NetworkdDir, "nopewarden-eth1.20.netdev")); err != nil {
 		t.Fatal("rollback did not restore the VLAN file")
 	}
 	sec, _ = os.ReadFile(e.in.PPPSecrets)
@@ -111,14 +111,14 @@ func TestWatchdogRollsBackUnconfirmed(t *testing.T) {
 	if err := RunWatchdog(e.in, dl, tok); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(e.in.NetworkdDir, "gatehouse-eth1.network")); err == nil {
+	if _, err := os.Stat(filepath.Join(e.in.NetworkdDir, "nopewarden-eth1.network")); err == nil {
 		t.Fatal("unconfirmed change survived the watchdog")
 	}
 	// Confirmed changes are left alone.
 	tok, dl, _ = e.in.Apply(o, 300*time.Millisecond)
 	e.in.Confirm(tok)
 	RunWatchdog(e.in, dl, tok)
-	if _, err := os.Stat(filepath.Join(e.in.NetworkdDir, "gatehouse-eth1.network")); err != nil {
+	if _, err := os.Stat(filepath.Join(e.in.NetworkdDir, "nopewarden-eth1.network")); err != nil {
 		t.Fatal("confirmed change was undone")
 	}
 }
@@ -130,7 +130,7 @@ func TestFailedReloadRestores(t *testing.T) {
 	if _, _, err := e.in.Apply(o, time.Minute); err == nil {
 		t.Fatal("expected failure")
 	}
-	if _, err := os.Stat(filepath.Join(e.in.NetworkdDir, "gatehouse-eth1.network")); err == nil {
+	if _, err := os.Stat(filepath.Join(e.in.NetworkdDir, "nopewarden-eth1.network")); err == nil {
 		t.Fatal("failed apply left files behind")
 	}
 }

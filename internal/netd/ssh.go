@@ -11,23 +11,23 @@ import (
 )
 
 // Remote login (SSH). The console's administrators can sign in over SSH with the same name and
-// password. The passwords are not copied anywhere: sshd asks Gatehouse to check them (a PAM line
-// that runs `gatehouse ssh-auth`), so a changed or removed password takes effect at once. Each
+// password. The passwords are not copied anywhere: sshd asks NopeWarden to check them (a PAM line
+// that runs `nopewarden ssh-auth`), so a changed or removed password takes effect at once. Each
 // administrator also needs a Linux login of the same name, which this keeps in step.
 
 // SSHPlan says whether remote login is on and which administrators may use it.
 type SSHPlan struct {
 	Enabled bool     `json:"enabled"`
 	Users   []string `json:"users"`
-	// Binary is the Gatehouse program the PAM line runs.
+	// Binary is the NopeWarden program the PAM line runs.
 	Binary string `json:"binary"`
 }
 
 const (
-	sshGroup   = "gatehouse-ssh"
-	sshDropIn  = "etc/ssh/sshd_config.d/10-gatehouse.conf"
+	sshGroup   = "nopewarden-ssh"
+	sshDropIn  = "etc/ssh/sshd_config.d/10-nopewarden.conf"
 	sshPamFile = "etc/pam.d/sshd"
-	pamMarker  = "# gatehouse-ssh"
+	pamMarker  = "# nopewarden-ssh"
 )
 
 var reLinuxUser = regexp.MustCompile(`^[a-z_][a-z0-9_-]{0,30}$`)
@@ -39,13 +39,13 @@ func SSHUserName(name string) (string, bool) {
 		return "", false
 	}
 	switch n {
-	case "root", "daemon", "bin", "sys", "sync", "games", "man", "lp", "mail", "news", "uucp", "proxy", "www-data", "backup", "list", "irc", "nobody", "gatehouse", "sshd", "systemd-network", "messagebus":
+	case "root", "daemon", "bin", "sys", "sync", "games", "man", "lp", "mail", "news", "uucp", "proxy", "www-data", "backup", "list", "irc", "nobody", "nopewarden", "sshd", "systemd-network", "messagebus":
 		return "", false
 	}
 	return n, true
 }
 
-const sshdConf = `# Written by Gatehouse. Remote login uses the console's administrator names and passwords.
+const sshdConf = `# Written by NopeWarden. Remote login uses the console's administrator names and passwords.
 Port 22
 PasswordAuthentication yes
 KbdInteractiveAuthentication no
@@ -79,7 +79,7 @@ func pamLine(binary string) string {
 // the Linux logins it made; turning it on writes the settings, makes the logins and starts it.
 func (s *Service) SSHApply(p SSHPlan) error {
 	if p.Enabled && (p.Binary == "" || !filepath.IsAbs(p.Binary) || strings.ContainsAny(p.Binary, " \t\n\"'\\")) {
-		return errors.New("the Gatehouse program path is not usable")
+		return errors.New("the NopeWarden program path is not usable")
 	}
 	pam := s.rootPath(sshPamFile)
 	drop := s.rootPath(sshDropIn)
@@ -143,7 +143,7 @@ func (s *Service) EnsureHostKeys() error {
 		args = append(args, "-f", s.Root)
 	}
 	if out, err := sysRun(30*time.Second, "ssh-keygen", args...); err != nil {
-		return fmt.Errorf("this machine had no SSH identity (host keys) and Gatehouse could not make one: %s", strings.TrimSpace(out))
+		return fmt.Errorf("this machine had no SSH identity (host keys) and NopeWarden could not make one: %s", strings.TrimSpace(out))
 	}
 	return nil
 }
@@ -195,7 +195,7 @@ func writeFileAtomic(path string, b []byte, mode os.FileMode) error {
 	return os.Rename(tmp, path)
 }
 
-// setPamLine puts the Gatehouse check at the top of sshd's login rules.
+// setPamLine puts the NopeWarden check at the top of sshd's login rules.
 func setPamLine(path, line string) error {
 	b, err := os.ReadFile(path)
 	if err != nil {

@@ -8,7 +8,7 @@ import Approval from './Approval.jsx';
 import { OpenPortModal } from './Forwards.jsx';
 import { pauseChoices, whenText } from './Profiles.jsx';
 import { WhyBody } from './Why.jsx';
-import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, Select, Spark, ToggleRow, useAction, useToast, fmt, confirmBox, usePortNames } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, Select, Spark, ToggleRow, useAction, useToast, fmt, usePortNames } from '../ui.jsx';
 
 const POLICIES = [
   { value: 'filtered', label: 'Allowed, ads and trackers filtered' },
@@ -76,7 +76,7 @@ function IconPicker({ d, onChanged }) {
       <div className="inline">
         <Button small onClick={() => file.current?.click()} disabled={busy}>Upload your own picture</Button>
         {d.icon_id > 0 && <Button small kind="danger" onClick={() => set({ icon_id: 0 })} disabled={busy}>Remove it</Button>}
-        {(d.icon || d.icon_id > 0) && <Button small onClick={() => set({ icon: '', icon_id: 0 })} disabled={busy}>Let Gatehouse guess</Button>}
+        {(d.icon || d.icon_id > 0) && <Button small onClick={() => set({ icon: '', icon_id: 0 })} disabled={busy}>Let NopeWarden guess</Button>}
         <input ref={file} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => { upload(e.target.files?.[0]); e.target.value = ''; }} />
       </div>
       <span className="hint">PNG, JPEG or WebP, up to 100 KB.</span>
@@ -242,7 +242,9 @@ export default function Devices({ me }) {
                             ? <Button small title="Stop handing this device the same address every time" onClick={() => run(() => put(`/api/devices/${d.id}/reservation`, { keep: false }), 'Address no longer fixed.').then(reload)}>Release address</Button>
                             : d.ip && <Button small title={`Always give this device ${d.ip}`} onClick={() => run(() => put(`/api/devices/${d.id}/reservation`, { keep: true, ip: d.ip }), `This device will always get ${d.ip}.`).then(reload)}>Keep address</Button>)}
                           <Button small onClick={() => run(() => patch(`/api/devices/${d.id}`, { internet: !d.internet }), d.internet ? 'Paused.' : 'Back online.').then(reload)}>{d.internet ? 'Pause' : 'Resume'}</Button>
-                          {!d.online && <Button small kind="danger" icon="trash" onClick={async () => await confirmBox('Forget this device?') && run(() => del(`/api/devices/${d.id}`), 'Forgotten.').then(reload)}>Forget</Button>}
+                          {!d.online && (d.forgetting
+                            ? <span className="pill warn" title="It is forgotten when the waiting changes are applied. Discard them on the Review page to keep it.">Forgetting…</span>
+                            : <Button small kind="danger" icon="trash" onClick={() => run(() => del(`/api/devices/${d.id}`), 'Saved. It is forgotten when the change is applied.').then(reload)}>Forget</Button>)}
                         </div>
                       )}
                     </td>

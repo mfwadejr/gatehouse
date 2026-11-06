@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/netd"
+	"nopewarden/internal/api"
+	"nopewarden/internal/netd"
 )
 
 // The packet size of an outbound tunnel, and the addresses and services used to measure it and to
@@ -126,7 +126,7 @@ func (a *App) registerVPNSizeRoutes() {
 		}
 		for _, e := range in.Exit {
 			if !netd.ValidExitSource(e) {
-				fail(w, errors.New(e+" is not a service Gatehouse can ask. Use dns:google, dns:cloudflare, or web:https://host/path"))
+				fail(w, errors.New(e+" is not a service NopeWarden can ask. Use dns:google, dns:cloudflare, or web:https://host/path"))
 				return
 			}
 		}

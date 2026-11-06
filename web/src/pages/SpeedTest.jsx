@@ -124,7 +124,7 @@ function Servers({ st, reload }) {
         <Button disabled={busy || !url} onClick={add}>Add server</Button>
       </div>
       <p className="small muted">The address starts with https:// and must be the same kind of server as Cloudflare's (it answers /__down and /__up).</p>
-      <p className="small muted">Cloudflare's test is public and needs no account. Its terms for automated daily use are not confirmed, so check them or add your own server if that matters to you. Gatehouse checks that a new server answers before keeping it.</p>
+      <p className="small muted">Cloudflare's test is public and needs no account. Its terms for automated daily use are not confirmed, so check them or add your own server if that matters to you. NopeWarden checks that a new server answers before keeping it.</p>
     </Card>
   );
 }

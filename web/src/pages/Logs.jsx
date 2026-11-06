@@ -6,7 +6,7 @@ import { del, get, getWatched, post, put, setFailing, useData, useStream } from 
 import { RuleForm } from './FirewallRules.jsx';
 import { COUNTRIES, MAP_H, MAP_W } from '../worldmap.js';
 import { groupRows, rowTitle } from '../logrows.js';
-import { Button, Card, Empty, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, Switch, Tabs, ToggleRow, Trend, useAction, fmt, confirmBox } from '../ui.jsx';
+import { Button, Card, Empty, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, Switch, Tabs, ToggleRow, Trend, useAction, fmt , useDelayedDelete } from '../ui.jsx';
 
 const KINDS = [
   { value: '', label: 'Everything' },
@@ -17,7 +17,7 @@ const KINDS = [
 const VERDICT = { allowed: ['good', 'Allowed'], blocked: ['bad', 'Blocked'], warning: ['warn', 'Problem'], info: ['', 'Info'] };
 const RANGES = [{ value: '1', label: '1 h' }, { value: '24', label: '24 h' }, { value: '168', label: '7 d' }, { value: '720', label: '30 d' }, { value: 'custom', label: 'Custom' }];
 const FILTER_NAMES = { device: 'Device', dest: 'Destination', network: 'Network', service: 'Service', port: 'Port', proto: 'Protocol', direction: 'Direction', rule: 'Rule', country: 'Country', app: 'App' };
-const DIRECTIONS = { outbound: 'Out to the internet', inbound: 'In from the internet', between: 'Between your networks', router: 'To Gatehouse itself' };
+const DIRECTIONS = { outbound: 'Out to the internet', inbound: 'In from the internet', between: 'Between your networks', router: 'To NopeWarden itself' };
 const ALL_COLS = [
   { id: 'time', label: 'Time' }, { id: 'device', label: 'Device' }, { id: 'what', label: 'What' }, { id: 'where', label: 'Networks' },
   { id: 'via', label: 'Out through' }, { id: 'result', label: 'Result' }, { id: 'why', label: 'Why' },
@@ -41,6 +41,7 @@ const bits = (n) => {
 const dtLocal = (ts) => { const d = new Date(ts * 1000 - new Date().getTimezoneOffset() * 60000); return d.toISOString().slice(0, 16); };
 
 function Recording({ onClose, state, onSaved }) {
+  const delayedDelete = useDelayedDelete();
   const [run, busy] = useAction();
   const [f, setF] = useState({ record_allowed: state.record_allowed, record_blocked: state.record_blocked });
   const { data: u, reload } = useData('/api/logs/usage');
@@ -56,7 +57,7 @@ function Recording({ onClose, state, onSaved }) {
       <div className="stack">
         <ToggleRow title="Allowed connections" desc="Records each new connection that the firewall let through, and the rule that allowed it. Turn off to keep the log smaller." checked={f.record_allowed} onChange={(v) => setF({ ...f, record_allowed: v })} />
         <ToggleRow title="Blocked connections" desc="Records each new connection that the firewall stopped, and why." checked={f.record_blocked} onChange={(v) => setF({ ...f, record_blocked: v })} />
-        {ap && <ToggleRow title="Name the apps" desc="Shows which app a connection belongs to, like YouTube or Spotify, using the website names devices look up through Gatehouse. It never looks inside traffic. Turn off if you would rather not see which apps each person uses." checked={ap.enabled} onChange={(v) => run(() => put('/api/apps/settings', { enabled: v }), v ? 'App names are on.' : 'App names are off.').then(reloadApps)} />}
+        {ap && <ToggleRow title="Name the apps" desc="Shows which app a connection belongs to, like YouTube or Spotify, using the website names devices look up through NopeWarden. It never looks inside traffic. Turn off if you would rather not see which apps each person uses." checked={ap.enabled} onChange={(v) => run(() => put('/api/apps/settings', { enabled: v }), v ? 'App names are on.' : 'App names are off.').then(reloadApps)} />}
         {keep && (
           <div className="stack">
             <div className="formgrid">
@@ -68,7 +69,7 @@ function Recording({ onClose, state, onSaved }) {
           </div>
         )}
         <p className="small muted">Only the first packet of each connection is recorded, and a flood is capped, so a busy network cannot fill the disk. Names asked for through DNS are always recorded.</p>
-        <Button kind="danger" onClick={async () => await confirmBox('Delete every log entry?') && run(() => del('/api/logs'), 'Logs cleared.').then(() => { reload(); onSaved(); onClose(); })}>Delete all log entries</Button>
+        <Button kind="danger" onClick={() => { delayedDelete('Every log entry', () => del('/api/logs'), () => { reload(); onSaved(); }); onClose(); }}>Delete all log entries</Button>
       </div>
     </Modal>
   );
@@ -200,7 +201,7 @@ export default function Logs({ me }) {
   useEffect(() => { clearTimeout(t.current); t.current = setTimeout(load, 250); return () => clearTimeout(t.current); }, [load]);
   const tick = useRef(0);
   useStream(live && tab === 'log' ? ['logs.live', 'dns.live'] : [], () => {
-    if (paged.current || Date.now() - tick.current < 1500) return;
+    if (paged.current || Date.now() - tick.current < 1000) return;
     tick.current = Date.now();
     load();
   });
@@ -222,7 +223,7 @@ export default function Logs({ me }) {
   const none = !loading && !rows.length;
   const chips = Object.entries(flt).filter(([, v]) => v !== '' && v != null);
   return (
-    <Page title="Logs" sub="What your network did: connections allowed and blocked, names looked up, devices joining or leaving, and threat alerts. Looking for how Gatehouse itself is running? Open Diagnostics."
+    <Page title="Logs" sub="What your network did: connections allowed and blocked, names looked up, devices joining or leaving, and threat alerts. Looking for how NopeWarden itself is running? Open Diagnostics."
       actions={<><label className="inline small"><Switch checked={live} onChange={setLive} label="Live updates" />Live</label><Button small onClick={() => setRec(true)}>Recording &amp; storage</Button></>}>
       {(!meta.record_allowed || !meta.record_blocked) && (
         <Note tone="warn" title="Some connections are not being recorded">
@@ -246,8 +247,8 @@ export default function Logs({ me }) {
             </div>
           )}
           {tab === 'log' && <Segmented value={kind} onChange={setKind} options={KINDS} />}
-          {tab === 'log' && <label className="inline small" title="Gatehouse checks that its own DNS is answering every few seconds. These checks are hidden unless you tick this."><input type="checkbox" checked={own} onChange={(e) => chooseOwn(e.target.checked)} /> Show Gatehouse's own checks</label>}
-          {words.length > 0 && keepInfo && <p className="small muted">Searching the time range above, up to {keepInfo.days} days back, which is how long Gatehouse keeps its logs. {fmt.n(rows.length)} shown so far{more ? '; press Show older for more' : ''}.</p>}
+          {tab === 'log' && <label className="inline small" title="NopeWarden checks that its own DNS is answering every few seconds. These checks are hidden unless you tick this."><input type="checkbox" checked={own} onChange={(e) => chooseOwn(e.target.checked)} /> Show NopeWarden's own checks</label>}
+          {words.length > 0 && keepInfo && <p className="small muted">Searching the time range above, up to {keepInfo.days} days back, which is how long NopeWarden keeps its logs. {fmt.n(rows.length)} shown so far{more ? '; press Show older for more' : ''}.</p>}
           {chips.length > 0 && (
             <div className="chips">
               {chips.map(([k, v]) => (
@@ -348,7 +349,7 @@ function Summary({ params, pick }) {
         <Card title="Blocked" desc="Stopped by the firewall."><div className="big">{fmt.n(s.blocked)}</div></Card>
       </div>
       <Card title="Where connections go" desc="By the country of the address on the far side. Click a country to see its connections.">
-        {geo && !geo.ready && <Note tone="warn" title="Country data not downloaded yet">Gatehouse downloads the country address lists the first time they are needed and keeps them up to date weekly. Until then the map stays empty.</Note>}
+        {geo && !geo.ready && <Note tone="warn" title="Country data not downloaded yet">NopeWarden downloads the country address lists the first time they are needed and keeps them up to date weekly. Until then the map stays empty.</Note>}
         <WorldMap countries={geo?.countries || s.countries} />
         {(s.countries || []).length > 0 && (
           <ul className="toplist">{s.countries.slice(0, 8).map((c) => <li key={c.key}><button className="link" onClick={() => pick('country', c.key)}>{regionName(c.key)}</button><span className="muted small">{fmt.n(c.n)}</span></li>)}</ul>
@@ -398,7 +399,7 @@ function Activity() {
         )}
       </Card>
       {apps?.enabled && (
-        <Card title="Apps that probably used the most data" desc="An estimate, worked out from the websites each device looked up. Only apps Gatehouse is sure about are listed.">
+        <Card title="Apps that probably used the most data" desc="An estimate, worked out from the websites each device looked up. Only apps NopeWarden is sure about are listed.">
           {!apps.apps.length ? <Empty>Not enough information yet.</Empty> : (
             <ul className="toplist">{apps.apps.slice(0, 12).map((x) => <li key={x.app}><span>{x.app} <span className="small muted">{x.category}</span></span><span className="muted small">about {bytes(x.bytes)}</span></li>)}</ul>
           )}

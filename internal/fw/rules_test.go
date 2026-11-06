@@ -71,7 +71,7 @@ func TestRichRulesCompileAndLoad(t *testing.T) {
 
 // Set contents come from DHCP leases and DNS answers, so they are checked before they reach nft.
 func TestSetScriptRefusesAnythingButAddresses(t *testing.T) {
-	for _, bad := range []string{"1.2.3.4 } ; flush ruleset ; add element inet gatehouse x {", "evil", "1.2.3.4 timeout 5s; drop", "aa:bb"} {
+	for _, bad := range []string{"1.2.3.4 } ; flush ruleset ; add element inet nopewarden x {", "evil", "1.2.3.4 timeout 5s; drop", "aa:bb"} {
 		if _, err := BuildSetScript(map[string]SetFill{"dv_abcd1234_4": {Elems: []string{bad}}}, nil); err == nil {
 			t.Errorf("accepted %q", bad)
 		}
@@ -185,13 +185,13 @@ func TestSetsDriveRulesInLiveKernel(t *testing.T) {
 	if err := ap.LoadSets(map[string]SetFill{set: {Replace: true, Elems: []string{"192.168.1.20", "192.168.1.21"}}, "dv_00000000_4": {Elems: []string{"1.1.1.1"}}}); err != nil {
 		t.Fatal(err)
 	}
-	out, _ := exec.Command("ip", "netns", "exec", "ghsets", "nft", "list", "set", "inet", "gatehouse", set).CombinedOutput()
+	out, _ := exec.Command("ip", "netns", "exec", "ghsets", "nft", "list", "set", "inet", "nopewarden", set).CombinedOutput()
 	if !strings.Contains(string(out), "192.168.1.20") || !strings.Contains(string(out), "192.168.1.21") {
 		t.Fatalf("set not filled:\n%s", out)
 	}
 	// Replacing shrinks it: a device that left is no longer covered.
 	ap.LoadSets(map[string]SetFill{set: {Replace: true, Elems: []string{"192.168.1.21"}}})
-	out, _ = exec.Command("ip", "netns", "exec", "ghsets", "nft", "list", "set", "inet", "gatehouse", set).CombinedOutput()
+	out, _ = exec.Command("ip", "netns", "exec", "ghsets", "nft", "list", "set", "inet", "nopewarden", set).CombinedOutput()
 	if strings.Contains(string(out), "192.168.1.20") {
 		t.Fatalf("old address stayed:\n%s", out)
 	}

@@ -2,6 +2,7 @@ import { AttentionProvider, useAttention, levelText } from './attention.jsx';
 import React, { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { ApiError, get, post, setCsrf, useData } from './api.js';
 import { Guard, Icon, Loading } from './ui.jsx';
+import { Logo } from './logo.jsx';
 import { Enrol, Login, Setup } from './pages/Auth.jsx';
 import FailbackPrompt from './pages/FailbackPrompt.jsx';
 import Installer from './pages/Installer.jsx';
@@ -83,7 +84,7 @@ function Shell({ me, onSignOut, reloadMe }) {
   return (
     <div className="shell">
       <aside className={`side ${open ? 'open' : ''}`}>
-        <div className="brand"><Icon name="logo" size={24} /><span>Gatehouse</span></div>
+        <div className="brand"><Logo size={24} /><span>NopeWarden</span></div>
         <button type="button" className="srchbtn" onClick={() => setFinding(true)} aria-label="Search"><Icon name="search" /><span>Search</span><kbd>/</kbd></button>
         <button type="button" className="menubtn" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls="primary-nav"><Icon name={open ? 'x' : 'menu'} /><span>Menu</span></button>
         <nav className="nav" id="primary-nav" aria-label="Primary">

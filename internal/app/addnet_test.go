@@ -221,7 +221,7 @@ func TestRemovingANetworkTakesItsLeftoversWithIt(t *testing.T) {
 	}
 }
 
-// A network that can manage Gatehouse keeps its firewall network when its port goes.
+// A network that can manage NopeWarden keeps its firewall network when its port goes.
 func TestRemovingTheManagementPortKeepsItsFirewallNetwork(t *testing.T) {
 	c, _, _ := siteBox(t, "192.168.1.1/24")
 	_, _, raw := c.call("GET", "/api/fw/zones", nil)

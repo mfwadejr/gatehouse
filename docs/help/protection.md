@@ -25,7 +25,7 @@ Tabs along the top:
 ## What happens if something goes wrong
 These features only add protection. If they fail, the protection goes and your internet carries on: your traffic is never held up.
 - A block that cannot be worked out lets the lookup through, and the Logs say so once an hour.
-- Threat watching reads copies of the traffic. If it stops, crashes or is removed, nothing changes for your devices. If it uses all of its processor share for ten minutes, Gatehouse switches it off by itself, says why on this page and in the Logs, and leaves it off until you switch it on again.
+- Threat watching reads copies of the traffic. If it stops, crashes or is removed, nothing changes for your devices. If it uses all of its processor share for ten minutes, NopeWarden switches it off by itself, says why on this page and in the Logs, and leaves it off until you switch it on again.
 - Blocking threats (**Protect**) is not available. It stays off until watching has proved itself on real traffic.
 - Most traffic is encrypted, so watching finds known bad servers and attack patterns, not everything.
 
@@ -33,4 +33,13 @@ These features only add protection. If they fail, the protection goes and your i
 A new camera starts talking to an address on a bad list. The **Threats** tab shows "A device may be infected and talking to a known bad server", with the camera's name. You unplug it, or choose **Never check this device** if you know it is fine.
 
 ## If something goes wrong
-If the page says **The program keeps failing**, the program starts and stops again and again; read the reason, then **Program log** under **Advanced** (or Diagnostics in the left menu). If **Install threat watching** fails, the page shows the reason; try again once the internet works and there is disk space. If the page says the program is not running, your traffic is not affected and Gatehouse keeps trying to start it. If it keeps stopping, choose **Light** under **Settings**. If a rule update breaks things, use **Roll back to the previous rules**.
+If the page says **The program keeps failing**, the program starts and stops again and again; read the reason, then **Program log** under **Advanced** (or Diagnostics in the left menu). If **Install threat watching** fails, the page shows the reason; try again once the internet works and there is disk space. If the page says the program is not running, your traffic is not affected and NopeWarden keeps trying to start it. If it keeps stopping, choose **Light** under **Settings**. If a rule update breaks things, use **Roll back to the previous rules**.
+
+## Names inside a topic, and your own names per profile
+- **View names** next to a topic shows the names it blocks. Search, and allow a name that should not be blocked.
+- Each profile can have its own **custom blocked names**.
+- **Threat alerts** look up the name behind an address and try again if the first lookup finds nothing; **Look up again** retries now.
+- **Security check**: each fix button opens the exact window that changes the setting.
+
+## Deleting a block
+Delete removes the block at once and shows an Undo button for a few seconds. Nothing asks "Are you sure?".

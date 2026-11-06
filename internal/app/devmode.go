@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/bridgemode"
+	"nopewarden/internal/api"
+	"nopewarden/internal/bridgemode"
 )
 
 // Device mode: the one place that says whether this box is a Router or a Bridge, with its ports in

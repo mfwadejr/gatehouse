@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"gatehouse/internal/ha"
+	"nopewarden/internal/ha"
 )
 
 func waitHA(t *testing.T, what string, d time.Duration, f func() bool) {
@@ -87,7 +87,7 @@ func TestHighAvailabilityPairing(t *testing.T) {
 	}
 
 	// The backup looks at the primary, then joins.
-	if rc, _, raw := sc.call("POST", "/api/ha/discover", map[string]string{"code": "GATEHOUSE-PAIR-1:nonsense"}); rc == 200 {
+	if rc, _, raw := sc.call("POST", "/api/ha/discover", map[string]string{"code": "NOPEWARDEN-PAIR-1:nonsense"}); rc == 200 {
 		t.Fatalf("a bad code must be refused: %s", raw)
 	}
 	rc, m, raw = sc.call("POST", "/api/ha/discover", map[string]string{"code": code})

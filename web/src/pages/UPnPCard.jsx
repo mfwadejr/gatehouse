@@ -55,7 +55,7 @@ export default function UPnPCard() {
   return (
     <>
       <NatNotice compact />
-      <Card title="Let devices open ports by themselves (UPnP)" desc="A game console or media app asks for a port and Gatehouse opens it for that device only, for a limited time. For a known app such as Plex, a port forward above is more reliable.">
+      <Card title="Let devices open ports by themselves (UPnP)" desc="A game console or media app asks for a port and NopeWarden opens it for that device only, for a limited time. For a known app such as Plex, a port forward above is more reliable.">
         <div className="stack">
           <Field label="How do you want to allow it?">
             <Segmented value={data.mode} onChange={(v) => save({ mode: v, on: false }, undefined)} options={[{ value: 'devices', label: 'Specific devices (safer)' }, { value: 'network', label: 'A whole network (less safe)' }]} />
@@ -96,7 +96,7 @@ export default function UPnPCard() {
               ))}
             </div>
           </Field>
-          <p className="small muted">Safety: a device can only open ports to itself. Ports below 1024 and the ones Gatehouse itself uses are never opened.</p>
+          <p className="small muted">Safety: a device can only open ports to itself. Ports below 1024 and the ones NopeWarden itself uses are never opened.</p>
           <ToggleRow title="UPnP" desc={data.on ? data.line : missing.length ? `Not on yet. ${missing.join(' ')}` : 'Ready. Switch it on.'}
             checked={data.on} disabled={busy || (!data.on && missing.length > 0)} onChange={(v) => save({ on: v }, v ? 'UPnP is set up. Apply the firewall to start using it.' : 'UPnP is off. Apply the firewall to finish.')} />
         </div>

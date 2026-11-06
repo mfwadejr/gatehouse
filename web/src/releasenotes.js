@@ -1,10 +1,29 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4',
+    title: 'One update schedule, a resolver of its own, and staged DNS changes',
+    items: [
+      'The product is named NopeWarden. Hard on threats. Easy on humans. The console, installer image, program, services and folders all use the name. The shield icon stays until the logo is ready.',
+      'One schedule for every recurring job: update checks, blocklist refreshes, country lists and threat rules each have a plain-English schedule (every N hours, daily at a time, weekly on a day, or off) in one place, and failed jobs retry after 5 minutes, 15, 30 and then every hour.',
+      'DNS: a Resolve directly option turns on NopeWarden\'s own Unbound resolver, which asks the internet\'s root servers itself instead of a forwarder. It can check DNSSEC and explains failures in plain words. If direct lookups stop working, NopeWarden falls back to your encrypted forwarders and raises an alert. Unbound is off until you turn it on and only listens inside the box.',
+      'DNS changes now wait on the Review page like firewall and network changes, so you can apply or discard them together. Review has a DNS area.',
+      'DNS follows the route: a device sent through a VPN or a connection looks names up through that same path, and the Routes page shows the addresses learned for each website route.',
+      'Threat alerts look up the name of the address behind them and retry when the first try finds nothing, with a Look up again button.',
+      'Protection: View names shows what a topic blocks, per profile custom blocked names, and names you can allow from inside a category.',
+      'Long pages show the first 15 rows and a Show more button.',
+      'Security check: each fix button opens the exact window to change, not just the page.',
+      'Overview: 5 and 15 minute map ranges, a hover popout beside the country, and a capped Your VPNs card. VPNs and networks have their own traffic graph and totals, and a quiet tunnel shows a grey Idle pill.',
+      'VPN import accepts more real-world profile shapes (byte-order marks, Windows line endings, more harmless directives) and says clearly why a profile is refused.',
+      'Forget device now waits on the Review page like other changes (the device shows Forgetting… until applied, and Discard keeps it). Countries and the add-network form have Save for later too, and adding a network now shows up on Review in plain words. Changes to blocks (apps, topics and names) wait with the DNS changes. Deleting a block or a downloaded blocklist no longer asks "Are you sure?": it is removed at once with an Undo button.',
+      'Fixed: saving an edited route said invalid request body; the Updates are ready banner stayed after installing; the packages updated line and Checked time were missing; the Pause menu on Routes was out of proportion; logs refresh twice as fast.',
+    ],
+  },
+  {
     version: '0.9.3.2',
     title: 'VPN tunnels set their own packet size',
     items: [
-      'A VPN to a provider could show Working while secure web pages stalled, because the tunnel was set to a larger packet size than the connection under it carries. Gatehouse now measures the size that gets through and sets it itself, for every VPN that goes out to a provider or another site, and measures again after every reconnect, when big packets stop getting through, and every 30 minutes.',
+      'A VPN to a provider could show Working while secure web pages stalled, because the tunnel was set to a larger packet size than the connection under it carries. NopeWarden now measures the size that gets through and sets it itself, for every VPN that goes out to a provider or another site, and measures again after every reconnect, when big packets stop getting through, and every 30 minutes.',
       'Each provider VPN card shows the Packet size and where it came from (measured, from the profile, or default), and a Test packet size button measures it now and shows what each address answered.',
       'A new Test addresses card lists the addresses used for the test (1.1.1.1, 8.8.8.8, 1.0.0.1, 8.8.4.4, 9.9.9.9) and the services asked what address the internet sees (Google, Amazon, Cloudflare). You can add, change, remove and reorder them, and restore the built-in lists.',
       'Internet sees you as now fills in within about 20 seconds of a reconnect (a failed lookup used to wait ten minutes), and says why when it cannot be found.',
@@ -22,18 +41,18 @@ export const RELEASES = [
     title: 'Discard one change, Save for later in more places, and US time zones',
     items: [
       'Review changes: every waiting change now has its own Discard. It puts things back to just before that change. Because later changes can depend on earlier ones, it also drops the changes saved after it, and says so before it does. Discard all changes is still there.',
-      'Save for later is now on more forms: the open-port editor, services, device groups, DHCP networks and reservations, connection groups, VPN settings, letting networks see each other, and who may manage Gatehouse. Each one also has Save and apply.',
+      'Save for later is now on more forms: the open-port editor, services, device groups, DHCP networks and reservations, connection groups, VPN settings, letting networks see each other, and who may manage NopeWarden. Each one also has Save and apply.',
       'Setup wizard: the time zone list starts with the United States (Eastern, Central, Mountain, Arizona, Pacific, Alaska, Hawaii) in plain words, followed by every other zone.',
-      'The installer image is now named with its version (for example gatehouse-0.9.3-amd64.iso). The 0.9.2 image was called gatehouse-dev-amd64.iso by mistake.',
+      'The installer image is now named with its version (for example nopewarden-0.9.3-amd64.iso). The 0.9.2 image was called nopewarden-dev-amd64.iso by mistake.',
     ],
   },
   {
     version: '0.9.2',
     title: 'Save and it is live, a Policies page, and tidier alerts',
     items: [
-      'Saving is now one click for a signed-in administrator. Save and apply puts a change live after a moment, keeps it once Gatehouse sees you can still reach it, and undoes it on its own if you cannot. Save for later keeps it on a new Review page instead.',
-      'Review changes lists everything waiting in plain words, shows any warning or problem Gatehouse found, and one Verify and commit button puts it all live. Discard all changes puts everything back as it was running. A badge at the top of every page shows how many changes wait.',
-      'If Gatehouse finds something worth a second look, or other changes are already waiting, nothing goes live on its own. It waits on the Review page with the reason.',
+      'Saving is now one click for a signed-in administrator. Save and apply puts a change live after a moment, keeps it once NopeWarden sees you can still reach it, and undoes it on its own if you cannot. Save for later keeps it on a new Review page instead.',
+      'Review changes lists everything waiting in plain words, shows any warning or problem NopeWarden found, and one Verify and commit button puts it all live. Discard all changes puts everything back as it was running. A badge at the top of every page shows how many changes wait.',
+      'If NopeWarden finds something worth a second look, or other changes are already waiting, nothing goes live on its own. It waits on the Review page with the reason.',
       'The authenticator code, when you asked for one before changing the firewall, is asked once and remembered for 15 minutes.',
       'New Policies page, next to Routes: every firewall rule, route, block and open port in one list, in plain words, with Pause, Turn off, Edit and Remove. Create policy moved there from the left menu.',
       'A sun and moon button by your name at the bottom of the menu switches between the dark and light look. The saved look now applies on every page and every visit (it used to apply only after opening Settings).',
@@ -83,12 +102,12 @@ export const RELEASES = [
     version: '0.8.56',
     title: 'Storage, and three clear kinds of log',
     items: [
-      'Storage (Settings, Alerts & logs): a table of everything Gatehouse keeps, with entries, estimated size, the oldest entry and the rule that removes it. Every table that grows now has a rule: threat alerts and internet outages go after 365 days (you can change it), firewall change copies keep the newest 200 (you can change that too), and the total size limit now also trims the smaller histories if it is still exceeded. The limit is now applied every hour, not only when you pressed Clean up.',
+      'Storage (Settings, Alerts & logs): a table of everything NopeWarden keeps, with entries, estimated size, the oldest entry and the rule that removes it. Every table that grows now has a rule: threat alerts and internet outages go after 365 days (you can change it), firewall change copies keep the newest 200 (you can change that too), and the total size limit now also trims the smaller histories if it is still exceeded. The limit is now applied every hour, not only when you pressed Clean up.',
       'An unused table that was never filled in was removed.',
       'Logs has a new Admin activity tab (administrators only): sign-ins, failed sign-ins and the changes people made, with who, what, when and from where. Search takes several words and a time range, and the count says how many match.',
-      'Diagnostics now starts with Is Gatehouse itself working? One sentence, problems first, each with a Look button, then facts: how long Gatehouse and the machine have been up, when the firewall was last applied, disk and log space, the clock, and warnings in the last hour.',
+      'Diagnostics now starts with Is NopeWarden itself working? One sentence, problems first, each with a Look button, then facts: how long NopeWarden and the machine have been up, when the firewall was last applied, disk and log space, the clock, and warnings in the last hour.',
       'Diagnostics has a System log tab: warnings and errors by default, Everything on request, search across up to 5000 lines with the words highlighted, a time range, and Follow. Known messages get a plain explanation.',
-      'Console connections records every live connection your browser opens to Gatehouse: when, from where, how long, and why it closed, so the idle connection-error bursts can be told apart as the box or the network. Unusual endings also go to the system log.',
+      'Console connections records every live connection your browser opens to NopeWarden: when, from where, how long, and why it closed, so the idle connection-error bursts can be told apart as the box or the network. Unusual endings also go to the system log.',
       'Logs and Diagnostics now open with one line saying what each is for, and point to the other.',
     ],
   },
@@ -120,9 +139,9 @@ export const RELEASES = [
   },
   {
     version: '0.8.53',
-    title: 'Wireless removed: Gatehouse is wired only',
+    title: 'Wireless removed: NopeWarden is wired only',
     items: [
-      'Wi-Fi support is gone. The Wi-Fi page and its link in the sidebar, Wi-Fi join cards, the Wi-Fi internet option in the setup wizard, and the Wi-Fi columns and filters on Devices are removed. If you need Wi-Fi, plug in a separate access point or Wi-Fi router; Gatehouse still protects everything that connects through it.',
+      'Wi-Fi support is gone. The Wi-Fi page and its link in the sidebar, Wi-Fi join cards, the Wi-Fi internet option in the setup wizard, and the Wi-Fi columns and filters on Devices are removed. If you need Wi-Fi, plug in a separate access point or Wi-Fi router; NopeWarden still protects everything that connects through it.',
       'The installer no longer carries Wi-Fi software or wireless firmware (hostapd, wpa_supplicant, iw, regulatory data, and the Intel, Atheros, Broadcom and MediaTek Wi-Fi firmware), and wireless cards are blocked from loading, so a Wi-Fi card in the machine is ignored. Wired network card firmware is unchanged.',
       'Updating from an earlier version drops the saved Wi-Fi settings and join cards. Old backups still restore; their Wi-Fi part is skipped. The Help now says plainly that wireless is not included.',
       'The earlier Wi-Fi code is kept in the project archive folder for reference.',
@@ -163,17 +182,17 @@ export const RELEASES = [
     version: '0.8.48',
     title: 'Diagnostics page, terminal, Suricata reasons, SSH fix',
     items: [
-      'A new Diagnostics page in the left menu: every part of Gatehouse with its state, why it is failing in plain words, its log, Restart, and Save a support bundle (passwords and keys hidden). The network tests are on it too.',
+      'A new Diagnostics page in the left menu: every part of NopeWarden with its state, why it is failing in plain words, its log, Restart, and Save a support bundle (passwords and keys hidden). The network tests are on it too.',
       'An optional Terminal on the Diagnostics page: a command line on the firewall from the console. It is off until you switch it on, asks for your password or code every time, closes by itself after 10 idle minutes, and each open and close is recorded in the Logs.',
       'Threat watching now says when the program keeps failing and restarting, shows the last thing it said, and has a Program log under Advanced. Its default memory limit is 2 GB.',
-      'Remote login (SSH) could not be turned on because the machine had no SSH identity. Gatehouse now makes one when you turn it on, and once at first start.',
+      'Remote login (SSH) could not be turned on because the machine had no SSH identity. NopeWarden now makes one when you turn it on, and once at first start.',
       'A new Protection page in the left menu. Overview gives a one-line verdict and the Security check; Apps & topics (moved from DNS) blocks apps, topics and websites; Threats is threat watching. Block lists for ads, trackers and adult sites stay under DNS.',
-      'Threat watching is no longer installed behind your back. Press Install threat watching: Gatehouse shows the packages, the download size, the disk space needed and any worry about this machine, and installs only when you agree. Choose Light, Balanced or Strict, set a processor and memory limit, update the rules (and roll back to the previous ones), search and switch off single checks, and save or load your tuning. It only watches and tells you; blocking threats is not available yet. If it stops, nothing changes for your devices, and if it uses all of its processor share for ten minutes Gatehouse switches it off and says why.',
+      'Threat watching is no longer installed behind your back. Press Install threat watching: NopeWarden shows the packages, the download size, the disk space needed and any worry about this machine, and installs only when you agree. Choose Light, Balanced or Strict, set a processor and memory limit, update the rules (and roll back to the previous ones), search and switch off single checks, and save or load your tuning. It only watches and tells you; blocking threats is not available yet. If it stops, nothing changes for your devices, and if it uses all of its processor share for ten minutes NopeWarden switches it off and says why.',
       'Add a network now offers five kinds: Trusted, Private, Guest, Isolated and Custom. Guest devices cannot see each other unless you turn that on. Choose the whole port or a VLAN on any port, and a VLAN with no address and no DHCP for a link to a switch or access point.',
       'If threat watching is on but the program is not running, the page now says why (for example it ran out of memory). Its default memory limit is now 2 GB, because the full rule set needs more than 1 GB.',
       'The Install window now shows the real download and disk size. The groups of checks sit in columns.',
       'Opening a port that the firewall itself uses (such as the console) now warns you instead of refusing.',
-      'Choose how often Gatehouse looks for updates: 6 hours, 12 hours (the usual), a day, a week, or your own number of hours.',
+      'Choose how often NopeWarden looks for updates: 6 hours, 12 hours (the usual), a day, a week, or your own number of hours.',
       'More topics to block (scams, piracy, crypto mining, drugs, games, video, music, messaging, shopping, AI). Settings, Advanced shows which version of the lists is in use. Blocking also has a thorough choice, which is saved but does not act yet.',
       'If a block or threat watching ever goes wrong, your internet is not affected. This is now stated beside the setting, in the Logs when it happens, and in the Protection and Reference chapters.',
     ],
@@ -182,12 +201,12 @@ export const RELEASES = [
     version: '0.8.43',
     title: 'Open ports made simple, block apps and topics, threat watching',
     items: [
-      'Open a port in three taps: pick the app, pick the device. Gatehouse says which port it used and lets you change it. It never picks a port for you; if one is taken it asks which one to use. Each device row also has an Open a port button. Open ports now show in the Rules list (under Show system rules) and in Services.',
+      'Open a port in three taps: pick the app, pick the device. NopeWarden says which port it used and lets you change it. It never picks a port for you; if one is taken it asks which one to use. Each device row also has an Open a port button. Open ports now show in the Rules list (under Show system rules) and in Services.',
       'You can give an app a different outside port and a different port on the device, which suits several copies of the same app. Renaming a service renames everything that uses it.',
       'Block an app, a topic (adult, gambling, social media, ads, malware) or a website for everyone, a network, a profile or one device, always or at set hours, with an exception for a device and a pause button. It blocks by name. Thorough checking of the traffic itself is shown but is not switched on yet. If anything goes wrong nothing is blocked.',
       'Each blocklist has View names, with a search and an Allow button.',
       'Threat protection (Firewall, Protection): reads what a detection engine notices and shows it in plain words in the Logs, with Allow for this device, Allow for all, Never check this device, and an Advanced tab. It watches and tells; it does not block. The engine itself is not installed by this version, so until it is the page says so.',
-      'The Logs hide Gatehouse\'s own health checks. A checkbox shows them again.',
+      'The Logs hide NopeWarden\'s own health checks. A checkbox shows them again.',
     ],
   },
   {
@@ -209,14 +228,14 @@ export const RELEASES = [
     version: '0.8.40',
     title: 'Build fix',
     items: [
-      'Fixes the automatic build for 0.8.39, which stopped because a help chapter shared a name with an older document on case-insensitive disks. The help now lives in its own folder. Nothing changes in how Gatehouse works.'
+      'Fixes the automatic build for 0.8.39, which stopped because a help chapter shared a name with an older document on case-insensitive disks. The help now lives in its own folder. Nothing changes in how NopeWarden works.'
     ],
   },
   {
     version: '0.8.39',
     title: 'Built-in help, and undo instead of "Are you sure?"',
     items: [
-      'Every page now has a "Help with this page" link. The help is built into Gatehouse, so it works with no internet: one chapter per page with a picture, a Getting started guide, a guide for when you are locked out, and a reference. It is also at /help/ on your box.',
+      'Every page now has a "Help with this page" link. The help is built into NopeWarden, so it works with no internet: one chapter per page with a picture, a Getting started guide, a guide for when you are locked out, and a reference. It is also at /help/ on your box.',
       'Deleting a firewall group or a route no longer asks "Are you sure?". It is removed at once and a message offers Undo for a few seconds, which puts it back exactly as it was.',
       'The first-run setup now offers Bridge as a third choice next to the router choices, and walks you into the bridge steps.',
       'A new help chapter, "How easy is it?", lists the everyday jobs and how many steps each takes. Opening a port by hand (6 steps) is the longest and is next to shorten.',
@@ -226,7 +245,7 @@ export const RELEASES = [
     version: '0.8.38',
     title: 'Build fix',
     items: [
-      'Fixes an automatic test that failed only in the first hour of a new month (the monthly provider report test looked at a time that had not happened yet). Nothing changes in how Gatehouse works.',
+      'Fixes an automatic test that failed only in the first hour of a new month (the monthly provider report test looked at a time that had not happened yet). Nothing changes in how NopeWarden works.',
     ],
   },
   {
@@ -252,7 +271,7 @@ export const RELEASES = [
       'Cards inside an opened "Advanced" section (Settings and Firewall) no longer touch each other; they have the same gap as cards everywhere else.',
       'Several small parts of the console used style names that did not exist, so they quietly used a guessed colour instead of your light or dark theme (the pickers, icon buttons, the world map, the file drop area and the QR code backdrop). They now follow the theme. Shadows and the dimmed background behind dialogs became proper shared styles.',
       'Spacing written directly into screens now uses the shared spacing scale. Nothing moves; the sizes are the same.',
-      'Behind the scenes, three automatic checks now run on every build and stop it if something is wrong: a colour or size written outside the shared styles, a style name that is not defined, and a screen that calls a part of Gatehouse that does not exist.',
+      'Behind the scenes, three automatic checks now run on every build and stop it if something is wrong: a colour or size written outside the shared styles, a style name that is not defined, and a screen that calls a part of NopeWarden that does not exist.',
     ],
   },
   {
@@ -271,7 +290,7 @@ export const RELEASES = [
     title: 'Device mode: Router or Bridge, with cabling help',
     items: [
       'Settings now starts with a Device mode card. It says in one sentence how this box works and which port is which (using the names you gave your ports), with a Change button.',
-      'Change opens a three-step walkthrough. Step 1: choose Router or Bridge. Step 2: plug in the cables and Gatehouse notices each port as it goes in (or pick the port from a list if the cable is already in). For a bridge you plug in the cable from your other router first, then your devices, and you can add a spare port for managing the box. Step 3: a plain cabling summary, then Apply.',
+      'Change opens a three-step walkthrough. Step 1: choose Router or Bridge. Step 2: plug in the cables and NopeWarden notices each port as it goes in (or pick the port from a list if the cable is already in). For a bridge you plug in the cable from your other router first, then your devices, and you can add a spare port for managing the box. Step 3: a plain cabling summary, then Apply.',
       'Safety: nothing is saved until the last step and Cancel changes nothing. The port you are connected through is named ("leave this cable plugged in") and can never be chosen as the internet port or the cable to your other router. Applying a bridge, or going back to routing, uses the same 60-second keep-or-undo as before. Moving the internet connection to another port is saved for you to apply from the usual bar, and is refused if that port carries one of your networks.',
       'Bridge mode keeps addresses (DHCP) with your other router and says so. Settings you had before bridge mode are kept and come back when you return to Router.',
       'While a box is in a high-availability pair its mode cannot be changed, with a message explaining why. The pair setup is one click away from the card.',
@@ -319,7 +338,7 @@ export const RELEASES = [
     version: '0.8.28',
     title: 'VPN tunnel keeps its address',
     items: [
-      'Fixed a likely cause of a provider VPN (such as ExpressVPN) that connected and then carried nothing: Gatehouse now tells the system network service to leave the address and route OpenVPN sets on its tunnel device alone. After updating, the Internet page shows changes waiting to be applied; press Review and apply once so the tunnel file is rewritten.',
+      'Fixed a likely cause of a provider VPN (such as ExpressVPN) that connected and then carried nothing: NopeWarden now tells the system network service to leave the address and route OpenVPN sets on its tunnel device alone. After updating, the Internet page shows changes waiting to be applied; press Review and apply once so the tunnel file is rewritten.',
       'When OpenVPN says the tunnel is up but the device has no address inside it, the VPN card now says exactly that, instead of saying the connection never finished.',
     ],
   },
@@ -336,7 +355,7 @@ export const RELEASES = [
     version: '0.8.26',
     title: 'VPN tunnels say what is wrong; Save says what it did',
     items: [
-      'Provider VPN files (ExpressVPN and others) now keep the certificate check and the packet-format line exactly as the provider wrote them. Gatehouse used to change one and drop the other, which could stop the connection from ever starting.',
+      'Provider VPN files (ExpressVPN and others) now keep the certificate check and the packet-format line exactly as the provider wrote them. NopeWarden used to change one and drop the other, which could stop the connection from ever starting.',
       'A VPN tunnel that is not working now says why in plain words (login refused, no answer from the server, certificate rejected, no address given), and shows the last lines OpenVPN wrote. A line is added to the event log when a tunnel drops or fails.',
       'Save now tells you what happened: "Saved. Press Review and apply at the bottom of the window to start using it", "No changes. These are already saved", or "No changes. This is already in use".',
     ],
@@ -359,7 +378,7 @@ export const RELEASES = [
     version: '0.8.23',
     title: 'Build fix',
     items: [
-      'Fixed: the build for 0.8.21 and 0.8.22 failed on a test that was too strict about timing. Nothing about how Gatehouse runs changed, and 0.8.21 and 0.8.22 include nothing else that is different.',
+      'Fixed: the build for 0.8.21 and 0.8.22 failed on a test that was too strict about timing. Nothing about how NopeWarden runs changed, and 0.8.21 and 0.8.22 include nothing else that is different.',
     ],
   },
   {
@@ -385,7 +404,7 @@ export const RELEASES = [
     title: 'Safer pair updates, any-port device placement, warm spare',
     items: [
       'Updating a pair: from the active unit, Update now updates the spare first, checks that it works, hands the role to it, then updates the other unit, with one progress list. If the spare cannot update, the active unit is never touched. The roles end up swapped; hand back whenever you like.',
-      'Move a device to another network now works from any port or Wi-Fi: Gatehouse moves that one device across to the VLAN network, so the device does not have to be plugged into the VLAN\'s port.',
+      'Move a device to another network now works from any port or Wi-Fi: NopeWarden moves that one device across to the VLAN network, so the device does not have to be plugged into the VLAN\'s port.',
       'Cable between the two units (optional): choose a spare port on each and the pair talks over it (settings copy, updates, connection copy), falling back to the shared network if it is unplugged. An unplugged cable never makes a unit take over (Settings, Advanced, pair).',
       'Keep the spare\'s internet connection ready (optional): the spare keeps its internet port connected but silent, copies the active unit\'s hardware address, and takes over faster. Not for PPPoE or Wi-Fi connections.',
       'Fixed: a build could fail on a slow machine because a test did not wait long enough for the console to start.',
@@ -395,7 +414,7 @@ export const RELEASES = [
     version: '0.8.19',
     title: 'Device placement, approvals, undo and more',
     items: [
-      'Move a device to another network (Devices, Details): like UniFi\'s Virtual Network Override. Pick a VLAN network and Gatehouse puts that one device on it, wired or wireless. The device must be plugged into the same port the VLAN is on, and takes the change when it next asks for an address.',
+      'Move a device to another network (Devices, Details): like UniFi\'s Virtual Network Override. Pick a VLAN network and NopeWarden puts that one device on it, wired or wireless. The device must be plugged into the same port the VLAN is on, and takes the change when it next asks for an address.',
       'New-device approval: new devices wait on a holding network until you allow or block them. Off by default; devices you already have are never held (Devices).',
       'Fewer prompts, and Undo: everyday changes no longer ask for a code. Only serious ones do (reset, restore, going back to an earlier setup, turning on remote login, plain backup download), with your authenticator code or, if you have none, your password. Deleting a firewall rule or an unused service shows Undo.',
       'Add more ports to this network (Networks, edit): turn a one-port network into a shared-port network without losing anything.',
@@ -409,8 +428,8 @@ export const RELEASES = [
     version: '0.8.18',
     title: 'Pairs, bridge mode and traffic labels',
     items: [
-      'High availability: pair two Gatehouse units so the second takes over by itself when the first fails. Settings are copied across, the spare is read-only and stays quiet, and connections carry over. Settings, Advanced. Needs a second unit with at least as many ports.',
-      'Bridge mode: put Gatehouse between another router and your network and filter without routing. The console stays reachable on its own address, setup has a 60-second undo, and Reset to default always brings routing back. Settings, Advanced.',
+      'High availability: pair two NopeWarden units so the second takes over by itself when the first fails. Settings are copied across, the spare is read-only and stays quiet, and connections carry over. Settings, Advanced. Needs a second unit with at least as many ports.',
+      'Bridge mode: put NopeWarden between another router and your network and filter without routing. The console stays reachable on its own address, setup has a 60-second undo, and Reset to default always brings routing back. Settings, Advanced.',
       'Traffic labels: an optional small program names the application behind each connection by looking at the first packets (YouTube, Zoom, BitTorrent), and flags cautions such as self-signed certificates. Off by default. It is on fresh install images only.',
       'The top of Overview is tidier: suggestions, the security check and common setups now sit together in one collapsed card.',
     ],
@@ -419,7 +438,7 @@ export const RELEASES = [
     version: '0.8.17',
     title: 'Cards, reports and remote access',
     items: [
-      'Wi-Fi join cards: a QR code that joins your Wi-Fi when scanned, and a card to print with the name and password. Works for Wi-Fi from Gatehouse and for any other access point (Wi-Fi page).',
+      'Wi-Fi join cards: a QR code that joins your Wi-Fi when scanned, and a card to print with the name and password. Works for Wi-Fi from NopeWarden and for any other access point (Wi-Fi page).',
       'My network: one printable page of your networks, addresses, devices, open ports and how to get back in. It never contains passwords or keys (Settings).',
       'Provider report card: a month of outages and speed against your plan, ready to print and show your provider. Data use shows this billing period and your heaviest devices, with an optional monthly limit and warnings (Internet page).',
       'Reach my home from anywhere: a web name that follows your home address (DuckDNS, No-IP and similar), then the VPN, then your phone (VPN page). It warns when your connection is shared by your provider and cannot work.',
@@ -435,9 +454,9 @@ export const RELEASES = [
     items: [
       'Profiles: Kids, Guests, Smart home and Work, each with a filtering level (Off, Basic, Enhanced or your own categories), safe search for Google, Bing, DuckDuckGo and YouTube, and hours when the internet is off, such as a bedtime. Put a device in a profile on the Devices page.',
       'Pause: stop the internet for one device, or for everyone in a profile, for 30 minutes, an hour, two hours, or until you resume. It takes effect in seconds with nothing to apply and comes back by itself.',
-      "Why can't it reach that? Pick a device and a website. Gatehouse checks pauses, DNS filtering and the firewall in order, says which one is in the way, and offers a fix such as Allow this site. It is on the Internet page and inside each device.",
+      "Why can't it reach that? Pick a device and a website. NopeWarden checks pauses, DNS filtering and the firewall in order, says which one is in the way, and offers a fix such as Allow this site. It is on the Internet page and inside each device.",
       'Security check on the Overview: the things that most often leave a network exposed, each with a button that takes you to where it is fixed, and one plain sentence at the top.',
-      'Undo: before every firewall or network change goes live, Gatehouse keeps a restore point. Settings, Changes lists them with a Revert button. A revert is reviewed and applied the usual way, with the usual 60 seconds to take it back.',
+      'Undo: before every firewall or network change goes live, NopeWarden keeps a restore point. Settings, Changes lists them with a Revert button. A revert is reviewed and applied the usual way, with the usual 60 seconds to take it back.',
       'Common setups: guest Wi-Fi, cameras on their own network, Plex from outside, and UniFi access points, each as steps in order.',
       'Internet provider presets fill in the usual settings for some providers. None is tested yet, and each says so.',
       'Optional: also block the best-known public encrypted-DNS websites (Firewall, Protection). It cannot be complete, and it says so.',
@@ -448,22 +467,22 @@ export const RELEASES = [
     title: 'Fewer surprises: tests, alerts and simpler ports',
     items: [
       'Test my internet: one button checks the cable, the modem, your provider and website names in turn, and says what to try. Ping, trace and name lookup are on the same page.',
-      'Gatehouse now tells you when your connection is shared by your provider (CGNAT) or sits behind another router, what stops working because of it, and the exact ports to open on the other router.',
+      'NopeWarden now tells you when your connection is shared by your provider (CGNAT) or sits behind another router, what stops working because of it, and the exact ports to open on the other router.',
       'One card for UPnP, under Firewall, Open ports. Choose who may use it and through which connection. It cannot be switched on until you have chosen.',
       'Open a port by picking the app and the device. Plex, Jellyfin, Minecraft and more are built in; add your own. The forward follows the device if its address changes, and can be limited to certain countries or addresses.',
       'Discovery: let printers, Chromecast, AirPlay and Home Assistant find each other across networks you pair (Firewall, Discovery).',
-      'Alerts by email or ntfy: a new device, the internet going down and back, a watched device going offline, or Gatehouse repairing something itself. Quiet hours hold them until morning, and a test button proves it works (Settings).',
+      'Alerts by email or ntfy: a new device, the internet going down and back, a watched device going offline, or NopeWarden repairing something itself. Quiet hours hold them until morning, and a test button proves it works (Settings).',
     ],
   },
   {
     version: '0.8.14',
     title: 'Countries, Routes and spare ports',
     items: [
-      'Countries: block or allow whole countries in one place, for traffic going out, coming in, or both. Gatehouse warns you before a choice could lock you out of your own country.',
+      'Countries: block or allow whole countries in one place, for traffic going out, coming in, or both. NopeWarden warns you before a choice could lock you out of your own country.',
       'Routes: send only the websites, addresses or countries you choose through a VPN, or through one internet connection, and leave everything else alone. A "stop if down" switch keeps traffic from leaking if the VPN drops. Routes carry IPv4 only.',
-      'Spare ports: on a network that uses a bridge, tick the ports that should act as a switch for it. Gatehouse tells you why a port cannot be ticked, and nothing changes until you apply.',
+      'Spare ports: on a network that uses a bridge, tick the ports that should act as a switch for it. NopeWarden tells you why a port cannot be ticked, and nothing changes until you apply.',
       'Adding a VPN no longer forces you to choose who uses it: pick "Nobody yet" and decide later.',
-      'After you apply a change, Gatehouse checks that you can still reach it and keeps the change by itself. If you cannot, it still undoes itself within 60 seconds. You can switch this off to confirm by hand.',
+      'After you apply a change, NopeWarden checks that you can still reach it and keeps the change by itself. If you cannot, it still undoes itself within 60 seconds. You can switch this off to confirm by hand.',
     ],
   },
   {

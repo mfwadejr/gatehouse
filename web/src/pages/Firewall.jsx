@@ -13,7 +13,7 @@ import Forwards from './Forwards.jsx';
 import Discovery from './Discovery.jsx';
 import NatNotice from '../natnotice.jsx';
 import { GroupsAndLists, Matrix, PairModal, RuleForm, RulesList } from './FirewallRules.jsx';
-import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Problems, Select, Tabs, ToggleRow, useAction, useToast, fmt, confirmBox } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Problems, Select, Tabs, ToggleRow, useAction, useToast, fmt, confirmBox, Limited } from '../ui.jsx';
 
 function ZoneForm({ initial, presets, ifaces, taken, onClose, onSaved }) {
   const [z, setZ] = useState({ kind: 'trusted', name: '', ifaces: [], internet: true, management: true, intra_allow: true, gateway: true, upnp: false, ssh: false, dns_force: true, description: '', ...initial });
@@ -48,9 +48,9 @@ function ZoneForm({ initial, presets, ifaces, taken, onClose, onSaved }) {
       </div>
       <ToggleRow title="Can reach the internet" checked={z.internet} onChange={set('internet')} />
       <ToggleRow title="Devices here can talk to each other" checked={z.intra_allow} onChange={set('intra_allow')} />
-      <ToggleRow title="Can manage Gatehouse" desc="Allows the console from this network. Keep at least one network on, so you can always get back in; Gatehouse refuses a change that would leave none." checked={z.management} onChange={set('management')} />
+      <ToggleRow title="Can manage NopeWarden" desc="Allows the console from this network. Keep at least one network on, so you can always get back in; NopeWarden refuses a change that would leave none." checked={z.management} onChange={set('management')} />
       <details className="more"><summary>Advanced</summary>
-        <ToggleRow title="Gatehouse is the gateway" desc="Off if another router on this network does that job." checked={z.gateway} onChange={set('gateway')} />
+        <ToggleRow title="NopeWarden is the gateway" desc="Off if another router on this network does that job." checked={z.gateway} onChange={set('gateway')} />
         <ToggleRow title="Make devices here use the enforced DNS server" desc="Catches gadgets with a DNS server built in, such as smart TVs and cameras. Turn off for a network that needs its own DNS. A different server for this network, and exceptions for single devices, are under Protection." checked={z.dns_force} onChange={set('dns_force')} />
         <ToggleRow title="Allow remote login (SSH)" checked={z.ssh} onChange={set('ssh')} />
       </details>
@@ -117,7 +117,7 @@ function Networks({ ov, presets, reload }) {
           {zones.map((z) => (
             <div className="item" key={z.id}>
               <div>
-                <div className="name">{z.name} <Pill>{kindTitle(z.kind)}</Pill>{z.management && <Pill tone="good">Can manage Gatehouse</Pill>}{!z.ifaces?.length && <Pill tone="warn">Not attached to anything</Pill>}</div>
+                <div className="name">{z.name} <Pill>{kindTitle(z.kind)}</Pill>{z.management && <Pill tone="good">Can manage NopeWarden</Pill>}{!z.ifaces?.length && <Pill tone="warn">Not attached to anything</Pill>}</div>
                 <div className="meta">{z.ifaces?.length ? z.ifaces.join(', ') : 'Not attached to a port, so nothing is on it. Remove it if you no longer need it.'}</div>
               </div>
               <div className="actions"><Button small icon="edit" onClick={() => setEdit(z)}>Edit</Button>
@@ -132,7 +132,7 @@ function Networks({ ov, presets, reload }) {
           <ul className="stack" style={{ margin: 0, paddingLeft: '1.2rem' }}>{ov.summary.map((s, i) => <li key={i}>{s}</li>)}</ul>
         </Card>
       )}
-      {addNet && <AddNetwork onClose={() => setAddNet(false)} onCreated={(n) => { setAddNet(false); toast(`${n} added. It goes live in a moment.`); reload(); go('networks'); }} />}
+      {addNet && <AddNetwork onClose={() => setAddNet(false)} onCreated={(n, later) => { setAddNet(false); toast(later ? `${n} saved for later. It waits on the Review page.` : `${n} added. It goes live in a moment.`); reload(); go('networks'); }} />}
       {edit && <ZoneForm initial={edit} presets={presets} ifaces={ifs || []} taken={taken} onClose={() => setEdit(null)} onSaved={reload} />}
     </>
   );
@@ -169,16 +169,16 @@ function Protected({ reload }) {
       </div>
       <p className="small muted">These rules are built in. They sit above everything you can edit, and no change you make here can remove them. If you are ever locked out, press Alt+F2 on the machine itself.</p>
       <div className="list">
-        {data.rules.map((r) => (
+        {<Limited items={data.rules} noun="rules" render={(r) => (
           <div className="item" key={r.title}>
             <div><div className="name">{r.title}</div><div className="meta">{r.text}</div>{r.note && <div className="meta muted">{r.note}</div>}</div>
             <Pill tone={r.active ? 'good' : ''}>{r.active ? 'Always on' : 'Standing by'}</Pill>
           </div>
-        ))}
+        )} />}
       </div>
       {edit && (
         <div className="stack mt3">
-          <Note title="Who may manage this device">Choose the networks or addresses allowed to open this console. Leave everything empty to allow every management network. If you pick something that does not include the address you are using now, Gatehouse refuses, so you cannot lock yourself out this way.</Note>
+          <Note title="Who may manage this device">Choose the networks or addresses allowed to open this console. Leave everything empty to allow every management network. If you pick something that does not include the address you are using now, NopeWarden refuses, so you cannot lock yourself out this way.</Note>
           <Field label="Networks">
             <div className="stack gap1">
               {(data.networks || []).map((n) => (

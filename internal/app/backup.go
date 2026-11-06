@@ -24,11 +24,11 @@ import (
 	"strings"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/crypt"
-	"gatehouse/internal/fw"
-	"gatehouse/internal/store"
-	"gatehouse/internal/update"
+	"nopewarden/internal/api"
+	"nopewarden/internal/crypt"
+	"nopewarden/internal/fw"
+	"nopewarden/internal/store"
+	"nopewarden/internal/update"
 )
 
 // Backups. A backup is one file holding the settings, the key that unlocks the saved passwords in
@@ -325,7 +325,7 @@ func openBackup(path, password string) (*openedBackup, error) {
 	}
 	zr, err := gzip.NewReader(bytes.NewReader(raw))
 	if err != nil {
-		return fail(errors.New("this is not a Gatehouse backup file"))
+		return fail(errors.New("this is not a NopeWarden backup file"))
 	}
 	tr := tar.NewReader(zr)
 	files := map[string][]byte{}

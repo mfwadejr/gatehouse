@@ -10,7 +10,7 @@ import { Button, Card, Modal, Note, Pill, useAction, useStepUp, stepReady, StepU
 
 function Session({ id, onEnd }) {
   useEffect(() => {
-    const on = (e) => { if (e.origin === window.location.origin && e.data?.gatehouseTerminal === 'ended') onEnd(true); };
+    const on = (e) => { if (e.origin === window.location.origin && e.data?.nopewardenTerminal === 'ended') onEnd(true); };
     window.addEventListener('message', on);
     return () => window.removeEventListener('message', on);
   }, [onEnd]);

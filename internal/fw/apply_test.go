@@ -10,9 +10,9 @@ import (
 	"time"
 )
 
-const lockoutScript = `add table inet gatehouse
-delete table inet gatehouse
-table inet gatehouse {
+const lockoutScript = `add table inet nopewarden
+delete table inet nopewarden
+table inet nopewarden {
 	chain input {
 		type filter hook input priority filter; policy drop;
 		iifname "lo" accept
@@ -22,9 +22,9 @@ table inet gatehouse {
 
 func buildBinary(t *testing.T) string {
 	t.Helper()
-	bin := filepath.Join(t.TempDir(), "gatehouse")
+	bin := filepath.Join(t.TempDir(), "nopewarden")
 	root, _ := filepath.Abs("../..")
-	c := exec.Command("go", "build", "-o", bin, "./cmd/gatehouse")
+	c := exec.Command("go", "build", "-o", bin, "./cmd/nopewarden")
 	c.Dir = root
 	if out, err := c.CombinedOutput(); err != nil {
 		t.Fatalf("build: %v\n%s", err, out)

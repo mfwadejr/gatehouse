@@ -6,7 +6,7 @@ import (
 )
 
 func TestParseRealKernelLine(t *testing.T) {
-	// A record exactly as /dev/kmsg returned it for a Gatehouse log rule.
+	// A record exactly as /dev/kmsg returned it for a NopeWarden log rule.
 	rec := "4,465,478930341,-;gh|allow|test:x IN= OUT=lo SRC=127.0.0.1 DST=127.0.0.1 LEN=31 TOS=0x00 PREC=0x00 TTL=64 ID=17787 DF PROTO=UDP SPT=54529 DPT=9999 LEN=11 "
 	ev, ok := ParseKmsg(rec, time.Unix(5, 0))
 	if !ok || ev.Verdict != "allow" || ev.Tag != "test:x" || ev.Out != "lo" || ev.DPort != 9999 || ev.SPort != 54529 || ev.Proto != "udp" || ev.TS != 5 {

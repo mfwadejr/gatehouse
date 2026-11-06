@@ -8,11 +8,11 @@ import (
 	"net/netip"
 	"strings"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/devices"
-	"gatehouse/internal/fw"
-	"gatehouse/internal/netd"
-	"gatehouse/internal/wanmon"
+	"nopewarden/internal/api"
+	"nopewarden/internal/devices"
+	"nopewarden/internal/fw"
+	"nopewarden/internal/netd"
+	"nopewarden/internal/wanmon"
 )
 
 // Connection groups. The Default group is every connection in the order and shares kept on the

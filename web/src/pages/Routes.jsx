@@ -4,7 +4,7 @@ import { del, holdAnd, post, put, useData } from '../api.js';
 import { SAVED_LATER, SaveChoice } from '../changes.jsx';
 import { OnToggle, PolicyControls, ServiceField, usePickers, WhenField, WhereField, WhoField, whenText } from '../policykit.jsx';
 import { go } from '../App.jsx';
-import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, Select, ToggleRow, useAction, useUndoDelete } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, Select, ToggleRow, useAction, useUndoDelete, Limited } from '../ui.jsx';
 
 const STATE = {
   working: { tone: 'good', label: 'Working' },
@@ -14,6 +14,10 @@ const STATE = {
   'one-connection': { tone: 'warn', label: 'Needs two connections' },
   paused: { tone: 'warn', label: 'Paused' },
 };
+
+// routeBody is what the server stores for a route: its own fields only. The routes list also carries
+// words made for the screen (state, plain, warnings), which must not be sent back.
+const routeBody = (r) => ({ id: r.id, name: r.name, enabled: r.enabled, target_kind: r.target_kind, target: r.target, mode: r.mode, kill: r.kill, who: r.who, where: r.where, service: r.service, sched: r.sched, paused_until: r.paused_until });
 
 function RouteForm({ initial, targets, onClose, onSaved }) {
   const { pickers, reload: reloadPickers } = usePickers();
@@ -35,7 +39,7 @@ function RouteForm({ initial, targets, onClose, onSaved }) {
   const chooseKind = (k) => setF((x) => ({ ...x, target_kind: k, target: k === x.target_kind ? x.target : firstOf(k), kill: k === 'tunnel' ? x.kill : false }));
   const tgt = targets.find((t) => t.kind === f.target_kind && t.target === f.target);
   const save = async (later) => {
-    const r = await run(() => (later ? holdAnd(() => put('/api/routes', f)) : put('/api/routes', f)), later ? SAVED_LATER : 'Saved.');
+    const r = await run(() => (later ? holdAnd(() => put('/api/routes', routeBody(f))) : put('/api/routes', routeBody(f))), later ? SAVED_LATER : 'Saved.');
     if (r) { onSaved(); onClose(); }
   };
   return (
@@ -89,7 +93,7 @@ function RouteForm({ initial, targets, onClose, onSaved }) {
         <WhoField value={f.who} onChange={set('who')} pickers={pickers} reload={reloadPickers} hint="Any mix of networks, devices, device groups and addresses. You can save now and choose later." />
         <WhereField value={f.where} onChange={set('where')} pickers={pickers} reload={reloadPickers} />
         <ServiceField value={f.service} onChange={set('service')} pickers={pickers} reload={reloadPickers} />
-        <p className="small muted">Websites are found from the lookups your devices make through Gatehouse, so a device that uses its own DNS, or already knew the address, may go the normal way at first. Routes carry IPv4 traffic.</p>
+        <p className="small muted">Websites are found from the lookups your devices make through NopeWarden, so a device that uses its own DNS, or already knew the address, may go the normal way at first. Routes carry IPv4 traffic.</p>
         <WhenField value={f.sched} onChange={set('sched')} hint="Always, or only during certain hours. Outside them the traffic takes the normal way." />
         <OnToggle checked={f.enabled} onChange={set('enabled')} what="the route" />
       </div>
@@ -114,7 +118,7 @@ export default function Routes() {
     [ids[i], ids[j]] = [ids[j], ids[i]];
     run(() => post('/api/routes/order', { order: ids })).then(again);
   };
-  const body = (r) => ({ id: r.id, name: r.name, enabled: r.enabled, target_kind: r.target_kind, target: r.target, mode: r.mode, kill: r.kill, who: r.who, where: r.where, service: r.service, sched: r.sched, paused_until: r.paused_until });
+  const body = routeBody;
   const pauseFor = (r, m) => run(() => post(`/api/routes/${r.id}/pause`, { minutes: m }), m === 0 ? 'Resumed.' : 'Paused.').then(again);
   return (
     <Page title="Routes" sub="Send chosen devices or networks through a VPN or one internet connection, for everything or only for some destinations."
@@ -124,7 +128,7 @@ export default function Routes() {
       )}
       <Card title="Your routes" desc="The first route that matches is used, so put the more specific ones at the top.">
         <div className="list">
-          {routes.map((r, i) => {
+          <Limited items={routes} noun="routes" render={(r, i) => {
             const st = STATE[r.state] || STATE.working;
             return (
               <div className={`item ${r.enabled ? '' : 'off'}`} key={r.id}>
@@ -133,6 +137,13 @@ export default function Routes() {
                   <div className="meta">{r.plain}</div>
                   {whenText(r.paused_until) && <div className="meta">{whenText(r.paused_until)}</div>}
                   {(r.warnings || []).map((w, k) => <div className="meta warnline" key={k}>⚠ {w}</div>)}
+                  {(r.where || '').includes('dom:') && (
+                    <details className="meta">
+                      <summary>{r.learned_total ? `${r.learned_total} address${r.learned_total === 1 ? '' : 'es'} learned for these websites` : 'No addresses learned yet'}</summary>
+                      {r.learned_total ? <div className="mono small" style={{ overflowWrap: 'anywhere' }}>{r.learned.join(', ')}{r.learned_total > r.learned.length ? ` and ${r.learned_total - r.learned.length} more` : ''}</div>
+                        : <div className="small">An address is learned when a device looks the website up. Until then there is nothing to send through this route. Addresses are forgotten when the website says they have expired.</div>}
+                    </details>
+                  )}
                 </div>
                 <div className="actions">
                   <Button small aria-label="Move up" disabled={i === 0} onClick={() => move(i, -1)}>↑</Button>
@@ -145,7 +156,7 @@ export default function Routes() {
                 </div>
               </div>
             );
-          })}
+          }} />
           {data && !routes.length && <Empty>No routes yet. Add one to send a device, a network or a website through a VPN or a chosen connection.</Empty>}
         </div>
       </Card>

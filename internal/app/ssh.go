@@ -9,16 +9,16 @@ import (
 	"strings"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/netd"
-	"gatehouse/internal/update"
+	"nopewarden/internal/api"
+	"nopewarden/internal/netd"
+	"nopewarden/internal/update"
 )
 
 // Remote login (SSH) with the console's administrator names and passwords. Off until switched on.
-// The password is checked by Gatehouse itself each time (see `gatehouse ssh-auth`), so nothing is
+// The password is checked by NopeWarden itself each time (see `nopewarden ssh-auth`), so nothing is
 // copied and a changed password applies at once.
 
-const gatehouseBinary = "/usr/local/bin/gatehouse"
+const nopewardenBinary = "/usr/local/bin/nopewarden"
 
 func (a *App) sshOn() bool { return a.Config.Setting("ssh.enabled", "0") == "1" }
 
@@ -43,7 +43,7 @@ func (a *App) sshSync() error {
 	if a.Net == nil {
 		return nil
 	}
-	return a.Net.SSHApply(netd.SSHPlan{Enabled: a.sshOn(), Users: a.adminNames(), Binary: gatehouseBinary})
+	return a.Net.SSHApply(netd.SSHPlan{Enabled: a.sshOn(), Users: a.adminNames(), Binary: nopewardenBinary})
 }
 
 // sshNetworks lists the networks remote login is reachable from, with the router's address there.
@@ -124,7 +124,7 @@ func (a *App) registerSSHRoutes() {
 		a.publishFW()
 		ok(w)
 	})
-	// Used only by `gatehouse ssh-auth`, which sshd runs to check a password. It answers only the
+	// Used only by `nopewarden ssh-auth`, which sshd runs to check a password. It answers only the
 	// machine itself, and only while remote login is on.
 	s.Public("POST /api/auth/ssh-verify", func(w http.ResponseWriter, r *http.Request) {
 		host, _, _ := net.SplitHostPort(r.RemoteAddr)

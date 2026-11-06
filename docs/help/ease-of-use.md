@@ -1,6 +1,6 @@
 # How easy is it?
 
-Gatehouse aims for no more than three steps for anything you do often. This page lists the everyday jobs, how many steps each takes today, and where the answer is still more than three. A step is one click, or one thing typed or chosen. Opening the page from the side menu counts as one. These counts come from walking through the screens, not from watching people use them.
+NopeWarden aims for no more than three steps for anything you do often. This page lists the everyday jobs, how many steps each takes today, and where the answer is still more than three. A step is one click, or one thing typed or chosen. Opening the page from the side menu counts as one. These counts come from walking through the screens, not from watching people use them.
 
 ## What it is for
 It shows you what to expect before you start, and it is the list the next round of improvements is taken from.

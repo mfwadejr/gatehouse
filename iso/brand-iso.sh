@@ -1,5 +1,5 @@
 #!/bin/sh
-# Puts the Gatehouse boot menus on a finished image and checks the result.
+# Puts the NopeWarden boot menus on a finished image and checks the result.
 #
 #   brand-iso.sh IMAGE.iso ARTDIR
 #

@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { del, post, put, saveFile, sendFile, useData } from '../api.js';
-import { Button, Card, Empty, Field, Input, Modal, Note, Pill, Select, useAction, fmt, confirmBox, useStepUp, stepReady, StepUp } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, Pill, Select, useAction, fmt, useStepUp, stepReady, StepUp, Limited , useDelayedDelete } from '../ui.jsx';
 
 // Backups of the settings: made on a schedule, checked when they are made, and checkable again by
 // trying a restore without changing anything. Nothing here touches the network until a restore is
@@ -74,7 +74,7 @@ function RestoreModal({ b, me, onClose, onDone }) {
   if (res) {
     return (
       <Modal title="Settings restored" onClose={() => { onDone(); onClose(); }} footer={<Button kind="primary" onClick={() => { onDone(); onClose(); }}>Close</Button>}>
-        <p>The settings from this backup are now saved. They are not live yet: open the Review page, check them, and commit them. If something goes wrong, Gatehouse puts the previous settings back by itself.</p>
+        <p>The settings from this backup are now saved. They are not live yet: open the Review page, check them, and commit them. If something goes wrong, NopeWarden puts the previous settings back by itself.</p>
         <p className="small muted">A backup of what was here before is in the list ({res.safety}). Accounts were taken from {res.accounts_from}.{res.key_changed ? ' This backup came from a different machine, so its sign-in accounts replaced the ones here. Sign in with the accounts from the backup.' : ''}</p>
       </Modal>
     );
@@ -120,6 +120,7 @@ function ProtectedDownload({ b, onClose }) {
 }
 
 export default function Backups({ me }) {
+  const delayedDelete = useDelayedDelete();
   const { data, reload } = useData('/api/backups', { every: 30000 });
   const [run, busy] = useAction();
   const [check, setCheck] = useState(null);
@@ -149,7 +150,7 @@ export default function Backups({ me }) {
         {lastGood && stale && <Note tone="" title="Try a restore check">No backup has been checked by hand in the last 90 days. Open Check on a backup, look at what is inside, and confirm it. That is how you know it will work on the day you need it.</Note>}
         {!list.length ? <Empty>No backups yet.</Empty> : (
           <div className="list">
-            {list.map((b) => (
+            {<Limited items={list} noun="backups" render={(b) => (
               <div className="item" key={b.name} style={{ alignItems: 'flex-start' }}>
                 <div>
                   <div className="name">{fmt.dt(b.created)} {statusPill(b)}{b.protected && <Pill tone="">Password</Pill>}</div>
@@ -160,10 +161,10 @@ export default function Backups({ me }) {
                   <Button small kind="danger" onClick={() => setRestore(b)}>Restore…</Button>
                   <Button small onClick={() => (b.protected ? run(() => saveFile('POST', `/api/backups/${b.name}/plain`, {}, b.name)) : setPlain(b))}>Download</Button>
                   {!b.protected && <Button small onClick={() => setPdl(b)}>Download with password</Button>}
-                  <Button small icon="trash" onClick={async () => { if (await confirmBox('Delete this backup?')) { if (await run(() => del(`/api/backups/${b.name}`), 'Deleted.')) reload(); } }}>Delete</Button>
+                  <Button small icon="trash" onClick={() => delayedDelete('The backup', () => del(`/api/backups/${b.name}`), reload)}>Delete</Button>
                 </div>
               </div>
-            ))}
+            )} />}
           </div>
         )}
         <div className="inline" style={{ alignItems: 'flex-end' }}>

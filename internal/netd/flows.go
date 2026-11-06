@@ -9,7 +9,7 @@ import (
 
 const (
 	flowAcctProc   = "proc/sys/net/netfilter/nf_conntrack_acct"
-	flowAcctSysctl = "etc/sysctl.d/60-gatehouse-flows.conf"
+	flowAcctSysctl = "etc/sysctl.d/60-nopewarden-flows.conf"
 	conntrackProc  = "proc/net/nf_conntrack"
 	maxConntrack   = 32 << 20
 )
@@ -26,7 +26,7 @@ func (s *Service) FlowAcct(on bool) error {
 		if err := os.MkdirAll(filepath.Dir(conf), 0o755); err != nil {
 			return err
 		}
-		if err := writeFileAtomic(conf, []byte("# Written by Gatehouse (flow export)\nnet.netfilter.nf_conntrack_acct = 1\n"), 0o644); err != nil {
+		if err := writeFileAtomic(conf, []byte("# Written by NopeWarden (flow export)\nnet.netfilter.nf_conntrack_acct = 1\n"), 0o644); err != nil {
 			return err
 		}
 	} else {

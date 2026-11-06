@@ -49,7 +49,7 @@ func NewIdentity(host string) (Identity, error) {
 		return Identity{}, err
 	}
 	sn, _ := rand.Int(rand.Reader, big.NewInt(1<<62))
-	t := &x509.Certificate{SerialNumber: sn, Subject: pkix.Name{CommonName: "gatehouse-ha-" + host},
+	t := &x509.Certificate{SerialNumber: sn, Subject: pkix.Name{CommonName: "nopewarden-ha-" + host},
 		NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().AddDate(10, 0, 0),
 		KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth}}
 	der, err := x509.CreateCertificate(rand.Reader, t, t, &k.PublicKey, k)
@@ -68,7 +68,7 @@ func (id Identity) pair() (tls.Certificate, error) {
 // Proof is what a unit holding the pairing code can say about its own fingerprint.
 func Proof(secret, fp string) string {
 	m := hmac.New(sha256.New, []byte(secret))
-	m.Write([]byte("gatehouse-ha-join:" + fp))
+	m.Write([]byte("nopewarden-ha-join:" + fp))
 	return hex.EncodeToString(m.Sum(nil))
 }
 

@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/netd"
+	"nopewarden/internal/api"
+	"nopewarden/internal/netd"
 )
 
 // Bufferbloat control (smart queues). For each internet connection the person turns it on for, the

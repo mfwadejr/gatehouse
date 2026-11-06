@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/flowexp"
+	"nopewarden/internal/api"
+	"nopewarden/internal/flowexp"
 )
 
 // Flow export: tells a collector on your network (a traffic-analysis tool) about every connection

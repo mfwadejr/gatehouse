@@ -10,9 +10,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"gatehouse/internal/dhcp"
-	dnssrv "gatehouse/internal/dns"
-	"gatehouse/internal/store"
+	"nopewarden/internal/dhcp"
+	dnssrv "nopewarden/internal/dns"
+	"nopewarden/internal/store"
 )
 
 type entry struct {

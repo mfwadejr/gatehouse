@@ -134,7 +134,7 @@ func TestInstallSequence(t *testing.T) {
 		t.Fatalf("%+v\n%s", s, s.Log)
 	}
 	all := strings.Join(f.snap(), "\n")
-	order := []string{"wipefs -a /dev/nvme0n1", "sgdisk --zap-all", "sgdisk -n1:0:+1M", "mkfs.vfat", "mkfs.ext4 -F -L gatehouse-root /dev/nvme0n1p3", "unsquashfs -f -d", "grub-install --target=x86_64-efi", "update-grub", "chown -R gatehouse:gatehouse /var/lib/gatehouse"}
+	order := []string{"wipefs -a /dev/nvme0n1", "sgdisk --zap-all", "sgdisk -n1:0:+1M", "mkfs.vfat", "mkfs.ext4 -F -L nopewarden-root /dev/nvme0n1p3", "unsquashfs -f -d", "grub-install --target=x86_64-efi", "update-grub", "chown -R nopewarden:nopewarden /var/lib/nopewarden"}
 	pos := -1
 	for _, o := range order {
 		i := strings.Index(all, o)
@@ -145,7 +145,7 @@ func TestInstallSequence(t *testing.T) {
 	}
 	// The installer no longer creates an account or a network: that happens in the browser.
 	for _, c := range f.snap() {
-		if strings.Contains(c, "gatehouse user add") || strings.Contains(c, "gatehouse seed") {
+		if strings.Contains(c, "nopewarden user add") || strings.Contains(c, "nopewarden seed") {
 			t.Fatalf("installer should not set up accounts or networks: %s", c)
 		}
 	}
@@ -179,7 +179,7 @@ func TestFailureStopsAndCleansUp(t *testing.T) {
 }
 
 func TestGrubDefaultsAreQuietAndBranded(t *testing.T) {
-	for _, want := range []string{`GRUB_DISTRIBUTOR="Gatehouse"`, "GRUB_TIMEOUT_STYLE=hidden", "splash", "GRUB_DISABLE_OS_PROBER=true"} {
+	for _, want := range []string{`GRUB_DISTRIBUTOR="NopeWarden"`, "GRUB_TIMEOUT_STYLE=hidden", "splash", "GRUB_DISABLE_OS_PROBER=true"} {
 		if !strings.Contains(grubDefaults, want) {
 			t.Errorf("grub defaults lack %q", want)
 		}

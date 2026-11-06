@@ -1,5 +1,5 @@
 // Package appid names the application behind a website name, such as "YouTube" for
-// googlevideo.com. It works from names a device asked for through Gatehouse's DNS, so it needs
+// googlevideo.com. It works from names a device asked for through NopeWarden's DNS, so it needs
 // no packet inspection. It only names what it is sure of; everything else stays unnamed.
 package appid
 

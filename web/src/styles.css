@@ -82,6 +82,8 @@ code, .mono { font-family: var(--font-family-mono); font-size: var(--font-size-s
 .btn.danger { color: var(--color-status-serious); border-color: var(--color-status-serious-border); }
 .btn.small { height: var(--size-control-sm); padding: 0 var(--space-2-5); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+/* The Pause drop-down sits in a row of small buttons, so it is sized and drawn like one. */
+select.in.pausesel { height: var(--size-control-sm); padding: 0 var(--space-2-5); width: auto; min-width: 7rem; background: transparent; border-color: var(--color-border-default); color: var(--color-text-secondary); }
 .link { background: none; border: 0; color: var(--color-text-link); padding: 0; cursor: pointer; font: inherit; }
 .link.small { font-size: var(--font-size-sm); }
 
@@ -569,3 +571,5 @@ mark { background: color-mix(in srgb, var(--color-status-warning) 35%, transpare
   .navgroup { display: block; }
   .main { padding: var(--space-4); }
 }
+.trafpanel { display: grid; grid-template-columns: minmax(14rem, 18rem) 1fr; gap: var(--space-5); align-items: start; }
+@media (max-width: 760px) { .trafpanel { grid-template-columns: 1fr; } }

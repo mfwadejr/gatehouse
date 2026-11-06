@@ -36,7 +36,7 @@ type Match struct {
 // has fewer wired ports than the primary uses, and warns, with the plain consequence, about a
 // backup port that is slower than the one it replaces or has no cable plugged in to measure.
 func MapPorts(roles []PortRole, backup []Port, keep map[string]string) ([]Match, error) {
-	wired := backup // ports lists only wired ports; Gatehouse has no wireless support
+	wired := backup // ports lists only wired ports; NopeWarden has no wireless support
 	if len(roles) == 0 {
 		return nil, errors.New("the primary has no ports in use to match")
 	}

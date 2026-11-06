@@ -26,15 +26,15 @@ func OVPNReason(lines []string) string {
 			strings.Contains(l, "certificate does not have extended key usage"), strings.Contains(l, "cert_verify"):
 			return "The server's certificate was rejected"
 		case strings.Contains(l, "cannot resolve host"), strings.Contains(l, "resolve: cannot"), strings.Contains(l, "name or service not known"):
-			return "Gatehouse could not look up the server's name"
+			return "NopeWarden could not look up the server's name"
 		case strings.Contains(l, "no shared cipher"), strings.Contains(l, "cipher negotiation failed"), strings.Contains(l, "cipher") && strings.Contains(l, "not supported"):
 			return "OpenVPN and the server could not agree on encryption"
 		case strings.Contains(l, "tls-crypt unwrap"), strings.Contains(l, "hmac authentication failed"), strings.Contains(l, "tls-auth") && strings.Contains(l, "fail"):
 			return "The server did not accept the key in this profile"
 		case strings.Contains(l, "network is unreachable"), strings.Contains(l, "no route to host"):
-			return "Gatehouse could not reach the server (no way out to the internet)"
+			return "NopeWarden could not reach the server (no way out to the internet)"
 		case strings.Contains(l, "tls key negotiation failed"), strings.Contains(l, "tls handshake failed"):
-			return "The server did not answer. Something between Gatehouse and the provider may be blocking it, or the profile's keys do not match"
+			return "The server did not answer. Something between NopeWarden and the provider may be blocking it, or the profile's keys do not match"
 		}
 	}
 	return ""

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"gatehouse/internal/api"
+	"nopewarden/internal/api"
 )
 
 // Port names. A person can give each network port a friendly name ("T-Mobile gateway", "Spare 1").

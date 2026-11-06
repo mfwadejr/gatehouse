@@ -1,6 +1,6 @@
 # UPnP
 
-Games, consoles and media apps can ask the gateway to open a port for them. Gatehouse supports this
+Games, consoles and media apps can ask the gateway to open a port for them. NopeWarden supports this
 but keeps it off until you switch it on twice: for a **network** (Firewall → Networks → "Let devices
 open ports automatically") and for an **internet connection** (Internet → the connection → "Let
 devices open ports on this connection").
@@ -18,7 +18,7 @@ What it will and will not do:
 
 How it works: the daemon answers the standard discovery (SSDP) and control (SOAP) requests on each
 allowed network, checks the policy, and asks the privileged helper to load the mappings into a separate
-nftables table (`ip gatehouse_upnp`). The main firewall lets connections that were redirected that way
+nftables table (`ip nopewarden_upnp`). The main firewall lets connections that were redirected that way
 through only while UPnP is on.
 
 Not supported: NAT-PMP / PCP, IPv6 pinholes (IGD2), and event subscriptions.

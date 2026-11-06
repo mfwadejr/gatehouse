@@ -10,7 +10,7 @@ const bytes = (n) => {
   return `${v >= 100 || i === 0 ? Math.round(v) : v.toFixed(1)} ${u[i]}`;
 };
 
-// Storage: what Gatehouse keeps on its own disk, how much room each kind takes, and when it goes.
+// Storage: what NopeWarden keeps on its own disk, how much room each kind takes, and when it goes.
 // Every kind that grows has a rule, so nothing is kept forever by accident.
 export default function Storage() {
   const { data, reload } = useData('/api/logs/storage', { every: 30000 });
@@ -23,7 +23,7 @@ export default function Storage() {
   const free = data.disk_free, size = data.disk_total;
   const low = size > 0 && free / size < 0.1;
   return (
-    <Card title="Storage" desc="What Gatehouse keeps on its own disk, how much room each kind takes, and when it is removed. Sizes are estimates.">
+    <Card title="Storage" desc="What NopeWarden keeps on its own disk, how much room each kind takes, and when it is removed. Sizes are estimates.">
       <div className="stack">
         {low && <Note tone="warn" title="This machine is running low on disk space">{bytes(free)} free of {bytes(size)}. Lower the number of days or the size limit under Logs, What gets recorded, or the settings below.</Note>}
         <p className="small muted">Logs and history use about {bytes(data.logs_bytes)} (limit {fmt.n(data.max_mb)} MB; the limit trims the oldest connections and lookups first, then the smaller histories). Settings and rules use {bytes(data.config_bytes)}.{size > 0 ? ` The disk has ${bytes(free)} free of ${bytes(size)}.` : ''}</p>

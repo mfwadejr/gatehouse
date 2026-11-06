@@ -53,10 +53,10 @@ func TestForcedDNSScopeRoutes(t *testing.T) {
 		t.Fatal("bad exception server accepted")
 	}
 	// The same device again changes it, not duplicates it.
-	c.call("PUT", "/api/fw/dnsforce/exception", map[string]any{"who": "dev:aa:bb:cc:00:00:09", "mode": "gatehouse"})
+	c.call("PUT", "/api/fw/dnsforce/exception", map[string]any{"who": "dev:aa:bb:cc:00:00:09", "mode": "nopewarden"})
 	_, m, _ = c.call("GET", "/api/fw/dnsforce", nil)
 	ex := m["exceptions"].([]any)
-	if len(ex) != 1 || ex[0].(map[string]any)["mode"] != "gatehouse" || ex[0].(map[string]any)["who"] != "dev:aa:bb:cc:00:00:09" {
+	if len(ex) != 1 || ex[0].(map[string]any)["mode"] != "nopewarden" || ex[0].(map[string]any)["who"] != "dev:aa:bb:cc:00:00:09" {
 		t.Fatalf("exceptions: %v", ex)
 	}
 	if rc, _, raw := c.call("DELETE", "/api/fw/dnsforce/exception/"+istr(int(em["id"].(float64))), nil); rc != 200 {

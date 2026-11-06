@@ -49,7 +49,7 @@ func (s Source) get(ctx context.Context, raw string, max int64) ([]byte, error) 
 		return nil, err
 	}
 	req, _ := http.NewRequestWithContext(ctx, "GET", raw, nil)
-	req.Header.Set("User-Agent", "gatehouse-updater")
+	req.Header.Set("User-Agent", "nopewarden-updater")
 	req.Header.Set("Accept", "application/vnd.github+json, application/octet-stream")
 	resp, err := s.client().Do(req)
 	if err != nil {
@@ -97,9 +97,9 @@ func (s Source) Latest(ctx context.Context) (*Release, error) {
 	}
 	for _, a := range in.Assets {
 		switch {
-		case strings.HasPrefix(a.Name, "gatehouse-update-") && strings.HasSuffix(a.Name, ".tar.gz"):
+		case strings.HasPrefix(a.Name, "nopewarden-update-") && strings.HasSuffix(a.Name, ".tar.gz"):
 			r.URL, r.Size = a.URL, a.Size
-		case strings.HasPrefix(a.Name, "gatehouse-update-") && strings.HasSuffix(a.Name, ".tar.gz.sig"):
+		case strings.HasPrefix(a.Name, "nopewarden-update-") && strings.HasSuffix(a.Name, ".tar.gz.sig"):
 			r.SigURL = a.URL
 		}
 	}

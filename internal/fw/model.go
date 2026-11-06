@@ -10,7 +10,7 @@ import (
 	"sort"
 	"time"
 
-	"gatehouse/internal/bridgemode"
+	"nopewarden/internal/bridgemode"
 )
 
 // Zone kinds. Wan is the internet side; Vpn zones behave like Private unless changed.
@@ -217,7 +217,7 @@ func (m *Model) WanIfaces() []string {
 var DefaultConsolePorts = []int{443}
 
 // DNSException is one device or group with its own forced-DNS treatment. Who is dev:<mac> or
-// grp:<name>. Mode is "off" (leave alone), "gatehouse" (force to this router) or "server" (force to Target).
+// grp:<name>. Mode is "off" (leave alone), "nopewarden" (force to this router) or "server" (force to Target).
 type DNSException struct {
 	ID     int64  `json:"id"`
 	Who    string `json:"who"`

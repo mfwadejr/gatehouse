@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	"gatehouse/internal/api"
+	"nopewarden/internal/api"
 )
 
 // Add more ports to a plain network (H42). A network on one port is changed, in place, into a

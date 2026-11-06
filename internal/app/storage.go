@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"gatehouse/internal/api"
+	"nopewarden/internal/api"
 )
 
 // Storage: what is kept, how much room it takes, and the rule that decides when it goes. Every table
@@ -196,7 +196,7 @@ type adminRow struct {
 	Sev    string `json:"severity"`
 }
 
-// adminActivity lists what people did to Gatehouse: sign-ins and failed attempts, and every change
+// adminActivity lists what people did to NopeWarden: sign-ins and failed attempts, and every change
 // an administrator made that was recorded. The search words must all appear somewhere in the row.
 func (a *App) adminActivity(q string, hours, limit int, before int64) ([]adminRow, int) {
 	names := []any{}

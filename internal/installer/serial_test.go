@@ -61,7 +61,7 @@ func TestInstallOverSerialLeavesTheNewSystemTalkingOnIt(t *testing.T) {
 	if err := in.brand(in.Target, "ttyS0,115200"); err != nil {
 		t.Fatal(err)
 	}
-	b, err := os.ReadFile(filepath.Join(in.Target, "etc/default/grub.d/gatehouse.cfg"))
+	b, err := os.ReadFile(filepath.Join(in.Target, "etc/default/grub.d/nopewarden.cfg"))
 	if err != nil || !strings.Contains(string(b), "console=ttyS0,115200n8") {
 		t.Fatalf("grub config: %v\n%s", err, b)
 	}

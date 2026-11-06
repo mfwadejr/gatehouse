@@ -1,10 +1,10 @@
 package app
 
 import (
-	"gatehouse/internal/fw"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"nopewarden/internal/fw"
 	"strings"
 	"testing"
 )

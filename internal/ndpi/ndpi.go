@@ -1,5 +1,5 @@
 // Package ndpi receives application names from gh-ndpi, the separate program that inspects the
-// first packets of each flow with the nDPI library. Gatehouse itself never runs that library: the
+// first packets of each flow with the nDPI library. NopeWarden itself never runs that library: the
 // program has almost no rights and sends back one short line per flow, which is checked here before
 // anything uses it.
 package ndpi

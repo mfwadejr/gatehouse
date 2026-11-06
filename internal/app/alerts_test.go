@@ -36,7 +36,7 @@ func TestEmailMessageCannotInjectHeaders(t *testing.T) {
 }
 
 func TestRepairEvents(t *testing.T) {
-	if !repairEvent("system", "Gatehouse was updated") || repairEvent("system", "Console port changed") {
+	if !repairEvent("system", "NopeWarden was updated") || repairEvent("system", "Console port changed") {
 		t.Fatal("wrong classification")
 	}
 }

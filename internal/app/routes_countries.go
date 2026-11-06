@@ -8,8 +8,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/fw"
+	"nopewarden/internal/api"
+	"nopewarden/internal/fw"
 )
 
 // homeCountry guesses which country this network is in, from the public address of the internet

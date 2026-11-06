@@ -4,16 +4,16 @@ import (
 	"errors"
 	"net/http"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/update"
+	"nopewarden/internal/api"
+	"nopewarden/internal/update"
 )
 
-// Power: restart or shut down the machine, or restart only Gatehouse's own programs.
+// Power: restart or shut down the machine, or restart only NopeWarden's own programs.
 
 var powerActions = map[string]struct{ title, detail string }{
-	"reboot":            {"The machine was restarted from the console", "The network is down for about a minute."},
-	"poweroff":          {"The machine was shut down from the console", "It stays off until someone switches it on."},
-	"restart-gatehouse": {"Gatehouse was restarted from the console", "The console, DNS and DHCP are down for a few seconds."},
+	"reboot":             {"The machine was restarted from the console", "The network is down for about a minute."},
+	"poweroff":           {"The machine was shut down from the console", "It stays off until someone switches it on."},
+	"restart-nopewarden": {"NopeWarden was restarted from the console", "The console, DNS and DHCP are down for a few seconds."},
 }
 
 func (a *App) registerPowerRoutes() {
@@ -27,7 +27,7 @@ func (a *App) registerPowerRoutes() {
 		}
 		meta, known := powerActions[in.Action]
 		if !known {
-			fail(w, errors.New("choose restart, shut down or restart Gatehouse"))
+			fail(w, errors.New("choose restart, shut down or restart NopeWarden"))
 			return
 		}
 		if a.Net == nil {

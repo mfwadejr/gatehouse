@@ -9,9 +9,9 @@ import (
 
 	"github.com/miekg/dns"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/netd"
-	"gatehouse/internal/wanmon"
+	"nopewarden/internal/api"
+	"nopewarden/internal/netd"
+	"nopewarden/internal/wanmon"
 )
 
 // "Test my internet": the cable, the modem or gateway, the provider connection and DNS, in turn,
@@ -96,7 +96,7 @@ func buildTest(in testInput) []testStep {
 	if len(noCable) == len(in.Links) {
 		failed = true
 		add(testStep{ID: "cable", Title: "Cable to your modem", State: "bad", Detail: "No cable signal on " + strings.Join(noCable, ", ") + ".",
-			Next: "Check the cable is firmly in the port on Gatehouse and in the modem, that the modem has power, and try another cable."})
+			Next: "Check the cable is firmly in the port on NopeWarden and in the modem, that the modem has power, and try another cable."})
 	} else if len(noCable) > 0 {
 		add(testStep{ID: "cable", Title: "Cable to your modem", State: "warn", Detail: "No cable signal on " + strings.Join(noCable, ", ") + ". The other connection has one.",
 			Next: "If you expect this one to work, check its cable and the modem's power."})
@@ -130,7 +130,7 @@ func buildTest(in testInput) []testStep {
 			add(testStep{ID: "gateway", Title: "Modem or gateway", State: "bad", Detail: "Nothing answers on " + strings.Join(bad, ", ") + " although the cable is connected.",
 				Next: "Restart the modem: unplug its power for 30 seconds, plug it back in and wait two minutes. If your provider gives a login (PPPoE), check it on the Internet page."})
 		case len(good) == 0:
-			add(testStep{ID: "gateway", Title: "Modem or gateway", State: "warn", Detail: "Gatehouse has not finished checking yet.", Next: "Run the test again in a minute."})
+			add(testStep{ID: "gateway", Title: "Modem or gateway", State: "warn", Detail: "NopeWarden has not finished checking yet.", Next: "Run the test again in a minute."})
 		default:
 			d := "The next device answers: " + strings.Join(good, "; ") + "."
 			st := "ok"
@@ -192,13 +192,13 @@ func buildTest(in testInput) []testStep {
 	} else {
 		switch {
 		case in.DNSOK:
-			d := fmt.Sprintf("Gatehouse looked up a website name in %d ms.", in.DNSMs)
+			d := fmt.Sprintf("NopeWarden looked up a website name in %d ms.", in.DNSMs)
 			if in.Via {
 				d = fmt.Sprintf("A website name was looked up through this connection in %d ms.", in.DNSMs)
 			}
 			add(testStep{ID: "dns", Title: "Names (DNS)", State: "ok", Detail: d})
 		case in.UpstreamOK:
-			add(testStep{ID: "dns", Title: "Names (DNS)", State: "bad", Detail: "The upstream DNS server " + in.UpstreamBy + " answers, but Gatehouse's own lookup failed: " + in.DNSErr + ".",
+			add(testStep{ID: "dns", Title: "Names (DNS)", State: "bad", Detail: "The upstream DNS server " + in.UpstreamBy + " answers, but NopeWarden's own lookup failed: " + in.DNSErr + ".",
 				Next: "Open the DNS page and check that DNS is on and that nothing blocks this name."})
 		default:
 			add(testStep{ID: "dns", Title: "Names (DNS)", State: "bad", Detail: "Website names do not resolve: " + orWord(in.DNSErr, "no answer") + ".",

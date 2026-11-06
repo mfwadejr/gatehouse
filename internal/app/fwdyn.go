@@ -12,7 +12,7 @@ import (
 
 	"github.com/miekg/dns"
 
-	"gatehouse/internal/fw"
+	"nopewarden/internal/fw"
 )
 
 // The live part of the firewall: the addresses behind devices, groups, domains and countries.

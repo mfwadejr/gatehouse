@@ -11,11 +11,11 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/netd"
+	"nopewarden/internal/api"
+	"nopewarden/internal/netd"
 )
 
-// Send logs elsewhere: Gatehouse's own events, and optionally every firewall decision, to a syslog
+// Send logs elsewhere: NopeWarden's own events, and optionally every firewall decision, to a syslog
 // server on your network. Off by default. Messages are queued and dropped when the queue is full,
 // so a dead log server can never slow the router down. Flow export (NetFlow/IPFIX) and SNMP are not
 // part of this.
@@ -63,7 +63,7 @@ func syslogLine(sev, host, msg string, at time.Time) string {
 		host = "-"
 	}
 	msg = strings.NewReplacer("\r", " ", "\n", " ").Replace(msg)
-	return fmt.Sprintf("<%d>1 %s %s gatehouse - - - %s", 16*8+n, at.UTC().Format(time.RFC3339), host, msg)
+	return fmt.Sprintf("<%d>1 %s %s nopewarden - - - %s", 16*8+n, at.UTC().Format(time.RFC3339), host, msg)
 }
 
 // send queues a line; it never blocks.
@@ -148,7 +148,7 @@ func (a *App) syslogFW(evs []netd.FWEvent) {
 func (a *App) hostnameCached() (string, error) {
 	h := a.setting("system.hostname", "")
 	if h == "" {
-		h = "gatehouse"
+		h = "nopewarden"
 	}
 	return h, nil
 }
@@ -185,7 +185,7 @@ func (a *App) registerSyslogRoutes() {
 		a.Config.SetSetting("syslog.config", string(b))
 		a.loadSyslog()
 		if in.On {
-			a.syslogSend("info", "Gatehouse is now sending its logs here")
+			a.syslogSend("info", "NopeWarden is now sending its logs here")
 		}
 		ok(w)
 	})

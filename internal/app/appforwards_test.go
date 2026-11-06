@@ -18,7 +18,7 @@ func TestAppForwardFollowsDeviceAndLimits(t *testing.T) {
 	if rc == 200 || !strings.Contains(string(raw), "not seen that device") {
 		t.Fatalf("%d %s", rc, raw)
 	}
-	// An app Gatehouse does not know is refused.
+	// An app NopeWarden does not know is refused.
 	if rc, _, raw = c.call("PUT", "/api/fw/appforwards", map[string]any{"app": "Nope", "mac": "aa:bb:cc:dd:ee:01", "enabled": true}); rc == 200 || !strings.Contains(string(raw), "does not know an app") {
 		t.Fatalf("%d %s", rc, raw)
 	}

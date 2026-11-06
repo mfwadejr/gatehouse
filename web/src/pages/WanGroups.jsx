@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { del, holdAnd, put, useData, useThroughput } from '../api.js';
 import { SAVED_LATER, SaveChoice } from '../changes.jsx';
 import SourcePicker from '../SourcePicker.jsx';
-import { Button, Card, Empty, Field, Input, Modal, Note, Pill, Segmented, Select, Trend, useAction, confirmBox, noticeBox } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, Pill, Segmented, Select, Trend, useAction, noticeBox , useDelayedDelete } from '../ui.jsx';
 import { linkState } from '../linkstate.js';
 
 // ---------------------------------------------------------------- rates
@@ -192,6 +192,7 @@ function summary(mode, members) {
 function liveTone(s) { if (!s) return ['', 'Not applied yet']; if (!s.up) return ['bad', 'No connection works']; return ['good', `Using ${(s.via || []).join(' and ')}`]; }
 
 export default function WanGroups({ wans, links, onChanged }) {
+  const delayedDelete = useDelayedDelete();
   const { data, reload } = useData('/api/net/groups', { topics: ['net.status'] });
   const [edit, setEdit] = useState(null);
   const [editDef, setEditDef] = useState(false);
@@ -229,7 +230,7 @@ export default function WanGroups({ wans, links, onChanged }) {
               <div className="actions">
                 <Pill tone={tone}>{text}</Pill>
                 <Button small icon="edit" onClick={() => setEdit(g)}>Edit</Button>
-                <Button small kind="danger" icon="trash" onClick={async () => { if (await confirmBox(`Remove the group ${g.name}? Its devices go back to the default connections.`)) run(() => del(`/api/net/groups/${g.id}`)).then(done); }}>Remove</Button>
+                <Button small kind="danger" icon="trash" onClick={() => delayedDelete(`The group ${g.name}`, () => del(`/api/net/groups/${g.id}`), done, 'Its devices go back to the default connections.')}>Remove</Button>
               </div>
             </div>
           );

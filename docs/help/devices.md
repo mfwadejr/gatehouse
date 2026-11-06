@@ -3,7 +3,7 @@
 ## What it is for
 Every device that has joined your network. Rename it, give it an icon, put it in a profile, or pause its internet.
 
-![The devices page, shown with no data yet](img/devices.png)
+![The devices page, shown with example data](img/devices.png)
 
 The picture is an example from a new, empty box; yours will show your own devices and numbers.
 
@@ -24,4 +24,4 @@ The picture is an example from a new, empty box; yours will show your own device
 Pause the games console for two hours at homework time: open it and choose the two-hour pause. It comes back by itself.
 
 ## If something goes wrong
-A device missing from the list has not joined yet, or has not asked Gatehouse for an address. Use **Add a device** to record it. If a name is wrong, rename it; the old name is only a guess from the network.
+A device missing from the list has not joined yet, or has not asked NopeWarden for an address. Use **Add a device** to record it. If a name is wrong, rename it; the old name is only a guess from the network.

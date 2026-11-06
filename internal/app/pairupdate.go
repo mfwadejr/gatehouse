@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/ha"
-	"gatehouse/internal/update"
+	"nopewarden/internal/ha"
+	"nopewarden/internal/update"
 )
 
 // Updating a pair. The active unit is never touched until the spare has been updated and has shown
@@ -157,7 +157,7 @@ func (a *App) pairRealPackage(ctx context.Context) ([]byte, string, string, erro
 	rel := a.upd.latest
 	a.upd.mu.Unlock()
 	if rel == nil || update.Compare(rel.Version, a.currentVersion()) <= 0 {
-		return nil, "", "", errors.New("there is no newer Gatehouse to install; check for updates first")
+		return nil, "", "", errors.New("there is no newer NopeWarden to install; check for updates first")
 	}
 	data, sig, err := a.updateSource().Fetch(ctx, rel)
 	if err != nil {
@@ -326,7 +326,7 @@ func (a *App) pairUpdateRun(user string, st *haLocal) {
 		a.pairFail(user, err.Error())
 		return
 	}
-	file := filepath.Join(inbox, "gatehouse-update-"+ver+".tar.gz")
+	file := filepath.Join(inbox, "nopewarden-update-"+ver+".tar.gz")
 	if err := os.WriteFile(file, data, 0o644); err != nil {
 		a.pairFail(user, err.Error())
 		return
@@ -407,7 +407,7 @@ func (a *App) haOnUpdate(pkg []byte, sig, version string) error {
 	if err := os.MkdirAll(inbox, 0o755); err != nil {
 		return err
 	}
-	file := filepath.Join(inbox, "gatehouse-update-"+version+".tar.gz")
+	file := filepath.Join(inbox, "nopewarden-update-"+version+".tar.gz")
 	if err := os.WriteFile(file, pkg, 0o644); err != nil {
 		return err
 	}

@@ -3,7 +3,7 @@
 ## What it is for
 One screen that tells you whether everything is fine, and what needs you. Open it first when something feels wrong.
 
-![The overview page, shown with no data yet](img/overview.png)
+![The overview page, shown with example data](img/overview.png)
 
 The picture is an example from a new, empty box; yours will show your own devices and numbers.
 
@@ -31,3 +31,8 @@ The **What happened** card shows a device contacting a known-bad address nine ti
 
 ## If something goes wrong
 If a card is empty, it has nothing to show yet, or the machine has no sensor for it. If every card says it cannot refresh, check that you can still reach the machine, then press **Try again now**.
+
+## New in 0.9.4
+- The map has **5 minute** and **15 minute** ranges as well as 1 hour, 24 hours, 7 days and 30 days. Hover a country to see a popout beside it with its numbers.
+- **Your VPNs** card lists tunnels with their state and speed, capped to the first few; open the VPN page for the rest. A tunnel with no traffic shows a grey **Idle** pill instead of a warning.
+- Each VPN and each network has its own traffic graph and totals on its own page (the **Traffic** button on Networks).

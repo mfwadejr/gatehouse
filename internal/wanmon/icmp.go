@@ -29,7 +29,7 @@ func icmpPingTo(ctx context.Context, dev, target string) (time.Duration, error) 
 	}
 	defer pc.Close()
 	id := os.Getpid() & 0xffff
-	msg := icmp.Message{Type: ipv4.ICMPTypeEcho, Code: 0, Body: &icmp.Echo{ID: id, Seq: 1, Data: []byte("gatehouse")}}
+	msg := icmp.Message{Type: ipv4.ICMPTypeEcho, Code: 0, Body: &icmp.Echo{ID: id, Seq: 1, Data: []byte("nopewarden")}}
 	b, err := msg.Marshal(nil)
 	if err != nil {
 		return 0, err

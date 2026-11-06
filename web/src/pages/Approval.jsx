@@ -20,7 +20,7 @@ export default function Approval() {
         {!!nets.length && (
           <>
             <ToggleRow title="Hold new devices until I approve them" checked={data.enabled} disabled={busy}
-              desc="While this is on, a brand-new device gets an address on the holding network, where it can reach nothing if that network is Isolated. If Gatehouse cannot place it, the device is let onto its own network, so nobody is left without a connection."
+              desc="While this is on, a brand-new device gets an address on the holding network, where it can reach nothing if that network is Isolated. If NopeWarden cannot place it, the device is let onto its own network, so nobody is left without a connection."
               onChange={(v) => run(() => put('/api/approval', { enabled: v, holding: data.holding || nets[0].iface }), v ? 'New devices will wait for you.' : 'New devices join as before.').then(reload)} />
             <label className="field"><span className="label">Holding network</span>
               <Select value={data.holding || ''} onChange={(v) => run(() => put('/api/approval', { enabled: data.enabled, holding: v }), 'Saved.').then(reload)}

@@ -9,7 +9,7 @@ import (
 
 func TestSyslogLineFormat(t *testing.T) {
 	l := syslogLine("warning", "gate", "a\nb", time.Date(2026, 10, 30, 10, 0, 0, 0, time.UTC))
-	if l != "<132>1 2026-10-30T10:00:00Z gate gatehouse - - - a b" {
+	if l != "<132>1 2026-10-30T10:00:00Z gate nopewarden - - - a b" {
 		t.Fatal(l)
 	}
 }

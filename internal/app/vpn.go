@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"gatehouse/internal/fw"
-	"gatehouse/internal/netcfg"
-	"gatehouse/internal/netd"
-	"gatehouse/internal/vpn"
+	"nopewarden/internal/fw"
+	"nopewarden/internal/netcfg"
+	"nopewarden/internal/netd"
+	"nopewarden/internal/vpn"
 )
 
 // The VPN side of the daemon. Everything about a tunnel lives in the configuration database;
@@ -226,7 +226,7 @@ func tunnelTables(wgs []wgRow, ovs []ovpnRow) (map[string]int, error) {
 	}
 	sort.Strings(names)
 	if len(names) > netcfg.MaxTunnelTable-299 {
-		return nil, fmt.Errorf("Gatehouse supports up to %d outbound VPN connections", netcfg.MaxTunnelTable-299)
+		return nil, fmt.Errorf("NopeWarden supports up to %d outbound VPN connections", netcfg.MaxTunnelTable-299)
 	}
 	out := map[string]int{}
 	for i, n := range names {

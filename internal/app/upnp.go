@@ -11,10 +11,10 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/fw"
-	"gatehouse/internal/netd"
-	"gatehouse/internal/upnp"
+	"nopewarden/internal/api"
+	"nopewarden/internal/fw"
+	"nopewarden/internal/netd"
+	"nopewarden/internal/upnp"
 )
 
 // UPnP lets a game console or media app on the inside open a port for itself. It is off unless
@@ -51,7 +51,7 @@ func (a *App) upnpInit() {
 			a.Bus.Publish("upnp.maps", map[string]int{"count": len(ms)})
 		}
 		a.upnp.tbl = t
-		a.upnp.srv = upnp.NewServer(t, "Gatehouse", a.upnpConfig)
+		a.upnp.srv = upnp.NewServer(t, "NopeWarden", a.upnpConfig)
 	})
 }
 

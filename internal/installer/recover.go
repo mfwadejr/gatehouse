@@ -190,7 +190,7 @@ func RunRecovery(t *Term, env RecoveryEnv) error {
 			if saved, err := env.ResetToDefault(level); err != nil {
 				t.p("\n  %s%v%s\n", red, err, reset)
 			} else {
-				t.p("\n  %sDone.%s A copy of the old settings is saved at %s.\n  Gatehouse restarts and the machine goes back to its starting state. Wait about a minute, then open the address shown on this screen.\n", green, reset, saved)
+				t.p("\n  %sDone.%s A copy of the old settings is saved at %s.\n  NopeWarden restarts and the machine goes back to its starting state. Wait about a minute, then open the address shown on this screen.\n", green, reset, saved)
 			}
 			pause(t)
 		case "8":

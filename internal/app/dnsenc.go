@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"sort"
 
-	"gatehouse/internal/api"
+	"nopewarden/internal/api"
 )
 
-// Encrypted DNS as one switch for Gatehouse's own lookups (what it asks the internet when a device
+// Encrypted DNS as one switch for NopeWarden's own lookups (what it asks the internet when a device
 // asks it). It is a front for the upstream list that already exists: choosing a mode writes that
 // list, and "Custom" leaves your own list alone. The previous list is kept so the change can be
 // taken back in one click.

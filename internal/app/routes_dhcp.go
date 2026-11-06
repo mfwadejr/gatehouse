@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/dhcp"
+	"nopewarden/internal/api"
+	"nopewarden/internal/dhcp"
 )
 
 func contextTimeout(d time.Duration) (context.Context, context.CancelFunc) {

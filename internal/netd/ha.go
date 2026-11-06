@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"gatehouse/internal/ha"
+	"nopewarden/internal/ha"
 )
 
 // HAPlan is what the helper puts in place for a pair of units: the settings for the program that
@@ -39,7 +39,7 @@ type HAPlan struct {
 	ConfOnly bool `json:"conf_only,omitempty"`
 }
 
-const haHeartNet = "etc/systemd/network/05-gatehouse-heart.network"
+const haHeartNet = "etc/systemd/network/05-nopewarden-heart.network"
 
 // heartApply writes or removes the network file for the cable. The cable port belongs to this file
 // alone; the name sorts first so nothing else claims the port.
@@ -61,7 +61,7 @@ func (s *Service) heartApply(dev, cidr string) error {
 	if err := os.MkdirAll(filepath.Dir(f), 0o755); err != nil {
 		return err
 	}
-	body := "# Written by Gatehouse (cable to the partner unit)\n[Match]\nName=" + dev + "\n\n[Network]\nAddress=" + cidr +
+	body := "# Written by NopeWarden (cable to the partner unit)\n[Match]\nName=" + dev + "\n\n[Network]\nAddress=" + cidr +
 		"\nLinkLocalAddressing=no\nIPv6AcceptRA=no\nLLDP=no\nEmitLLDP=no\n\n[Link]\nRequiredForOnline=no\n"
 	old, _ := os.ReadFile(f)
 	if string(old) == body {
@@ -78,18 +78,18 @@ func (s *Service) heartApply(dev, cidr string) error {
 const (
 	haKeepalived = "etc/keepalived/keepalived.conf"
 	haConntrackd = "etc/conntrackd/conntrackd.conf"
-	haSysctl     = "etc/sysctl.d/90-gatehouse-ha.conf"
-	haWan        = "etc/gatehouse/ha-wan"
-	haWanWarm    = "etc/gatehouse/ha-wan-warm"
-	haWanStatic  = "etc/gatehouse/ha-wan-static"
-	haWanMACs    = "etc/gatehouse/ha-wan-macs"
+	haSysctl     = "etc/sysctl.d/90-nopewarden-ha.conf"
+	haWan        = "etc/nopewarden/ha-wan"
+	haWanWarm    = "etc/nopewarden/ha-wan-warm"
+	haWanStatic  = "etc/nopewarden/ha-wan-static"
+	haWanMACs    = "etc/nopewarden/ha-wan-macs"
 )
 
 var reHADev = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,14}$`)
 
 func haText(what, s string) error {
-	if len(s) == 0 || len(s) > 16<<10 || strings.ContainsRune(s, 0) || !strings.HasPrefix(s, "# Written by Gatehouse") {
-		return fmt.Errorf("the %s settings are not in the form Gatehouse writes", what)
+	if len(s) == 0 || len(s) > 16<<10 || strings.ContainsRune(s, 0) || !strings.HasPrefix(s, "# Written by NopeWarden") {
+		return fmt.Errorf("the %s settings are not in the form NopeWarden writes", what)
 	}
 	return nil
 }

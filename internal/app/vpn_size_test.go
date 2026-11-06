@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"gatehouse/internal/netd"
+	"nopewarden/internal/netd"
 )
 
 func TestProfileTunMTU(t *testing.T) {

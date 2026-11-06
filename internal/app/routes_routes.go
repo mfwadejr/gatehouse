@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/fw"
+	"nopewarden/internal/api"
+	"nopewarden/internal/fw"
 )
 
 // The Routes screen: send chosen devices or networks through a VPN or one internet connection,
@@ -29,6 +29,9 @@ type routeView struct {
 	State       string   `json:"state"` // working, off, nobody, target-off, one-connection
 	Plain       string   `json:"plain"`
 	Warnings    []string `json:"warnings"`
+	// Addresses learned so far for the website names this route covers, and how many in all.
+	Learned      []string `json:"learned,omitempty"`
+	LearnedTotal int      `json:"learned_total,omitempty"`
 }
 
 type legacyUse struct {
@@ -106,6 +109,7 @@ func (a *App) routesView() map[string]any {
 	views := []routeView{}
 	for _, r := range rows {
 		v := routeView{RouteRow: r, Warnings: []string{}}
+		v.Learned, v.LearnedTotal = a.learnedFor(r.Where)
 		t, have := byKey[r.TargetKind+"|"+r.Target]
 		v.TargetLabel = labelOr(t.Label, r.Target)
 		if r.TargetKind == "links" {
@@ -195,7 +199,7 @@ func (a *App) routesView() map[string]any {
 		}
 		for _, d := range r.Dests {
 			if d.Kind == "domain" {
-				v.Warnings = append(v.Warnings, "Websites are found from the lookups your devices make through Gatehouse. A device using its own DNS, or one that already knew the address, may go the normal way at first.")
+				v.Warnings = append(v.Warnings, "Websites are found from the lookups your devices make through NopeWarden. A device using its own DNS, or one that already knew the address, may go the normal way at first.")
 				break
 			}
 		}
@@ -231,10 +235,13 @@ func (a *App) registerRouteRoutes() {
 		api.JSON(w, 200, a.routesView())
 	})
 	s.HandleAdmin("PUT /api/routes", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-		var in fw.RouteRow
-		if !api.Decode(w, r, &in) || !a.needHelper(w) {
+		// A client may send back a route exactly as the list showed it, with the words made for the
+		// screen; those are ignored here, so an edit never fails because of them.
+		var shown routeView
+		if !api.Decode(w, r, &shown) || !a.needHelper(w) {
 			return
 		}
+		in := shown.RouteRow
 		err := a.mutateVPN(c.User.Username, func(tx *sql.Tx) error {
 			if in.TargetKind == "tunnel" {
 				var n int
@@ -366,4 +373,32 @@ func pausePick(minutes int) (int64, error) {
 		return 0, fmt.Errorf("choose a pause of up to 30 days")
 	}
 	return pauseUntil(minutes, time.Now()), nil
+}
+
+// learnedFor lists the addresses NopeWarden has learned for the website names in a route's Where
+// ("dom:example.com,..."): they are learned when a device looks the name up, and forgotten when the
+// answer's time runs out. At most 30 are listed.
+func (a *App) learnedFor(where string) ([]string, int) {
+	a.dyn.mu.Lock()
+	defer a.dyn.mu.Unlock()
+	seen := map[string]bool{}
+	for _, tok := range strings.Split(where, ",") {
+		tok = strings.TrimSpace(tok)
+		if !strings.HasPrefix(tok, "dom:") {
+			continue
+		}
+		for ip := range a.dyn.dom[strings.TrimPrefix(tok, "dom:")] {
+			seen[ip] = true
+		}
+	}
+	out := make([]string, 0, len(seen))
+	for ip := range seen {
+		out = append(out, ip)
+	}
+	sort.Strings(out)
+	total := len(out)
+	if len(out) > 30 {
+		out = out[:30]
+	}
+	return out, total
 }

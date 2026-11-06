@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"gatehouse/internal/ha"
-	"gatehouse/internal/netd"
+	"nopewarden/internal/ha"
+	"nopewarden/internal/netd"
 )
 
 func fastFailback(t *testing.T) {

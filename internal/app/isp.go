@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"gatehouse/internal/api"
+	"nopewarden/internal/api"
 )
 
 // The provider report card and data use. Outages are recorded as they happen; speeds come from the
@@ -68,7 +68,7 @@ type ispReport struct {
 	UpPct      float64     `json:"up_pct"`
 	Links      []ispLink   `json:"links"`
 	SpeedTests int         `json:"speed_tests"`
-	Since      int64       `json:"since"` // when Gatehouse started recording outages
+	Since      int64       `json:"since"` // when NopeWarden started recording outages
 }
 
 // ispMonth parses YYYY-MM (the current month when empty) in the router's time zone.

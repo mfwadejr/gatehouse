@@ -87,17 +87,17 @@ func TestApplyOpenVPN(t *testing.T) {
 	if err := v.Apply(VPNPlan{OpenVPN: []OVPNInstance{srv, cl}}); err != nil {
 		t.Fatal(err)
 	}
-	if !r.has("enable openvpn-server@gatehouse-tun0.service") || !r.has("restart openvpn-server@gatehouse-tun0.service") || !r.has("restart openvpn-client@gatehouse-tun1.service") {
+	if !r.has("enable openvpn-server@nopewarden-tun0.service") || !r.has("restart openvpn-server@nopewarden-tun0.service") || !r.has("restart openvpn-client@nopewarden-tun1.service") {
 		t.Errorf("units not started: %v", r.calls)
 	}
-	key := filepath.Join(v.ServerDir, "gatehouse-tun0", "server.key")
+	key := filepath.Join(v.ServerDir, "nopewarden-tun0", "server.key")
 	if fi, err := os.Stat(key); err != nil || fi.Mode().Perm() != 0o600 {
 		t.Errorf("server key must be private: %v %v", fi, err)
 	}
-	if fi, _ := os.Stat(filepath.Join(v.ServerDir, "gatehouse-tun0", "crl.pem")); fi == nil || fi.Mode().Perm() != 0o644 {
+	if fi, _ := os.Stat(filepath.Join(v.ServerDir, "nopewarden-tun0", "crl.pem")); fi == nil || fi.Mode().Perm() != 0o644 {
 		t.Error("the revocation list must stay readable after OpenVPN drops privileges")
 	}
-	if fi, _ := os.Stat(filepath.Join(v.ClientDir, "gatehouse-tun1.conf")); fi == nil || fi.Mode().Perm() != 0o600 {
+	if fi, _ := os.Stat(filepath.Join(v.ClientDir, "nopewarden-tun1.conf")); fi == nil || fi.Mode().Perm() != 0o600 {
 		t.Error("client profile holds a key and must be private")
 	}
 	// Applying the same thing again restarts nothing.
@@ -105,7 +105,7 @@ func TestApplyOpenVPN(t *testing.T) {
 	if err := v.Apply(VPNPlan{OpenVPN: []OVPNInstance{srv, cl}}); err != nil {
 		t.Fatal(err)
 	}
-	if r.has("restart openvpn-server@gatehouse-tun0.service") {
+	if r.has("restart openvpn-server@nopewarden-tun0.service") {
 		t.Errorf("restarted without a change: %v", r.calls)
 	}
 	// Removing the server stops it and deletes its files.
@@ -113,7 +113,7 @@ func TestApplyOpenVPN(t *testing.T) {
 	if err := v.Apply(VPNPlan{OpenVPN: []OVPNInstance{cl}}); err != nil {
 		t.Fatal(err)
 	}
-	if !r.has("disable --now openvpn-server@gatehouse-tun0.service") {
+	if !r.has("disable --now openvpn-server@nopewarden-tun0.service") {
 		t.Errorf("not stopped: %v", r.calls)
 	}
 	if _, err := os.Stat(key); err == nil {
@@ -204,7 +204,7 @@ func TestStatusReadsOpenVPNMessagesForABrokenClient(t *testing.T) {
 	}
 	st := v.Status()
 	o := st.OVPN["tun1"]
-	if !strings.Contains(asked, "openvpn-client@gatehouse-tun1.service") {
+	if !strings.Contains(asked, "openvpn-client@nopewarden-tun1.service") {
 		t.Fatalf("journal not asked for the client's unit: %q", asked)
 	}
 	if len(o.Log) != 1 || !strings.Contains(o.Reason, "did not answer") {
@@ -219,7 +219,7 @@ func TestOVPNConnectedFollowsTheNewestWord(t *testing.T) {
 	if OVPNConnected([]string{"Initialization Sequence Completed", "[x] Inactivity timeout (--ping-restart), restarting", "SIGUSR1[soft,ping-restart] received, process restarting"}) {
 		t.Error("a tunnel that is restarting was seen as connected")
 	}
-	if OVPNConnected([]string{"Starting openvpn-client@gatehouse-tun0.service"}) {
+	if OVPNConnected([]string{"Starting openvpn-client@nopewarden-tun0.service"}) {
 		t.Error("starting is not connected")
 	}
 }

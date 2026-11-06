@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/netcfg"
-	"gatehouse/internal/wanmon"
+	"nopewarden/internal/netcfg"
+	"nopewarden/internal/wanmon"
 )
 
 // Plan is the request the daemon sends: what to configure and how to watch the links.
@@ -319,7 +319,7 @@ func (s *Service) FWEvents(since uint64, max int) ([]FWEvent, uint64) {
 	return s.Log.Since(since, max)
 }
 
-// ResetNetwork removes everything Gatehouse set up on the network side (networks, VPN tunnels,
+// ResetNetwork removes everything NopeWarden set up on the network side (networks, VPN tunnels,
 // Wi-Fi, connection monitor) and leaves the machine on the built-in default: every wired port
 // asks for an address. It skips the lock-out check on purpose, because an empty configuration is
 // exactly what a reset is for.

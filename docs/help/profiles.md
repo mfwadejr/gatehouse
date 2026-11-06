@@ -3,7 +3,7 @@
 ## What it is for
 A profile decides which blocklists apply to a device and when the internet is off for it, such as a Kids profile.
 
-![The profiles page, shown with no data yet](img/profiles.png)
+![The profiles page, shown with example data](img/profiles.png)
 
 The picture is an example from a new, empty box; yours will show your own devices and numbers.
 
@@ -21,4 +21,4 @@ The picture is an example from a new, empty box; yours will show your own device
 Kids: **Enhanced** filtering, **Safe search** on, internet off from 21:00 to 07:00.
 
 ## If something goes wrong
-Deleting a profile moves its devices back to the Default profile. Safe search works for browsers that use Gatehouse for DNS; turn on forced DNS for devices that do not.
+Deleting a profile moves its devices back to the Default profile. Safe search works for browsers that use NopeWarden for DNS; turn on forced DNS for devices that do not.

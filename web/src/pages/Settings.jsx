@@ -19,6 +19,7 @@ import TrafficLabels from './TrafficLabels.jsx';
 import BlockVersions from './BlockVersions.jsx';
 import RemoteLogin from './RemoteLogin.jsx';
 import Alerts from './Alerts.jsx';
+import { ScheduleEditor, ScheduleTable } from '../ScheduleEditor.jsx';
 
 function Password() {
   const [f, setF] = useState({ current: '', next: '', again: '' });
@@ -151,7 +152,7 @@ function ConsolePort() {
 const POWER = {
   reboot: { title: 'Restart this machine', verb: 'Restart', warn: 'The network is down for about a minute while it restarts. This page reconnects by itself.', waiting: 'Restarting…' },
   poweroff: { title: 'Shut down this machine', verb: 'Shut down', warn: 'The network goes down and stays down until someone switches the machine back on.', waiting: 'Shutting down…' },
-  'restart-gatehouse': { title: 'Restart Gatehouse only', verb: 'Restart Gatehouse', warn: 'The console, DNS and DHCP are down for a few seconds. The machine itself keeps running.', waiting: 'Restarting Gatehouse…' },
+  'restart-nopewarden': { title: 'Restart NopeWarden only', verb: 'Restart NopeWarden', warn: 'The console, DNS and DHCP are down for a few seconds. The machine itself keeps running.', waiting: 'Restarting NopeWarden…' },
 };
 
 // Waits until the machine stops answering and then answers again, then reloads the page.
@@ -198,10 +199,10 @@ function PowerModal({ action, me, onClose }) {
 function PowerCard({ me }) {
   const [action, setAction] = useState(null);
   return (
-    <Card title="Power" desc="Restart or shut down this machine, or restart just the Gatehouse programs. Asks for your authenticator code if you use one.">
+    <Card title="Power" desc="Restart or shut down this machine, or restart just the NopeWarden programs. Asks for your authenticator code if you use one.">
       <div className="actions">
         <Button onClick={() => setAction('reboot')}>Restart this machine</Button>
-        <Button onClick={() => setAction('restart-gatehouse')}>Restart Gatehouse only</Button>
+        <Button onClick={() => setAction('restart-nopewarden')}>Restart NopeWarden only</Button>
         <Button onClick={() => setAction('poweroff')}>Shut down</Button>
       </div>
       {action && <PowerModal action={action} me={me} onClose={() => setAction(null)} />}
@@ -218,7 +219,7 @@ const RESET = {
   factory: {
     title: 'Factory reset',
     verb: 'Erase everything',
-    lines: ['Everything is erased: all settings, accounts, logs and history. The setup wizard opens again.', 'Gatehouse itself and the installed system stay as they are.'],
+    lines: ['Everything is erased: all settings, accounts, logs and history. The setup wizard opens again.', 'NopeWarden itself and the installed system stay as they are.'],
   },
 };
 
@@ -313,6 +314,9 @@ function Updates({ me }) {
             setJob(null);
             setLive(null);
             reload();
+            // The list of waiting updates is from the check before the run, so look again now;
+            // otherwise it keeps showing updates that were just installed.
+            post('/api/system/update/check', {}).then(() => reload()).catch(() => {});
           }
         } else if (!x.checking) {
           setLive(null);
@@ -336,29 +340,32 @@ function Updates({ me }) {
   const l = d.latest;
   const steps = d.steps || [];
   const working = !!job;
-  const res = outcome?.result;
+  // After the console restarts the page reloads and forgets what it started, so fall back to the
+  // result the machine kept: the last run's outcome stays visible for a day.
+  const kept = d.result && d.result.ok && Date.now() / 1000 - (d.result.at || 0) < 86400 ? d.result : null;
+  const res = outcome?.result || kept;
   return (
-    <Card title="Updates" desc="Gatehouse and the system underneath it update together, from one button. Nothing is installed until you press Update now, unless you choose Automatic below. Your settings are kept."
+    <Card title="Updates" desc="NopeWarden and the system underneath it update together, from one button. Nothing is installed until you press Update now, unless you choose Automatic below. Your settings are kept."
       actions={<Button small disabled={busy || working || d.checking || !d.key_set} onClick={() => run(() => post('/api/system/update/check', {})).then(() => { reload(); })}>Check now</Button>}>
       <div className="stack">
         <div className="inline"><span>You are running version <b>{d.current}</b>.</span>{d.checked_at > 0 && <span className="small muted">Checked {fmt.ago(d.checked_at)}</span>}</div>
-        {!d.key_set && <Note tone="warn" title="Updates are not set up in this build">This copy of Gatehouse has no update signing key, so it cannot install updates. Build a new installer once with a key (docs/UPDATES.md); after that, updates need no installer.</Note>}
-        {d.key_set && d.error && <Note tone="warn" title="Could not look for Gatehouse updates">{d.error}</Note>}
+        {!d.key_set && <Note tone="warn" title="Updates are not set up in this build">This copy of NopeWarden has no update signing key, so it cannot install updates. Build a new installer once with a key (docs/UPDATES.md); after that, updates need no installer.</Note>}
+        {d.key_set && d.error && <Note tone="warn" title="Could not look for NopeWarden updates">{d.error}</Note>}
         {d.key_set && d.system_error && <Note tone="warn" title="Could not look at the system updates">{d.system_error}</Note>}
         {d.pair?.phase === 'failed' && d.pair.error && <Note tone="warn" title="The update of both units stopped">{d.pair.error}</Note>}
         {d.checking && !working && <p className="muted">Looking at what the system has waiting…</p>}
         {working && (
           <Note tone="good" title="Updating">
             {steps.length > 0 && <UpdateSteps steps={steps} rollingBack={d.rolling_back} />}
-            <p className="small" style={{ margin: '.5rem 0 0' }}>{d.rolling_back ? 'Something went wrong, so the previous version is being put back.' : 'This takes a few minutes. The console restarts near the end and this page reconnects by itself. If anything goes wrong the old Gatehouse is put back automatically.'}</p>
+            <p className="small" style={{ margin: '.5rem 0 0' }}>{d.rolling_back ? 'Something went wrong, so the previous version is being put back.' : 'This takes a few minutes. The console restarts near the end and this page reconnects by itself. If anything goes wrong the old NopeWarden is put back automatically.'}</p>
             {lost && <p className="small" style={{ margin: '.5rem 0 0' }}><b>This page cannot reach the machine.</b> Look at the machine's own screen: it shows what is happening.</p>}
           </Note>
         )}
-        {!working && outcome && (outcome.error
+        {!working && (outcome || kept) && ((outcome || {}).error
           ? <Note tone="bad" title="The update could not start">{outcome.error}</Note>
           : res?.ok
             ? <Note tone="good" title={res.from === res.to ? 'System updates installed' : `Updated to ${res.to}`}>
-                {res.from === res.to ? 'Gatehouse was already the newest version.' : 'Everything is running the new version.'}
+                {res.from === res.to ? 'NopeWarden was already the newest version.' : 'Everything is running the new version.'}
                 {res.system && res.system.packages > 0 && ` ${res.system.packages} system packages were updated.`}
                 {res.system?.skipped && ` The system updates were skipped: ${res.system.skipped}`}
               </Note>
@@ -367,7 +374,7 @@ function Updates({ me }) {
         {!working && d.available && (
           <Note tone="good" title="Updates are ready">
             <ul className="ulist">
-              {d.gatehouse_new && l && <li><b>Gatehouse {l.version}</b>{l.notes && <div style={{ whiteSpace: 'pre-wrap' }} className="small">{l.notes}</div>}</li>}
+              {d.nopewarden_new && l && <li><b>NopeWarden {l.version}</b>{l.notes && <div style={{ whiteSpace: 'pre-wrap' }} className="small">{l.notes}</div>}</li>}
               {d.system_count > 0 && <li><b>{d.system_count} system update{d.system_count === 1 ? '' : 's'}</b>{d.system_names?.length > 0 && <span className="small muted"> ({d.system_names.slice(0, 6).join(', ')}{d.system_count > 6 ? ', …' : ''})</span>}</li>}
             </ul>
             <Button kind="primary" disabled={busy || d.state !== 'idle'} onClick={start}>Update now</Button>
@@ -375,30 +382,16 @@ function Updates({ me }) {
         )}
         {!working && d.key_set && !d.available && !d.error && !d.system_error && !d.checking && d.checked_at > 0 && <p className="muted">Everything is up to date.</p>}
         {d.needs_reboot && !working && <Note tone="warn" title="A restart is needed">The system was updated and needs a restart to finish. The network is down for about a minute while it restarts; pick a moment that suits you.<div style={{ marginTop: '.5rem' }}><Button onClick={() => setRestart(true)}>Restart now</Button></div></Note>}
-        <Field label="Updating" hint="Off: only when you press Check now. Notify: Gatehouse looks as often as you choose below and tells you when something is ready. Automatic: it installs by itself in the hour you choose below.">
+        <Field label="Updating" hint="Off: only when you press Check now. Notify: NopeWarden looks as often as you choose below and tells you when something is ready. Automatic: it installs by itself in the hour you choose below.">
           <Segmented value={d.mode} onChange={(v) => save({ mode: v })} options={[{ value: 'off', label: 'Off' }, { value: 'notify', label: 'Notify' }, { value: 'auto', label: 'Automatic' }]} />
         </Field>
-        {d.mode !== 'off' && (
-          <Field label="How often to check" hint="Checking more often than every few hours does not help, because releases do not come out that fast. Press Check now any time.">
-            <div className="stack">
-              <Segmented value={[6, 12, 24, 168].includes(d.check_hours) && !customEvery ? String(d.check_hours) : 'custom'}
-                onChange={(v) => { if (v === 'custom') setCustomEvery(true); else { setCustomEvery(false); save({ check_hours: Number(v) }); } }}
-                options={[{ value: '6', label: 'Every 6 hours' }, { value: '12', label: 'Every 12 hours' }, { value: '24', label: 'Once a day' }, { value: '168', label: 'Once a week' }, { value: 'custom', label: 'Custom' }]} />
-              {([6, 12, 24, 168].includes(d.check_hours) ? customEvery : true) && (
-                <Form className="inline" onSubmit={() => run(() => put('/api/system/update/settings', { check_hours: Number(everyText ?? d.check_hours) }), 'Saved.').then(() => { setEveryText(null); reload(); })}>
-                  <Input value={everyText ?? String(d.check_hours)} onChange={setEveryText} inputMode="numeric" aria-label="Hours between checks" style={{ maxWidth: '6rem' }} /> <span className="small muted">hours (1 to 720)</span>
-                  <Button type="submit" disabled={busy || everyText === null}>Save</Button>
-                </Form>
-              )}
-            </div>
-          </Field>
-        )}
+        {d.mode !== 'off' && <ScheduleEditor id="updates" label="How often to check" />}
         {d.mode === 'auto' && (
-          <Field label="Start automatic updates at" hint="Gatehouse restarts for about a minute while it updates, so pick a quiet hour (the machine's own clock).">
+          <Field label="Start automatic updates at" hint="NopeWarden restarts for about a minute while it updates, so pick a quiet hour (the machine's own clock).">
             <Select value={String(d.window)} onChange={(v) => save({ window: Number(v) })} options={Array.from({ length: 24 }, (_, h) => ({ value: String(h), label: hourLabel(h) }))} style={{ maxWidth: '10rem' }} />
           </Field>
         )}
-        <Field label="Where releases come from" hint="The GitHub page that publishes Gatehouse releases, as owner/name. Only releases signed with this build's key are ever installed.">
+        <Field label="Where releases come from" hint="The GitHub page that publishes NopeWarden releases, as owner/name. Only releases signed with this build's key are ever installed.">
           <Form className="inline" onSubmit={() => run(() => put('/api/system/update/settings', { repo }), 'Saved.').then(() => { setRepo(null); reload(); })}><Input value={repo ?? d.repo} onChange={setRepo} style={{ maxWidth: '18rem' }} />
             <Button type="submit" disabled={busy || repo === null || repo === d.repo}>Save</Button></Form>
         </Field>
@@ -451,7 +444,7 @@ export default function Settings({ me, reloadMe }) {
         <>
           <Guard what="Get started"><GetStarted /></Guard>
           <Guard what="Device mode"><DeviceMode /></Guard>
-          <Guard what="Updates"><Updates me={me} /></Guard>
+          <Guard what="Updates"><Updates me={me} /><Card title="Update schedule" desc="When each recurring job looks for something new. The same controls appear on the page each job belongs to."><ScheduleTable /></Card></Guard>
           <Guard what="PowerCard"><PowerCard me={me} /></Guard>
           <Guard what="ConsolePort"><ConsolePort /></Guard>
           <Guard what="Map location"><MapLocation /></Guard>

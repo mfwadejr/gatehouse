@@ -12,12 +12,12 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/netd"
-	"gatehouse/internal/update"
+	"nopewarden/internal/api"
+	"nopewarden/internal/netd"
+	"nopewarden/internal/update"
 )
 
-// Updates: one update covers Gatehouse and the operating system underneath it. Gatehouse comes
+// Updates: one update covers NopeWarden and the operating system underneath it. NopeWarden comes
 // from a signed package published with a release; the package also names the Debian packages
 // the release needs, and the Debian updates for the release the machine is on are installed
 // with it, system first. Only tagged releases are offered. Nothing is installed until an
@@ -87,7 +87,7 @@ func (a *App) currentVersion() string {
 	if v := strings.TrimSpace(a.Cfg.Version); v != "" && v != "dev" {
 		return v
 	}
-	if b, err := os.ReadFile("/etc/gatehouse-release"); err == nil {
+	if b, err := os.ReadFile("/etc/nopewarden-release"); err == nil {
 		return strings.TrimSpace(string(b))
 	}
 	return "dev"
@@ -184,8 +184,9 @@ func (a *App) updateTick(ctx context.Context, force bool) {
 		return
 	}
 	a.upd.mu.Lock()
-	stale := time.Since(a.upd.checkedAt) > a.updateEvery()
+	never := a.upd.checkedAt.IsZero()
 	a.upd.mu.Unlock()
+	stale := never || a.schedDue("updates")
 	if force || stale {
 		a.checkUpdate(ctx)
 		return
@@ -213,7 +214,7 @@ func (a *App) autoInstall(now time.Time) {
 	}
 }
 
-// reportUpdateResult writes the outcome of the last update to the Gatehouse log, once.
+// reportUpdateResult writes the outcome of the last update to the NopeWarden log, once.
 func (a *App) reportUpdateResult() {
 	r, ok := update.ReadResult(a.updateState())
 	if !ok || fmt.Sprint(r.At) == a.Config.Setting("update.reported", "") {
@@ -234,7 +235,7 @@ func (a *App) reportUpdateResult() {
 	case r.OK && r.From == r.To:
 		a.event("system", "info", "System updates were installed", strings.TrimSpace(sys))
 	case r.OK:
-		a.event("system", "info", "Gatehouse was updated", fmt.Sprintf("From %s to %s.%s", r.From, r.To, sys))
+		a.event("system", "info", "NopeWarden was updated", fmt.Sprintf("From %s to %s.%s", r.From, r.To, sys))
 	case r.RolledBack:
 		a.event("system", "warning", "An update did not work and was undone", fmt.Sprintf("Version %s: %s", r.To, r.Error))
 	default:
@@ -252,8 +253,8 @@ type updateStep struct {
 type updateView struct {
 	Current       string          `json:"current"`
 	Latest        *update.Release `json:"latest"`
-	GatehouseNew  bool            `json:"gatehouse_new"` // a newer Gatehouse is published
-	SystemCount   int             `json:"system_count"`  // operating system updates waiting
+	NopeWardenNew bool            `json:"nopewarden_new"` // a newer NopeWarden is published
+	SystemCount   int             `json:"system_count"`   // operating system updates waiting
 	SystemNames   []string        `json:"system_names,omitempty"`
 	SystemError   string          `json:"system_error,omitempty"`
 	Checking      bool            `json:"checking"`  // still asking Debian
@@ -294,13 +295,13 @@ func updateSteps(plan update.Plan, active string) []updateStep {
 		{"verify", "Checking its signature", true, false},
 		{"backup", "Saving a copy of your settings", true, false},
 		{"system", "Installing system updates", false, true},
-		{"install", "Installing Gatehouse", true, false},
-		{"restart", "Restarting Gatehouse", true, false},
+		{"install", "Installing NopeWarden", true, false},
+		{"restart", "Restarting NopeWarden", true, false},
 		{"health", "Checking that it runs properly", true, false},
 	}
 	var out []updateStep
 	for _, st := range all {
-		if (st.gh && plan.Gatehouse) || (st.sys && plan.System) {
+		if (st.gh && plan.NopeWarden) || (st.sys && plan.System) {
 			out = append(out, updateStep{ID: st.id, Label: st.label})
 		}
 	}
@@ -338,14 +339,30 @@ func (a *App) updateStatus() updateView {
 	_, err := a.updateKey()
 	v.KeySet = err == nil
 	if latest != nil {
-		v.GatehouseNew = update.Compare(latest.Version, v.Current) > 0
+		v.NopeWardenNew = update.Compare(latest.Version, v.Current) > 0
+	}
+	res, haveRes := update.ReadResult(a.updateState())
+	if sys != nil && haveRes && res.At > 0 {
+		// The waiting list comes from a check made before the last run. If a run has finished since,
+		// the list is out of date (it kept showing updates that had just been installed), so leave it
+		// out and look again.
+		a.upd.mu.Lock()
+		old := res.At > a.upd.sysChecked.Unix()
+		a.upd.mu.Unlock()
+		if old && !working && v.State == "idle" {
+			sys = nil
+			if !checking {
+				a.checkSystem()
+				v.Checking = true
+			}
+		}
 	}
 	if sys != nil {
 		v.SystemCount, v.SystemNames = sys.Count, sys.Names
 	}
-	v.Available = v.GatehouseNew || v.SystemCount > 0
-	if r, ok := update.ReadResult(a.updateState()); ok {
-		v.Result = &r
+	v.Available = v.NopeWardenNew || v.SystemCount > 0
+	if haveRes {
+		v.Result = &res
 	}
 	v.NeedsReboot = rebootNeeded()
 	if ps, p := a.pairSteps(); p != nil {
@@ -361,7 +378,7 @@ func (a *App) updateStatus() updateView {
 	} else if v.State != "idle" {
 		p, ok := update.ReadPlan(a.updateState())
 		if !ok {
-			p = update.Plan{Gatehouse: true, System: true}
+			p = update.Plan{NopeWarden: true, System: true}
 		}
 		act := map[string]string{"starting": "system", "system": "system", "installing": "install", "restarting": "restart", "checking": "health", "rolling-back": "health"}[v.State]
 		if v.State == "starting" && !p.System {
@@ -466,7 +483,7 @@ func (a *App) updateInstall(w http.ResponseWriter, r *http.Request, c *api.Ctx) 
 	api.JSON(w, 200, map[string]any{"started": true, "to": to})
 }
 
-// startAnyUpdate updates a running pair the safe way (spare first) when there is a newer Gatehouse,
+// startAnyUpdate updates a running pair the safe way (spare first) when there is a newer NopeWarden,
 // and a single unit, or a system-only update, the ordinary way.
 func (a *App) startAnyUpdate(user string, auto bool) (string, error) {
 	if st := a.haLoad(); st != nil && st.Activated && st.PeerFP != "" {
@@ -485,7 +502,7 @@ func (a *App) startAnyUpdate(user string, auto bool) (string, error) {
 
 // startUpdate checks that there is something to install and starts the run in the background:
 // the console downloads and checks the package, then hands it to the helper, which installs the
-// system updates first and Gatehouse second. It returns the version being installed (the current
+// system updates first and NopeWarden second. It returns the version being installed (the current
 // one for a run that only updates the operating system).
 func (a *App) startUpdate(user string, auto bool) (string, error) {
 	pub, err := a.updateKey()
@@ -509,7 +526,7 @@ func (a *App) startUpdate(user string, auto bool) (string, error) {
 		a.upd.mu.Unlock()
 		return "", errors.New("there is nothing new to install; check for updates first")
 	}
-	plan := update.Plan{Gatehouse: gh, System: true}
+	plan := update.Plan{NopeWarden: gh, System: true}
 	a.upd.working, a.upd.plan, a.upd.runErr = true, plan, ""
 	a.upd.step = "system"
 	if gh {
@@ -575,7 +592,7 @@ func (a *App) prepareUpdate(pub []byte, rel *update.Release, gh bool) error {
 	if err := os.MkdirAll(inbox, 0o755); err != nil {
 		return err
 	}
-	file := filepath.Join(inbox, "gatehouse-update-"+rel.Version+".tar.gz")
+	file := filepath.Join(inbox, "nopewarden-update-"+rel.Version+".tar.gz")
 	if err := os.WriteFile(file, data, 0o644); err != nil {
 		return err
 	}

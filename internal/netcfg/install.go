@@ -25,9 +25,9 @@ type Installer struct {
 	NetworkdDir string // /etc/systemd/network
 	PPPDir      string // /etc/ppp/peers
 	PPPSecrets  string // /etc/ppp/chap-secrets (pap-secrets is written beside it)
-	SysctlFile  string // /etc/sysctl.d/90-gatehouse.conf
+	SysctlFile  string // /etc/sysctl.d/90-nopewarden.conf
 	VPNDir      string // where tunnel keys live; empty disables key files
-	StateDir    string // /var/lib/gatehouse/net
+	StateDir    string // /var/lib/nopewarden/net
 
 	// Hooks for the parts that talk to systemd; replaced in tests.
 	Reload   func() error
@@ -39,12 +39,12 @@ type Installer struct {
 	mu sync.Mutex
 }
 
-const filePrefix = "gatehouse-"
+const filePrefix = "nopewarden-"
 
 func NewInstaller() *Installer {
 	return &Installer{
 		NetworkdDir: "/etc/systemd/network", PPPDir: "/etc/ppp/peers", PPPSecrets: "/etc/ppp/chap-secrets",
-		SysctlFile: "/etc/sysctl.d/90-gatehouse.conf", VPNDir: VPNKeyDir, StateDir: "/var/lib/gatehouse/net",
+		SysctlFile: "/etc/sysctl.d/90-nopewarden.conf", VPNDir: VPNKeyDir, StateDir: "/var/lib/nopewarden/net",
 		Reload: func() error {
 			if out, err := exec.Command("networkctl", "reload").CombinedOutput(); err != nil {
 				return fmt.Errorf("networkctl reload: %s", strings.TrimSpace(string(out)))
@@ -53,7 +53,7 @@ func NewInstaller() *Installer {
 			return nil
 		},
 		Services: func(start, stop []string) error {
-			unit := func(u string) string { return "gatehouse-ppp@" + u + ".service" }
+			unit := func(u string) string { return "nopewarden-ppp@" + u + ".service" }
 			for _, u := range stop {
 				exec.Command("systemctl", "disable", "--now", unit(u)).Run()
 			}
@@ -92,7 +92,7 @@ func writeAtomic(path string, data []byte, mode os.FileMode) error {
 	return os.Rename(tmp, path)
 }
 
-// current reads every file Gatehouse owns, keyed by absolute path.
+// current reads every file NopeWarden owns, keyed by absolute path.
 func (in *Installer) current() (map[string]string, error) {
 	out := map[string]string{}
 	add := func(dir, pattern string) error {
@@ -134,7 +134,7 @@ func (in *Installer) papSecrets() string {
 	return filepath.Join(filepath.Dir(in.PPPSecrets), "pap-secrets")
 }
 
-const secretsMarker = "# gatehouse-managed"
+const secretsMarker = "# nopewarden-managed"
 
 // desired maps absolute path to the new content for an Output.
 func (in *Installer) desired(o *Output) map[string]string {

@@ -9,16 +9,16 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/appid"
-	dnssrv "gatehouse/internal/dns"
-	"gatehouse/internal/fw"
+	"nopewarden/internal/api"
+	"nopewarden/internal/appid"
+	dnssrv "nopewarden/internal/dns"
+	"nopewarden/internal/fw"
 )
 
 // Blocks by scope: block an app, a topic (a category list) or a name for everyone, one network,
 // one profile or one device, always or on a schedule, with an "allow" exception for a device.
 //
-// Today the "fast" way is in force: Gatehouse refuses the lookup of the app's names. The "thorough"
+// Today the "fast" way is in force: NopeWarden refuses the lookup of the app's names. The "thorough"
 // way (looking at the traffic itself) is stored and shown but not yet switched on.
 //
 // This feature fails open. If anything in it goes wrong, lookups are answered as if there were no
@@ -66,7 +66,7 @@ func (a *App) scopeFault(why string) {
 	}
 	a.scope.faultAt = time.Now()
 	a.scope.mu2.Unlock()
-	a.event("system", "warning", "Blocking by name let traffic through", "Something went wrong ("+why+"), so Gatehouse let it through instead of blocking. Nothing was cut off.")
+	a.event("system", "warning", "Blocking by name let traffic through", "Something went wrong ("+why+"), so NopeWarden let it through instead of blocking. Nothing was cut off.")
 }
 
 func (a *App) scopeLoc() *time.Location {
@@ -102,7 +102,7 @@ func (a *App) cachedScopeRules() []scopeRule {
 	c := &a.scope
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.rules == nil || time.Since(c.at) > 5*time.Second {
+	if c.rules == nil || (time.Since(c.at) > 5*time.Second && !a.dnsHeld()) {
 		if r, err := a.loadScopeRules(); err == nil {
 			c.rules, c.at = r, time.Now()
 			if c.rules == nil {
@@ -114,6 +114,9 @@ func (a *App) cachedScopeRules() []scopeRule {
 }
 
 func (a *App) dropScopeCache() {
+	if a.dnsHeld() {
+		return // a change is waiting; blocking keeps working from what is in force until it is applied
+	}
 	a.scope.mu.Lock()
 	a.scope.at = time.Time{}
 	a.scope.rules = nil
@@ -330,7 +333,7 @@ func (a *App) saveScopeRule(in blockIn) error {
 			}
 		}
 		if !found {
-			return errors.New("Gatehouse does not know that app yet")
+			return errors.New("NopeWarden does not know that app yet")
 		}
 	case "topic":
 		if a.topicKey(in.Value) == "" {
@@ -541,7 +544,7 @@ func (a *App) registerScopeRoutes() {
 		st := a.ndpiStatus()
 		api.JSON(w, 200, map[string]any{
 			"app_names": map[string]any{"version": a.Cfg.Version, "apps": len(names), "domains": domains,
-				"note": "Built into Gatehouse. It is renewed whenever Gatehouse is updated."},
+				"note": "Built into NopeWarden. It is renewed whenever NopeWarden is updated."},
 			"topics": topics, "app_topics": len(appTopics),
 			"labels": map[string]any{"installed": st["installed"], "enabled": st["enabled"], "connected": st["connected"],
 				"note": "The traffic-labelling program carries its own list of apps. It comes with the install image and is renewed with it."},
@@ -552,6 +555,26 @@ func (a *App) registerScopeRoutes() {
 		id, good := pathID(r)
 		if !good {
 			fail(w, errBadID)
+			return
+		}
+		rows, total, err := a.Lists.Names(id, r.URL.Query().Get("q"), 100)
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		if rows == nil {
+			rows = []dnssrv.NameRow{}
+		}
+		var upd int64
+		var name string
+		a.Config.QueryRow(`SELECT name,last_ok FROM blocklists WHERE id=?`, id).Scan(&name, &upd)
+		api.JSON(w, 200, map[string]any{"names": rows, "total": total, "list": name, "updated": upd})
+	})
+	// The names inside a topic (a category backed by one list), so a person can see what choosing it blocks.
+	s.Handle("GET /api/blocks/topics/{key}/names", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		id, found := a.categoryIDs()[r.PathValue("key")]
+		if !found {
+			api.Error(w, 404, "This topic has no list of names to browse. Apps are recognised by what they do, not by a list of names.")
 			return
 		}
 		rows, total, err := a.Lists.Names(id, r.URL.Query().Get("q"), 100)

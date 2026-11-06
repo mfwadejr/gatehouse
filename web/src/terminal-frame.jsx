@@ -37,7 +37,7 @@ const b64 = {
       if (r.closed) {
         term.write('\r\n\x1b[33m[The terminal has ended.]\x1b[0m\r\n');
         alive = false;
-        window.parent.postMessage({ gatehouseTerminal: 'ended' }, window.location.origin);
+        window.parent.postMessage({ nopewardenTerminal: 'ended' }, window.location.origin);
       }
     } catch {
       await new Promise((res) => setTimeout(res, 1500));

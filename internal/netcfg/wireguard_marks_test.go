@@ -12,7 +12,7 @@ func TestTunnelMarksBecomePolicyRules(t *testing.T) {
 	}
 	out := &Output{Networkd: map[string]string{}, Private: map[string]string{}}
 	c.generateTunnels(out)
-	f := out.Networkd["gatehouse-tun1.network"]
+	f := out.Networkd["nopewarden-tun1.network"]
 	for _, want := range []string{"FirewallMark=0x1000\nTable=main\nSuppressPrefixLength=0\nPriority=20", "FirewallMark=0x1000\nTable=300\nPriority=21", "FirewallMark=0x1002\nTable=300\nPriority=25"} {
 		if !strings.Contains(f, want) {
 			t.Errorf("missing %q in:\n%s", want, f)
@@ -30,7 +30,7 @@ func TestTunnelFileKeepsTheProgramsOwnAddress(t *testing.T) {
 	c := Config{Tunnels: []Tunnel{{Name: "tun0", Table: 300, Enabled: true}}}
 	out := &Output{Networkd: map[string]string{}}
 	c.generateTunnels(out)
-	f := out.Networkd["gatehouse-tun0.network"]
+	f := out.Networkd["nopewarden-tun0.network"]
 	if !strings.Contains(f, "KeepConfiguration=static") || !strings.Contains(f, "[Match]\nName=tun0") {
 		t.Fatalf("tunnel file:\n%s", f)
 	}

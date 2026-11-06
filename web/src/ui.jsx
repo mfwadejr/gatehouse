@@ -80,7 +80,7 @@ export function Page({ title, sub, actions, children }) {
       </header>
       {stale && (
         <div className="stalenote small" role="status">
-          Some of what is shown here could not be refreshed just now, so it may be out of date. Gatehouse keeps trying.{' '}
+          Some of what is shown here could not be refreshed just now, so it may be out of date. NopeWarden keeps trying.{' '}
           <button type="button" className="link" onClick={refreshAll}>Try again now</button>
         </div>
       )}
@@ -118,13 +118,18 @@ export function ToggleRow({ title, desc, checked, onChange, disabled }) {
 }
 
 // Long-list pattern: show the first n rows, with a button for the rest.
-export function Limited({ items, n = 20, render, noun = 'rows' }) {
-  const [all, setAll] = useState(false);
-  const shown = all ? items : items.slice(0, n);
+export function Limited({ items, n = 15, render, noun = 'rows' }) {
+  const [shown, setShown] = useState(n);
+  const rows = items.slice(0, shown);
   return (
     <>
-      {shown.map(render)}
-      {items.length > n && <button type="button" className="link small" onClick={() => setAll(!all)}>{all ? 'Show fewer' : `Show all ${items.length} ${noun}`}</button>}
+      {rows.map(render)}
+      {items.length > n && (
+        <div className="inline">
+          {shown < items.length && <button type="button" className="link small" onClick={() => setShown(shown + n)}>{`Show more (${Math.min(n, items.length - shown)} of the ${items.length - shown} left)`}</button>}
+          {shown > n && <button type="button" className="link small" onClick={() => setShown(n)}>Show fewer</button>}
+        </div>
+      )}
     </>
   );
 }
@@ -481,6 +486,24 @@ export function useUndoDelete() {
   }, [toast]);
 }
 
+// For things that cannot be put back once they are gone (a VPN with its keys, a backup file, a
+// connection): the removal waits a few seconds with an Undo, then happens. Closing the page in that
+// time cancels it, which is the safe way round.
+export function useDelayedDelete(wait = 8) {
+  const toast = useToast();
+  return useCallback((what, remove, refresh, note = '') => {
+    let cancelled = false;
+    toast(`${what} will be removed in ${wait} seconds.${note ? ` ${note}` : ''}`, 'warn', { undo: async () => { cancelled = true; toast(`${what} was kept.`); } });
+    setTimeout(async () => {
+      if (cancelled) return;
+      try { await remove(); } catch (e) { toast(e.message || 'Something went wrong.', 'bad'); return; }
+      refresh && refresh();
+      toast(`${what} removed.`);
+    }, wait * 1000 - 500);
+    return true;
+  }, [toast, wait]);
+}
+
 // Shows what went wrong in one part of a screen and leaves the rest working. Without it, one part
 // that cannot draw leaves a blank page.
 export class Guard extends React.Component {
@@ -492,7 +515,7 @@ export class Guard extends React.Component {
     return (
       <div className="note bad" role="alert" style={{ margin: 'var(--space-3) 0' }}>
         <div>
-          <strong>{this.props.what ? `${this.props.what} could not be shown.` : 'This part of the screen could not be shown.'}</strong> The rest of Gatehouse is working. Reload the page; if it happens again, send this text to support: {String(this.state.err?.message || this.state.err).slice(0, 300)}
+          <strong>{this.props.what ? `${this.props.what} could not be shown.` : 'This part of the screen could not be shown.'}</strong> The rest of NopeWarden is working. Reload the page; if it happens again, send this text to support: {String(this.state.err?.message || this.state.err).slice(0, 300)}
         </div>
       </div>
     );

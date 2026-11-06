@@ -37,6 +37,13 @@ type Server struct {
 	// Route says how a client's lookups must travel (through a VPN tunnel or the normal connection).
 	// Nil means everyone uses the normal connection.
 	Route func(client string) Path
+	// RouteName, when it knows the answer, says how this client's lookup of this name travels: a name
+	// that a route sends through a VPN is looked up through that VPN, whoever asks. ok false means
+	// no route covers the name, and Route decides.
+	RouteName func(client, qname string) (Path, bool)
+	// ExplainFail, when a lookup came back as a server failure, may say in plain words why (for
+	// example that a DNSSEC check failed). Empty means no particular reason is known.
+	ExplainFail func(r *dns.Msg) string
 	// Egress names the device the box's own lookups leave through when no tunnel is used, so the
 	// log can show which internet connection carried them. Nil leaves it blank.
 	Egress func() string
@@ -252,7 +259,11 @@ func (s *Server) handle(client string, r *dns.Msg, start time.Time, udp bool) *d
 	// 5. Where this client's lookups travel: a device sent through a VPN has its lookups sent
 	// through it too, with a cache of its own.
 	var path Path
-	if s.Route != nil {
+	named := false
+	if s.RouteName != nil {
+		path, named = s.RouteName(client, strings.TrimSuffix(q.Name, "."))
+	}
+	if !named && s.Route != nil {
 		path = s.Route(client)
 	}
 	if path.Hold {
@@ -295,6 +306,12 @@ func (s *Server) handle(client string, r *dns.Msg, start time.Time, udp bool) *d
 	}
 	if u != nil {
 		upName = u.Name
+	}
+	if resp.Rcode == dns.RcodeServerFailure && s.ExplainFail != nil {
+		if why := s.ExplainFail(r); why != "" {
+			resp.Id = r.Id
+			return finish(resp, OutFailed, why, upName)
+		}
 	}
 	if entry.Via == "" && s.Egress != nil {
 		entry.Via = s.Egress()

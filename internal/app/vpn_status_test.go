@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"gatehouse/internal/netd"
+	"nopewarden/internal/netd"
 )
 
 func TestClientProblemSaysWhyInPlainWords(t *testing.T) {

@@ -31,7 +31,7 @@ func ConntrackdConf(p Pairing, role Role, iface string) (string, error) {
 			return "", fmt.Errorf("%q is not an address", a)
 		}
 	}
-	return fmt.Sprintf(`# Written by Gatehouse. Changes here are replaced.
+	return fmt.Sprintf(`# Written by NopeWarden. Changes here are replaced.
 Sync {
     Mode FTFW {
     }
@@ -77,9 +77,9 @@ General {
 // connection table into the kernel and sends the update to the switch by announcing the shared
 // addresses; becoming standby asks the partner for its table. It never changes the firewall.
 const NotifyScript = `#!/bin/sh
-# Written by Gatehouse. Called by keepalived as: ha-notify GROUP|INSTANCE name STATE priority
+# Written by NopeWarden. Called by keepalived as: ha-notify GROUP|INSTANCE name STATE priority
 state="$3"
-log() { logger -t gatehouse-ha "$*"; }
+log() { logger -t nopewarden-ha "$*"; }
 case "$state" in
   MASTER)
     log "this unit is now active"
@@ -87,18 +87,18 @@ case "$state" in
     conntrackd -C /etc/conntrackd/conntrackd.conf -f 2>/dev/null
     conntrackd -C /etc/conntrackd/conntrackd.conf -R 2>/dev/null
     conntrackd -C /etc/conntrackd/conntrackd.conf -B 2>/dev/null
-    touch /run/gatehouse-ha-active
+    touch /run/nopewarden-ha-active
     # Only the active unit has its internet ports up, so two units never share one provider address.
-    [ -r /etc/gatehouse/ha-wan ] && while read -r d; do
+    [ -r /etc/nopewarden/ha-wan ] && while read -r d; do
       [ -n "$d" ] && ip link set dev "$d" up && networkctl reconfigure "$d" 2>/dev/null
-    done < /etc/gatehouse/ha-wan
+    done < /etc/nopewarden/ha-wan
     ;;
   BACKUP|FAULT|STOP)
     log "this unit is now standby ($state)"
-    rm -f /run/gatehouse-ha-active
-    [ -r /etc/gatehouse/ha-wan ] && while read -r d; do
+    rm -f /run/nopewarden-ha-active
+    [ -r /etc/nopewarden/ha-wan ] && while read -r d; do
       [ -n "$d" ] && ip link set dev "$d" down
-    done < /etc/gatehouse/ha-wan
+    done < /etc/nopewarden/ha-wan
     conntrackd -C /etc/conntrackd/conntrackd.conf -t 2>/dev/null
     conntrackd -C /etc/conntrackd/conntrackd.conf -n 2>/dev/null
     ;;

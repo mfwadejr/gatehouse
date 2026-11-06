@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { post, useData } from '../api.js';
 import { Button, Card, Empty, Field, Input, Modal, Note, Pill, useAction, useStepUp, stepReady, StepUp } from '../ui.jsx';
 
-// Undo. Gatehouse saves a restore point just before every firewall or network change goes live.
+// Undo. NopeWarden saves a restore point just before every firewall or network change goes live.
 // Revert puts the settings back as they were, as changes that are not live yet: you review and apply
 // them the usual way, with the usual 60 seconds to take it back.
 
@@ -21,7 +21,7 @@ export default function Changes({ me }) {
     if (r) { setPick(null); setCode(''); setPw(''); reload(); }
   };
   return (
-    <Card title="Changes" desc={`Before every change to the firewall or network, Gatehouse keeps a copy of how things were (the last ${data.keep}). Pick a point to go back to it.`}>
+    <Card title="Changes" desc={`Before every change to the firewall or network, NopeWarden keeps a copy of how things were (the last ${data.keep}). Pick a point to go back to it.`}>
       {data.points.length === 0 ? <Empty>No changes yet. The first one you apply will appear here.</Empty> : (
         <div className="list">
           {data.points.map((p, i) => (

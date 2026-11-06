@@ -1,19 +1,19 @@
-# Gatehouse specification
+# NopeWarden specification
 
-Working name: Gatehouse. DNS, DHCP, gateway and zone firewall appliance with a web console, installed from a bootable USB stick.
+Working name: NopeWarden. DNS, DHCP, gateway and zone firewall appliance with a web console, installed from a bootable USB stick.
 
 Status: first build. Everything below is in scope for the first bootable image unless it is listed under "Deferred".
 
 ## 1. Goals
 
 - One appliance that provides DNS filtering, DHCP, routing/NAT, a zone-based firewall, UPnP and monitoring.
-- Per-VLAN control: DHCP can be served by Gatehouse or left to another server, and Gatehouse can be the gateway for a VLAN or leave that to another router.
+- Per-VLAN control: DHCP can be served by NopeWarden or left to another server, and NopeWarden can be the gateway for a VLAN or leave that to another router.
 - Safe by default. A bad change must never lock the administrator out of the box.
 - A polished, themed console and installer. Every colour, size and spacing value comes from design tokens.
 
 ## 1a. Ease of use is the product
 
-pfSense and OPNsense are powerful and hard. Gatehouse exists to be the opposite: a person who has never configured a firewall should be able to set up and run it. Every feature in this document is judged against these rules, and a feature that cannot meet them is not shipped in that form.
+pfSense and OPNsense are powerful and hard. NopeWarden exists to be the opposite: a person who has never configured a firewall should be able to set up and run it. Every feature in this document is judged against these rules, and a feature that cannot meet them is not shipped in that form.
 
 1. **Defaults first.** A working network after the installer, with nothing else configured: DNS filtering on, DHCP on, a safe firewall, no open inbound ports. Most people never open a settings page.
 2. **Say what you want, not how.** Firewall policy is expressed as plain statements in the console ("Guests can reach the internet, but not other networks"), chosen from presets per network: Trusted, Private, Guest, Isolated (IoT), and Custom. Presets compile to the zone rules. Raw rules are an Advanced view, not the front door.
@@ -37,15 +37,15 @@ Measured by a first-boot test: from USB boot to a working, filtered network in u
 
 ## 3. Architecture
 
-One Go program, `gatehouse`, with sub-commands. The web console is a React app built into static files and embedded in the binary.
+One Go program, `nopewarden`, with sub-commands. The web console is a React app built into static files and embedded in the binary.
 
 | Process | Runs as | Purpose |
 | --- | --- | --- |
-| `gatehouse daemon` | user `gatehouse`, with `CAP_NET_BIND_SERVICE` | DNS, DHCP, UPnP, web/API, metrics, scheduling |
-| `gatehouse netd` | root | Applies network and firewall changes on request over a unix socket. Validates every request. |
-| `gatehouse rollback` | root, started by a systemd timer | Restores the last known good ruleset if a change is not confirmed in time. Independent of the other processes. |
-| `gatehouse recover` | root, local console only | Resets the firewall to the baseline, resets an admin password, clears TOTP. |
-| `gatehouse installer` | root, live image only | Serves the installer UI and performs the install. |
+| `nopewarden daemon` | user `nopewarden`, with `CAP_NET_BIND_SERVICE` | DNS, DHCP, UPnP, web/API, metrics, scheduling |
+| `nopewarden netd` | root | Applies network and firewall changes on request over a unix socket. Validates every request. |
+| `nopewarden rollback` | root, started by a systemd timer | Restores the last known good ruleset if a change is not confirmed in time. Independent of the other processes. |
+| `nopewarden recover` | root, local console only | Resets the firewall to the baseline, resets an admin password, clears TOTP. |
+| `nopewarden installer` | root, live image only | Serves the installer UI and performs the install. |
 
 External components the program orchestrates rather than re-implements:
 
@@ -83,15 +83,15 @@ All styling derives from `tokens/tokens.json` (see section 11).
 
 ## 7. DHCP
 
-- DHCPv4 scopes bound to an interface or VLAN. Mode per scope: `serve`, `relay` (another router relays to Gatehouse), `off`.
+- DHCPv4 scopes bound to an interface or VLAN. Mode per scope: `serve`, `relay` (another router relays to NopeWarden), `off`.
 - Reservations, options (router, DNS, domain, NTP), lease times, lease persistence.
 - Default gateway option is independent of who serves DHCP.
-- Rogue-server probe per VLAN, with a warning when another server is found where Gatehouse serves, or none where one is expected.
+- Rogue-server probe per VLAN, with a warning when another server is found where NopeWarden serves, or none where one is expected.
 - Leases feed DNS names and the device list.
 
 ## 8. Gateway, WAN and routing
 
-- Zone role per VLAN: `gateway` (Gatehouse routes and NATs) or `host` (another router stays the gateway).
+- Zone role per VLAN: `gateway` (NopeWarden routes and NATs) or `host` (another router stays the gateway).
 - WAN link types: DHCP, static, PPPoE, with optional VLAN tag; IPv4 and IPv6 (DHCPv6 prefix delegation to LAN zones, router advertisements, static v6).
 - Multi-WAN: priority failover and weighted load balancing, per-link health checks (ICMP or TCP to configurable targets), policy routing so replies leave through the link they arrived on.
 - NAT masquerade per WAN link, optional port forwards.
@@ -100,24 +100,24 @@ All styling derives from `tokens/tokens.json` (see section 11).
 ## 9. Firewall
 
 - Zones, each bound to interfaces. Policy per ordered zone pair with a default action and ordered rules (source, destination, service, action, logging, enabled).
-- Reusable objects: address groups, domain lists (resolved by Gatehouse DNS), address lists with scheduled refresh, service groups.
+- Reusable objects: address groups, domain lists (resolved by NopeWarden DNS), address lists with scheduled refresh, service groups.
 - Host firewall for the box itself ("Self" zone). Defaults, inbound drop: DNS 53/tcp+udp and DHCP 67/udp from LAN zones, HTTPS 443 from the management network, SSH 22 off by default, ICMP and ICMPv6 neighbour discovery allowed with limits. Outbound open for upstream DNS, NTP, updates.
-- DNS enforcement: redirect client port 53 to Gatehouse, block 853, optional DoH provider IP block.
-- Compile to nftables in a dedicated table (`inet gatehouse`). Never touches other tables.
+- DNS enforcement: redirect client port 53 to NopeWarden, block 853, optional DoH provider IP block.
+- Compile to nftables in a dedicated table (`inet nopewarden`). Never touches other tables.
 
 ### Anti-lockout
 
 1. A protected management rule is always first. It cannot be edited, reordered or removed through the UI.
 2. Pre-apply simulation: a change that would block the administrator's current session or leave no valid management source is refused.
-3. Commit with confirm: every apply starts a confirm window (default 60 s). The confirmation must arrive on a new connection. The rollback runs in `gatehouse rollback`, a separate process started by a systemd timer, so it works if the daemon hangs.
+3. Commit with confirm: every apply starts a confirm window (default 60 s). The confirmation must arrive on a new connection. The rollback runs in `nopewarden rollback`, a separate process started by a systemd timer, so it works if the daemon hangs.
 4. Last known good ruleset is stored on each confirmation and loaded automatically if the ruleset fails to start. Rules load before the web console listens.
-5. `gatehouse recover` at the local console resets to the baseline.
+5. `nopewarden recover` at the local console resets to the baseline.
 6. Sign-in lockouts are temporary and tracked per source and per account.
 
 ### UPnP
 
 - Per WAN link. Off by default. Enabled per zone, never IoT or Guest unless chosen. Device allowlist.
-- A mapping must target the requester's own address. No ports below 1024, none that match management or Gatehouse ports. Lease length, mappings per device and request rate limited.
+- A mapping must target the requester's own address. No ports below 1024, none that match management or NopeWarden ports. Lease length, mappings per device and request rate limited.
 - No event subscriptions. Listens only on internal interfaces.
 - Mappings live in nftables sets with element timeouts. Every request is logged. UI lists active mappings with revoke.
 - Return traffic is bound to the link the mapping belongs to. Mappings are dropped on failover by default.
@@ -136,7 +136,7 @@ Two engines, managed from one console page. Both appear to the firewall as zones
 ### OpenVPN
 - Orchestrates the `openvpn` daemon from generated configuration. Server mode (routed, UDP or TCP) and client mode (import a provider `.ovpn`).
 - Built-in certificate authority written in Go (ECDSA P-256): CA, server certificate, per-user client certificates, revocation list. CA key sealed in `config.db`.
-- Server: port, protocol, pool, pushed routes and DNS (Gatehouse DNS by default), cipher policy limited to AEAD suites, `tls-crypt` key, user certificates with optional username and password plus TOTP.
+- Server: port, protocol, pool, pushed routes and DNS (NopeWarden DNS by default), cipher policy limited to AEAD suites, `tls-crypt` key, user certificates with optional username and password plus TOTP.
 - Profiles: generate and download a single `.ovpn` per user; revoke from the console.
 - Live status from the management interface on a unix socket (clients, bytes in and out, connected since).
 
@@ -185,6 +185,6 @@ Two engines, managed from one console page. Both appear to the firewall as zones
 
 ## 15. Open items
 
-- Product name (Gatehouse is a placeholder).
+- Product name (NopeWarden is a placeholder).
 - ISO delivery: GitHub Actions build, downloaded from the repository release.
 - Hardware validation on the owner's PC (NIC model, boot mode).

@@ -421,7 +421,7 @@ CREATE TABLE dns_zone_targets(
 CREATE TABLE dns_exceptions(
   id INTEGER PRIMARY KEY,
   who TEXT NOT NULL UNIQUE,            -- dev:aa:bb:cc:dd:ee:ff or grp:Name
-  mode TEXT NOT NULL,                  -- off, gatehouse or server
+  mode TEXT NOT NULL,                  -- off, nopewarden or server
   target TEXT NOT NULL DEFAULT ''
 );
 `, `
@@ -430,7 +430,7 @@ CREATE TABLE dns_exceptions(
 ALTER TABLE vpn_ovpn_users ADD COLUMN paused INTEGER NOT NULL DEFAULT 0;
 `, `
 -- Blocklists: how many names a list blocks, how many exceptions ("allowed") it carries and how many
--- lines Gatehouse could not use; and when to try a failed download again. A failed download no
+-- lines NopeWarden could not use; and when to try a failed download again. A failed download no
 -- longer counts as a finished one.
 ALTER TABLE blocklists ADD COLUMN allowed INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE blocklists ADD COLUMN skipped INTEGER NOT NULL DEFAULT 0;
@@ -470,7 +470,7 @@ ALTER TABLE groups ADD COLUMN hours TEXT NOT NULL DEFAULT '';
 ALTER TABLE groups ADD COLUMN paused_until INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE devices ADD COLUMN paused_until INTEGER NOT NULL DEFAULT 0;
 `, `
--- Package 6: Wi-Fi join cards for access points Gatehouse does not run, usage caps, ISP report data.
+-- Package 6: Wi-Fi join cards for access points NopeWarden does not run, usage caps, ISP report data.
 CREATE TABLE wifi_cards(
   id INTEGER PRIMARY KEY,
   title TEXT NOT NULL,

@@ -4,7 +4,7 @@ import { del, get, holdAnd, post, put, useData } from '../api.js';
 import { SAVED_LATER, SaveChoice } from '../changes.jsx';
 import { CODES, countryName } from '../AddrPicker.jsx';
 import { PolicyControls, WhenField, whenText } from '../policykit.jsx';
-import { Button, Card, Empty, Field, Input, Modal, Note, Pill, Select, ToggleRow, useAction, useToast, confirmBox } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, Pill, Select, ToggleRow, useAction, useToast, Limited , useDelayedDelete } from '../ui.jsx';
 
 // Open a port for an app on a device. Pick the app, pick the device, tick the connection. The
 // device is followed by its hardware address, so the forward keeps working if its address changes.
@@ -248,6 +248,7 @@ function LegacyForm({ f, wans, onClose, onSaved }) {
 }
 
 export default function Forwards({ reload }) {
+  const delayedDelete = useDelayedDelete();
   const { data, reload: rf } = useData('/api/fw/appforwards');
   const { data: legacy, reload: rl } = useData('/api/fw/forwards');
   const { data: wans } = useData('/api/net/wans');
@@ -263,7 +264,7 @@ export default function Forwards({ reload }) {
   return (
     <Card title="Open a port to the internet" desc="Let the internet reach an app on one of your devices." actions={<Button small icon="plus" onClick={() => setEdit({})}>Open a port</Button>}>
       <div className="list">
-        {items.map((g) => (
+        {<Limited items={items} noun="forwards" render={(g) => (
           <div className="item" key={`${g.group}-${g.id || ''}`}>
             <div className="fill">
               <div className="name">{g.text} {!g.enabled && <Pill>Off</Pill>}{whenText(g.paused_until) && <Pill tone="warn">{whenText(g.paused_until)}</Pill>}</div>
@@ -277,10 +278,10 @@ export default function Forwards({ reload }) {
                 onPause={g.legacy ? undefined : (m) => run(() => post('/api/fw/appforwards/pause', { group: g.group, minutes: m }), m === 0 ? 'Saved. Apply the firewall to resume it.' : 'Saved. Apply the firewall to start the pause.').then(refresh)}
                 onToggle={g.legacy ? undefined : () => run(() => post('/api/fw/appforwards/enable', { group: g.group, enabled: !g.enabled }), 'Saved. Apply the firewall to start using it.').then(refresh)}
                 onEdit={() => g.legacy ? setOld((legacy || []).find((l) => l.id === g.id)) : setEdit({ group: g.group, name: g.group, ports: g.ports, app: g.app, mac: g.mac, device_name: g.device_name, ip: g.ip, connections: g.connections, src: g.src, countries: g.countries, enabled: g.enabled, sched: g.sched })}
-                onRemove={async () => await confirmBox(`Delete "${g.group}"?`) && run(() => g.legacy ? del(`/api/fw/forwards/${g.id}`) : del(`/api/fw/appforwards/${encodeURIComponent(g.group)}`)).then(refresh)} />
+                onRemove={() => delayedDelete(`The port forward "${g.group}"`, () => (g.legacy ? del(`/api/fw/forwards/${g.id}`) : del(`/api/fw/appforwards/${encodeURIComponent(g.group)}`)), refresh)} />
             </div>
           </div>
-        ))}
+        )} />}
         {data && !items.length && <Empty>No ports are open to the internet.</Empty>}
       </div>
       {data && data.connections.length === 0 && <Note tone="warn">Add an internet connection first, on the Internet page.</Note>}

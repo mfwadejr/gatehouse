@@ -91,7 +91,7 @@ func RunTextInstaller() error {
 		if disp != nil {
 			outs = append(outs, disp) // drawn as graphics; the keyboard still comes from the console
 		} else {
-			io.WriteString(f, palette) // the Gatehouse colours, as on the other screens
+			io.WriteString(f, palette) // the NopeWarden colours, as on the other screens
 			outs = append(outs, f)
 		}
 		pump(f)

@@ -11,7 +11,7 @@ import (
 
 // Safe search: for devices in a profile that asks for it, the main search engines and YouTube are
 // pointed at the address their own "safe" mode uses. The device still opens the usual website name;
-// only the address behind the name changes. This only works while the device asks Gatehouse for
+// only the address behind the name changes. This only works while the device asks NopeWarden for
 // names (encrypted DNS inside a browser, or a VPN, bypasses it).
 
 var reGoogle = regexp.MustCompile(`^(www\.)?google\.(com|co\.[a-z]{2}|com\.[a-z]{2}|[a-z]{2})\.$`)

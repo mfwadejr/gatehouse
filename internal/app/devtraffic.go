@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/fw"
+	"nopewarden/internal/api"
+	"nopewarden/internal/fw"
 )
 
 // How much each device sends and receives. The firewall counts it (see fw.AcctUp); this reads the
@@ -48,7 +48,9 @@ type arpEntry struct{ MAC, Dev string }
 
 // arpTable reads the kernel's list of neighbours: address, hardware address and the port it was
 // seen on. It also finds devices that were given a fixed address and never used DHCP.
-func arpTable() map[string]arpEntry {
+var arpTable = arpTableReal
+
+func arpTableReal() map[string]arpEntry {
 	out := map[string]arpEntry{}
 	f, err := os.Open("/proc/net/arp")
 	if err != nil {

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/netcfg"
+	"nopewarden/internal/api"
+	"nopewarden/internal/netcfg"
 )
 
 // Silent warm standby (see package ha): the option is one setting that is copied to both units.

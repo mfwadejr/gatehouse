@@ -136,7 +136,7 @@ func (u *Upstream) status(now time.Time) UpstreamStatus {
 		st.Reason = fmt.Sprintf("Did not answer the last %d queries: %s", u.fails, friendlyErr(u.lastErr))
 	case u.ewma > degradedAbove:
 		st.State = "degraded"
-		st.Reason = fmt.Sprintf("Answers take %d ms on average, slower than the %d ms Gatehouse treats as slow. It still works, and is tried after faster ones.", u.ewma.Milliseconds(), degradedAbove.Milliseconds())
+		st.Reason = fmt.Sprintf("Answers take %d ms on average, slower than the %d ms NopeWarden treats as slow. It still works, and is tried after faster ones.", u.ewma.Milliseconds(), degradedAbove.Milliseconds())
 		if u.Proto != "udp" && u.Proto != "" {
 			st.Reason += " A slow or mobile internet link (a hotspot, for example) makes every encrypted lookup slower."
 		}
@@ -533,7 +533,7 @@ func (p *Pool) Test(ctx context.Context, u *Upstream) TestResult {
 	u.record(answer, nil, p.now())
 	switch {
 	case connect > 0 && connect > 3*answer && connect > 100*time.Millisecond:
-		r.Verdict = "The server itself answers quickly, but opening the connection is slow. That points at the internet link, not the server. Gatehouse keeps connections open to avoid paying this for every lookup."
+		r.Verdict = "The server itself answers quickly, but opening the connection is slow. That points at the internet link, not the server. NopeWarden keeps connections open to avoid paying this for every lookup."
 	case answer > degradedAbove:
 		r.Verdict = "This server is slow to answer from here. Another server may suit this connection better."
 	default:

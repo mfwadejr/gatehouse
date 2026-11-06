@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/ha"
-	"gatehouse/internal/netd"
+	"nopewarden/internal/api"
+	"nopewarden/internal/ha"
+	"nopewarden/internal/netd"
 )
 
 func (a *App) haOwns(addr string) bool {

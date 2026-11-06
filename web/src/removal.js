@@ -16,7 +16,7 @@ export async function confirmRemoval(url, lead, { zoneRemoval = false } = {}) {
     if (goes.length) lines.push(`This also removes: ${goes.join(', ')}.`);
     if (imp.kept) lines.push(imp.kept);
     if (zoneRemoval && !imp.management && imp.other_ports?.length) lines.push(`${imp.other_ports.join(', ')} keeps its address but is no longer part of any firewall network.`);
-    if (zoneRemoval && imp.management) lines.push('This network can manage Gatehouse, so its address range stays and devices on it keep working.');
+    if (zoneRemoval && imp.management) lines.push('This network can manage NopeWarden, so its address range stays and devices on it keep working.');
   }
   return confirmBox(lines.join('\n'), { title: 'Remove this network?', yes: 'Remove' });
 }

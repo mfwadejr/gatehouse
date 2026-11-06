@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"gatehouse/internal/crypt"
-	"gatehouse/internal/fw"
-	"gatehouse/internal/store"
+	"nopewarden/internal/crypt"
+	"nopewarden/internal/fw"
+	"nopewarden/internal/store"
 )
 
 func open(t *testing.T) (*store.DB, *crypt.Box) {
@@ -65,7 +65,7 @@ func TestValidate(t *testing.T) {
 		{"wan ok", func(n *Network) { n.WAN = &WAN{Port: "enp1s0", Type: "dhcp"} }, ""},
 		{"pppoe needs login", func(n *Network) { n.WAN = &WAN{Port: "enp1s0", Type: "pppoe"} }, "user name and password"},
 		{"bridge reuse", func(n *Network) { n.Bridge = []string{"enp2s0"} }, "already used"},
-		{"mode missing", func(n *Network) { n.LAN.Mode = "" }, "how Gatehouse is used"},
+		{"mode missing", func(n *Network) { n.LAN.Mode = "" }, "how NopeWarden is used"},
 		{"behind with wan", func(n *Network) {
 			n.LAN = LAN{Port: "enp2s0", Mode: "behind", Addressing: "dhcp"}
 			n.WAN = &WAN{Port: "enp1s0", Type: "dhcp"}

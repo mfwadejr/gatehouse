@@ -34,16 +34,16 @@ func Ensure(dir, hostname string) (certPath, keyPath string, err error) {
 	}
 	serial, _ := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 100))
 	if hostname == "" {
-		hostname = "gatehouse"
+		hostname = "nopewarden"
 	}
 	tpl := &x509.Certificate{
 		SerialNumber: serial,
-		Subject:      pkix.Name{CommonName: hostname, Organization: []string{"Gatehouse"}},
+		Subject:      pkix.Name{CommonName: hostname, Organization: []string{"NopeWarden"}},
 		NotBefore:    time.Now().Add(-time.Hour),
 		NotAfter:     time.Now().AddDate(5, 0, 0),
 		KeyUsage:     x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		DNSNames:     []string{hostname, hostname + ".lan", "gatehouse", "gatehouse.lan", "localhost"},
+		DNSNames:     []string{hostname, hostname + ".lan", "nopewarden", "nopewarden.lan", "localhost"},
 		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::1")},
 	}
 	// Include every address the device has now, so the certificate matches how people reach it.

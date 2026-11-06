@@ -20,7 +20,7 @@ export default function GuestPortal() {
         <ToggleRow title="Use a sign-in page" checked={f.on} onChange={set('on')} />
         {f.on && (
           <>
-            <Field label="Which networks" hint="Pick your guest network. A network that manages Gatehouse, or that faces the internet, can never be chosen, so you cannot lock yourself out.">
+            <Field label="Which networks" hint="Pick your guest network. A network that manages NopeWarden, or that faces the internet, can never be chosen, so you cannot lock yourself out.">
               <div className="stack">
                 {nets.map((n) => (
                   <label key={n.iface} style={{ display: 'flex', gap: '.6rem', alignItems: 'center', opacity: n.allowed ? 1 : 0.55 }}>

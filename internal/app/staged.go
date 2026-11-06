@@ -12,12 +12,12 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/update"
+	"nopewarden/internal/api"
+	"nopewarden/internal/update"
 )
 
 // Staged changes. A change saved "for later" waits, in plain words, on the Review page until the
-// person commits everything at once or discards it. Gatehouse keeps:
+// person commits everything at once or discards it. NopeWarden keeps:
 //   - a journal of what was staged, in words, written when each change is saved; and
 //   - a copy of the settings from just before each staged change, so Discard puts everything back
 //     exactly as it was running, or goes back to just before one line (dropping that line and the
@@ -37,6 +37,8 @@ type stagedEntry struct {
 	TS    int64  `json:"ts"`
 	Actor string `json:"actor"`
 	Text  string `json:"text"`
+	// DNS marks a change that waits with the DNS area (names, lists, blocks, forgotten devices).
+	DNS bool `json:"dns,omitempty"`
 	// Before names the copy of the settings taken just before this change was saved. Discarding this
 	// line puts that copy back, which also drops every change saved after it.
 	Before string `json:"before,omitempty"`
@@ -71,12 +73,15 @@ func (a *App) removeStagedSnap(name string) {
 
 // stagedPath says whether a request can stage a change to the firewall or the network.
 func stagedPath(path string) bool {
+	if strings.HasPrefix(path, "/api/devices/") && !strings.Contains(path[len("/api/devices/"):], "/") {
+		return true // forgetting a device can wait (other device changes are not journaled: see stagedAfter)
+	}
 	for _, end := range []string{"/apply", "/confirm", "/rollback", "/preview", "/discard", "/test"} {
 		if strings.HasSuffix(path, end) {
 			return false
 		}
 	}
-	for _, p := range []string{"/api/fw/", "/api/net/", "/api/routes", "/api/vpn/", "/api/dhcp/", "/api/dns/", "/api/wan"} {
+	for _, p := range []string{"/api/fw/", "/api/net/", "/api/routes", "/api/vpn/", "/api/dhcp/", "/api/dns/", "/api/wan", "/api/networks/", "/api/blocks"} {
 		if strings.HasPrefix(path, p) {
 			return true
 		}
@@ -109,7 +114,7 @@ func (a *App) stagedBefore(method, path string) {
 	if a.Config.Setting(stagedBaseKey, "") != "" || len(a.stagedJournal()) > 0 {
 		return
 	}
-	if f, n := a.anyDirty(); f || n {
+	if f, n := a.anyDirty(); f || n || a.dnsHeld() {
 		return // something was already waiting before staging was tracked; nothing clean to go back to
 	}
 	if name := a.takeStagedSnap(); name != "" {
@@ -148,7 +153,7 @@ func (a *App) stagedAfter(actor, method, path string, body []byte) {
 	defer stagedMu.Unlock()
 	f, n := a.anyDirty()
 	j := a.stagedJournal()
-	if !f && !n {
+	if !f && !n && !a.dnsHeld() {
 		if len(j) > 0 || a.Config.Setting(stagedBaseKey, "") != "" {
 			a.clearStaged()
 		}
@@ -188,7 +193,21 @@ func (a *App) stagedAfter(actor, method, path string, body []byte) {
 	if !stagedPath(path) {
 		return
 	}
+	if strings.HasPrefix(path, "/api/devices/") {
+		if method != http.MethodDelete || !a.dnsHeld() {
+			return // only a staged "forget" is a waiting change; pausing and the rest are immediate
+		}
+	}
 	text := stagedWords(method, path, body)
+	if method == http.MethodDelete && strings.HasPrefix(path, "/api/devices/") {
+		id, _ := strconv.ParseInt(strings.TrimPrefix(path, "/api/devices/"), 10, 64)
+		var name, mac string
+		a.Config.QueryRow(`SELECT name,mac FROM devices WHERE id=?`, id).Scan(&name, &mac)
+		if name == "" {
+			name = mac
+		}
+		text = "Forgot the device " + name + "."
+	}
 	tip := a.Config.Setting(stagedTipKey, "")
 	if len(j) > 0 && j[len(j)-1].Text == text {
 		// The same line again: whatever it changed belongs to that line, so the next line starts from now.
@@ -202,7 +221,7 @@ func (a *App) stagedAfter(actor, method, path string, body []byte) {
 	if len(j) > 0 {
 		id = j[len(j)-1].ID + 1
 	}
-	j = append(j, stagedEntry{ID: id, TS: time.Now().Unix(), Actor: actor, Text: text, Before: tip})
+	j = append(j, stagedEntry{ID: id, TS: time.Now().Unix(), Actor: actor, Text: text, Before: tip, DNS: a.dnsHeld() && (dnsStagePath(method, path) || strings.HasPrefix(path, "/api/devices/"))})
 	a.Config.SetSetting(stagedTipKey, a.takeStagedSnap())
 	if len(j) > 60 { // each line holds a copy of the settings, so the list is kept short
 		for _, e := range j[:len(j)-60] {
@@ -230,6 +249,12 @@ func stagedWords(method, path string, body []byte) string {
 		return verb + " firewall settings."
 	case strings.HasPrefix(path, "/api/fw/"):
 		return verb + " the firewall."
+	case path == "/api/networks/add":
+		return "Added a network."
+	case path == "/api/networks/move":
+		return "Moved a network to another port or VLAN."
+	case path == "/api/networks/add-ports":
+		return "Added ports to a network."
 	case strings.HasPrefix(path, "/api/net/wans"), strings.HasPrefix(path, "/api/wan"):
 		return verb + " an internet connection."
 	case strings.HasPrefix(path, "/api/net/"):
@@ -261,7 +286,7 @@ func (a *App) stagedView() map[string]any {
 		items = append(items, map[string]any{"id": e.ID, "ts": e.TS, "actor": e.Actor, "text": e.Text, "can_discard": can})
 	}
 	return map[string]any{
-		"items": items, "fw": f, "net": n,
+		"items": items, "fw": f, "net": n, "dns": a.dnsHeld(),
 		"can_discard": a.Config.Setting(stagedBaseKey, "") != "",
 	}
 }
@@ -318,9 +343,22 @@ func (a *App) registerStagedRoutes() {
 		// Restoring puts the settings from that moment back, including these bookkeeping values, so read
 		// them first and write them again afterwards.
 		oldBase, oldTip := a.Config.Setting(stagedBaseKey, ""), a.Config.Setting(stagedTipKey, "")
+		wasHeld := a.dnsHeld()
+		dnsHold.Store(false) // so the restore rebuilds DNS from the settings it puts back
 		if _, err := a.restoreBackup(p, "", c.User.Username); err != nil {
+			dnsHold.Store(wasHeld)
 			fail(w, err)
 			return
+		}
+		a.dropScopeCache()
+		if wasHeld && idx >= 0 {
+			// part of the list is still waiting, so DNS keeps waiting too if a remaining line is a DNS change
+			for _, e := range j[:idx] {
+				if e.DNS || strings.Contains(e.Text, "DNS") || strings.Contains(e.Text, "list") {
+					dnsHold.Store(true)
+					break
+				}
+			}
 		}
 		what, detail := "Staged changes discarded", "Discarded every change that was waiting to be applied."
 		if idx >= 0 {
@@ -346,7 +384,7 @@ func (a *App) registerStagedRoutes() {
 		a.fwSync()
 		a.publishNet()
 		if idx >= 0 {
-			if f, n := a.anyDirty(); !f && !n {
+			if f, n := a.anyDirty(); !f && !n && !a.dnsHeld() {
 				a.clearStaged()
 			}
 		}

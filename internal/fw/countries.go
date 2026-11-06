@@ -94,7 +94,7 @@ func CountryRules(zones []Zone, p CountryPolicy) []Rule {
 			to := n
 			where := "to " + n
 			if n == "self" {
-				where = "to Gatehouse itself"
+				where = "to NopeWarden itself"
 			}
 			out = append(out, Rule{Name: CountryPrefix + "in", From: "Internet", To: to, Src: list, Service: "any", Action: "drop",
 				Enabled: true, Not: allow, Early: true, Descr: what + "what other countries send " + where + "."})

@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"gatehouse/internal/netd"
-	"gatehouse/internal/update"
+	"nopewarden/internal/netd"
+	"nopewarden/internal/update"
 )
 
 const updTestPriv = `-----BEGIN OPENSSH PRIVATE KEY-----
@@ -30,7 +30,7 @@ func updPackage(t *testing.T, version string, sign bool) (data []byte, sig strin
 		t.Fatal(err)
 	}
 	dir := t.TempDir()
-	bin := filepath.Join(dir, "gatehouse")
+	bin := filepath.Join(dir, "nopewarden")
 	os.WriteFile(bin, append([]byte("\x7fELF"), []byte("body")...), 0o755)
 	data, err = update.Build(version, "Fixes", "2026-10-23", map[string]string{update.BinaryDest: bin}, map[string]uint32{update.BinaryDest: 0o755})
 	if err != nil {
@@ -49,8 +49,8 @@ func updServer(t *testing.T, version string, sign bool) string {
 	var base string
 	mux.HandleFunc("/latest", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"tag_name":"v` + version + `","body":"Fixes","assets":[
-		 {"name":"gatehouse-update-` + version + `.tar.gz","browser_download_url":"` + base + `/pkg","size":1},
-		 {"name":"gatehouse-update-` + version + `.tar.gz.sig","browser_download_url":"` + base + `/sig","size":1}]}`))
+		 {"name":"nopewarden-update-` + version + `.tar.gz","browser_download_url":"` + base + `/pkg","size":1},
+		 {"name":"nopewarden-update-` + version + `.tar.gz.sig","browser_download_url":"` + base + `/sig","size":1}]}`))
 	})
 	mux.HandleFunc("/pkg", func(w http.ResponseWriter, r *http.Request) { w.Write(data) })
 	mux.HandleFunc("/sig", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(sig)) })
@@ -91,7 +91,7 @@ func (f *fakeNet) updateGiven() string { f.mu.Lock(); defer f.mu.Unlock(); retur
 func TestUpdateCheckAndInstall(t *testing.T) {
 	c, fn, data := updBox(t, updServer(t, "0.2.0", true), true)
 	rc, m, raw := c.call("POST", "/api/system/update/check", nil)
-	if rc != 200 || m["available"] != true || m["gatehouse_new"] != true || m["current"] != "0.1.5" {
+	if rc != 200 || m["available"] != true || m["nopewarden_new"] != true || m["current"] != "0.1.5" {
 		t.Fatalf("check: %d %s", rc, raw)
 	}
 	if rc, _, raw := c.call("POST", "/api/system/update/install", map[string]any{}); rc != 200 {
@@ -105,7 +105,7 @@ func TestUpdateCheckAndInstall(t *testing.T) {
 		t.Fatal("signature not stored next to the package")
 	}
 	if fn.sysStarted {
-		t.Fatal("a Gatehouse update must go through the full update, not the system-only one")
+		t.Fatal("a NopeWarden update must go through the full update, not the system-only one")
 	}
 }
 
@@ -167,7 +167,7 @@ func TestUpdateSettings(t *testing.T) {
 	}
 }
 
-// With no newer Gatehouse, waiting system updates still make something to install, and the
+// With no newer NopeWarden, waiting system updates still make something to install, and the
 // install goes the system-only way.
 func TestSystemUpdatesAloneAreOffered(t *testing.T) {
 	c, fn, _ := updBox(t, updServer(t, "0.1.5", true), true)
@@ -178,7 +178,7 @@ func TestSystemUpdatesAloneAreOffered(t *testing.T) {
 		return m["checking"] == false && m["system_count"] == float64(4)
 	})
 	_, m, _ := c.call("GET", "/api/system/update", nil)
-	if m["available"] != true || m["gatehouse_new"] == true {
+	if m["available"] != true || m["nopewarden_new"] == true {
 		t.Fatalf("%v", m)
 	}
 	if rc, _, raw := c.call("POST", "/api/system/update/install", map[string]any{}); rc != 200 {
@@ -186,16 +186,16 @@ func TestSystemUpdatesAloneAreOffered(t *testing.T) {
 	}
 	waitFor(t, "the system-only update to start", func() bool { fn.mu.Lock(); defer fn.mu.Unlock(); return fn.sysStarted })
 	if fn.updateGiven() != "" {
-		t.Fatal("a package was installed though no newer Gatehouse exists")
+		t.Fatal("a package was installed though no newer NopeWarden exists")
 	}
 }
 
-// A Gatehouse update brings the system updates with it and checks them, even if the count is 0.
-func TestGatehouseUpdateIncludesSystemStep(t *testing.T) {
+// A NopeWarden update brings the system updates with it and checks them, even if the count is 0.
+func TestNopeWardenUpdateIncludesSystemStep(t *testing.T) {
 	c, _, _ := updBox(t, updServer(t, "0.2.0", true), true)
 	c.call("POST", "/api/system/update/check", nil)
 	// While preparing, the progress list names every step in order.
-	steps := updateSteps(update.Plan{Gatehouse: true, System: true}, "system")
+	steps := updateSteps(update.Plan{NopeWarden: true, System: true}, "system")
 	var ids []string
 	for _, st := range steps {
 		ids = append(ids, st.ID+":"+st.State)

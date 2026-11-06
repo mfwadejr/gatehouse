@@ -100,9 +100,9 @@ func TestReadLineEditing(t *testing.T) {
 
 func TestSerialFromCmdline(t *testing.T) {
 	cases := map[string][2]any{
-		"boot=live quiet console=tty0 console=ttyS0,115200n8 gatehouse.text": {"ttyS0", 115200},
-		"console=ttyS1,9600 gatehouse.text":                                  {"ttyS1", 9600},
-		"boot=live gatehouse.text":                                           {"ttyS0", 115200},
+		"boot=live quiet console=tty0 console=ttyS0,115200n8 nopewarden.text": {"ttyS0", 115200},
+		"console=ttyS1,9600 nopewarden.text":                                  {"ttyS1", 9600},
+		"boot=live nopewarden.text":                                           {"ttyS0", 115200},
 	}
 	for in, want := range cases {
 		d, b := SerialFromCmdline(in)
@@ -120,7 +120,7 @@ func TestRecoveryScreen(t *testing.T) {
 		ClearTwoStep:   func(n string) error { got = append(got, "mfa:"+n); return nil },
 		ResetFirewall:  func() error { got = append(got, "fw"); return nil },
 		ResetAccess:    func() error { got = append(got, "access"); return nil },
-		Diagnose:       func() string { return "gatehouse          failed" },
+		Diagnose:       func() string { return "nopewarden          failed" },
 		Services:       func() string { return "DHCP (hands out addresses)\n  Listening: yes" },
 		ResetToDefault: func(l string) (string, error) { got = append(got, "reset:"+l); return "/backup.db", nil },
 	}
@@ -142,7 +142,7 @@ func TestRecoveryScreen(t *testing.T) {
 	if strings.Join(got, ",") != "pw:marvin:a long enough pass,mfa:marvin,fw,access,reset:network" {
 		t.Fatalf("actions: %v\n%s", got, out.String())
 	}
-	if !strings.Contains(out.String(), "gatehouse          failed") {
+	if !strings.Contains(out.String(), "nopewarden          failed") {
 		t.Fatal("the diagnostics view shows nothing")
 	}
 	if !strings.Contains(out.String(), "Listening: yes") {
@@ -211,7 +211,7 @@ func TestManagementPortIsRememberedOnTheNewSystem(t *testing.T) {
 }
 
 func TestManagementPortWithoutACableNeedsInsisting(t *testing.T) {
-	ask := portAsk{step: 2, title: "Which port will you manage Gatehouse from?"}
+	ask := portAsk{step: 2, title: "Which port will you manage NopeWarden from?"}
 	env := &TextEnv{Ports: func() []Port { return []Port{{Name: "enp1s0"}, {Name: "enp2s0"}} }, Refresh: func() {}, Poll: 5 * time.Millisecond, Settle: time.Millisecond}
 	// No cable anywhere: Enter alone gets nowhere; choosing a port asks, and "n" goes back.
 	script := strings.Join([]string{"", "2", "n", "2", "y"}, "\r") + "\r"
@@ -230,7 +230,7 @@ func TestManagementPortWithoutACableNeedsInsisting(t *testing.T) {
 func TestManagementPortListUpdatesByItself(t *testing.T) {
 	var mu sync.Mutex
 	linked := false
-	ask := portAsk{step: 2, title: "Which port will you manage Gatehouse from?"}
+	ask := portAsk{step: 2, title: "Which port will you manage NopeWarden from?"}
 	env := &TextEnv{Ports: func() []Port {
 		mu.Lock()
 		defer mu.Unlock()

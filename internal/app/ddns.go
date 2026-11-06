@@ -14,13 +14,13 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/api"
+	"nopewarden/internal/api"
 )
 
 // Easy remote access: a web name that always points at this router (dynamic DNS), so a phone can
 // reach home with the VPN from anywhere. Two kinds of service are supported: DuckDNS, and the
 // standard "dyndns2" protocol that No-IP, Dynu and many others speak. The provider reads the
-// router's public address from the request itself, so Gatehouse never has to guess it.
+// router's public address from the request itself, so NopeWarden never has to guess it.
 
 type ddnsCfg struct {
 	Provider string `json:"provider"` // "", duckdns, dyndns2
@@ -86,7 +86,7 @@ func (a *App) ddnsUpdate(ctx context.Context) error {
 		req, err = http.NewRequestWithContext(ctx, "GET", u, nil)
 		if err == nil {
 			req.SetBasicAuth(c.User, secret)
-			req.Header.Set("User-Agent", "Gatehouse")
+			req.Header.Set("User-Agent", "NopeWarden")
 		}
 	default:
 		return errors.New("unknown service")

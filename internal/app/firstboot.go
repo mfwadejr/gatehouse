@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"gatehouse/internal/fw"
+	"nopewarden/internal/fw"
 )
 
 // ResetMarker is left in the data directory by the recovery screen, which can clear the settings

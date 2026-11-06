@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	dnssrv "gatehouse/internal/dns"
-	"gatehouse/internal/netd"
+	dnssrv "nopewarden/internal/dns"
+	"nopewarden/internal/netd"
 )
 
 func TestFWReason(t *testing.T) {
@@ -116,7 +116,7 @@ func TestDNSRowsShowNetworkAndConnection(t *testing.T) {
 	if len(items) != 2 {
 		t.Fatalf("rows: %+v", items)
 	}
-	// Gatehouse's own health check is hidden unless asked for.
+	// NopeWarden's own health check is hidden unless asked for.
 	time.Sleep(700 * time.Millisecond)
 	var own struct{ Items []LogItem }
 	rr := newRec()
@@ -136,7 +136,7 @@ func TestDNSRowsShowNetworkAndConnection(t *testing.T) {
 	if fwd.Via != "T-Mobile" || fwd.ViaKind != "wan" || fwd.FromZone != "Cameras" || fwd.ToZone != "Internet" {
 		t.Fatalf("forwarded lookup: %+v", fwd)
 	}
-	if cached.Via != "" || cached.FromZone != "Cameras" || cached.ToZone != "Gatehouse" {
+	if cached.Via != "" || cached.FromZone != "Cameras" || cached.ToZone != "NopeWarden" {
 		t.Fatalf("cached lookup: %+v", cached)
 	}
 }

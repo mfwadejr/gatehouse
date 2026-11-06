@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	dnssrv "gatehouse/internal/dns"
+	dnssrv "nopewarden/internal/dns"
 )
 
 func newScopeApp(t *testing.T) *App {

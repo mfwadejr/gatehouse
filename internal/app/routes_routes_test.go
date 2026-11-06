@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"gatehouse/internal/fw"
-	"gatehouse/internal/netcfg"
+	"nopewarden/internal/fw"
+	"nopewarden/internal/netcfg"
 )
 
 func TestRoutesSendOnlyChosenDestinationsThroughATunnel(t *testing.T) {

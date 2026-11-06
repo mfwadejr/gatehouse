@@ -56,7 +56,7 @@ func TestBridgeModeApplyConfirmAndLeave(t *testing.T) {
 	ff.mu.Lock()
 	script := ff.script
 	ff.mu.Unlock()
-	if !strings.Contains(script, "table bridge gatehouse_br") || strings.Contains(script, "masquerade") {
+	if !strings.Contains(script, "table bridge nopewarden_br") || strings.Contains(script, "masquerade") {
 		t.Fatalf("firewall script:\n%s", script)
 	}
 	// Not confirmed yet: still not live.
@@ -73,7 +73,7 @@ func TestBridgeModeApplyConfirmAndLeave(t *testing.T) {
 	if p, _ := a.buildPlan(a.Config); len(p.Config.WANs) != 0 || p.Config.Interfaces[0].Name != "br-gate" {
 		t.Fatal("later network applies must stay in bridge mode")
 	}
-	if _, s, err := a.currentRuleset(); err != nil || !strings.Contains(s, "gatehouse_br") {
+	if _, s, err := a.currentRuleset(); err != nil || !strings.Contains(s, "nopewarden_br") {
 		t.Fatalf("later firewall applies must stay in bridge mode: %v", err)
 	}
 	if st := a.bridgeStatus(); st["dirty"] != false {
@@ -98,7 +98,7 @@ func TestBridgeModeApplyConfirmAndLeave(t *testing.T) {
 	ff.mu.Lock()
 	script = ff.script
 	ff.mu.Unlock()
-	if strings.Contains(script, "gatehouse_br") {
+	if strings.Contains(script, "nopewarden_br") {
 		t.Fatal("the routing ruleset must not contain the bridge filter")
 	}
 	if rc, _, raw := c.call("POST", "/api/bridge/confirm", map[string]any{}); rc != 200 {

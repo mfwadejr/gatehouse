@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/devices"
-	"gatehouse/internal/fw"
+	"nopewarden/internal/api"
+	"nopewarden/internal/devices"
+	"nopewarden/internal/fw"
 )
 
 // The Devices page: every device with its maker, where it is connected, what network it is on, how
@@ -22,23 +22,24 @@ import (
 
 type deviceRow struct {
 	devices.Device
-	Vendor    string   `json:"vendor"`
-	IconGuess string   `json:"icon_guess"`
-	Source    string   `json:"source"`  // "device" or "vpn"
-	Conn      string   `json:"conn"`    // wired, vpn, or empty when not known
-	Port      string   `json:"port"`    // the port, card or tunnel
-	Network   string   `json:"network"` // the firewall network
-	DownBps   float64  `json:"down_bps"`
-	UpBps     float64  `json:"up_bps"`
-	TodayDown int64    `json:"today_down"`
-	TodayUp   int64    `json:"today_up"`
-	Groups    []string `json:"groups"`
-	Reserved  bool     `json:"reserved"`
-	Override  string   `json:"override"`         // the VLAN network this device is placed on, if any
-	OverNet   string   `json:"override_network"` // that network's name
-	Approval  string   `json:"approval"`         // ok, pending or blocked
-	Via       string   `json:"via,omitempty"`    // the VPN this device is sent through
-	ViaState  string   `json:"via_state,omitempty"`
+	Vendor     string   `json:"vendor"`
+	IconGuess  string   `json:"icon_guess"`
+	Source     string   `json:"source"`  // "device" or "vpn"
+	Conn       string   `json:"conn"`    // wired, vpn, or empty when not known
+	Port       string   `json:"port"`    // the port, card or tunnel
+	Network    string   `json:"network"` // the firewall network
+	DownBps    float64  `json:"down_bps"`
+	UpBps      float64  `json:"up_bps"`
+	TodayDown  int64    `json:"today_down"`
+	TodayUp    int64    `json:"today_up"`
+	Groups     []string `json:"groups"`
+	Reserved   bool     `json:"reserved"`
+	Override   string   `json:"override"`         // the VLAN network this device is placed on, if any
+	OverNet    string   `json:"override_network"` // that network's name
+	Approval   string   `json:"approval"`         // ok, pending or blocked
+	Via        string   `json:"via,omitempty"`    // the VPN this device is sent through
+	ViaState   string   `json:"via_state,omitempty"`
+	Forgetting bool     `json:"forgetting,omitempty"` // will be forgotten when the waiting changes are applied
 }
 
 // zoneByIface maps a port to the name of its firewall network.
@@ -59,6 +60,10 @@ func (a *App) deviceRows() ([]deviceRow, error) {
 	list, err := a.Devices.List()
 	if err != nil {
 		return nil, err
+	}
+	forgetting := map[int64]bool{}
+	for _, id := range a.forgetPendingIDs() {
+		forgetting[id] = true
 	}
 	zones := a.zoneByIface()
 	arp := arpTable()
@@ -105,6 +110,7 @@ func (a *App) deviceRows() ([]deviceRow, error) {
 		if r.Groups == nil {
 			r.Groups = []string{}
 		}
+		r.Forgetting = forgetting[d.ID]
 		r.IconGuess = devices.GuessIcon(r.Vendor, d.Name, d.Hostname)
 		iface := scopeIface[leaseScope[mac]]
 		if d.Online {
@@ -325,7 +331,7 @@ func (a *App) registerDeviceViewRoutes() {
 			}
 		}
 		if scope == 0 {
-			fail(w, errors.New("that address is not on a network Gatehouse hands out addresses for"))
+			fail(w, errors.New("that address is not on a network NopeWarden hands out addresses for"))
 			return
 		}
 		if _, err := a.Config.Exec(`INSERT INTO dhcp_reservations(scope_id,mac,ip,hostname) VALUES(?,?,?,?)

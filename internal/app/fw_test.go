@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"gatehouse/internal/auth"
-	"gatehouse/internal/fw"
+	"nopewarden/internal/auth"
+	"nopewarden/internal/fw"
 )
 
 type fakeFW struct {

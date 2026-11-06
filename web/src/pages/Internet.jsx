@@ -3,7 +3,7 @@ import { del, holdAnd, put, useData } from '../api.js';
 import { SAVED_LATER, SaveChoice } from '../changes.jsx';
 import WanGroups, { Traffic } from './WanGroups.jsx';
 import SpeedTest from './SpeedTest.jsx';
-import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, Tabs, ToggleRow, useAction, useToast, fmt, confirmBox, usePortNames } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, Tabs, ToggleRow, useAction, useToast, fmt, usePortNames , useDelayedDelete } from '../ui.jsx';
 import { linkState, linkMeasure } from '../linkstate.js';
 import NatNotice from '../natnotice.jsx';
 import NetTools from './NetTools.jsx';
@@ -60,7 +60,7 @@ function WanForm({ initial, ports, found, onClose, onSaved, wans }) {
         <Field label="Who is your provider?" hint="Optional. Fills in the usual settings; check the note.">
           <Select value={w.preset || ''} onChange={(v) => { const p = PROVIDERS.find((x) => x.id === v); setW((x) => ({ ...x, preset: v, ...(p ? { type: p.type, vlan: p.vlan } : {}) })); if (p && p.vlan) setAdv(true); }}
             options={[{ value: '', label: 'Choose a provider…' }, ...PROVIDERS.map((p) => ({ value: p.id, label: `${p.label}${p.tested ? '' : ' (unverified)'}` }))]} />
-          {PROVIDERS.find((x) => x.id === w.preset) && <p className="small muted">{PROVIDERS.find((x) => x.id === w.preset).note} Gatehouse has not tested this with the provider itself, so if it does not connect, check your provider's own instructions.</p>}
+          {PROVIDERS.find((x) => x.id === w.preset) && <p className="small muted">{PROVIDERS.find((x) => x.id === w.preset).note} NopeWarden has not tested this with the provider itself, so if it does not connect, check your provider's own instructions.</p>}
         </Field>
       )}
       <Field label="How does your provider connect you?">
@@ -87,7 +87,7 @@ function WanForm({ initial, ports, found, onClose, onSaved, wans }) {
           <Field label="VLAN number" hint="Only if your provider requires one. 0 for none."><NumberInput value={w.vlan} onChange={set('vlan')} /></Field>
           <Field label="IPv6"><Select value={w.v6_mode} onChange={set('v6_mode')} options={[{ value: 'none', label: 'Off' }, { value: 'slaac', label: 'Automatic' }, { value: 'pd', label: 'Automatic with a prefix for my networks' }, { value: 'static', label: 'Fixed address' }]} /></Field>
           {w.v6_mode === 'static' && <><Field label="IPv6 address"><Input value={w.v6_addr} onChange={set('v6_addr')} /></Field><Field label="IPv6 gateway"><Input value={w.v6_gateway} onChange={set('v6_gateway')} /></Field></>}
-          <Field label="Check by" hint="How Gatehouse knows this connection works."><Select value={w.check_kind} onChange={set('check_kind')} options={[{ value: 'icmp', label: 'Ping' }, { value: 'tcp', label: 'Open a connection' }]} /></Field>
+          <Field label="Check by" hint="How NopeWarden knows this connection works."><Select value={w.check_kind} onChange={set('check_kind')} options={[{ value: 'icmp', label: 'Ping' }, { value: 'tcp', label: 'Open a connection' }]} /></Field>
           <Field label="Check against" hint={w.check_kind === 'tcp' ? 'host:port' : 'An address that is almost always up'}><Input value={w.check_target} onChange={set('check_target')} placeholder="1.1.1.1" /></Field>
           <Field label="Order" hint="1 is used first."><NumberInput value={w.priority} onChange={set('priority')} /></Field>
           <Field label="Share of traffic" hint="Used when sharing load."><NumberInput value={w.weight} onChange={set('weight')} /></Field>
@@ -124,10 +124,10 @@ function QuickSetup({ ports, found, onDone }) {
   const wanOK = wan.iface && wan.name && (wan.type !== 'pppoe' || (wan.pppoe_user && wan.pppoe_pass)) && (wan.type !== 'static' || (wan.addr && wan.gateway));
   const lanOK = lan.iface && lan.iface !== wan.iface && /^\d+\.\d+\.\d+\.\d+\/\d+$/.test(lan.cidr);
   return (
-    <Card enter title={step === 0 ? 'Step 1 of 2 · Connect to the internet' : 'Step 2 of 2 · Your own network'} desc="Gatehouse does the rest: addressing, DNS, and a safe firewall.">
+    <Card enter title={step === 0 ? 'Step 1 of 2 · Connect to the internet' : 'Step 2 of 2 · Your own network'} desc="NopeWarden does the rest: addressing, DNS, and a safe firewall.">
       {step === 0 ? (
         <>
-          <Note tone="good" title="Plug the internet cable in now">Plug the cable from your modem or provider into the port you want to use. Gatehouse will notice which port it is.</Note>
+          <Note tone="good" title="Plug the internet cable in now">Plug the cable from your modem or provider into the port you want to use. NopeWarden will notice which port it is.</Note>
           <Field label="Port"><PortPicker value={wan.iface} onChange={sw('iface')} ports={ports} found={found} /></Field>
           <Field label="How does your provider connect you?"><Segmented value={wan.type} onChange={sw('type')} options={TYPES} /></Field>
           {wan.type === 'pppoe' && <div className="formgrid"><Field label="Username"><Input value={wan.pppoe_user} onChange={sw('pppoe_user')} autoComplete="off" /></Field><Field label="Password"><Input type="password" value={wan.pppoe_pass} onChange={sw('pppoe_pass')} autoComplete="new-password" /></Field></div>}
@@ -138,7 +138,7 @@ function QuickSetup({ ports, found, onDone }) {
         <>
           <Field label="Which port connects to your switch or devices?"><PortPicker value={lan.iface} onChange={(v) => setLan((x) => ({ ...x, iface: v }))} ports={ports} found="" exclude={[wan.iface]} /></Field>
           <Field label="Address of this device on your network" hint="The usual 192.168.1.1/24 is fine unless it clashes with another network you use."><Input value={lan.cidr} onChange={(v) => setLan((x) => ({ ...x, cidr: v }))} /></Field>
-          <p className="sec small">This creates a trusted home network that can manage Gatehouse, hands out addresses from .100 to .200 automatically, and protects it from the internet.</p>
+          <p className="sec small">This creates a trusted home network that can manage NopeWarden, hands out addresses from .100 to .200 automatically, and protects it from the internet.</p>
           <div className="actions"><Button onClick={() => setStep(0)}>Back</Button><Button kind="primary" disabled={!lanOK || busy} onClick={finish}>Set everything up</Button></div>
         </>
       )}
@@ -156,6 +156,7 @@ const readTab = (tabs) => {
 };
 
 export default function Internet({ me }) {
+  const delayedDelete = useDelayedDelete();
   const pn = usePortNames();
   const { data: wd, reload: rw } = useData('/api/net/wans', { topics: ['net.status'] });
   const { data: ifs, reload: ri } = useData('/api/net/interfaces', { topics: ['net.status'] });
@@ -216,7 +217,7 @@ export default function Internet({ me }) {
                     <div className="actions">
                       <Pill tone={ls.tone}>{ls.text}</Pill>
                       <Button small icon="edit" onClick={() => setEdit(w)}>Edit</Button>
-                      <Button small kind="danger" icon="trash" onClick={async () => { if (await confirmBox(`Remove ${w.name}?`)) run(() => del(`/api/net/wans/${w.id}`)).then(all); }}>Remove</Button>
+                      <Button small kind="danger" icon="trash" onClick={() => delayedDelete(`The connection ${w.name}`, () => del(`/api/net/wans/${w.id}`), all)}>Remove</Button>
                     </div>
                   </div>
                 );

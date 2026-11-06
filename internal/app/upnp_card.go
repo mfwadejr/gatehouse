@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/fw"
+	"nopewarden/internal/api"
+	"nopewarden/internal/fw"
 )
 
 // One UPnP card. The three old switches (on each internet connection, on each network, and the

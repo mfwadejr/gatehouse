@@ -10,21 +10,21 @@ import (
 	"strings"
 	"sync"
 
-	"gatehouse/internal/speedtest"
-	"gatehouse/internal/update"
+	"nopewarden/internal/speedtest"
+	"nopewarden/internal/update"
 )
 
 // Where updates live. Downloads arrive in a folder the console can write; everything the helper
 // trusts is copied into folders only root can write, and the outcome is written where the console
 // can read it but not change it.
 var (
-	UpdateInbox  = "/var/lib/gatehouse/update"
-	UpdateStage  = "/var/lib/gatehouse-update/stage"
-	UpdateState  = "/var/lib/gatehouse-update"
-	ReleaseFile  = "/etc/gatehouse-release"
-	aptAutoFile  = "/etc/apt/apt.conf.d/99gatehouse-auto-upgrades"
+	UpdateInbox  = "/var/lib/nopewarden/update"
+	UpdateStage  = "/var/lib/nopewarden-update/stage"
+	UpdateState  = "/var/lib/nopewarden-update"
+	ReleaseFile  = "/etc/nopewarden-release"
+	aptAutoFile  = "/etc/apt/apt.conf.d/99nopewarden-auto-upgrades"
 	runUpdateCmd = func(self string) error {
-		return exec.Command("systemd-run", "--unit=gatehouse-update", "--collect", self, "update-apply").Run()
+		return exec.Command("systemd-run", "--unit=nopewarden-update", "--collect", self, "update-apply").Run()
 	}
 )
 
@@ -86,7 +86,7 @@ func (s *Service) UpdateStart(path string) error {
 	if err := os.WriteFile(filepath.Join(UpdateStage, "package.sig"), sig, 0o600); err != nil {
 		return err
 	}
-	return launchUpdate(update.Plan{Gatehouse: true, System: true})
+	return launchUpdate(update.Plan{NopeWarden: true, System: true})
 }
 
 // launchUpdate records what the run covers and starts it as its own service.
@@ -106,7 +106,7 @@ func launchUpdate(plan update.Plan) error {
 }
 
 // SystemUpdateStart installs only the operating system's updates, for when there is no newer
-// Gatehouse. It runs the same way as a full update, so progress and results look the same.
+// NopeWarden. It runs the same way as a full update, so progress and results look the same.
 func (s *Service) SystemUpdateStart() error {
 	if err := onDebian13(); err != nil {
 		return err
@@ -127,7 +127,7 @@ func (s *Service) SystemUpdateStart() error {
 	return launchUpdate(update.Plan{System: true})
 }
 
-// Power restarts or shuts down the machine, or restarts only Gatehouse's own services. The action
+// Power restarts or shuts down the machine, or restarts only NopeWarden's own services. The action
 // happens a few seconds later, in a separate timer unit, so the answer reaches the browser first.
 func (s *Service) Power(action string) error {
 	var args []string
@@ -136,12 +136,12 @@ func (s *Service) Power(action string) error {
 		args = []string{"systemctl", "reboot"}
 	case "poweroff":
 		args = []string{"systemctl", "poweroff"}
-	case "restart-gatehouse":
-		args = []string{"systemctl", "restart", "gatehouse-netd", "gatehouse", "gatehouse-screen"}
+	case "restart-nopewarden":
+		args = []string{"systemctl", "restart", "nopewarden-netd", "nopewarden", "nopewarden-screen"}
 	default:
 		return errors.New("unknown power action")
 	}
-	return runPowerCmd(append([]string{"systemd-run", "--unit=gatehouse-power", "--collect", "--on-active=3s"}, args...))
+	return runPowerCmd(append([]string{"systemd-run", "--unit=nopewarden-power", "--collect", "--on-active=3s"}, args...))
 }
 
 var runPowerCmd = func(argv []string) error {

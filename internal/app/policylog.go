@@ -10,6 +10,9 @@ import (
 // in Admin activity, in plain words: created or edited, turned on or off, paused, resumed, removed.
 func (a *App) policyChange(actor, method, path string, body []byte) {
 	a.stagedAfter(actor, method, path, body)
+	if strings.HasPrefix(path, "/api/routes") {
+		forgetRouteNames()
+	}
 	what, ok := describePolicyChange(method, path, body)
 	if !ok {
 		return

@@ -10,11 +10,11 @@ export default function TrafficLabels() {
   if (!data) return null;
   const warns = data.warnings || [];
   return (
-    <Card title="Traffic labels" desc="Names the app behind each connection, such as YouTube, Zoom or BitTorrent, even when the device never asked Gatehouse for a website name.">
+    <Card title="Traffic labels" desc="Names the app behind each connection, such as YouTube, Zoom or BitTorrent, even when the device never asked NopeWarden for a website name.">
       <div className="stack">
         {!data.installed && <Note title="Not on this system">The labelling program comes with a fresh install image built with it. Updates alone do not add it. The name-based app labels in the log keep working either way.</Note>}
         <ToggleRow title="Label traffic by looking at it" disabled={busy || !data.installed}
-          desc="Reads the first packets of each connection on your inside ports. It needs some processor time and is the most private thing Gatehouse does, because it sees which apps each person uses. Off by default."
+          desc="Reads the first packets of each connection on your inside ports. It needs some processor time and is the most private thing NopeWarden does, because it sees which apps each person uses. Off by default."
           checked={data.enabled} onChange={(v) => run(() => put('/api/ndpi', { enabled: v }), v ? 'Traffic labels are on.' : 'Traffic labels are off.').then(reload)} />
         {data.enabled && (
           <p className="small muted">
@@ -26,7 +26,7 @@ export default function TrafficLabels() {
             {warns.map((w, i) => <div className="item" key={i}><div><div className="name">{w.src} to {w.dst}:{w.dp} <Pill tone="warn">Caution</Pill></div><div className="meta">{w.app}: {(w.risk || []).join('; ')}</div></div></div>)}
           </div>
         )}
-        <p className="small muted">If the program stops or cannot read a connection, Gatehouse falls back to the website name. Nothing about your internet depends on it.</p>
+        <p className="small muted">If the program stops or cannot read a connection, NopeWarden falls back to the website name. Nothing about your internet depends on it.</p>
       </div>
     </Card>
   );

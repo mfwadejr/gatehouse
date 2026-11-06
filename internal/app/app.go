@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"nopewarden/internal/sched"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -15,17 +16,17 @@ import (
 	"sync/atomic"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/auth"
-	"gatehouse/internal/crypt"
-	"gatehouse/internal/devices"
-	"gatehouse/internal/dhcp"
-	dnssrv "gatehouse/internal/dns"
-	"gatehouse/internal/events"
-	"gatehouse/internal/fw"
-	"gatehouse/internal/mdns"
-	"gatehouse/internal/ndpi"
-	"gatehouse/internal/store"
+	"nopewarden/internal/api"
+	"nopewarden/internal/auth"
+	"nopewarden/internal/crypt"
+	"nopewarden/internal/devices"
+	"nopewarden/internal/dhcp"
+	dnssrv "nopewarden/internal/dns"
+	"nopewarden/internal/events"
+	"nopewarden/internal/fw"
+	"nopewarden/internal/mdns"
+	"nopewarden/internal/ndpi"
+	"nopewarden/internal/store"
 )
 
 // Config says where things live and listen. Defaults suit the installed appliance.
@@ -52,7 +53,7 @@ type Config struct {
 }
 
 func DefaultConfig() Config {
-	return Config{DataDir: "/var/lib/gatehouse", WebAddr: ":443", DNSAddrs: []string{":53"}, DHCPAddr: ":67"}
+	return Config{DataDir: "/var/lib/nopewarden", WebAddr: ":443", DNSAddrs: []string{":53"}, DHCPAddr: ":67"}
 }
 
 // App is the running daemon.
@@ -98,6 +99,7 @@ type App struct {
 	threatW    threatWatch
 	traffic    wanTraffic
 	netTraffic wanTraffic // each network's own speed, summed over its ports
+	vpnTraffic wanTraffic // each VPN tunnel's own speed, by VPN id
 	viaNames   viaCache
 	health     healthSampler
 	hist       histState
@@ -110,6 +112,7 @@ type App struct {
 	setupMu    sync.Mutex
 	con        consoles
 	upd        updates
+	ub         unboundCtl
 	dyn        *fwDyn
 	rogue      rogueState
 	devt       devTraffic
@@ -156,8 +159,11 @@ func New(cfg Config) (*App, error) {
 	pool := dnssrv.NewPool([]string{"1.1.1.1:53", "9.9.9.9:53"})
 	a.DNS = dnssrv.NewServer(a.dnsOptions(), pool, a.Devices, namesAdapter{a.DHCP}, a.QLog)
 	a.DNS.Route = a.dnsPath
+	a.DNS.RouteName = a.dnsPathForName
+	a.DNS.ExplainFail = a.explainFailure
 	a.DNS.Egress = defaultEgress
 	a.Lists = dnssrv.NewManager(a.Config, filepath.Join(cfg.DataDir, "lists"), nil)
+	a.Lists.Schedule = func() sched.Spec { return a.schedSpec("lists") }
 	a.DNS.NewManager(a.Lists)
 	if err := a.Lists.SeedDefaults(); err != nil {
 		return nil, err
@@ -186,6 +192,8 @@ func New(cfg Config) (*App, error) {
 	a.API.Audit = func(actor, sev, title, detail string) { a.auditEvent(actor, sev, title, detail) }
 	a.API.Changed = a.policyChange
 	a.API.Before = a.stagedBefore
+	a.API.BeforeReq = a.dnsStageBefore
+	a.Lists.Hold = a.dnsHeld
 	a.API.Secure = cfg.TLSCert != ""
 	a.API.Topic("dns.stats", "dns.live", "dns.upstreams", "dns.lists", "dhcp.leases", "dhcp.utilisation", "fw.status", "net.status", "vpn.status", "logs.live", "upnp.maps", "dhcp.alerts", "speedtest", "events")
 	a.FW = cfg.FW
@@ -313,18 +321,25 @@ func (a *App) seedUpstreams() error {
 }
 
 func (a *App) loadUpstreams() error {
+	// read the settings before the query: the database has one connection, and the rows hold it
+	direct := a.directActive()
 	rows, err := a.Config.Query(`SELECT id,name,address,proto,tls_name,position FROM dns_upstreams WHERE enabled=1 ORDER BY position,id`)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
 	var list []*dnssrv.Upstream
+	if direct {
+		list = append(list, unboundUpstream())
+	}
 	for rows.Next() {
 		u := &dnssrv.Upstream{}
 		if err := rows.Scan(&u.ID, &u.Name, &u.Addr, &u.Proto, &u.TLSName, &u.Position); err != nil {
 			return err
 		}
-		list = append(list, u)
+		if !direct {
+			list = append(list, u)
+		}
 	}
 	a.DNS.Pool().SetOrdered(a.setting("dns.upstream_order", "fastest") == "ordered")
 	a.DNS.Pool().Set(list)
@@ -420,6 +435,7 @@ func (a *App) Run(ctx context.Context) error {
 	run(func() { a.overrideLoop(ctx) })
 	run(func() { a.haSyncLoop(ctx) })
 	run(func() { a.updateLoop(ctx) })
+	run(func() { a.unboundLoop(ctx) })
 	run(func() { a.dynLoop(ctx) })
 	run(func() { a.rogueLoop(ctx) })
 	run(func() { a.sshLoop(ctx) })

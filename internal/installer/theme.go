@@ -2,7 +2,7 @@ package installer
 
 import (
 	"fmt"
-	"gatehouse/internal/gfx"
+	"nopewarden/internal/gfx"
 	"strings"
 	"unicode/utf8"
 )
@@ -120,7 +120,7 @@ func (s *Screen) header(sub string) {
 		s.mid(blue + l + reset)
 	}
 	s.blank()
-	s.mid(bold + "G A T E H O U S E" + reset)
+	s.mid(bold + "N O P E W A R D E N" + reset)
 	if sub != "" {
 		s.mid(dim + sub + reset)
 	}

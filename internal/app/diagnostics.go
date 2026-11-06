@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/api"
+	"nopewarden/internal/api"
 )
 
 // Diagnostics: see what each service is doing and its log, restart one, save a support bundle, and
@@ -187,10 +187,10 @@ func (a *App) registerDiagnosticsRoutes() {
 			fail(w, err)
 			return
 		}
-		out = "Gatehouse " + a.Cfg.Version + "\n" + out + "\n===== Settings (secrets hidden) =====\n" + a.settingsForBundle()
+		out = "NopeWarden " + a.Cfg.Version + "\n" + out + "\n===== Settings (secrets hidden) =====\n" + a.settingsForBundle()
 		a.event(c.User.Username, "info", "Saved a support bundle", "")
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.Header().Set("Content-Disposition", `attachment; filename="gatehouse-support-bundle.txt"`)
+		w.Header().Set("Content-Disposition", `attachment; filename="nopewarden-support-bundle.txt"`)
 		w.Write([]byte(out))
 	})
 

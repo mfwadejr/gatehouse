@@ -21,7 +21,7 @@ type Env struct {
 	// Services restarted, in order, after files are replaced.
 	Services []string
 	// System installs the Debian packages a release needs and the operating system's own updates.
-	// It runs first; if it fails, nothing of Gatehouse has been touched. Nil skips the step.
+	// It runs first; if it fails, nothing of NopeWarden has been touched. Nil skips the step.
 	System func(required []string) (SystemResult, error)
 	// How long the new version gets to start answering, and the old one after a rollback.
 	Wait, RollbackWait time.Duration
@@ -37,8 +37,8 @@ type SystemResult struct {
 // Plan says which parts an update run covers, so the Updates page can show the right steps even
 // after the console has restarted.
 type Plan struct {
-	Gatehouse bool `json:"gatehouse"`
-	System    bool `json:"system"`
+	NopeWarden bool `json:"nopewarden"`
+	System     bool `json:"system"`
 }
 
 // Result is what happened, kept for the Updates page and the log.
@@ -114,7 +114,7 @@ func (e Env) waitHealthy(limit time.Duration) bool {
 // previous version back. It returns what happened; it never leaves the machine half updated.
 //
 // The operating system goes first: the packages the release names, then the Debian updates. A
-// failure there stops the run with Gatehouse untouched. p may be nil for a run that only updates
+// failure there stops the run with NopeWarden untouched. p may be nil for a run that only updates
 // the operating system.
 func Apply(e Env, p *Package, from string) Result {
 	res := Result{From: from, To: from}
@@ -185,8 +185,8 @@ func Apply(e Env, p *Package, from string) Result {
 			return e.finish(res)
 		}
 	}
-	oldRel, _ := os.ReadFile(e.dest("/etc/gatehouse-release"))
-	writeAtomic(e.dest("/etc/gatehouse-release"), []byte(p.Manifest.Version+"\n"), 0o644)
+	oldRel, _ := os.ReadFile(e.dest("/etc/nopewarden-release"))
+	writeAtomic(e.dest("/etc/nopewarden-release"), []byte(p.Manifest.Version+"\n"), 0o644)
 
 	e.state("restarting")
 	err := e.restart()
@@ -199,7 +199,7 @@ func Apply(e Env, p *Package, from string) Result {
 	e.state("rolling-back")
 	undo()
 	if len(oldRel) > 0 {
-		writeAtomic(e.dest("/etc/gatehouse-release"), oldRel, 0o644)
+		writeAtomic(e.dest("/etc/nopewarden-release"), oldRel, 0o644)
 	}
 	e.restart()
 	res.RolledBack = true

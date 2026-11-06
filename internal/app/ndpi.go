@@ -7,22 +7,22 @@ import (
 	"sort"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/ndpi"
-	"gatehouse/internal/netd"
+	"nopewarden/internal/api"
+	"nopewarden/internal/ndpi"
+	"nopewarden/internal/netd"
 )
 
 // Traffic labels (nDPI). A separate small program watches copies of the packets on the inside ports
-// and tells Gatehouse what each connection is ("YouTube", "Zoom", "BitTorrent"), including traffic
-// that never asked Gatehouse's DNS. It is off by default because it uses some processor time, and
+// and tells NopeWarden what each connection is ("YouTube", "Zoom", "BitTorrent"), including traffic
+// that never asked NopeWarden's DNS. It is off by default because it uses some processor time, and
 // because it looks at the first packets of every connection, which is the most private thing
-// Gatehouse can do. It never changes or blocks traffic, and a failure only means the name-based
+// NopeWarden can do. It never changes or blocks traffic, and a failure only means the name-based
 // labels carry on alone.
 
 const (
 	ndpiSetting = "ndpi.enabled"
 	ndpiSocket  = netd.NDPISocketDir + "/ndpi.sock"
-	ndpiGroup   = "gatehouse-ndpi"
+	ndpiGroup   = "nopewarden-ndpi"
 )
 
 func (a *App) ndpiOn() bool { return a.Config.Setting(ndpiSetting, "0") == "1" }

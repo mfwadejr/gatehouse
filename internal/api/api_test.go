@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"gatehouse/internal/auth"
-	"gatehouse/internal/crypt"
-	"gatehouse/internal/events"
-	"gatehouse/internal/store"
+	"nopewarden/internal/auth"
+	"nopewarden/internal/crypt"
+	"nopewarden/internal/events"
+	"nopewarden/internal/store"
 )
 
 type env struct {

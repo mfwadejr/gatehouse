@@ -7,8 +7,8 @@ import { linkState } from '../linkstate.js';
 const CONN = { wired: 'Wired', vpn: 'VPN' };
 const SHOW = 18;
 
-// The map shows what Gatehouse itself can see: its own ports and its VPNs, and the
-// devices it has seen on each. A device behind a switch or access point that Gatehouse does not
+// The map shows what NopeWarden itself can see: its own ports and its VPNs, and the
+// devices it has seen on each. A device behind a switch or access point that NopeWarden does not
 // manage appears under the port that switch is plugged into.
 function PortGroup({ g, onOpen, showOffline }) {
   const pn = usePortNames();
@@ -59,7 +59,7 @@ export default function DeviceMap({ devices, onOpen }) {
     return arr;
   }, [devices]);
   return (
-    <Card title="Map" desc="Gatehouse in the middle. It can only see its own ports and VPNs, so devices behind a switch show under the port it is plugged into."
+    <Card title="Map" desc="NopeWarden in the middle. It can only see its own ports and VPNs, so devices behind a switch show under the port it is plugged into."
       actions={<ToggleRow title="Show devices that are away" checked={showOffline} onChange={setShowOffline} />}>
       {!devices.length ? <Empty>No devices have joined yet.</Empty> : (
         <div className="dm">
@@ -69,7 +69,7 @@ export default function DeviceMap({ devices, onOpen }) {
               {wans.length ? wans.map((w) => { const s = linkState(links[w.name]); return <div className="small" key={w.name}>{w.name} <Pill tone={s.tone}>{s.health === 'working' ? 'Working' : s.text}</Pill></div>; }) : <span className="small muted">Not set up</span>}
             </div>
             <div className="dm-line" aria-hidden="true" />
-            <div className="dm-node gh"><b>Gatehouse</b><span className="small muted">{devices.filter((d) => d.online).length} devices online</span></div>
+            <div className="dm-node gh"><b>NopeWarden</b><span className="small muted">{devices.filter((d) => d.online).length} devices online</span></div>
           </div>
           <div className="dm-ports">
             {groups.map((g) => <PortGroup key={g.port || 'none'} g={g} onOpen={onOpen} showOffline={showOffline} />)}

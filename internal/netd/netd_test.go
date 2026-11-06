@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"gatehouse/internal/netcfg"
-	"gatehouse/internal/speedtest"
-	"gatehouse/internal/wanmon"
+	"nopewarden/internal/netcfg"
+	"nopewarden/internal/speedtest"
+	"nopewarden/internal/wanmon"
 )
 
 func newSvc(t *testing.T) *Service {
@@ -82,7 +82,7 @@ func TestUnconfirmedRollsBackOnBoot(t *testing.T) {
 	if _, _, err := s.Apply(plan(), time.Minute); err != nil {
 		t.Fatal(err)
 	}
-	glob := filepath.Join(s.Inst.NetworkdDir, "gatehouse-*.network")
+	glob := filepath.Join(s.Inst.NetworkdDir, "nopewarden-*.network")
 	if m, _ := filepath.Glob(glob); len(m) == 0 {
 		t.Fatal("not installed")
 	}

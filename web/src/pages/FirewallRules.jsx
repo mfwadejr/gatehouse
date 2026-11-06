@@ -25,7 +25,7 @@ export function RuleForm({ initial, zoneNames, pickers, reloadPickers, onClose, 
   const local = r.from !== 'Internet';
   const hasDevice = tokens(r.src).some((t) => t.startsWith('dev:') || t.startsWith('grp:'));
   const hasCountry = tokens(r.dst).some((t) => t.startsWith('geo:'));
-  const toOptions = [...zoneNames.map((z) => ({ value: z, label: z })), { value: 'self', label: 'Gatehouse itself' }];
+  const toOptions = [...zoneNames.map((z) => ({ value: z, label: z })), { value: 'self', label: 'NopeWarden itself' }];
   const save = async (later) => {
     const body = ruleBody({ ...r, service: r.service || 'any', also_mac: r.also_mac && hasDevice && local });
     if (await run(() => (later ? holdAnd(() => put('/api/fw/rules', body)) : put('/api/fw/rules', body)), later ? SAVED_LATER : 'Saved.')) { onSaved(); onClose(); }
@@ -40,8 +40,8 @@ export function RuleForm({ initial, zoneNames, pickers, reloadPickers, onClose, 
         <Field label="To"><Select value={r.to} onChange={set('to')} options={toOptions} /></Field>
       </div>
       <Field label="Which devices"><AddrPicker side="src" value={r.src} onChange={set('src')} pickers={pickers} local={local} reload={reloadPickers} /></Field>
-      <Field label="Going where" hint={r.to === 'self' ? 'Gatehouse itself.' : 'Leave empty for anywhere on that network.'}>
-        {r.to === 'self' ? <span className="muted small">Services on Gatehouse itself</span> : <AddrPicker side="dst" value={r.dst} onChange={set('dst')} pickers={pickers} local={local} reload={reloadPickers} />}
+      <Field label="Going where" hint={r.to === 'self' ? 'NopeWarden itself.' : 'Leave empty for anywhere on that network.'}>
+        {r.to === 'self' ? <span className="muted small">Services on NopeWarden itself</span> : <AddrPicker side="dst" value={r.dst} onChange={set('dst')} pickers={pickers} local={local} reload={reloadPickers} />}
       </Field>
       {hasCountry && (
         <Note tone={geo?.ready ? '' : 'warn'} title="Countries">
@@ -49,7 +49,7 @@ export function RuleForm({ initial, zoneNames, pickers, reloadPickers, onClose, 
           {' '}Addresses on your own networks and your VPN connections are never matched.
         </Note>
       )}
-      {tokens(r.dst).some((t) => t.startsWith('dom:')) && <p className="small muted">Websites are matched by the addresses devices were given when they looked them up through Gatehouse, so this works for devices that use Gatehouse for DNS.</p>}
+      {tokens(r.dst).some((t) => t.startsWith('dom:')) && <p className="small muted">Websites are matched by the addresses devices were given when they looked them up through NopeWarden, so this works for devices that use NopeWarden for DNS.</p>}
       <Field label="What for"><ServicePicker value={r.service} onChange={set('service')} pickers={pickers} reload={reloadPickers} /></Field>
       <Field label="Then"><Select value={r.action} onChange={set('action')} options={ACTIONS} /></Field>
       <Field label="When"><ScheduleEditor value={r.sched} onChange={set('sched')} /></Field>
@@ -155,7 +155,7 @@ export function PairModal({ pair, ov, onClose, onChanged, onShowRules, onAddRule
       {picked ? (
         <>
           <p>{picked.text}</p>
-          <p className="small muted">Rules you wrote by hand are kept and still apply first. The rules that keep you able to manage Gatehouse stay above everything. Nothing changes until you apply the firewall.</p>
+          <p className="small muted">Rules you wrote by hand are kept and still apply first. The rules that keep you able to manage NopeWarden stay above everything. Nothing changes until you apply the firewall.</p>
         </>
       ) : (
         <>
@@ -225,7 +225,7 @@ export function RulesList({ ov, rules, countryRules, pickers, reloadPickers, rel
       <div className="toolbar">
         <Input value={q} onChange={setQ} placeholder="Search rules, devices, ports" aria-label="Search rules" />
         <Select value={filter?.from || ''} onChange={(v) => setFilter({ ...filter, from: v })} aria-label="From network" options={[{ value: '', label: 'From any network' }, ...fromNames]} />
-        <Select value={filter?.to || ''} onChange={(v) => setFilter({ ...filter, to: v })} aria-label="To network" options={[{ value: '', label: 'To any network' }, ...names, { value: 'self', label: 'Gatehouse itself' }]} />
+        <Select value={filter?.to || ''} onChange={(v) => setFilter({ ...filter, to: v })} aria-label="To network" options={[{ value: '', label: 'To any network' }, ...names, { value: 'self', label: 'NopeWarden itself' }]} />
         <Select value={act} onChange={setAct} aria-label="Action" options={[{ value: '', label: 'Allow or block' }, { value: 'accept', label: 'Allow' }, { value: 'drop', label: 'Block' }, { value: 'reject', label: 'Reject' }]} />
         {filtered && <Button small onClick={() => { setQ(''); setAct(''); setFilter({}); }}>Clear</Button>}
       </div>
@@ -240,7 +240,7 @@ export function RulesList({ ov, rules, countryRules, pickers, reloadPickers, rel
             <div className="item" key={`p${g.group}`}><div><div className="name">🚪 Open port: {g.group} {!g.enabled && <Pill>Off</Pill>}</div><div className="meta">{g.text}</div></div><Button small onClick={goPorts}>Set on the Open ports tab</Button></div>
           ))}
           {(countryRules || []).map((r, i) => (
-            <div className="item" key={`c${i}`}><div><div className="name">🏳 {r.name}: {r.from} → {r.to === 'self' ? 'Gatehouse' : r.to} <Pill tone="bad">{actionWord(r.action)}</Pill></div><div className="meta">{r.descr}</div></div><Pill>Set on the Countries tab</Pill></div>
+            <div className="item" key={`c${i}`}><div><div className="name">🏳 {r.name}: {r.from} → {r.to === 'self' ? 'NopeWarden' : r.to} <Pill tone="bad">{actionWord(r.action)}</Pill></div><div className="meta">{r.descr}</div></div><Pill>Set on the Countries tab</Pill></div>
           ))}
         </div>
       )}
@@ -253,7 +253,7 @@ export function RulesList({ ov, rules, countryRules, pickers, reloadPickers, rel
                 <RuleSide chips={r.src_chips || []} pickers={pickers} />
                 <span aria-label="goes to">→</span>
                 <RuleSide chips={r.dst_chips || []} pickers={pickers} />
-                <span className="muted">· {r.from} → {r.to === 'self' ? 'Gatehouse' : r.to} · {r.service === 'any' ? 'everything' : r.service.replace(/list:/g, 'list ')}{r.ipver ? ` · IPv${r.ipver} only` : ''}{r.ctstate === 'new' ? ' · new connections' : ''}{r.limit ? ` · max ${r.limit}/s` : ''}</span>
+                <span className="muted">· {r.from} → {r.to === 'self' ? 'NopeWarden' : r.to} · {r.service === 'any' ? 'everything' : r.service.replace(/list:/g, 'list ')}{r.ipver ? ` · IPv${r.ipver} only` : ''}{r.ctstate === 'new' ? ' · new connections' : ''}{r.limit ? ` · max ${r.limit}/s` : ''}</span>
               </div>
               {r.descr && <div className="meta">{r.descr}</div>}
               {(r.warnings || []).map((w, i) => <div className="meta warnline" key={i}>⚠ {w}</div>)}

@@ -50,9 +50,9 @@ jobs:
           fi
           grep -q -- '--- PASS: TestNetnsPolicy' root-tests.log
       - name: Build the program
-        run: CGO_ENABLED=1 go build -trimpath -ldflags "-s -w -X main.version=${{ steps.v.outputs.version }}" -o gatehouse ./cmd/gatehouse
+        run: CGO_ENABLED=1 go build -trimpath -ldflags "-s -w -X main.version=${{ steps.v.outputs.version }}" -o nopewarden ./cmd/nopewarden
       - uses: actions/upload-artifact@v4
-        with: { name: gatehouse-binary, path: gatehouse, retention-days: 7 }
+        with: { name: nopewarden-binary, path: nopewarden, retention-days: 7 }
 
   iso:
     name: Installer image
@@ -61,17 +61,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
-        with: { name: gatehouse-binary, path: bin }
+        with: { name: nopewarden-binary, path: bin }
       - name: Build the image in a Debian 13 container
         run: |
-          chmod +x bin/gatehouse
+          chmod +x bin/nopewarden
           mkdir -p out
           docker run --rm --privileged -e VERSION -v "$PWD":/src -w /src debian:trixie sh -ec '
             apt-get update
             apt-get install -y --no-install-recommends live-build debootstrap squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin mtools dosfstools syslinux syslinux-common isolinux ca-certificates
             # Optional traffic-labelling program. A failure here only means the image has no gh-ndpi.
-            (apt-get install -y --no-install-recommends gcc libc6-dev libndpi-dev libpcap-dev pkg-config >/dev/null 2>&1 && sh iso/ndpi/build.sh /src/iso/config/includes.chroot/usr/lib/gatehouse) || echo "gh-ndpi: skipped"
-            OUT=/src/out iso/build.sh /src/bin/gatehouse "${VERSION}"
+            (apt-get install -y --no-install-recommends gcc libc6-dev libndpi-dev libpcap-dev pkg-config >/dev/null 2>&1 && sh iso/ndpi/build.sh /src/iso/config/includes.chroot/usr/lib/nopewarden) || echo "gh-ndpi: skipped"
+            OUT=/src/out iso/build.sh /src/bin/nopewarden "${VERSION}"
           '
         env:
           VERSION: ${{ needs.binary.outputs.version }}
@@ -81,7 +81,7 @@ jobs:
           ls -l out/*.iso
       - uses: actions/upload-artifact@v4
         with:
-          name: gatehouse-iso
+          name: nopewarden-iso
           path: out/*
           retention-days: 14
       - name: Sign the update package
@@ -95,9 +95,9 @@ jobs:
           if [ -z "$KEY" ]; then echo "::warning::UPDATE_SIGNING_KEY is not set; this release has no update package"; exit 0; fi
           umask 077
           printf '%s\n' "$KEY" > "$RUNNER_TEMP/update.key"
-          chmod +x bin/gatehouse
+          chmod +x bin/nopewarden
           git log -1 --format=%B > "$RUNNER_TEMP/notes.txt"
-          bin/gatehouse update-build -version "${VERSION}" -bin bin/gatehouse -units iso/config/includes.chroot/etc/systemd/system -packages iso/update-packages.list \
+          bin/nopewarden update-build -version "${VERSION}" -bin bin/nopewarden -units iso/config/includes.chroot/etc/systemd/system -packages iso/update-packages.list \
             -key "$RUNNER_TEMP/update.key" -notes "$RUNNER_TEMP/notes.txt" -out out
           rm -f "$RUNNER_TEMP/update.key"
       - name: Publish a release
@@ -106,9 +106,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
-            gh release create "${GITHUB_REF_NAME}" out/* --title "Gatehouse ${GITHUB_REF_NAME}" --generate-notes
+            gh release create "${GITHUB_REF_NAME}" out/* --title "NopeWarden ${GITHUB_REF_NAME}" --generate-notes
           else
             gh release delete nightly --yes --cleanup-tag 2>/dev/null || true
-            gh release create nightly out/* --prerelease --target "${GITHUB_SHA}" --title "Gatehouse ${{ needs.binary.outputs.version }} (test build)" \
+            gh release create nightly out/* --prerelease --target "${GITHUB_SHA}" --title "NopeWarden ${{ needs.binary.outputs.version }} (test build)" \
               --notes "Automatic build ${{ needs.binary.outputs.version }} of commit ${GITHUB_SHA::7}. For testing."
           fi

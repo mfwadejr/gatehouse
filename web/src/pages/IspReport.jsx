@@ -56,7 +56,7 @@ export function IspReport() {
   const [m, setM] = useState(months[0].value);
   const { data } = useData(`/api/isp/report?month=${m}`, { every: 120000 });
   return (
-    <Card title="Provider report card" desc="Outages and speed for a month, to show your provider. Built from what Gatehouse measured itself."
+    <Card title="Provider report card" desc="Outages and speed for a month, to show your provider. Built from what NopeWarden measured itself."
       actions={<a className="btn small" href={`/api/isp/report/print?month=${m}`} target="_blank" rel="noreferrer">Open to print</a>}>
       <div style={{ maxWidth: '16rem' }}><Select value={m} onChange={setM} options={months} /></div>
       {data && (

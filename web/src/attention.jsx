@@ -51,7 +51,7 @@ export function AttentionProvider({ children }) {
     });
     if (dns?.upstreams?.length && !dns.upstreams.some((u) => u.state === 'healthy')) add('bad', 'No DNS server is answering', 'Devices cannot look up names until one answers. Open DNS and press Test.', 'dns');
     if (upd?.needs_reboot) add('warn', 'A restart is needed', 'The system was updated and needs a restart to finish.', 'settings');
-    else if (upd?.available && upd.mode !== 'off' && upd.state === 'idle') add('info', 'Updates are ready to install', [upd.gatehouse_new && upd.latest ? `Gatehouse ${upd.latest.version}` : '', upd.system_count > 0 ? `${upd.system_count} system update${upd.system_count === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and '), 'settings');
+    else if (upd?.available && upd.mode !== 'off' && upd.state === 'idle') add('info', 'Updates are ready to install', [upd.nopewarden_new && upd.latest ? `NopeWarden ${upd.latest.version}` : '', upd.system_count > 0 ? `${upd.system_count} system update${upd.system_count === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and '), 'settings');
     // The security check and threat alerts both live on Protection.
     const bad = (sec?.items || []).filter((i) => i.level === 'bad').length;
     const warn = (sec?.items || []).filter((i) => i.level === 'warn').length;

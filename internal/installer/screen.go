@@ -2,9 +2,9 @@ package installer
 
 import (
 	"fmt"
-	"gatehouse/internal/gfx"
 	"log"
 	"net"
+	"nopewarden/internal/gfx"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -99,7 +99,7 @@ func RenderScreen(ports []Port, urls []string, code string, w, h int) string {
 	case len(ports) == 0:
 		s.mid(amber + "No network port found yet" + reset)
 		s.blank()
-		s.mid(fg + "Gatehouse needs at least one wired network port." + reset)
+		s.mid(fg + "NopeWarden needs at least one wired network port." + reset)
 		s.mid(fg + "If you use a USB network adapter, plug it in now." + reset)
 		s.mid(dim + "It is detected automatically." + reset)
 	case connected == 0:
@@ -264,18 +264,18 @@ func RenderStatus(host string, ports []Port, urls []string, setup string, w, h i
 	case setup == "starting":
 		s.mid(bold + "Starting" + reset)
 		s.blank()
-		s.mid(fg + "Gatehouse is starting. This takes up to a minute." + reset)
+		s.mid(fg + "NopeWarden is starting. This takes up to a minute." + reset)
 		s.mid(dim + "This screen updates by itself." + reset)
 	case setup == "looping" && len(urls) > 0:
 		s.mid(amber + "●" + reset + bold + " The console keeps stopping" + reset)
 		s.blank()
-		s.mid(fg + "Gatehouse restarts it by itself, but it keeps failing." + reset)
+		s.mid(fg + "NopeWarden restarts it by itself, but it keeps failing." + reset)
 		s.mid(fg + "Your firewall is still protecting the network." + reset)
 		s.mid(fg + "Press Alt+F2 on this keyboard, then choose 4, to see why." + reset)
 	case setup == "down" && len(urls) > 0:
 		s.mid(amber + "●" + reset + bold + " The console is not running" + reset)
 		s.blank()
-		s.mid(fg + "The network is up, but Gatehouse did not start." + reset)
+		s.mid(fg + "The network is up, but NopeWarden did not start." + reset)
 		s.mid(fg + "Press Alt+F2 on this keyboard, then choose 4, to see why." + reset)
 	case len(urls) == 0:
 		s.mid(amber + "Waiting for a network connection" + reset)
@@ -295,7 +295,7 @@ func RenderStatus(host string, ports []Port, urls []string, setup string, w, h i
 		open("To finish setting up, open")
 		s.mid(fg + "and sign in." + reset)
 	default:
-		s.mid(green + "●" + reset + bold + " Gatehouse is running" + reset)
+		s.mid(green + "●" + reset + bold + " NopeWarden is running" + reset)
 		s.blank()
 		open("Manage it from a computer on your network: open")
 		s.blank()
@@ -357,7 +357,7 @@ func consoleState(port, setup string) string {
 
 // restarts is how many times systemd has restarted the console by itself.
 func restarts() int {
-	out, err := exec.Command("systemctl", "show", "gatehouse", "-p", "NRestarts", "--value").Output()
+	out, err := exec.Command("systemctl", "show", "nopewarden", "-p", "NRestarts", "--value").Output()
 	if err != nil {
 		return 0
 	}
@@ -366,7 +366,7 @@ func restarts() int {
 }
 
 // ConsolePortFile is the copy of the console's port that the console keeps for these screens.
-var ConsolePortFile = "/var/lib/gatehouse/console.port"
+var ConsolePortFile = "/var/lib/nopewarden/console.port"
 
 // ReadConsolePort is the port the console is set to answer on, or def when none is saved.
 func ReadConsolePort(def string) string {
@@ -397,7 +397,7 @@ func consoleSize() (w, h int) {
 
 // readSetupState reads how far first-time setup has got, as written by the daemon.
 func readSetupState() string {
-	b, err := os.ReadFile("/var/lib/gatehouse/setup-state")
+	b, err := os.ReadFile("/var/lib/nopewarden/setup-state")
 	if err != nil {
 		return "ready"
 	}

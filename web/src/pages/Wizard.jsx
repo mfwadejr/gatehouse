@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { get, post } from '../api.js';
 import { Button, Field, Icon, Input, Note, Pill, Segmented, Select, ToggleRow, enterToPrimary } from '../ui.jsx';
+import { Logo } from '../logo.jsx';
 
 const baseAddr = (cidr) => (cidr || '').split('/')[0];
 
@@ -14,7 +15,7 @@ function Frame({ title, step, of = 3, children }) {
   return (
     <main className="auth">
       <section className="card" ref={ref} style={{ width: 'min(100%, 40rem)' }}>
-        <div className="brand" style={{ padding: 0 }}><Icon name="logo" size={24} /><span>Gatehouse</span></div>
+        <div className="brand" style={{ padding: 0 }}><Logo size={24} /><span>NopeWarden</span></div>
         {step && <div className="small muted">Step {step} of {of}</div>}
         <h1>{title}</h1>
         {children}
@@ -79,7 +80,7 @@ export default function Wizard({ data, me, onDone }) {
     if (has(ins.wan_port) && ins.wan_port !== n.lan.port) n.wan = { type: 'dhcp', addr: '', gateway: '', dns: '', pppoe_user: '', pppoe_pass: '', port: ins.wan_port };
     return n;
   });
-  const [host, setHost] = useState(data.hostname || 'gatehouse');
+  const [host, setHost] = useState(data.hostname || 'nopewarden');
   const [zone, setZone] = useState(data.timezone || 'UTC');
   const [mfa, setMfa] = useState(false);
   const [err, setErr] = useState('');
@@ -118,19 +119,19 @@ export default function Wizard({ data, me, onDone }) {
 
   if (step === 'mode') {
     return (
-      <Frame title="How will Gatehouse be used?" step={sn} of={order.length}>
+      <Frame title="How will NopeWarden be used?" step={sn} of={order.length}>
         <p className="sec">You can change any of this later. Nothing is switched on until you finish.</p>
         <div className="stack">
           <button type="button" className={`preset ${router && !wantBridge ? 'on' : ''}`} aria-pressed={router && !wantBridge} onClick={() => { setWantBridge(false); setLan('mode')('router'); }}>
-            <span className="t">Gatehouse is my router</span>
+            <span className="t">NopeWarden is my router</span>
             <span className="d">It hands out addresses to your devices (DHCP), runs DNS, and connects you to the internet.</span>
           </button>
           <button type="button" className={`preset ${!router && !wantBridge ? 'on' : ''}`} aria-pressed={!router && !wantBridge} onClick={() => { setWantBridge(false); setNet((m) => ({ ...m, lan: { ...m.lan, mode: 'behind' }, wan: null })); }}>
-            <span className="t">Gatehouse sits behind my existing router</span>
-            <span className="d">Another router stays in charge of addresses and the internet. Gatehouse adds DNS filtering and a firewall for devices on this network.</span>
+            <span className="t">NopeWarden sits behind my existing router</span>
+            <span className="d">Another router stays in charge of addresses and the internet. NopeWarden adds DNS filtering and a firewall for devices on this network.</span>
           </button>
           <button type="button" className={`preset ${wantBridge ? 'on' : ''}`} aria-pressed={wantBridge} onClick={() => setWantBridge(true)}>
-            <span className="t">Gatehouse filters between my router and my devices (bridge)</span>
+            <span className="t">NopeWarden filters between my router and my devices (bridge)</span>
             <span className="d">It passes traffic through without routing and filters it. Your other router keeps handing out addresses. You plug in the cables and keep the change in the next screen, with a 60-second way back.</span>
           </button>
         </div>
@@ -209,7 +210,7 @@ export default function Wizard({ data, me, onDone }) {
           onChange={(p) => setNet((m) => ({ ...m, lan: { ...m.lan, port: p }, wan: m.wan?.port === p ? { ...m.wan, port: '' } : m.wan, bridge: m.bridge.filter((b) => b !== p) }))} />
         {router ? (
           <>
-            <Field label="Address of this device on your network" hint={data.install?.address && lan.address === data.install.address ? 'Chosen during install. You can change it here.' : 'Gatehouse picked a range that does not clash with the network you are on now.'}>
+            <Field label="Address of this device on your network" hint={data.install?.address && lan.address === data.install.address ? 'Chosen during install. You can change it here.' : 'NopeWarden picked a range that does not clash with the network you are on now.'}>
               <Input className="mono" value={lan.address} onChange={setLan('address')} placeholder="192.168.1.1/24" />
             </Field>
             <ToggleRow title="Give devices their addresses (DHCP)" desc={lan.no_dhcp ? 'Off. Devices need an address set by hand, or another server on this network must hand them out.' : 'Recommended. Devices that connect get an address, the gateway and DNS automatically.'} checked={!lan.no_dhcp} onChange={(v) => setLan('no_dhcp')(!v)} />
@@ -254,10 +255,10 @@ export default function Wizard({ data, me, onDone }) {
 
   return (
     <Frame title="About this device" step={sn} of={order.length}>
-      <Field label="Name of this device" hint="Shown on your network, for example gatehouse"><Input value={host} onChange={setHost} /></Field>
+      <Field label="Name of this device" hint="Shown on your network, for example nopewarden"><Input value={host} onChange={setHost} /></Field>
       <Field label="Time zone"><Select value={zone} onChange={setZone} options={zoneOptions(data.timezones)} /></Field>
       <ToggleRow title="Require two-factor sign-in" desc="Optional. Asks for a code from an authenticator app each time you sign in. You can change this later in Settings." checked={mfa} onChange={setMfa} />
-      {router && hereIsLan && !(data.install?.address && lan.address === data.install.address) && <Note tone="warn" title="Your connection will move">Gatehouse becomes your router on this port. After you finish, unplug and replug the cable on this computer so it gets a new address. The next page shows where to go.</Note>}
+      {router && hereIsLan && !(data.install?.address && lan.address === data.install.address) && <Note tone="warn" title="Your connection will move">NopeWarden becomes your router on this port. After you finish, unplug and replug the cable on this computer so it gets a new address. The next page shows where to go.</Note>}
       {err && <Note tone="bad">{err}</Note>}
       <div className="actions"><Button onClick={() => setStep('network')}>Back</Button><Button kind="primary" disabled={busy || !host} onClick={() => finish(false)}>Finish setup</Button></div>
     </Frame>
@@ -278,15 +279,15 @@ function Applied({ url, mode, user, onDone }) {
   }, [url]);
   return (
     <Frame title="Setting up your network…">
-      <p className="sec">{mode === 'router' ? 'Gatehouse is becoming your router and will start handing out addresses.' : 'Gatehouse is applying your settings.'}</p>
+      <p className="sec">{mode === 'router' ? 'NopeWarden is becoming your router and will start handing out addresses.' : 'NopeWarden is applying your settings.'}</p>
       {url ? (
         <>
-          <Note tone="good" title="Unplug and replug the cable on this computer">That makes it pick up a new address. This page opens Gatehouse by itself as soon as it is ready{up ? '' : '.'} Sign in as <strong>{user}</strong>.</Note>
+          <Note tone="good" title="Unplug and replug the cable on this computer">That makes it pick up a new address. This page opens NopeWarden by itself as soon as it is ready{up ? '' : '.'} Sign in as <strong>{user}</strong>.</Note>
           <div className="actions"><a className="btn primary" href={url}>Open {url.replace('https://', '').replace('/', '')} now</a></div>
         </>
       ) : (
         <>
-          <Note tone="good" title="Done">Gatehouse gets its address from your router. The address is shown on this machine&apos;s screen. Open it and sign in as <strong>{user}</strong>.</Note>
+          <Note tone="good" title="Done">NopeWarden gets its address from your router. The address is shown on this machine&apos;s screen. Open it and sign in as <strong>{user}</strong>.</Note>
           <div className="actions"><Button kind="primary" onClick={onDone}>Continue</Button></div>
         </>
       )}

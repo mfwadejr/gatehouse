@@ -8,7 +8,7 @@ import { Button, Field, Select, ToggleRow } from './ui.jsx';
 // port forward asks for who, where, what and when in the same way and the same words.
 
 // usePickers loads what the pickers offer: devices, groups, networks, saved port lists and the
-// services Gatehouse knows by name.
+// services NopeWarden knows by name.
 export function usePickers() {
   const { data, reload } = useData('/api/fw/pickers');
   return { pickers: data, reload };
@@ -54,7 +54,7 @@ export function OnToggle({ checked, onChange, what = 'This' }) {
 export function PauseMenu({ until, name, onPause, disabled }) {
   if (until * 1000 > Date.now()) return <Button small kind="primary" disabled={disabled} onClick={() => onPause(0)}>Resume now</Button>;
   return (
-    <Select value="" onChange={(v) => v && onPause(Number(v))} aria-label={`Pause ${name}`} disabled={disabled}
+    <Select value="" className="pausesel" onChange={(v) => v && onPause(Number(v))} aria-label={`Pause ${name}`} disabled={disabled}
       options={[{ value: '', label: 'Pause…' }, ...pauseChoices().map((c) => ({ value: String(c.m), label: c.t }))]} />
   );
 }

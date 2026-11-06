@@ -30,7 +30,7 @@ export default function SourcePicker({ value, onChange }) {
           {ch && !ch.networks.length && <span className="muted small">No networks yet.</span>}
         </div>
       </Field>
-      <Field label="Individual devices" hint="Gatehouse keeps the device's address fixed so it stays in the group.">
+      <Field label="Individual devices" hint="NopeWarden keeps the device's address fixed so it stays in the group.">
         <Input value={q} onChange={setQ} placeholder="Search devices" aria-label="Search devices" />
         <div className="stack" style={{ gap: 'var(--space-1)', maxHeight: '12rem', overflow: 'auto', marginTop: 'var(--space-2)' }}>
           {devs.map((d) => (

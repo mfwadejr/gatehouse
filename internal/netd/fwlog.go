@@ -24,7 +24,7 @@ type FWEvent struct {
 	DPort   int    `json:"dport"`
 }
 
-// ParseKmsg reads one /dev/kmsg record written by a Gatehouse log rule. Anything else,
+// ParseKmsg reads one /dev/kmsg record written by a NopeWarden log rule. Anything else,
 // including other programs' kernel messages, is ignored.
 func ParseKmsg(rec string, now time.Time) (FWEvent, bool) {
 	var ev FWEvent

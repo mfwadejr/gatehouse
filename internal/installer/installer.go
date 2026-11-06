@@ -1,4 +1,4 @@
-// Package installer writes Gatehouse to a disk from the live image. It runs only on the
+// Package installer writes NopeWarden to a disk from the live image. It runs only on the
 // live system, behind a one-time code shown on the machine's own screen.
 package installer
 
@@ -53,7 +53,7 @@ type Disk struct {
 type Request struct {
 	Disk    string `json:"disk"`
 	Confirm string `json:"confirm"` // must repeat the disk path
-	// MgmtPort is the network port the person will manage Gatehouse from. It is remembered on the
+	// MgmtPort is the network port the person will manage NopeWarden from. It is remembered on the
 	// new system, which brings that port up first and answers first-time setup only there.
 	MgmtPort string `json:"mgmt_port,omitempty"`
 	MgmtMAC  string `json:"mgmt_mac,omitempty"`
@@ -88,7 +88,7 @@ type Installer struct {
 	Squash   string // path of the root filesystem image on the live medium
 	EFI      func() bool
 	RebootFn func() // replaces the real restart in tests
-	Binary   string // path to the gatehouse binary, for creating the account inside the target
+	Binary   string // path to the nopewarden binary, for creating the account inside the target
 	mu       sync.Mutex
 	st       Status
 	logBuf   strings.Builder
@@ -97,7 +97,7 @@ type Installer struct {
 
 func New() *Installer {
 	return &Installer{R: execRunner{}, Target: "/mnt/target", Squash: "/run/live/medium/live/filesystem.squashfs",
-		EFI: func() bool { _, err := os.Stat("/sys/firmware/efi"); return err == nil }, Binary: "/usr/local/bin/gatehouse"}
+		EFI: func() bool { _, err := os.Stat("/sys/firmware/efi"); return err == nil }, Binary: "/usr/local/bin/nopewarden"}
 }
 
 func (in *Installer) Status() Status {
@@ -119,10 +119,10 @@ func (in *Installer) Status() Status {
 // MgmtPortFile is where the installer leaves the chosen management port on the new system
 // (relative to its root): the port's name and its MAC address, so it is found again even if the
 // kernel names the port differently.
-const MgmtPortFile = "var/lib/gatehouse/mgmt-port"
+const MgmtPortFile = "var/lib/nopewarden/mgmt-port"
 
 const (
-	defaultHost = "gatehouse"
+	defaultHost = "nopewarden"
 	defaultZone = "UTC"
 )
 
@@ -319,7 +319,7 @@ func (in *Installer) plan(r Request) []step {
 			return in.sh("", "sgdisk", "--zap-all", d)
 		}},
 		{"Creating partitions", func() error {
-			if err := in.sh("", "sgdisk", "-n1:0:+1M", "-t1:ef02", "-c1:bios", "-n2:0:+512M", "-t2:ef00", "-c2:efi", "-n3:0:0", "-t3:8300", "-c3:gatehouse", d); err != nil {
+			if err := in.sh("", "sgdisk", "-n1:0:+1M", "-t1:ef02", "-c1:bios", "-n2:0:+512M", "-t2:ef00", "-c2:efi", "-n3:0:0", "-t3:8300", "-c3:nopewarden", d); err != nil {
 				return err
 			}
 			in.sh("", "partprobe", d)
@@ -328,10 +328,10 @@ func (in *Installer) plan(r Request) []step {
 		}},
 		{"Formatting", func() error {
 			_ = bios
-			if err := in.sh("", "mkfs.vfat", "-F", "32", "-n", "GATEHOUSE", esp); err != nil {
+			if err := in.sh("", "mkfs.vfat", "-F", "32", "-n", "NOPEWARDEN", esp); err != nil {
 				return err
 			}
-			return in.sh("", "mkfs.ext4", "-F", "-L", "gatehouse-root", root)
+			return in.sh("", "mkfs.ext4", "-F", "-L", "nopewarden-root", root)
 		}},
 		{"Copying the system", func() error {
 			if err := os.MkdirAll(t, 0o755); err != nil {
@@ -389,7 +389,7 @@ func (in *Installer) plan(r Request) []step {
 				if err := in.chroot("", "grub-install", "--target=x86_64-efi", "--efi-directory=/boot/efi", "--removable", "--no-nvram"); err != nil {
 					return err
 				}
-				in.chroot("", "grub-install", "--target=x86_64-efi", "--efi-directory=/boot/efi", "--bootloader-id=gatehouse") // best effort: a firmware entry too
+				in.chroot("", "grub-install", "--target=x86_64-efi", "--efi-directory=/boot/efi", "--bootloader-id=nopewarden") // best effort: a firmware entry too
 			} else if err := in.chroot("", "grub-install", "--target=i386-pc", d); err != nil {
 				return err
 			}
@@ -402,16 +402,16 @@ func (in *Installer) plan(r Request) []step {
 			if err := in.chroot("", "update-grub"); err != nil {
 				return err
 			}
-			// Menu entries would otherwise read "Gatehouse GNU/Linux".
+			// Menu entries would otherwise read "NopeWarden GNU/Linux".
 			in.chroot("", "sed", "-i", "s# GNU/Linux##g", "/boot/grub/grub.cfg")
 			return nil
 		}},
 		{"Preparing first start", func() error {
-			if err := in.chroot("", "install", "-d", "-o", "gatehouse", "-g", "gatehouse", "-m", "750", "/var/lib/gatehouse"); err != nil {
+			if err := in.chroot("", "install", "-d", "-o", "nopewarden", "-g", "nopewarden", "-m", "750", "/var/lib/nopewarden"); err != nil {
 				return err
 			}
 			if r.MgmtPort != "" {
-				if err := os.MkdirAll(filepath.Join(t, "var/lib/gatehouse"), 0o755); err != nil {
+				if err := os.MkdirAll(filepath.Join(t, "var/lib/nopewarden"), 0o755); err != nil {
 					return err
 				}
 				if err := os.WriteFile(filepath.Join(t, MgmtPortFile), []byte(r.MgmtPort+" "+r.MgmtMAC+"\n"), 0o644); err != nil {
@@ -419,14 +419,14 @@ func (in *Installer) plan(r Request) []step {
 				}
 			}
 			if body := r.installNetBody(); body != "" {
-				if err := os.MkdirAll(filepath.Join(t, "var/lib/gatehouse"), 0o755); err != nil {
+				if err := os.MkdirAll(filepath.Join(t, "var/lib/nopewarden"), 0o755); err != nil {
 					return err
 				}
 				if err := os.WriteFile(filepath.Join(t, InstallNetFile), []byte(body), 0o644); err != nil {
 					return err
 				}
 			}
-			return in.chroot("", "chown", "-R", "gatehouse:gatehouse", "/var/lib/gatehouse")
+			return in.chroot("", "chown", "-R", "nopewarden:nopewarden", "/var/lib/nopewarden")
 		}},
 		{"Finishing", func() error {
 			in.sh("", "sync")
@@ -476,16 +476,16 @@ func (in *Installer) reboot() {
 func PinMemory() { unix.Mlockall(unix.MCL_CURRENT | unix.MCL_FUTURE) }
 
 // grubDefaults makes the installed machine start the way the installer did: no menu unless
-// a key is held, no kernel text, the Gatehouse splash, and nothing that names another product.
-const grubDefaults = `# Written by the Gatehouse installer.
-GRUB_DISTRIBUTOR="Gatehouse"
+// a key is held, no kernel text, the NopeWarden splash, and nothing that names another product.
+const grubDefaults = `# Written by the NopeWarden installer.
+GRUB_DISTRIBUTOR="NopeWarden"
 GRUB_TIMEOUT=0
 GRUB_TIMEOUT_STYLE=hidden
 GRUB_CMDLINE_LINUX_DEFAULT="quiet splash usbcore.autosuspend=-1 loglevel=0 systemd.show_status=0 vt.global_cursor_default=0"
 GRUB_TERMINAL_OUTPUT=gfxterm
 GRUB_GFXMODE=auto
 GRUB_GFXPAYLOAD_LINUX=keep
-GRUB_THEME=/boot/grub/themes/gatehouse/theme.txt
+GRUB_THEME=/boot/grub/themes/nopewarden/theme.txt
 GRUB_DISABLE_OS_PROBER=true
 GRUB_DISABLE_RECOVERY=true
 GRUB_DISABLE_SUBMENU=y
@@ -506,17 +506,17 @@ GRUB_SERIAL_COMMAND="serial --unit=` + unit + ` --speed=` + speed + ` --word=8 -
 `
 }
 
-// brand puts the Gatehouse boot menu and splash into the installed system.
+// brand puts the NopeWarden boot menu and splash into the installed system.
 func (in *Installer) brand(t, serial string) error {
 	if err := os.MkdirAll(filepath.Join(t, "etc/default/grub.d"), 0o755); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(t, "etc/default/grub.d/gatehouse.cfg"), []byte(grubConfig(serial)), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(t, "etc/default/grub.d/nopewarden.cfg"), []byte(grubConfig(serial)), 0o644); err != nil {
 		return err
 	}
 	if serial != "" {
 		// Remembered so the status screen knows to speak on the serial port too.
-		os.MkdirAll(filepath.Join(t, "var/lib/gatehouse"), 0o755)
+		os.MkdirAll(filepath.Join(t, "var/lib/nopewarden"), 0o755)
 		if err := os.WriteFile(filepath.Join(t, strings.TrimPrefix(SerialMarker, "/")), []byte(strings.ReplaceAll(serial, ",", " ")+"\n"), 0o644); err != nil {
 			return err
 		}
@@ -525,9 +525,9 @@ func (in *Installer) brand(t, serial string) error {
 	if err := in.sh("", "mkdir", "-p", filepath.Join(t, "boot/grub/themes")); err != nil {
 		return err
 	}
-	in.sh("", "rm", "-rf", filepath.Join(t, "boot/grub/themes/gatehouse"))
-	if err := in.sh("", "cp", "-a", filepath.Join(t, "usr/share/gatehouse/grub-theme"), filepath.Join(t, "boot/grub/themes/gatehouse")); err != nil {
+	in.sh("", "rm", "-rf", filepath.Join(t, "boot/grub/themes/nopewarden"))
+	if err := in.sh("", "cp", "-a", filepath.Join(t, "usr/share/nopewarden/grub-theme"), filepath.Join(t, "boot/grub/themes/nopewarden")); err != nil {
 		return err
 	}
-	return in.chroot("", "plymouth-set-default-theme", "gatehouse")
+	return in.chroot("", "plymouth-set-default-theme", "nopewarden")
 }

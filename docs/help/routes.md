@@ -28,3 +28,6 @@ A streaming app only works from another country: add a route for its website thr
 
 ## If something goes wrong
 **Not working** means the VPN behind the route is down. **Needs two connections** means a route needs more than one internet connection. With **Kill switch** on, the traffic stops rather than leaking.
+
+## Addresses learned for a website
+Each website route shows the addresses NopeWarden has learned for the site and when. They are filled in as devices look the site up, and cleared when you delete the route. If you edit a route, saving works with the route exactly as the list shows it.

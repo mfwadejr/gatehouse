@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"gatehouse/internal/netd"
+	"nopewarden/internal/netd"
 )
 
 func TestBaseDomain(t *testing.T) {

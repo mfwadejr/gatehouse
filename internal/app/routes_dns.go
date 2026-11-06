@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"gatehouse/internal/api"
-	dnssrv "gatehouse/internal/dns"
+	"nopewarden/internal/api"
+	dnssrv "nopewarden/internal/dns"
 )
 
 var (
@@ -90,7 +90,7 @@ func (a *App) dnsAddList(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		ctx, cancel := contextTimeout(2 * time.Minute)
 		defer cancel()
 		if a.Lists.Refresh(ctx, id) == nil {
-			a.Lists.Reload()
+			a.reloadLists()
 		}
 	}()
 	api.JSON(w, 200, map[string]int64{"id": id})
@@ -126,7 +126,7 @@ func (a *App) dnsAddRecord(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		fail(w, err)
 		return
 	}
-	a.DNS.SetLocalRecords(a.localRecords())
+	a.setLocalRecords()
 	ok(w)
 }
 
@@ -147,7 +147,7 @@ func (a *App) dnsAddUpstream(w http.ResponseWriter, r *http.Request, c *api.Ctx)
 		fail(w, errors.New("that resolver is already in the list"))
 		return
 	}
-	a.loadUpstreams()
+	a.reloadUpstreams()
 	ok(w)
 }
 
@@ -197,7 +197,7 @@ func (a *App) dnsSaveSettings(w http.ResponseWriter, r *http.Request, c *api.Ctx
 			return
 		}
 	}
-	if err := a.applyDNS(); err != nil {
+	if err := a.applyDNSHeld(); err != nil {
 		fail(w, err)
 		return
 	}
@@ -253,7 +253,7 @@ func (a *App) dnsOrderUpstreams(w http.ResponseWriter, r *http.Request, c *api.C
 		fail(w, err)
 		return
 	}
-	a.loadUpstreams()
+	a.reloadUpstreams()
 	ok(w)
 }
 

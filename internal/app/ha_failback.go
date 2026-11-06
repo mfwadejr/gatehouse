@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/ha"
-	"gatehouse/internal/netd"
+	"nopewarden/internal/api"
+	"nopewarden/internal/ha"
+	"nopewarden/internal/netd"
 )
 
 // Failback. When the unit that normally runs the network (the Primary) comes back after the other

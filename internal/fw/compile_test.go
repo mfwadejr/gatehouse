@@ -32,7 +32,7 @@ func TestCompileShape(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{
-		"delete table inet gatehouse",
+		"delete table inet nopewarden",
 		`iifname "eth1" tcp dport 443 accept comment "protected: management console"`,
 		`iifname "eth1" oifname "eth0" counter accept comment "internet:Home"`,
 		`iifname "eth2" oifname "eth1" ip daddr { 192.168.1.50, 192.168.1.51 } tcp dport 631 counter accept`,
@@ -238,7 +238,7 @@ func TestStartingRulesFollowPort(t *testing.T) {
 func TestFirstBootBaselineLetsTheSetupPortGetAnAddress(t *testing.T) {
 	dir := t.TempDir()
 	InstallNetPath = filepath.Join(dir, "install-net")
-	defer func() { InstallNetPath = "/var/lib/gatehouse/install-net" }()
+	defer func() { InstallNetPath = "/var/lib/nopewarden/install-net" }()
 	got := FirstBootBaselineFor(443)
 	if !strings.Contains(got, "udp sport 68 udp dport 67 accept") {
 		t.Fatal("DHCP requests from a computer on the setup port would be dropped")

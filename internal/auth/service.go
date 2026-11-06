@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/crypt"
-	"gatehouse/internal/store"
+	"nopewarden/internal/crypt"
+	"nopewarden/internal/store"
 )
 
 var (

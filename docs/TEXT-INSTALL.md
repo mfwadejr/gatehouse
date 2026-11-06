@@ -2,13 +2,13 @@
 
 The boot menu has three choices:
 
-1. **Install Gatehouse**: installs on this machine, using its own screen and keyboard.
-2. **Install Gatehouse (basic graphics)**: the same, for screens that show nothing with the first one.
+1. **Install NopeWarden**: installs on this machine, using its own screen and keyboard.
+2. **Install NopeWarden (basic graphics)**: the same, for screens that show nothing with the first one.
 3. **Install with serial console (115200 8N1)**: for machines with no screen, over a serial cable.
 
 (The old "install from another computer" choice and its code are gone: the machine asks two questions on its own screen, and everything else is done in a browser after the restart.)
 
-Every choice asks only for the disk and for the network port you will manage Gatehouse from. The administrator account, networks, name and time zone are set in a browser after the machine restarts, so there is nothing to write down and no code to type.
+Every choice asks only for the disk and for the network port you will manage NopeWarden from. The administrator account, networks, name and time zone are set in a browser after the machine restarts, so there is nothing to write down and no code to type.
 
 Use the third choice for a machine with no screen, or one you reach through a serial cable or a management card.
 
@@ -40,7 +40,7 @@ The boot menu is also sent to the serial port, but it only waits four seconds. O
 ## The questions
 
 1. Which disk to install on. The USB stick you started from is never offered.
-2. Which network port you will manage Gatehouse from. Plug a cable into it; the list updates by itself and shows the cable as soon as it is connected. A port with a cable is required (you can insist on one without, after a warning).
+2. Which network port you will manage NopeWarden from. Plug a cable into it; the list updates by itself and shows the cable as soon as it is connected. A port with a cable is required (you can insist on one without, after a warning).
 3. A confirmation: type the disk name; anything else starts over.
 4. Progress, then "Remove the USB stick now, then press Enter to restart."
 
@@ -50,6 +50,6 @@ After the restart the machine's screen shows an address. Open it in a browser on
 
 ## First start after the installation
 
-The port you chose asks the network for an address like any wired port. If no router answers within about 30 seconds, Gatehouse gives that port the address **192.168.100.1** and hands out addresses on it, so a laptop plugged straight into the machine can open https://192.168.100.1. The screen always shows the address to use.
+The port you chose asks the network for an address like any wired port. If no router answers within about 30 seconds, NopeWarden gives that port the address **192.168.100.1** and hands out addresses on it, so a laptop plugged straight into the machine can open https://192.168.100.1. The screen always shows the address to use.
 
 Until the administrator account exists, the setup page only answers on the management port. Once the account exists the setup page is closed for good and the address shows the normal sign-in page. The temporary address goes away when setup is finished.

@@ -75,12 +75,12 @@ func TestPKI(t *testing.T) {
 
 func TestServerConfigAndProfile(t *testing.T) {
 	s := OVPNServer{Dev: "tun0", Proto: "udp", Port: 1194, Subnet: "10.9.0.0/24", DNS: "10.9.0.1", RouteAll: false,
-		Routes: []string{"192.168.1.0/24"}, Dir: "/etc/openvpn/server/gatehouse-tun0"}
+		Routes: []string{"192.168.1.0/24"}, Dir: "/etc/openvpn/server/nopewarden-tun0"}
 	c, err := s.Config()
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"dev tun0", "proto udp4", "port 1194", "server 10.9.0.0 255.255.255.0", "dh none", "tls-crypt /etc/openvpn/server/gatehouse-tun0/tls-crypt.key",
+	for _, want := range []string{"dev tun0", "proto udp4", "port 1194", "server 10.9.0.0 255.255.255.0", "dh none", "tls-crypt /etc/openvpn/server/nopewarden-tun0/tls-crypt.key",
 		"crl-verify", "data-ciphers AES-256-GCM", `push "dhcp-option DNS 10.9.0.1"`, `push "route 192.168.1.0 255.255.255.0"`, "tls-version-min 1.2"} {
 		if !strings.Contains(c, want) {
 			t.Errorf("server config lacks %q\n%s", want, c)
@@ -156,8 +156,8 @@ func TestImportProfile(t *testing.T) {
 			t.Errorf("imported config lost %q", kept)
 		}
 	}
-	full := OVPNClientConfig(ip, "tun1", "/etc/openvpn/client/gatehouse-tun1.auth")
-	for _, want := range []string{"dev tun1", "route-nopull", "script-security 1", "auth-user-pass /etc/openvpn/client/gatehouse-tun1.auth"} {
+	full := OVPNClientConfig(ip, "tun1", "/etc/openvpn/client/nopewarden-tun1.auth")
+	for _, want := range []string{"dev tun1", "route-nopull", "script-security 1", "auth-user-pass /etc/openvpn/client/nopewarden-tun1.auth"} {
 		if !strings.Contains(full, want) {
 			t.Errorf("final config lacks %q", want)
 		}

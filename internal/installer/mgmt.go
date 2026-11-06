@@ -11,18 +11,18 @@ import (
 	"time"
 )
 
-// The management port. The installer asks which network port the person will manage Gatehouse
+// The management port. The installer asks which network port the person will manage NopeWarden
 // from and leaves the answer on the new system. Until setup is finished, that port is the one
 // that matters: it asks for an address like every wired port does, and if no router answers it
 // gives itself 192.168.100.1 and hands out addresses to whatever is plugged in, so a laptop
 // connected straight to the machine can open the setup page with nothing configured.
 
 // MgmtPortPath is where the installer left the choice: the port's name and its MAC address.
-var MgmtPortPath = "/var/lib/gatehouse/mgmt-port"
+var MgmtPortPath = "/var/lib/nopewarden/mgmt-port"
 
 // FallbackFile is the temporary network file that gives the management port its own address.
 // It lives in /run, so a restart removes it, and it is removed as soon as setup is finished.
-var FallbackFile = "/run/systemd/network/05-gatehouse-fallback.network"
+var FallbackFile = "/run/systemd/network/05-nopewarden-fallback.network"
 
 const (
 	// FallbackAddr is the management address when no router gives one.
@@ -66,7 +66,7 @@ func FallbackConfig(port string) string { return FallbackConfigFor(port, Fallbac
 func FallbackConfigFor(port, addr string) string { return fallbackConfig(port, addr, true) }
 
 // ChosenConfig is the file for an address the person chose during the install. It only gives the
-// port its address: Gatehouse's own DHCP service hands out addresses to whatever is plugged in.
+// port its address: NopeWarden's own DHCP service hands out addresses to whatever is plugged in.
 func ChosenConfig(port, addr string) string { return fallbackConfig(port, addr, false) }
 
 func fallbackConfig(port, addr string, server bool) string {
@@ -79,7 +79,7 @@ func fallbackConfig(port, addr string, server bool) string {
 	if hosts < 254 {
 		offset, size = hosts/2, max(hosts/2-1, 1)
 	}
-	body := fmt.Sprintf(`# Written by Gatehouse while setup is not finished: the management port's own address.
+	body := fmt.Sprintf(`# Written by NopeWarden while setup is not finished: the management port's own address.
 [Match]
 Name=%s
 

@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/dhcp"
+	"nopewarden/internal/api"
+	"nopewarden/internal/dhcp"
 )
 
 type rogueState struct {
@@ -21,7 +21,7 @@ type rogueState struct {
 	kick   chan struct{}
 }
 
-// Another DHCP server on a network where Gatehouse serves addresses makes devices pick an address at
+// Another DHCP server on a network where NopeWarden serves addresses makes devices pick an address at
 // random from the two. The check asks the network for offers the way a new device would, takes no
 // address, and reports who answered.
 type rogueFinding struct {
@@ -61,14 +61,14 @@ func (a *App) probeScope(id int64) (verdict string, out []rogueFinding, name str
 	verdict = "ok"
 	switch {
 	case len(out) > 0 && mode == "serve":
-		verdict = "conflict" // someone else hands out addresses where Gatehouse does
+		verdict = "conflict" // someone else hands out addresses where NopeWarden does
 	case len(out) == 0 && mode == "off":
-		verdict = "none" // Gatehouse expects another device to serve here, and nothing answered
+		verdict = "none" // NopeWarden expects another device to serve here, and nothing answered
 	}
 	return verdict, out, name, nil
 }
 
-// rogueAlert is what the console shows when another DHCP server answers on a network Gatehouse serves.
+// rogueAlert is what the console shows when another DHCP server answers on a network NopeWarden serves.
 type rogueAlert struct {
 	Scope int64          `json:"scope"`
 	Name  string         `json:"name"`
@@ -87,7 +87,7 @@ func (a *App) rogueAlerts() []rogueAlert {
 	return out
 }
 
-// rogueCheck looks at every network Gatehouse serves and keeps the alert list current. A new
+// rogueCheck looks at every network NopeWarden serves and keeps the alert list current. A new
 // problem is also written to the activity log once.
 func (a *App) rogueCheck() {
 	rows, err := a.Config.Query(`SELECT id FROM dhcp_scopes WHERE enabled=1 AND mode='serve'`)
@@ -126,7 +126,7 @@ func (a *App) rogueCheck() {
 				who = append(who, f.Server)
 			}
 			a.event("dhcp", "warn", "Another DHCP server is answering on "+name,
-				strings.Join(who, ", ")+" hands out addresses here too, so devices may get the wrong settings. Switch it off, or turn off DHCP on this network in Gatehouse.")
+				strings.Join(who, ", ")+" hands out addresses here too, so devices may get the wrong settings. Switch it off, or turn off DHCP on this network in NopeWarden.")
 		}
 	}
 	a.rogue.mu.Lock()

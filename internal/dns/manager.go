@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"nopewarden/internal/sched"
 	"os"
 	"path/filepath"
 	"sort"
@@ -14,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/store"
+	"nopewarden/internal/store"
 )
 
 // ListInfo is a blocklist as the console shows it.
@@ -29,7 +30,7 @@ type ListInfo struct {
 	LastOK    int64  `json:"last_ok"`
 	Entries   int    `json:"entries"` // names the list blocks
 	Allowed   int    `json:"allowed"` // exceptions ("do not block this") the list carries
-	Skipped   int    `json:"skipped"` // lines in a syntax Gatehouse does not use
+	Skipped   int    `json:"skipped"` // lines in a syntax NopeWarden does not use
 	Status    string `json:"status"`  // new, downloading, ok, error, stale
 	Error     string `json:"error,omitempty"`
 	Plain     string `json:"plain,omitempty"` // the error in plain words
@@ -52,7 +53,13 @@ type Manager struct {
 	OnChange func()
 	// Online, when set, says whether the internet answers; a list that failed is tried again at
 	// once when this goes from false to true, instead of waiting out its backoff.
-	Online   func() bool
+	Online func() bool
+	// Schedule, when set, says when lists are refreshed (one schedule for every list). Without it each
+	// list uses its own interval.
+	Schedule func() sched.Spec
+	// Hold, when it says true, keeps Reload from changing what is running: a change is waiting to be
+	// applied from the Review page and the engine is rebuilt then.
+	Hold     func() bool
 	fetching map[int64]bool // lists being downloaded right now
 	unique   int            // distinct names blocked across all enabled lists
 	// AllowFetch lets tests permit loopback URLs; production blocks private addresses.
@@ -334,7 +341,7 @@ func (m *Manager) Refresh(ctx context.Context, id int64) error {
 	if err != nil {
 		return fail(err)
 	}
-	req.Header.Set("User-Agent", "Gatehouse/1.0")
+	req.Header.Set("User-Agent", "NopeWarden/1.0")
 	resp, err := m.http.Do(req)
 	if err != nil {
 		return fail(err)
@@ -349,19 +356,37 @@ func (m *Manager) Refresh(ctx context.Context, id int64) error {
 	return m.Reload()
 }
 
-// Due returns lists whose refresh interval has passed.
+// Due returns lists whose refresh is due. The rows are read to the end first: the schedule lookup
+// uses the database too, and the database has one connection.
 func (m *Manager) due() []int64 {
-	rows, err := m.db.Query(`SELECT id FROM blocklists WHERE enabled=1 AND local=0 AND url<>'' AND ?>=retry_at AND
-		(last_ok=0 OR ?-last_ok >= interval_hours*3600)`, m.now().Unix(), m.now().Unix())
+	type row struct{ id, lastOK, hours int64 }
+	var all []row
+	rows, err := m.db.Query(`SELECT id,last_ok,interval_hours FROM blocklists WHERE enabled=1 AND local=0 AND url<>'' AND ?>=retry_at`, m.now().Unix())
 	if err != nil {
 		return nil
 	}
-	defer rows.Close()
-	var ids []int64
 	for rows.Next() {
-		var id int64
-		rows.Scan(&id)
-		ids = append(ids, id)
+		var r row
+		rows.Scan(&r.id, &r.lastOK, &r.hours)
+		all = append(all, r)
+	}
+	rows.Close()
+	var ids []int64
+	now := m.now()
+	for _, r := range all {
+		if m.Schedule != nil {
+			var last time.Time
+			if r.lastOK > 0 {
+				last = time.Unix(r.lastOK, 0)
+			}
+			if m.Schedule().Due(last, now) {
+				ids = append(ids, r.id)
+			}
+			continue
+		}
+		if r.lastOK == 0 || now.Unix()-r.lastOK >= r.hours*3600 {
+			ids = append(ids, r.id)
+		}
 	}
 	return ids
 }
@@ -394,6 +419,14 @@ func (m *Manager) Run(ctx context.Context) {
 
 // Reload rebuilds the engine from the database and cached list files.
 func (m *Manager) Reload() error {
+	if m.Hold != nil && m.Hold() {
+		return nil
+	}
+	return m.ReloadNow()
+}
+
+// ReloadNow rebuilds the engine whether or not a change is being held.
+func (m *Manager) ReloadNow() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	type lst struct {

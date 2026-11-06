@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"gatehouse/internal/crypt"
-	"gatehouse/internal/store"
+	"nopewarden/internal/crypt"
+	"nopewarden/internal/store"
 )
 
 func newSvc(t *testing.T) (*Service, *time.Time) {
@@ -66,7 +66,7 @@ func TestTOTPVector(t *testing.T) {
 
 func enrol(t *testing.T, s *Service, now time.Time, uid int64) (string, []string) {
 	t.Helper()
-	secret, uri, err := s.BeginEnrol(uid, "Gatehouse")
+	secret, uri, err := s.BeginEnrol(uid, "NopeWarden")
 	if err != nil || !strings.HasPrefix(uri, "otpauth://totp/") {
 		t.Fatalf("begin: %v %s", err, uri)
 	}

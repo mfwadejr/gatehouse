@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"gatehouse/internal/auth"
-	"gatehouse/internal/wanmon"
+	"nopewarden/internal/auth"
+	"nopewarden/internal/wanmon"
 )
 
 func TestWanGroups(t *testing.T) {

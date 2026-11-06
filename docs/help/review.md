@@ -4,18 +4,18 @@
 Saving a change to the firewall, the network or a policy puts it live straight away. Sometimes you would rather collect several changes first and put them live together. **Save for later** does that, and this page is where those changes wait.
 
 ## How saving works
-- **Save and apply** (the main button) saves the change and puts it live after a moment. Gatehouse then checks that you can still reach it and keeps the change. If a change cuts you off, nothing more is needed: it undoes itself within 60 seconds.
-- **Save for later** saves the change but leaves it waiting. It is offered on the forms for rules, routes, open ports, services, device groups, internet connections, connection groups, networks, network types, DHCP networks and reservations, VPN settings, letting networks see each other, and who may manage Gatehouse. A small badge showing how many changes are waiting, with a link to **Review changes**, appears at the top of every page.
+- **Save and apply** (the main button) saves the change and puts it live after a moment. NopeWarden then checks that you can still reach it and keeps the change. If a change cuts you off, nothing more is needed: it undoes itself within 60 seconds.
+- **Save for later** saves the change but leaves it waiting. It is offered on the forms for rules, routes, open ports, services, device groups, internet connections, connection groups, networks, network types, DHCP networks and reservations, VPN settings, letting networks see each other, and who may manage NopeWarden. A small badge showing how many changes are waiting, with a link to **Review changes**, appears at the top of every page.
 - Quick actions such as **Pause…**, **Turn off** and **Remove** are applied the same way as **Save and apply**.
-- If Gatehouse finds something worth a second look (a warning or a problem), or other changes are already waiting, nothing goes live on its own. The change waits here, with the reason shown.
+- If NopeWarden finds something worth a second look (a warning or a problem), or other changes are already waiting, nothing goes live on its own. The change waits here, with the reason shown.
 
 ## What is on the page
 - **Changes waiting**: every saved-but-not-live change, in plain words and in the order you made them.
-- **Worth knowing before you commit** and **problems**: what Gatehouse found when it checked. A problem has to be fixed before you can commit.
+- **Worth knowing before you commit** and **problems**: what NopeWarden found when it checked. A problem has to be fixed before you can commit.
 - **Verify and commit** puts everything waiting live in one step, network first and then the firewall, each with the 60-second safety.
 - **Discard** on a line goes back to just before that change. Later changes can depend on earlier ones, so it also drops every change saved after it, and asks first. On the last line it drops only that change.
-- **Discard all changes** puts everything back exactly as it was running. It is offered only when Gatehouse still has the copy it made before the first waiting change.
-- **Code from your authenticator app** shows when you asked for a code before changing the firewall. Gatehouse remembers a good code for 15 minutes.
+- **Discard all changes** puts everything back exactly as it was running. It is offered only when NopeWarden still has the copy it made before the first waiting change.
+- **Code from your authenticator app** shows when you asked for a code before changing the firewall. NopeWarden remembers a good code for 15 minutes.
 
 ## Common tasks
 1. Make three changes and put them live together: choose **Save for later** on each, open **Review**, check the list, **Verify and commit**.
@@ -24,3 +24,9 @@ Saving a change to the firewall, the network or a policy puts it live straight a
 
 ## If something goes wrong
 If you are told other changes are waiting, open **Review** and commit or discard them first. If a commit fails, the message says which part (network or firewall) and what was wrong; the changes stay waiting.
+
+## The DNS area
+Review now has three areas: **Networks**, **DNS** and **Firewall**. DNS changes wait here like the others. Applying sends them live; discarding restores DNS exactly as it was running.
+
+## What waits here
+Firewall, route, VPN, DHCP, network and DNS changes wait here, and so do Forget a device, adding a network, country rules and changes to blocks. A device you chose to forget shows Forgetting… on the Devices page until the change is applied; discarding the change keeps the device.

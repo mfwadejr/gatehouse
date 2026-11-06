@@ -1,0 +1,22 @@
+[Unit]
+Description=NopeWarden network helper (firewall, interfaces, internet connections)
+Documentation=https://github.com/
+ConditionKernelCommandLine=!boot=live
+After=local-fs.target
+Before=network-pre.target nopewarden.service
+Wants=network-pre.target
+
+[Service]
+Type=simple
+RuntimeDirectory=nopewarden
+RuntimeDirectoryPreserve=yes
+ExecStart=/usr/local/bin/nopewarden netd -user nopewarden -group nopewarden
+Restart=always
+RestartSec=2
+# The helper must be able to change the network, so it keeps root, but little else.
+NoNewPrivileges=no
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

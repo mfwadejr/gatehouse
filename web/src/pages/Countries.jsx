@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { post, put, useData } from '../api.js';
+import { ScheduleEditor } from '../ScheduleEditor.jsx';
+import { holdAnd, post, put, useData } from '../api.js';
+import { SAVED_LATER, SaveChoice } from '../changes.jsx';
 import { CODES, countryName } from '../AddrPicker.jsx';
 import { Button, Card, Input, Note, Pill, Segmented, ToggleRow, useAction, useToast, confirmBox } from '../ui.jsx';
 
@@ -25,16 +27,16 @@ export default function Countries({ reload }) {
   const max = data.max || 40;
   const set = (patch) => setP((x) => ({ ...x, ...patch }));
   const toggle = (cc) => set({ countries: sel.has(cc) ? p.countries.filter((c) => c !== cc) : [...p.countries, cc] });
-  const save = async (confirm) => {
+  const save = async (confirm, later) => {
     try {
-      await put('/api/fw/countries', { ...p, confirm });
+      await (later ? holdAnd(() => put('/api/fw/countries', { ...p, confirm })) : put('/api/fw/countries', { ...p, confirm }));
       await again();
       reload?.();
       return true;
     } catch (e) {
       const m = e.message || '';
       if (m.startsWith('needs-confirm:') && !confirm) {
-        if (await confirmBox(m.replace('needs-confirm:', '').trim() + '\nYou could lose your own access to some sites and services.', { title: 'This includes your own country', yes: 'Save anyway' })) return save(true);
+        if (await confirmBox(m.replace('needs-confirm:', '').trim() + '\nYou could lose your own access to some sites and services.', { title: 'This includes your own country', yes: 'Save anyway' })) return save(true, later);
         return false;
       }
       throw e;
@@ -45,14 +47,15 @@ export default function Countries({ reload }) {
     const list = (x) => [...(x || [])].sort().join(',');
     return !!p.enabled === !!o.enabled && p.mode === o.mode && p.dir === o.dir && list(p.countries) === list(o.countries);
   };
-  const doSave = () => (same() ? toast('No changes. These are already saved.') : run(() => save(false), 'Saved. Apply the firewall to start using it.'));
+  const doSave = (later) => (same() ? toast('No changes. These are already saved.') : run(() => save(false, later), later ? SAVED_LATER : 'Saved.'));
   const preset = () => home && set({ enabled: true, mode: 'allow', dir: 'both', countries: [home] });
   const verb = p.mode === 'allow' ? 'Only these countries are allowed' : 'These countries are blocked';
   const dirText = { both: 'both ways', out: 'for what your devices send out', in: 'for what arrives from the internet' }[p.dir];
   const over = p.countries.length > max;
   return (
     <Card title="Block or allow countries" desc="Stop traffic to or from whole countries. The country comes from public address registries, so VPN and hosting addresses can be wrong.">
-      {!data.ready && <Note tone="warn" title="Country data not downloaded yet">Gatehouse is fetching the address lists. This can take a few minutes. <button type="button" className="linkbtn" onClick={() => post('/api/fw/geo/refresh').then(again)}>Download now</button></Note>}
+      {!data.ready && <Note tone="warn" title="Country data not downloaded yet">NopeWarden is fetching the address lists. This can take a few minutes. <button type="button" className="linkbtn" onClick={() => post('/api/fw/geo/refresh').then(again)}>Download now</button></Note>}
+      <ScheduleEditor id="geo" label="How often to refresh the country data" />
       <ToggleRow title="Use country rules" desc={p.enabled ? `${verb}, ${dirText}.` : 'Off. Nothing is blocked by country.'} checked={!!p.enabled} onChange={(v) => set({ enabled: v })} />
       <div className="countries-opts">
         <div><div className="small muted">What to do</div><Segmented value={p.mode} onChange={(v) => set({ mode: v })} options={[{ value: 'block', label: 'Block these' }, { value: 'allow', label: 'Allow only these' }]} /></div>
@@ -85,7 +88,7 @@ export default function Countries({ reload }) {
         {!shown.length && <span className="muted small">Nothing matches.</span>}
       </div>
       <div className="inline mt3">
-        <Button kind="primary" disabled={busy || over} onClick={doSave}>Save</Button>
+        <SaveChoice busy={busy} disabled={over} onSave={doSave} />
         <span className="small muted">Your own networks and VPN far ends are never matched. Rules appear under Rules, Show system rules.</span>
       </div>
     </Card>

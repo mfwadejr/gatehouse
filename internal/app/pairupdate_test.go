@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"gatehouse/internal/ha"
-	"gatehouse/internal/update"
+	"nopewarden/internal/ha"
+	"nopewarden/internal/update"
 )
 
 // pairedUnits sets up two running, activated units that can talk to each other, both on 0.1.5.

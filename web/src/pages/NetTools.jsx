@@ -90,7 +90,7 @@ function Tools() {
     }
   });
   return (
-    <Card title="Tools" desc="Run a check from Gatehouse itself: whether a site answers, the path to it, or what a name points to.">
+    <Card title="Tools" desc="Run a check from NopeWarden itself: whether a site answers, the path to it, or what a name points to.">
       <div className="stack">
         <Segmented value={kind} onChange={(v) => { setKind(v); setOut(''); }} options={[{ value: 'ping', label: 'Ping' }, { value: 'trace', label: 'Trace the path' }, { value: 'dns', label: 'Look up a name' }]} />
         <Field label={kind === 'dns' ? 'Website name' : 'Website name or address'} hint="For example example.com or 8.8.8.8">

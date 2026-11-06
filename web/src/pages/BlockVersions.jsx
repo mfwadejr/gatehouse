@@ -8,7 +8,7 @@ export default function BlockVersions() {
   if (!data) return null;
   const a = data.app_names;
   return (
-    <Card title="Lists used for blocking" desc="What Gatehouse checks when it blocks an app, a topic or a website.">
+    <Card title="Lists used for blocking" desc="What NopeWarden checks when it blocks an app, a topic or a website.">
       <div className="list">
         <div className="item"><div><div className="name">App names</div><div className="meta">{a.apps} apps, {a.domains} website names. Version {a.version}. {a.note}</div></div></div>
         <div className="item"><div><div className="name">App kinds</div><div className="meta">{data.app_topics} topics made from the app names (Games, Video streaming and so on). No download.</div></div></div>

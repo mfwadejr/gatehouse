@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/devices"
-	dnssrv "gatehouse/internal/dns"
-	"gatehouse/internal/fw"
+	"nopewarden/internal/api"
+	"nopewarden/internal/devices"
+	dnssrv "nopewarden/internal/dns"
+	"nopewarden/internal/fw"
 )
 
 func pathID(r *http.Request) (int64, bool) {
@@ -38,6 +38,10 @@ func (a *App) registerRoutes() {
 	a.registerPortRoutes()
 	a.registerProtectRoutes()
 	a.registerUpdateRoutes()
+	a.registerScheduleRoutes()
+	a.registerThreatLookupRoutes()
+	a.registerDNSStageRoutes()
+	a.registerResolverRoutes()
 	a.registerPowerRoutes()
 	a.registerResetRoutes()
 	a.registerBackupRoutes()
@@ -95,7 +99,7 @@ func (a *App) registerRoutes() {
 			fail(w, err)
 			return
 		}
-		a.Lists.Reload()
+		a.reloadLists()
 		ok(w)
 	})
 	s.HandleAdmin("PATCH /api/dns/lists/{id}", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
@@ -233,7 +237,7 @@ func (a *App) registerRoutes() {
 			return
 		}
 		a.Config.Exec(`DELETE FROM dns_records WHERE id=?`, id)
-		a.DNS.SetLocalRecords(a.localRecords())
+		a.setLocalRecords()
 		ok(w)
 	})
 	s.Handle("GET /api/dns/upstreams", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
@@ -285,7 +289,7 @@ func (a *App) registerRoutes() {
 			return
 		}
 		a.Config.Exec(`DELETE FROM dns_upstreams WHERE id=?`, id)
-		a.loadUpstreams()
+		a.reloadUpstreams()
 		ok(w)
 	})
 	s.Handle("GET /api/dns/settings", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
@@ -343,12 +347,15 @@ func (a *App) registerRoutes() {
 			fail(w, err)
 			return
 		}
-		if err := a.Devices.Forget(id); err != nil {
+		if r.Header.Get(stageHeader) != "" {
+			a.forgetLater(id) // waits on the Review page like other changes
+			ok(w)
+			return
+		}
+		if err := a.forgetDevice(id); err != nil {
 			fail(w, err)
 			return
 		}
-		a.Config.Exec(`DELETE FROM device_group_members WHERE lower(mac)=?`, mac)
-		a.fwSync()
 		ok(w)
 	})
 

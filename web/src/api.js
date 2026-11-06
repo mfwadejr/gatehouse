@@ -24,7 +24,7 @@ export function api(method, path, body) {
 // A change to the firewall, the network or a policy is staged by the server. The console is told
 // each time one is saved, so it can apply it at once (the default) or leave it for the Review page
 // when the person chose "Save for later" (holdAnd).
-const STAGING = /^\/api\/(fw|net|routes|vpn|dhcp|dns|wan)/;
+const STAGING = /^\/api\/(fw|net|routes|vpn|dhcp|dns|wan|networks|blocks)/;
 const NOT_STAGING = /\/(apply|confirm|rollback|preview|discard|check|test)$/;
 let hold = false;
 export async function holdAnd(fn) {
@@ -33,7 +33,7 @@ export async function holdAnd(fn) {
 }
 async function writeCall(method, path, body) {
   const r = await apiCall(method, path, body);
-  if (STAGING.test(path) && !NOT_STAGING.test(path.split('?')[0])) window.dispatchEvent(new CustomEvent('gh-staged', { detail: { hold } }));
+  if ((STAGING.test(path) || (method === 'DELETE' && /^\/api\/devices\/\d+$/.test(path))) && !NOT_STAGING.test(path.split('?')[0])) window.dispatchEvent(new CustomEvent('gh-staged', { detail: { hold } }));
   return r;
 }
 
@@ -41,13 +41,15 @@ async function apiCall(method, path, body) {
   const opts = { method, credentials: 'same-origin', headers: {} };
   if (csrf) opts.headers['X-CSRF-Token'] = csrf;
   if (installCode) opts.headers['X-Install-Code'] = installCode;
+  // DNS changes from the console wait for the Review step (applied a moment later, or from Review).
+  if (method !== 'GET' && (/^\/api\/(dns|blocks)(\/|$)/.test(path) || (method === 'DELETE' && /^\/api\/devices\/\d+$/.test(path)))) opts.headers['X-Stage'] = '1';
   if (body !== undefined) {
     opts.headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(body);
   }
   let res;
   try { res = await fetch(path, opts); }
-  catch { throw new ApiError('Cannot reach Gatehouse. Check the network cable and try again.', 0); }
+  catch { throw new ApiError('Cannot reach NopeWarden. Check the network cable and try again.', 0); }
   let data = null;
   const text = await res.text();
   if (text) { try { data = JSON.parse(text); } catch { data = null; } }

@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/speedtest"
+	"nopewarden/internal/api"
+	"nopewarden/internal/speedtest"
 )
 
 // Speed tests for each internet connection: on demand, and optionally once a day at a quiet hour.

@@ -8,14 +8,14 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/bridgemode"
-	"gatehouse/internal/fw"
-	"gatehouse/internal/netcfg"
-	"gatehouse/internal/netd"
+	"nopewarden/internal/api"
+	"nopewarden/internal/bridgemode"
+	"nopewarden/internal/fw"
+	"nopewarden/internal/netcfg"
+	"nopewarden/internal/netd"
 )
 
-// Bridge mode. Gatehouse sits between another router and the local network and filters instead of
+// Bridge mode. NopeWarden sits between another router and the local network and filters instead of
 // routing. The networks and internet connections already saved are NOT touched: bridge mode swaps
 // them out when the plan and ruleset are built, so switching it off puts everything back exactly.
 //
@@ -121,7 +121,7 @@ func (a *App) currentPorts(clientIP string) []string {
 
 func bridgeSummary(b *bridgemode.Config) string {
 	if b == nil || !b.Enabled {
-		return "Bridge mode switched off: Gatehouse routes again."
+		return "Bridge mode switched off: NopeWarden routes again."
 	}
 	return "Bridge mode: " + b.Outside + " faces the other router, " + strings.Join(b.Inside, ", ") +
 		" face the local network; the console is reachable from the inside only."

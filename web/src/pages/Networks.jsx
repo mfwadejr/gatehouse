@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import TrafficPanel from '../TrafficPanel.jsx';
 import { del, holdAnd, post, put, useData } from '../api.js';
 import { SAVED_LATER, SaveChoice } from '../changes.jsx';
 import { confirmRemoval } from '../removal.js';
@@ -68,7 +69,7 @@ function EditNetwork({ n, zones, onClose, onSaved }) {
   const [extra, setExtra] = useState([]);
   const tickExtra = (name, on) => setExtra((x) => (on ? [...x.filter((m) => m !== name), name] : x.filter((m) => m !== name)));
   const addPorts = async () => {
-    const ok = await run(() => post('/api/networks/add-ports', { id: n.iface.id, ports: extra }), 'Saved. Apply it to start using it.');
+    const ok = await run(() => post('/api/networks/add-ports', { id: n.iface.id, ports: extra }), 'Saved. It goes live in a moment.');
     if (ok) { onSaved(); onClose(); }
   };
   const movable = !isBridge;
@@ -107,7 +108,7 @@ function EditNetwork({ n, zones, onClose, onSaved }) {
                 );
               })}
               {mem.length === 0 && <Note tone="warn">A network needs at least one port.</Note>}
-              {(dropped.length > 0 || added.length > 0) && <Note tone="warn">{dropped.length ? `Taking ${dropped.join(', ')} out cuts off devices plugged into ${dropped.length === 1 ? 'it' : 'them'}. ` : ''}If you manage Gatehouse through one of these ports, keep another way in until you have applied and checked it. Gatehouse puts the change back by itself if you cannot confirm it.</Note>}
+              {(dropped.length > 0 || added.length > 0) && <Note tone="warn">{dropped.length ? `Taking ${dropped.join(', ')} out cuts off devices plugged into ${dropped.length === 1 ? 'it' : 'them'}. ` : ''}If you manage NopeWarden through one of these ports, keep another way in until you have applied and checked it. NopeWarden puts the change back by itself if you cannot confirm it.</Note>}
             </div>
           </Field>
         )}
@@ -124,7 +125,7 @@ function EditNetwork({ n, zones, onClose, onSaved }) {
                   </label>
                 );
               })}
-              {extra.length > 0 && <Note tone="warn">Gatehouse briefly restarts this network while it changes. If you manage Gatehouse through it, keep another way in until you have applied and checked it. Gatehouse puts the change back by itself if you cannot confirm it.</Note>}
+              {extra.length > 0 && <Note tone="warn">NopeWarden briefly restarts this network while it changes. If you manage NopeWarden through it, keep another way in until you have applied and checked it. NopeWarden puts the change back by itself if you cannot confirm it.</Note>}
               <div><Button small disabled={busy || extra.length === 0} onClick={addPorts}>Add {extra.length ? extra.join(', ') : 'ports'} to this network</Button></div>
             </div>
           </Field>
@@ -140,11 +141,11 @@ function EditNetwork({ n, zones, onClose, onSaved }) {
                 <Field label="VLAN number" hint="Leave empty to use the whole port. Your switch must pass the number you choose.">
                   <Input value={vlan} onChange={(v) => setVlan(v.replace(/\D/g, ''))} className="in mono" />
                 </Field>
-                {moved && <Note tone="warn">Moving a network to another port or VLAN cuts devices off until they are on the new one. If you manage Gatehouse from this network, keep another way in until you have applied and checked it.</Note>}
+                {moved && <Note tone="warn">Moving a network to another port or VLAN cuts devices off until they are on the new one. If you manage NopeWarden from this network, keep another way in until you have applied and checked it.</Note>}
               </>
             )}
             <p className="small muted">
-              {f.kind === 'vlan' ? <>This network is a VLAN: number {f.vlan} on port {f.parent}. Your switch must pass that number.</> : f.kind === 'bridge' ? <>This network spreads over several ports ({(f.members || []).join(', ')}), carried by {f.name}.</> : <>This network uses the whole port {f.name}. To add another network to the same port, add a network and choose this port: Gatehouse then uses a VLAN number for it.</>}
+              {f.kind === 'vlan' ? <>This network is a VLAN: number {f.vlan} on port {f.parent}. Your switch must pass that number.</> : f.kind === 'bridge' ? <>This network spreads over several ports ({(f.members || []).join(', ')}), carried by {f.name}.</> : <>This network uses the whole port {f.name}. To add another network to the same port, add a network and choose this port: NopeWarden then uses a VLAN number for it.</>}
             </p>
           </div>
         </details>
@@ -180,6 +181,7 @@ export default function Networks({ me }) {
   const { ports, reload: rp } = usePortWatch(false);
   const pn = usePortNames();
   const [adding, setAdding] = useState(false);
+  const [traffic, setTraffic] = useState('');
   const [edit, setEdit] = useState(null);
   const [dhcp, setDhcp] = useState(null);
   const toast = useToast();
@@ -222,6 +224,7 @@ export default function Networks({ me }) {
                   <div className="meta">{dhcpText(n.scope)}{n.zone ? ` · ${n.online} device${n.online === 1 ? '' : 's'} online${n.total > n.online ? `, ${n.total} known` : ''}` : ''}</div>
                 </div>
                 <div className="actions">
+                  {n.zone && <Button small onClick={() => setTraffic(traffic === n.zone ? '' : n.zone)}>{traffic === n.zone ? 'Hide traffic' : 'Traffic'}</Button>}
                   <Button small onClick={() => setDhcp(n.scope || newScope(n))}>DHCP</Button>
                   <Button small icon="edit" onClick={() => setEdit(n)}>Edit</Button>
                   <Button small kind="danger" icon="trash" onClick={async () => { if (await confirmRemoval(`/api/net/interfaces/${n.iface.id}/removal`, `Remove ${n.title}? Devices on it will lose their connection.`)) run(() => del(`/api/net/interfaces/${n.iface.id}`)).then(all); }}>Remove</Button>
@@ -232,6 +235,8 @@ export default function Networks({ me }) {
         )}
       </Card>
 
+      {traffic && <TrafficPanel kind="net" id={traffic} title={`${traffic} traffic`} sub="What the devices on this network are downloading and uploading, all its ports together." />}
+
       <Card title="Network ports on this device" desc="Live status and addresses. Give a port a name you will recognise, such as your internet gateway or a spare.">
         <div className="list">
           {ports.map((p) => <PortRow key={p.name} p={p} onSaved={rp} />)}
@@ -239,7 +244,7 @@ export default function Networks({ me }) {
         </div>
       </Card>
 
-      {adding && <AddNetwork onClose={() => setAdding(false)} onCreated={(n) => { setAdding(false); toast(`${n} added. It goes live in a moment.`); all(); }} />}
+      {adding && <AddNetwork onClose={() => setAdding(false)} onCreated={(n, later) => { setAdding(false); toast(later ? `${n} saved for later. It waits on the Review page.` : `${n} added. It goes live in a moment.`); all(); }} />}
       {edit && <EditNetwork n={edit} zones={zones || []} onClose={() => setEdit(null)} onSaved={all} />}
       {dhcp && <ScopeForm initial={dhcp} ifaces={ifs || []} onClose={() => setDhcp(null)} onSaved={all} />}
     </Page>

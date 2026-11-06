@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { post, useData } from '../api.js';
 import { Button, Card, Field, Input, Modal, Note, Pill, Select, useAction } from '../ui.jsx';
 
-// "Why can't it reach that?" Pick a device and a website or address. Gatehouse goes through
+// "Why can't it reach that?" Pick a device and a website or address. NopeWarden goes through
 // everything that can stop it and says which thing did.
 
 const tone = { blocks: 'bad', ok: 'good', unknown: 'warn' };
@@ -38,7 +38,7 @@ export function WhyBody({ device: fixed, target: t0 = '', onFixed }) {
       <div><Button kind="primary" disabled={busy || !device || !target.trim()} onClick={ask}>Find out why</Button></div>
       {res && (
         <div className="stack">
-          <Note tone={res.verdict === 'blocked' ? 'bad' : res.verdict === 'open' ? 'good' : 'warn'} title={res.verdict === 'blocked' ? `${res.device} cannot reach ${res.target}` : res.verdict === 'open' ? 'Gatehouse is not blocking it' : 'No clear answer'}>{res.summary}</Note>
+          <Note tone={res.verdict === 'blocked' ? 'bad' : res.verdict === 'open' ? 'good' : 'warn'} title={res.verdict === 'blocked' ? `${res.device} cannot reach ${res.target}` : res.verdict === 'open' ? 'NopeWarden is not blocking it' : 'No clear answer'}>{res.summary}</Note>
           <div className="list">
             {res.findings.map((f, i) => (
               <div className="item" key={i}>
@@ -54,7 +54,7 @@ export function WhyBody({ device: fixed, target: t0 = '', onFixed }) {
 }
 
 export default function Why() {
-  return <Card title="Why can't it reach that?" desc="Pick a device and a website. Gatehouse checks pauses, filtering and the firewall, and tells you which one is in the way."><WhyBody /></Card>;
+  return <Card title="Why can't it reach that?" desc="Pick a device and a website. NopeWarden checks pauses, filtering and the firewall, and tells you which one is in the way."><WhyBody /></Card>;
 }
 
 export function WhyModal({ device, onClose }) {

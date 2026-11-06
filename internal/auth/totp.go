@@ -94,7 +94,7 @@ func NewRecoveryCodes(n int) []string {
 
 func hashRecovery(code string) string {
 	code = strings.ToLower(strings.ReplaceAll(strings.TrimSpace(code), " ", ""))
-	h := sha256.Sum256([]byte("gatehouse-recovery:" + code))
+	h := sha256.Sum256([]byte("nopewarden-recovery:" + code))
 	return hex.EncodeToString(h[:])
 }
 

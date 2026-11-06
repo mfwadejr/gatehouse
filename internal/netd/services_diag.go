@@ -9,21 +9,21 @@ import (
 	"time"
 )
 
-// Diagnostics: what each Gatehouse service is doing, its recent log, and a restart. Only a short,
+// Diagnostics: what each NopeWarden service is doing, its recent log, and a restart. Only a short,
 // fixed list of services can be looked at or restarted, so this cannot be pointed at anything else.
 
-// DiagUnit is one service Gatehouse can show.
+// DiagUnit is one service NopeWarden can show.
 type DiagUnit struct {
 	Unit    string
 	Title   string
-	Restart string // "", "unit" (restart it directly) or "gatehouse" (the delayed restart of the console programs)
+	Restart string // "", "unit" (restart it directly) or "nopewarden" (the delayed restart of the console programs)
 }
 
 var diagUnits = []DiagUnit{
-	{"gatehouse", "Gatehouse console", "gatehouse"},
-	{"gatehouse-netd", "Gatehouse helper (changes the network)", "gatehouse"},
-	{"gatehouse-screen", "Gatehouse screen", "gatehouse"},
-	{"gatehouse-suricata", "Threat watching", "unit"},
+	{"nopewarden", "NopeWarden console", "nopewarden"},
+	{"nopewarden-netd", "NopeWarden helper (changes the network)", "nopewarden"},
+	{"nopewarden-screen", "NopeWarden screen", "nopewarden"},
+	{"nopewarden-suricata", "Threat watching", "unit"},
 	{"ssh", "Remote login (SSH)", "unit"},
 	{"keepalived", "High availability", "unit"},
 	{"chrony", "Clock", "unit"},
@@ -159,8 +159,8 @@ func (s *Service) DiagRestart(unit string) error {
 	if !ok || d.Restart == "" {
 		return errors.New("that service cannot be restarted from here")
 	}
-	if d.Restart == "gatehouse" {
-		return s.Power("restart-gatehouse")
+	if d.Restart == "nopewarden" {
+		return s.Power("restart-nopewarden")
 	}
 	if out, err := sysRun(60*time.Second, "systemctl", "restart", unit); err != nil {
 		return fmt.Errorf("it did not restart: %s", strings.TrimSpace(out))
@@ -176,7 +176,7 @@ func (s *Service) DiagBundle() (string, error) {
 		out, _ := sysRun(30*time.Second, name, args...)
 		fmt.Fprintf(&b, "\n===== %s =====\n%s\n", title, redact(strings.TrimSpace(out)))
 	}
-	fmt.Fprintf(&b, "Gatehouse support bundle, made %s\n", time.Now().Format(time.RFC3339))
+	fmt.Fprintf(&b, "NopeWarden support bundle, made %s\n", time.Now().Format(time.RFC3339))
 	section("Machine", "uname", "-a")
 	section("Release", "cat", "/etc/os-release")
 	section("Uptime", "uptime")

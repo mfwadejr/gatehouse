@@ -33,7 +33,7 @@ export default function Alerts() {
         <ToggleRow title="Push message with ntfy" desc="Free, no account needed. Install the ntfy app on your phone and subscribe to your topic name. Pick a long random topic, because anyone who knows it can read your alerts." checked={f.ntfy.enabled} onChange={nt('enabled')} />
         {f.ntfy.enabled && (
           <div className="formgrid">
-            <Field label="Topic"><Input value={f.ntfy.topic} onChange={nt('topic')} placeholder="gatehouse-home-7f3k29x" className="in mono" /></Field>
+            <Field label="Topic"><Input value={f.ntfy.topic} onChange={nt('topic')} placeholder="nopewarden-home-7f3k29x" className="in mono" /></Field>
             <Field label="Server" hint="Leave as it is unless you run your own."><Input value={f.ntfy.server} onChange={nt('server')} className="in mono" /></Field>
             <Field label="Access token (optional)" hint={data.ntfy.has_token ? 'A token is saved. Type a new one to replace it.' : 'Only if your server needs a login.'}><Input type="password" value={f.ntfy.new_token} onChange={nt('new_token')} autoComplete="off" /></Field>
             <div style={{ alignSelf: 'end' }}><Button onClick={() => test('ntfy')} disabled={busy}>Send a test</Button></div>
@@ -47,7 +47,7 @@ export default function Alerts() {
             <Field label="Connection"><Select value={f.email.security} onChange={em('security')} options={[{ value: 'starttls', label: 'Secure (STARTTLS, usually port 587)' }, { value: 'tls', label: 'Secure (TLS, usually port 465)' }, { value: 'none', label: 'Not secure (no login allowed)' }]} /></Field>
             <Field label="Login name"><Input value={f.email.user} onChange={em('user')} autoComplete="off" /></Field>
             <Field label="Password" hint={data.email.has_pass ? 'A password is saved. Type a new one to replace it.' : ''}><Input type="password" value={f.email.new_pass} onChange={em('new_pass')} autoComplete="new-password" /></Field>
-            <Field label="Send from"><Input value={f.email.from} onChange={em('from')} placeholder="gatehouse@example.com" /></Field>
+            <Field label="Send from"><Input value={f.email.from} onChange={em('from')} placeholder="nopewarden@example.com" /></Field>
             <Field label="Send to"><Input value={f.email.to} onChange={em('to')} placeholder="you@example.com" /></Field>
             <div style={{ alignSelf: 'end' }}><Button onClick={() => test('email')} disabled={busy}>Send a test</Button></div>
           </div>

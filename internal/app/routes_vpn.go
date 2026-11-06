@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/devices"
-	"gatehouse/internal/fw"
-	"gatehouse/internal/vpn"
+	"nopewarden/internal/api"
+	"nopewarden/internal/devices"
+	"nopewarden/internal/fw"
+	"nopewarden/internal/vpn"
 )
 
 var reHost = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9.\-]{0,251}[A-Za-z0-9])?$`)

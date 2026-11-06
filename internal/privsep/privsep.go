@@ -16,12 +16,12 @@ import (
 	"syscall"
 	"time"
 
-	"gatehouse/internal/fw"
-	"gatehouse/internal/netcfg"
-	"gatehouse/internal/netd"
-	"gatehouse/internal/speedtest"
-	"gatehouse/internal/threatcfg"
-	"gatehouse/internal/wanmon"
+	"nopewarden/internal/fw"
+	"nopewarden/internal/netcfg"
+	"nopewarden/internal/netd"
+	"nopewarden/internal/speedtest"
+	"nopewarden/internal/threatcfg"
+	"nopewarden/internal/wanmon"
 )
 
 // NetController is the network side of the helper; *netd.Service implements it.
@@ -45,6 +45,8 @@ type NetController interface {
 	SpeedTest(ctx context.Context, p speedtest.Params) (speedtest.Result, error)
 	Diag(kind, target string) (string, error)
 	SSHApply(p netd.SSHPlan) error
+	UnboundStatus() netd.UnboundInfo
+	UnboundApply(p netd.UnboundPlan) error
 	SSHLog(since int64) ([]string, error)
 	HAApply(p netd.HAPlan) error
 	NDPIApply(p netd.NDPIPlan) error
@@ -325,6 +327,14 @@ func (s *Server) dispatchNet(r request) (any, error) {
 			return nil, errors.New("bad parameters")
 		}
 		return nil, s.Net.SSHApply(p)
+	case "unbound.status":
+		return s.Net.UnboundStatus(), nil
+	case "unbound.apply":
+		var p netd.UnboundPlan
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return nil, s.Net.UnboundApply(p)
 	case "ha.apply":
 		var p netd.HAPlan
 		if err := json.Unmarshal(r.Params, &p); err != nil {
@@ -654,6 +664,20 @@ func (c *Client) SSHApply(p netd.SSHPlan) error {
 	return c.callWithin(2*time.Minute, "ssh.apply", p, nil)
 }
 
+// UnboundStatus says whether Unbound is installed and running.
+func (c *Client) UnboundStatus() netd.UnboundInfo {
+	var out netd.UnboundInfo
+	if err := c.call("unbound.status", nil, &out); err != nil {
+		return netd.UnboundInfo{Why: "NopeWarden could not ask the network helper (" + err.Error() + ")."}
+	}
+	return out
+}
+
+// UnboundApply writes Unbound's settings and starts it, or stops it.
+func (c *Client) UnboundApply(p netd.UnboundPlan) error {
+	return c.callWithin(3*time.Minute, "unbound.apply", p, nil)
+}
+
 // HAApply installs or removes the high-availability services.
 func (c *Client) HAApply(p netd.HAPlan) error {
 	return c.callWithin(2*time.Minute, "ha.apply", p, nil)
@@ -753,8 +777,8 @@ func (c *Client) SystemCheck() (netd.SystemUpdates, error) {
 	return out, err
 }
 
-// Power restarts or shuts down the machine, or restarts only Gatehouse ("reboot", "poweroff",
-// "restart-gatehouse").
+// Power restarts or shuts down the machine, or restarts only NopeWarden ("reboot", "poweroff",
+// "restart-nopewarden").
 func (c *Client) Power(action string) error {
 	return c.call("system.power", map[string]string{"action": action}, nil)
 }
@@ -790,7 +814,7 @@ type TermChunk struct {
 	Closed bool   `json:"closed"`
 }
 
-// DiagServices lists the Gatehouse services and how each is doing.
+// DiagServices lists the NopeWarden services and how each is doing.
 func (c *Client) DiagServices() []netd.DiagService {
 	var out []netd.DiagService
 	c.call("diag.services", nil, &out)

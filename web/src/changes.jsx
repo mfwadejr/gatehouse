@@ -4,16 +4,16 @@ import { Button, useToast } from './ui.jsx';
 
 // The one place that applies changes. Saving a change to the firewall, the network or a policy
 // applies it straight away (after a quiet moment, so several quick saves go live together) unless
-// the person pressed "Save for later", or Gatehouse found something worth a second look; either
+// the person pressed "Save for later", or NopeWarden found something worth a second look; either
 // way the change waits on the Review page. Every apply keeps the 60-second safety: if this browser
-// can still reach Gatehouse a few seconds after applying, the change is kept; if not, it undoes
+// can still reach NopeWarden a few seconds after applying, the change is kept; if not, it undoes
 // itself. "Ask me to confirm every time" (per browser) turns the automatic keeping off.
-const autoKey = 'gatehouse.autoConfirm';
+const autoKey = 'nopewarden.autoConfirm';
 const readAuto = () => { try { return localStorage.getItem(autoKey) !== 'off'; } catch { return true; } };
 
 const Ctx = createContext(null);
 export const useChanges = () => useContext(Ctx);
-const AREAS = [['net', 'network settings'], ['fw', 'the firewall']];
+const AREAS = [['net', 'network settings'], ['dns', 'DNS settings'], ['fw', 'the firewall']];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const review = () => { window.location.hash = '#/review'; };
 
@@ -39,7 +39,7 @@ export function ChangeProvider({ me, children }) {
   const dirtyKinds = AREAS.filter(([k]) => st?.[k]?.dirty).map(([k]) => k);
   const fresh = async () => { const s = await get('/api/applystate'); stRef.current = s; return s; };
 
-  // Keep a change by itself once this browser has proved it can still reach Gatehouse.
+  // Keep a change by itself once this browser has proved it can still reach NopeWarden.
   useEffect(() => {
     if (!pend || !auto || tried.current === pend.token) return undefined;
     tried.current = pend.token;
@@ -52,7 +52,7 @@ export function ChangeProvider({ me, children }) {
         await sleep(2000); if (dead) return;
         await get('/api/auth/me'); if (dead) return;
         await post(`/api/${kind}/confirm`, { token: pend.token });
-        toast('Applied and kept. You can still reach Gatehouse, so the change is permanent.');
+        toast('Applied and kept. You can still reach NopeWarden, so the change is permanent.');
         reload();
       } catch { /* cannot reach it: the countdown undoes the change, or it can be kept by hand */ }
     })();
@@ -112,7 +112,7 @@ export function ChangeProvider({ me, children }) {
       for (const k of kinds) {
         const pv = await post(`/api/${k}/preview`);
         if (!pv.ok) { toast((pv.problems || ['This change cannot be applied yet.'])[0], 'bad'); review(); return; }
-        if (pv.warnings?.length) { toast('Saved. Gatehouse found something worth a look before it goes live.', 'warn'); review(); return; }
+        if (pv.warnings?.length) { toast('Saved. NopeWarden found something worth a look before it goes live.', 'warn'); review(); return; }
       }
       const err = await commit('');
       if (err) {
@@ -163,8 +163,8 @@ function ChangeBar({ pend, left, auto, setAutoPref, busy, confirm, undo }) {
     <div className="confirmbar countdown floating" role="alert">
       <div>
         <div className="count">{left ?? ''}s</div>
-        <div className="sec">{auto ? 'Checking that you can still reach Gatehouse. If you can, the change is kept on its own.' : 'Does everything still work? Confirm to keep this change.'} If you cannot, the previous settings come back on their own.</div>
-        <button type="button" className="link small" onClick={() => setAutoPref(!auto)}>{auto ? 'Ask me to confirm every time' : 'Keep changes automatically when I can still reach Gatehouse'}</button>
+        <div className="sec">{auto ? 'Checking that you can still reach NopeWarden. If you can, the change is kept on its own.' : 'Does everything still work? Confirm to keep this change.'} If you cannot, the previous settings come back on their own.</div>
+        <button type="button" className="link small" onClick={() => setAutoPref(!auto)}>{auto ? 'Ask me to confirm every time' : 'Keep changes automatically when I can still reach NopeWarden'}</button>
       </div>
       <div className="actions">
         <Button onClick={undo} disabled={busy}>Undo now</Button>

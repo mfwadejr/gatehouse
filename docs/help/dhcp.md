@@ -1,14 +1,14 @@
 # DHCP
 
 ## What it is for
-DHCP gives every device on a network an address when it joins. Gatehouse does this for you.
+DHCP gives every device on a network an address when it joins. NopeWarden does this for you.
 
-![The dhcp page, shown with no data yet](img/dhcp.png)
+![The dhcp page, shown with example data](img/dhcp.png)
 
 The picture is an example from a new, empty box; yours will show your own devices and numbers.
 
 ## What is on the page
-- **Address pools**: one per network, with **First address to give out**, **Last address to give out**, **Gateway**, **DNS server**, **How long an address is kept** and **Home domain**. **Who hands out addresses here?** is **Gatehouse**, **Another router, relayed to Gatehouse**, or **Another device (Gatehouse stays out of it)**. **Check for other servers** listens for a second DHCP server, which causes trouble.
+- **Address pools**: one per network, with **First address to give out**, **Last address to give out**, **Gateway**, **DNS server**, **How long an address is kept** and **Home domain**. **Who hands out addresses here?** is **NopeWarden**, **Another router, relayed to NopeWarden**, or **Another device (NopeWarden stays out of it)**. **Check for other servers** listens for a second DHCP server, which causes trouble.
 - **Devices with an address**: every device that has one now, with **Reserve** and **Release**.
 - **Reserved addresses**: devices that always get the same address. **Add reservation** takes the device address (MAC) and the address to keep.
 

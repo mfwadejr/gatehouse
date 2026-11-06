@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"gatehouse/internal/threatcfg"
+	"nopewarden/internal/threatcfg"
 )
 
 // pcapOne builds a capture holding one TCP packet from a home device to an outside address.
@@ -44,20 +44,20 @@ func pcapOne(payload string) []byte {
 	return append(append(b, rec...), pkt...)
 }
 
-// With the real engine installed, our settings file loads and an alert it writes is read by Gatehouse.
+// With the real engine installed, our settings file loads and an alert it writes is read by NopeWarden.
 // Skipped on a machine without the engine; the CI machine has none, so this runs where it is installed.
-func TestRealEngineAlertReachesGatehouse(t *testing.T) {
+func TestRealEngineAlertReachesNopeWarden(t *testing.T) {
 	bin, err := exec.LookPath("suricata")
 	if err != nil {
 		t.Skip("the threat-watching engine is not installed here")
 	}
 	dir := t.TempDir()
-	inc := filepath.Join(dir, "gatehouse.yaml")
+	inc := filepath.Join(dir, "nopewarden.yaml")
 	os.WriteFile(inc, []byte(threatcfg.Include()), 0o644)
 	rules := filepath.Join(dir, "t.rules")
-	os.WriteFile(rules, []byte(`alert tcp $HOME_NET any -> $EXTERNAL_NET any (msg:"ET MALWARE Test Beacon"; content:"GATEHOUSE-TEST-BEACON"; classtype:trojan-activity; sid:9000001; rev:1;)`+"\n"), 0o644)
+	os.WriteFile(rules, []byte(`alert tcp $HOME_NET any -> $EXTERNAL_NET any (msg:"ET MALWARE Test Beacon"; content:"NOPEWARDEN-TEST-BEACON"; classtype:trojan-activity; sid:9000001; rev:1;)`+"\n"), 0o644)
 	pc := filepath.Join(dir, "t.pcap")
-	os.WriteFile(pc, pcapOne("GET /GATEHOUSE-TEST-BEACON HTTP/1.1\r\n\r\n"), 0o644)
+	os.WriteFile(pc, pcapOne("GET /NOPEWARDEN-TEST-BEACON HTTP/1.1\r\n\r\n"), 0o644)
 	logs := filepath.Join(dir, "logs")
 	os.Mkdir(logs, 0o755)
 	cmd := exec.Command(bin, "-c", "/etc/suricata/suricata.yaml", "--include", inc, "-S", rules, "-r", pc, "-l", logs, "-k", "none")
@@ -75,7 +75,7 @@ func TestRealEngineAlertReachesGatehouse(t *testing.T) {
 		kept = a.threatIngest(l, time.Now()) || kept
 	}
 	if !kept || countAlerts(a) != 1 {
-		t.Fatalf("Gatehouse did not keep the real alert: %s", eve)
+		t.Fatalf("NopeWarden did not keep the real alert: %s", eve)
 	}
 }
 

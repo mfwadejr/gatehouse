@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { get, post, put, useData } from '../api.js';
 import { Button, Card, Field, Input, NumberInput, Note, Pill, Problems, Segmented, Select, ToggleRow, useAction, useToast, confirmBox } from '../ui.jsx';
 
-// Bridge mode: Gatehouse sits between another router and your network and filters, instead of
+// Bridge mode: NopeWarden sits between another router and your network and filters, instead of
 // routing. Saving only stages the setup. Applying starts a 60-second countdown; unless it is kept,
 // the network files and the firewall both go back by themselves.
 const blank = { enabled: true, outside: '', inside: [], oob: '', oob_addr: '', mode: 'static', addr: '', gateway: '', dns: '', subnets: [], allow: [], open: false };
@@ -34,7 +34,7 @@ export function BridgePending({ pending, reload }) {
         await get('/api/auth/me');
         if (dead) return;
         await post('/api/bridge/confirm', {});
-        toast('Applied and kept. You can still reach Gatehouse, so the change is permanent.');
+        toast('Applied and kept. You can still reach NopeWarden, so the change is permanent.');
         reload();
       } catch { /* cannot reach it: leave the countdown to undo itself */ }
     })();
@@ -44,7 +44,7 @@ export function BridgePending({ pending, reload }) {
     <div className="confirmbar countdown" role="alert">
       <div>
         <div className="count">{left ?? ''}s</div>
-        <div className="sec">Checking that you can still reach Gatehouse. If you can, the change is kept on its own. If you cannot, the network and the firewall both go back to how they were. After a change of address, open the new address in the browser to keep it.</div>
+        <div className="sec">Checking that you can still reach NopeWarden. If you can, the change is kept on its own. If you cannot, the network and the firewall both go back to how they were. After a change of address, open the new address in the browser to keep it.</div>
       </div>
       <div className="actions">
         <Button disabled={busy} onClick={() => run(async () => { await post('/api/bridge/cancel', {}); reload(); }, 'Undone. The previous settings are back.')}>Undo now</Button>
@@ -92,12 +92,12 @@ export default function BridgeMode() {
   }
 
   return (
-    <Card title="Bridge mode" desc="Use Gatehouse as a filter between another router and your network, without routing or changing addresses. Your current networks stay saved and come back when you switch it off."
+    <Card title="Bridge mode" desc="Use NopeWarden as a filter between another router and your network, without routing or changing addresses. Your current networks stay saved and come back when you switch it off."
       actions={live ? <Pill tone="good">On</Pill> : <Pill>Off</Pill>}>
       <div className="stack">
         {data.undone && <Note tone="warn" title="The last change was not kept">It was undone on its own, and your previous settings are back. Your setup is still saved below so you can try again.</Note>}
         <Problems list={data.problems} />
-        <ToggleRow title="Use bridge mode" desc="Off means Gatehouse routes as usual." checked={f.enabled} onChange={set('enabled')} />
+        <ToggleRow title="Use bridge mode" desc="Off means NopeWarden routes as usual." checked={f.enabled} onChange={set('enabled')} />
         {f.enabled && (
           <>
             <div className="formgrid">
@@ -110,7 +110,7 @@ export default function BridgeMode() {
                 </div>
               </Field>
             </div>
-            <Field label="Gatehouse's own address"><Segmented value={f.mode} onChange={set('mode')} options={[{ value: 'static', label: 'Fixed (recommended)' }, { value: 'dhcp', label: 'From your other router' }]} /></Field>
+            <Field label="NopeWarden's own address"><Segmented value={f.mode} onChange={set('mode')} options={[{ value: 'static', label: 'Fixed (recommended)' }, { value: 'dhcp', label: 'From your other router' }]} /></Field>
             {f.mode === 'static' ? (
               <div className="formgrid">
                 <Field label="Address" hint="Unused address on your network, with its size."><Input value={f.addr} onChange={set('addr')} placeholder="192.168.1.2/24" className="in mono" /></Field>
@@ -118,14 +118,14 @@ export default function BridgeMode() {
                 <Field label="DNS server (optional)"><Input value={f.dns} onChange={set('dns')} placeholder="192.168.1.1" className="in mono" /></Field>
               </div>
             ) : <Note tone="warn" title="The address can change">If your other router hands out a different address later, the console moves with it. Reserve this address on that router so it stays the same.</Note>}
-            <Note title="Addresses and DHCP">Your other router keeps handing out addresses; Gatehouse does not. The console answers on the address above, from your devices only.</Note>
+            <Note title="Addresses and DHCP">Your other router keeps handing out addresses; NopeWarden does not. The console answers on the address above, from your devices only.</Note>
             <details className="more"><summary>Extra safety and exceptions</summary>
               <div className="stack">
                 <div className="formgrid">
                   <Field label="Management-only port (optional)" hint="A spare port that is never part of the bridge. Plug a laptop in here to always reach the console."><Select value={f.oob} onChange={set('oob')} options={portOpts('None')} /></Field>
                   {f.oob && <Field label="Its address"><Input value={f.oob_addr} onChange={set('oob_addr')} placeholder="192.168.99.1/24" className="in mono" /></Field>}
                 </div>
-                <Field label="Networks on the other router's side that may manage Gatehouse" hint="Leave empty so only your own devices can. For example an office or VPN range: 10.8.0.0/24"><Input value={subnets} onChange={setSubnets} className="in mono" /></Field>
+                <Field label="Networks on the other router's side that may manage NopeWarden" hint="Leave empty so only your own devices can. For example an office or VPN range: 10.8.0.0/24"><Input value={subnets} onChange={setSubnets} className="in mono" /></Field>
                 <div className="stack">
                   <strong>Let a service on your network be reached from outside</strong>
                   {f.allow.map((a, i) => (

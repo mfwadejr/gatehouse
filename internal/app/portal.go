@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/fw"
+	"nopewarden/internal/api"
+	"nopewarden/internal/fw"
 )
 
 // Guest sign-in page (captive portal). On the networks it is switched on for, a device that has not
@@ -304,7 +304,7 @@ func (a *App) portalChoices() []portalNet {
 	for i := range out {
 		out[i].Allowed = ok[out[i].Iface]
 		if !out[i].Allowed {
-			out[i].Why = "This network manages Gatehouse or faces the internet, so it can never be put behind a sign-in page."
+			out[i].Why = "This network manages NopeWarden or faces the internet, so it can never be put behind a sign-in page."
 		}
 	}
 	return out
@@ -349,7 +349,7 @@ func (a *App) registerPortalRoutes() {
 		var keep []string
 		for _, d := range in.Ifaces {
 			if !okNets[d] {
-				fail(w, errors.New(d+" cannot be put behind a sign-in page (it manages Gatehouse, faces the internet, or does not exist)"))
+				fail(w, errors.New(d+" cannot be put behind a sign-in page (it manages NopeWarden, faces the internet, or does not exist)"))
 				return
 			}
 			keep = append(keep, d)

@@ -46,7 +46,7 @@ func TestSNMPSwitchOnAndOffAndFirewall(t *testing.T) {
 	buf := make([]byte, 2048)
 	cn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	n, err := cn.Read(buf)
-	if err != nil || !strings.Contains(string(buf[:n]), "Gatehouse") {
+	if err != nil || !strings.Contains(string(buf[:n]), "NopeWarden") {
 		t.Fatalf("no answer: %v %q", err, buf[:n])
 	}
 	cn.Write(snmpGet("public", "1.3.6.1.2.1.1.1.0"))

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"gatehouse/internal/fw"
+	"nopewarden/internal/fw"
 )
 
 func TestRouteByPortThroughAConnectionGroup(t *testing.T) {

@@ -1,5 +1,5 @@
 // Package web carries the built console. Run "npm run build" in this directory first; the
-// build output in dist/ is embedded into the gatehouse binary.
+// build output in dist/ is embedded into the nopewarden binary.
 package web
 
 import (

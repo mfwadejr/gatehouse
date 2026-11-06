@@ -13,16 +13,16 @@ import (
 	"strings"
 	"time"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/fw"
-	"gatehouse/internal/vpn"
+	"nopewarden/internal/api"
+	"nopewarden/internal/fw"
+	"nopewarden/internal/vpn"
 )
 
-// Site-to-site: two Gatehouse routers joined by a WireGuard link. One end creates the link and
+// Site-to-site: two NopeWarden routers joined by a WireGuard link. One end creates the link and
 // gets a pairing code; the other end pastes it. The code carries everything both ends need, so
 // each side routes to the other's network and allows traffic both ways without any further steps.
 
-const sitePrefix = "GATEHOUSE-SITE-1:"
+const sitePrefix = "NOPEWARDEN-SITE-1:"
 
 const siteZoneName = "Remote sites"
 
@@ -51,7 +51,7 @@ func decodeSiteCode(s string) (sitePairing, error) {
 	var p sitePairing
 	s = strings.Join(strings.Fields(s), "")
 	if !strings.HasPrefix(s, sitePrefix) {
-		return p, errors.New("that is not a Gatehouse site link code; copy the whole code from the other site")
+		return p, errors.New("that is not a NopeWarden site link code; copy the whole code from the other site")
 	}
 	raw, err := base64.RawURLEncoding.DecodeString(strings.TrimPrefix(s, sitePrefix))
 	if err != nil || json.Unmarshal(raw, &p) != nil || p.V != 1 {
@@ -205,7 +205,7 @@ func (a *App) vpnNewSite(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 	}
 	a.rememberEndpoint(host)
 	a.refreshVPN()
-	api.JSON(w, 200, map[string]any{"id": id, "code": code, "filename": safeFile(cleanLabel(in.Label, "Site link")) + ".gatehouse-site"})
+	api.JSON(w, 200, map[string]any{"id": id, "code": code, "filename": safeFile(cleanLabel(in.Label, "Site link")) + ".nopewarden-site"})
 }
 
 func (a *App) vpnJoinSite(w http.ResponseWriter, r *http.Request, c *api.Ctx) {

@@ -3,8 +3,8 @@ package app
 import (
 	"net/http"
 
-	"gatehouse/internal/api"
-	"gatehouse/internal/fw"
+	"nopewarden/internal/api"
+	"nopewarden/internal/fw"
 )
 
 // The "Finish setting up" list on the Overview. It is worked out from what the machine actually

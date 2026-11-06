@@ -1,4 +1,4 @@
-// Package bridgemode describes Gatehouse working as a transparent filtering bridge: it sits between
+// Package bridgemode describes NopeWarden working as a transparent filtering bridge: it sits between
 // another router and the local network, passes traffic through at the link level and filters it,
 // instead of routing. Everything here is plain data and checks; nothing touches the machine.
 //
@@ -98,7 +98,7 @@ func (c Config) Validate() error {
 				add("the router address must be inside the management network")
 			}
 		} else {
-			add("enter your other router's address; without it Gatehouse cannot reach the internet for updates")
+			add("enter your other router's address; without it NopeWarden cannot reach the internet for updates")
 		}
 	default:
 		add("the management address must be fixed or automatic")

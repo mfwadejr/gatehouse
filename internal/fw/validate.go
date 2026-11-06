@@ -262,7 +262,7 @@ func (m *Model) Validate() error {
 	}
 	for _, e := range m.DNSExceptions {
 		switch e.Mode {
-		case DNSOff, DNSGatehouse:
+		case DNSOff, DNSNopeWarden:
 		case DNSServer:
 			if err := CheckDNSServer(e.Target); err != nil {
 				add("forced DNS exception %q: %v", e.Who, err)

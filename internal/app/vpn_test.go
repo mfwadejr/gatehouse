@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"gatehouse/internal/netcfg"
-	"gatehouse/internal/netd"
+	"nopewarden/internal/netcfg"
+	"nopewarden/internal/netd"
 )
 
 const ovpnProfile = `client

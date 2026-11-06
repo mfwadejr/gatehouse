@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// A printable picture of the network for the My network page: the internet connection(s), Gatehouse,
+// A printable picture of the network for the My network page: the internet connection(s), NopeWarden,
 // each network and the devices on it. It is plain SVG with no scripts, no passwords and no keys.
 
 type topoNet struct {
@@ -99,10 +99,10 @@ func topologySVG(t topology) string {
 	for i, l := range t.Internet {
 		text(cx-155, inetY+40+i*topoLine, trunc(l, 44), false, false)
 	}
-	// Gatehouse
+	// NopeWarden
 	fmt.Fprintf(&b, `<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#444" stroke-width="1.5"/>`, cx, inetY+inetH, cx, ghY)
 	box(cx-110, ghY, 220, ghH, "#e6f4ea")
-	text(cx-95, ghY+27, "Gatehouse", true, false)
+	text(cx-95, ghY+27, "NopeWarden", true, false)
 	// Networks. Each row has a line just above it that the boxes hang from; the rows join up by a
 	// line down the left edge, so no line ever crosses a box.
 	rowY := make([]int, rows)

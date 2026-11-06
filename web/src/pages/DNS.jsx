@@ -1,10 +1,12 @@
 import { useHashTab } from '../hashtab.js';
+import ResolverCard from './Resolver.jsx';
+import { ScheduleEditor } from '../ScheduleEditor.jsx';
 import EncryptedDns from './EncryptedDns.jsx';
 import React, { useState } from 'react';
 import { del, get, patch, post, put, useData, useStream } from '../api.js';
 import { go } from '../App.jsx';
 import { Chart } from '../charts.jsx';
-import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, Spark, Trend, Tabs, ToggleRow, useAction, fmt, Bar, confirmBox } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, Spark, Trend, Tabs, ToggleRow, useAction, useUndoDelete, fmt, Bar, Limited , useDelayedDelete } from '../ui.jsx';
 
 function Overview() {
   const { data, setData } = useData('/api/dns/summary', { every: 10000 });
@@ -30,7 +32,7 @@ function Overview() {
   return (
     <>
       {data && data.lists_enabled > 0 && !data.blocking_active && (
-        <Note tone="warn" title="Blocking is not active yet">Your blocklists have not downloaded yet, so nothing is being blocked. Gatehouse keeps trying and starts blocking as soon as one arrives. The Blocklists tab shows how it is going.</Note>
+        <Note tone="warn" title="Blocking is not active yet">Your blocklists have not downloaded yet, so nothing is being blocked. NopeWarden keeps trying and starts blocking as soon as one arrives. The Blocklists tab shows how it is going.</Note>
       )}
       <section className="dns-tiles">
         <div className="card tile"><span className="lbl">Lookups, 24 hours</span><div><span className="val">{top ? fmt.n(top.total) : '–'}</span></div><span className="foot">{fmt.d1(st?.qps)} a second right now</span></div>
@@ -93,7 +95,10 @@ function Overview() {
         </div>
       </Card>
       <EncryptedDns onChanged={ru} />
-      <Upstreams ups={list} reload={ru} onAdd={() => setAdd(true)} />
+      <ResolverCard />
+      {(list || []).some((u) => u.id < 0)
+        ? <Card title="Upstream DNS servers" desc="Not used right now."><p className="small muted" style={{ margin: 0 }}>Resolve directly is on, so NopeWarden is not asking forwarders. Your forwarders are kept and take over by themselves if Unbound stops answering. To see or change them, choose Encrypted forwarders above.</p></Card>
+        : <Upstreams ups={list} reload={ru} onAdd={() => setAdd(true)} />}
       {add && <AddUpstream onClose={() => setAdd(false)} onSaved={ru} />}
     </>
   );
@@ -153,9 +158,9 @@ function Upstreams({ ups, reload, onAdd }) {
   const setMode = async (m) => { await run(() => put('/api/dns/upstream-mode', { mode: m })); rm(); };
   const allDown = ups.length > 0 && ups.every((u) => u.state === 'down');
   return (
-    <Card title="Upstream DNS servers" desc="Where Gatehouse asks when it does not already know the answer."
+    <Card title="Upstream DNS servers" desc="Where NopeWarden asks when it does not already know the answer."
       actions={<><Button small icon="plus" onClick={onAdd}>Add</Button><Button small onClick={() => run(() => post('/api/dns/cache/flush'), 'Memory cleared.')}>Clear saved answers</Button></>}>
-      <Field label="Which server is asked first" hint={ordered ? 'The first server in the list is asked; the next one only if it does not answer. Use the arrows to change the order.' : 'Gatehouse measures how fast each one answers and asks the fastest first. Slower ones are the backup.'}>
+      <Field label="Which server is asked first" hint={ordered ? 'The first server in the list is asked; the next one only if it does not answer. Use the arrows to change the order.' : 'NopeWarden measures how fast each one answers and asks the fastest first. Slower ones are the backup.'}>
         <Segmented value={ordered ? 'ordered' : 'fastest'} onChange={setMode} options={[{ value: 'fastest', label: 'Fastest first' }, { value: 'ordered', label: 'In my order' }]} />
       </Field>
       {allDown && <Note tone="warn" title="No server is answering">Names that are not already saved cannot be looked up until one of these answers again.</Note>}
@@ -201,14 +206,14 @@ function ListMeta({ l }) {
   const [details, setDetails] = useState(false);
   const hhmm = (t) => new Date(t * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const counts = `${fmt.n(l.entries)} blocked${l.allowed ? ` · ${fmt.n(l.allowed)} allowed` : ''}${l.skipped ? ` · ${fmt.n(l.skipped)} not used` : ''}`;
-  const total = `${fmt.n(l.entries + l.allowed)} in all${l.skipped ? `, ${fmt.n(l.skipped)} lines Gatehouse cannot use` : ''}`;
+  const total = `${fmt.n(l.entries + l.allowed)} in all${l.skipped ? `, ${fmt.n(l.skipped)} lines NopeWarden cannot use` : ''}`;
   if (l.status === 'downloading') return <div className="meta">Downloading…</div>;
-  if (l.status === 'new') return <div className="meta">{l.enabled ? 'Waiting to download. Gatehouse does this by itself.' : 'Switched off'}</div>;
+  if (l.status === 'new') return <div className="meta">{l.enabled ? 'Waiting to download. NopeWarden does this by itself.' : 'Switched off'}</div>;
   if (l.status === 'error') {
     return (
       <div className="meta">
         <span className="errtext">{l.plain || "Couldn't download this list."}</span>
-        {l.retry_at ? ` Gatehouse will try again at ${hhmm(l.retry_at)}.` : ''}
+        {l.retry_at ? ` NopeWarden will try again at ${hhmm(l.retry_at)}.` : ''}
         {l.last_ok ? <> Using the copy from {fmt.ago(l.last_ok)} ({counts}).</> : ' Nothing is blocked from this list yet.'}
         {' '}<button className="linkbtn" onClick={() => setDetails(!details)}>{details ? 'Hide details' : 'Details'}</button>
         {details && <div className="small mono muted">{l.error}</div>}
@@ -219,11 +224,13 @@ function ListMeta({ l }) {
 }
 
 function Lists() {
+  const delayedDelete = useDelayedDelete();
   const { data: lists, reload } = useData('/api/dns/lists', { topics: ['dns.lists'], every: 15000 });
   const { data: sum } = useData('/api/dns/summary', { every: 30000 });
   const { data: rules, reload: rr } = useData('/api/dns/rules', { topics: ['dns.lists'] });
   const [add, setAdd] = useState(false);
   const [run] = useAction();
+  const undoDelete = useUndoDelete();
   const [rule, setRule] = useState({ domain: '', action: 'block', note: '' });
   const [q, setQ] = useState('');
   const [why, setWhy] = useState(null);
@@ -232,8 +239,9 @@ function Lists() {
     <>
       <Card title="Blocklists" desc="Lists of ad, tracker and malware names. Blocked names get no answer." actions={<Button small icon="plus" onClick={() => setAdd(true)}>Add list</Button>}>
         {sum?.unique_blocked > 0 && <p className="small muted">Different names blocked across all lists: <b>{fmt.n(sum.unique_blocked)}</b>. A name that is on two lists counts once.</p>}
+        <ScheduleEditor id="lists" label="How often to refresh the lists" hideRun />
         <div className="list">
-          {(lists || []).map((l) => (
+          {<Limited items={(lists || [])} noun="lists" render={(l) => (
             <div className="item" key={l.id}>
               <div>
                 <div className="name">{l.name} {l.local && <Pill>Yours</Pill>}</div>
@@ -242,11 +250,11 @@ function Lists() {
               <div className="actions">
                 <Button small onClick={() => setNames(l)}>View names</Button>
                 {!l.local && <Button small icon="refresh" onClick={() => run(() => post(`/api/dns/lists/${l.id}/refresh`), 'Updated.').then(reload)}>Update</Button>}
-                <Button small kind="danger" icon="trash" onClick={async () => await confirmBox(`Delete ${l.name}?`) && run(() => del(`/api/dns/lists/${l.id}`)).then(reload)}>Delete</Button>
+                <Button small kind="danger" icon="trash" onClick={async () => (l.local ? delayedDelete(`The list "${l.name}"`, () => del(`/api/dns/lists/${l.id}`), reload, 'Its names are not kept.') : undoDelete(`The list "${l.name}"`, () => del(`/api/dns/lists/${l.id}`), () => post('/api/dns/lists', { name: l.name, url: l.url, format: l.format, interval_hours: l.interval_hours }), reload))}>Delete</Button>
                 <button role="switch" aria-checked={l.enabled} aria-label={`Use ${l.name}`} className="switch" onClick={() => run(() => patch(`/api/dns/lists/${l.id}`, { enabled: !l.enabled })).then(reload)} />
               </div>
             </div>
-          ))}
+          )} />}
           {!lists?.length && <Empty>No lists yet.</Empty>}
         </div>
       </Card>
@@ -258,7 +266,7 @@ function Lists() {
           <Button kind="primary" disabled={!rule.domain} onClick={() => run(() => post('/api/dns/rules', rule), 'Saved.').then(() => { setRule({ ...rule, domain: '' }); rr(); })}>Add</Button>
         </div>
         <div className="list">
-          {(rules || []).map((r) => <div className="item" key={r.id}><div className="inline"><Pill tone={r.action === 'allow' ? 'good' : 'bad'}>{r.action}</Pill><span className="name">{r.domain}</span></div><Button small kind="danger" icon="trash" onClick={() => run(() => del(`/api/dns/rules/${r.id}`)).then(rr)}>Remove</Button></div>)}
+          {<Limited items={(rules || [])} noun="rules" render={(r) => <div className="item" key={r.id}><div className="inline"><Pill tone={r.action === 'allow' ? 'good' : 'bad'}>{r.action}</Pill><span className="name">{r.domain}</span></div><Button small kind="danger" icon="trash" onClick={() => run(() => del(`/api/dns/rules/${r.id}`)).then(rr)}>Remove</Button></div>} />}
         </div>
       </Card>
 
@@ -330,7 +338,6 @@ function AddList({ onClose, onSaved }) {
         <div className="formgrid">
           <Field label="Web address"><Input value={f.url} onChange={set('url')} placeholder="https://" /></Field>
           <Field label="Format"><Select value={f.format} onChange={set('format')} options={[{ value: 'domains', label: 'One name per line' }, { value: 'hosts', label: 'Hosts file' }, { value: 'adblock', label: 'Adblock style' }]} /></Field>
-          <Field label="Refresh every (hours)"><NumberInput value={f.interval_hours} onChange={set('interval_hours')} /></Field>
         </div>
       ) : (
         <Field label="Names, one per line"><textarea className="in" rows={8} value={f.text} onChange={(e) => set('text')(e.target.value)} /></Field>
@@ -371,7 +378,7 @@ function Records() {
     </div>
   );
   return (
-    <Card enter title="Your own names" desc="Make a name point somewhere on your network, like nas.lan → 192.168.1.10. Devices that get an address from Gatehouse already have a name automatically.">
+    <Card enter title="Your own names" desc="Make a name point somewhere on your network, like nas.lan → 192.168.1.10. Devices that get an address from NopeWarden already have a name automatically.">
       {data && dset && isV4 && !mine && <Note title="Give this firewall a name">{nameBox}</Note>}
       {data && dset && isV4 && mine && !changing && (
         <p className="small muted">Open the console at <a href={`https://${mine.name}`}>https://{mine.name}</a>. Type the https:// part, or the browser will search the web instead.{' '}
@@ -393,6 +400,7 @@ function Records() {
 }
 
 function Groups() {
+  const delayedDelete = useDelayedDelete();
   const { data: groups, reload } = useData('/api/dns/groups');
   const { data: lists } = useData('/api/dns/lists');
   const [edit, setEdit] = useState(null);
@@ -400,12 +408,12 @@ function Groups() {
   return (
     <Card title="Filtering profiles" desc="Choose which lists apply to which devices. Assign a device to a profile on the Devices page." actions={<Button small icon="plus" onClick={() => setEdit({ name: '', filtering: true, description: '', lists: [] })}>Add profile</Button>}>
       <div className="list">
-        {(groups || []).map((g) => (
+        {<Limited items={(groups || [])} noun="groups" render={(g) => (
           <div className="item" key={g.id}>
             <div><div className="name">{g.name}</div><div className="meta">{g.filtering ? `${g.lists?.length || 0} lists` : 'No filtering'} · {g.devices} device{g.devices === 1 ? '' : 's'}{g.description ? ` · ${g.description}` : ''}</div></div>
-            <div className="actions"><Button small icon="edit" onClick={() => setEdit(g)}>Edit</Button><Button small kind="danger" icon="trash" onClick={async () => await confirmBox(`Delete ${g.name}?`) && run(() => del(`/api/dns/groups/${g.id}`)).then(reload)}>Delete</Button></div>
+            <div className="actions"><Button small icon="edit" onClick={() => setEdit(g)}>Edit</Button><Button small kind="danger" icon="trash" onClick={() => delayedDelete(`The profile ${g.name}`, () => del(`/api/dns/groups/${g.id}`), reload)}>Delete</Button></div>
           </div>
-        ))}
+        )} />}
       </div>
       {edit && (
         <Modal title={edit.id ? `Edit ${edit.name}` : 'New profile'} onClose={() => setEdit(null)} footer={<><Button onClick={() => setEdit(null)}>Cancel</Button><Button kind="primary" disabled={!edit.name} onClick={async () => { if (await run(() => put('/api/dns/groups', edit), 'Saved.')) { reload(); setEdit(null); } }}>Save</Button></>}>
@@ -435,7 +443,7 @@ function SettingsTab() {
         <Select value={v.block_mode} onChange={set('block_mode')} options={[{ value: 'null', label: 'Answer with an empty address (fastest to fail)' }, { value: 'nxdomain', label: 'Say the name does not exist' }, { value: 'refused', label: 'Refuse' }]} />
       </Field>
       <div className="formgrid">
-        <Field label="Home domain" hint="Names like printer.lan are answered by Gatehouse."><Input value={v.local_domain} onChange={set('local_domain')} /></Field>
+        <Field label="Home domain" hint="Names like printer.lan are answered by NopeWarden."><Input value={v.local_domain} onChange={set('local_domain')} /></Field>
         <Field label="Queries per second per device" hint="A device asking more than this is slowed down."><NumberInput value={v.rate_limit} onChange={set('rate_limit')} /></Field>
         <Field label="Short burst allowed"><NumberInput value={v.rate_burst} onChange={set('rate_burst')} /></Field>
         <Field label="Remember answers (entries)"><NumberInput value={v.cache_size} onChange={set('cache_size')} /></Field>

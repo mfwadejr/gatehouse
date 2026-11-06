@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"gatehouse/internal/devices"
-	"gatehouse/internal/fw"
-	"gatehouse/internal/netd"
+	"nopewarden/internal/devices"
+	"nopewarden/internal/fw"
+	"nopewarden/internal/netd"
 )
 
 // Tunnel health. Every VPN gets one plain state the console can show and alert on:

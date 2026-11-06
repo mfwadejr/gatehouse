@@ -26,14 +26,14 @@ var reDev = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,14}$`)
 // never touch the main ruleset; the main ruleset lets their connections through when UPnP is on.
 func UPnPScript(ms []UPnPMapping) (string, error) {
 	var b strings.Builder
-	b.WriteString("add table ip gatehouse_upnp\ndelete table ip gatehouse_upnp\n")
+	b.WriteString("add table ip nopewarden_upnp\ndelete table ip nopewarden_upnp\n")
 	if len(ms) == 0 {
 		return b.String(), nil
 	}
 	if len(ms) > 512 {
 		return "", errors.New("too many port mappings")
 	}
-	b.WriteString("table ip gatehouse_upnp {\n\tchain prerouting {\n\t\ttype nat hook prerouting priority dstnat; policy accept;\n")
+	b.WriteString("table ip nopewarden_upnp {\n\tchain prerouting {\n\t\ttype nat hook prerouting priority dstnat; policy accept;\n")
 	for _, m := range ms {
 		if m.Proto != "tcp" && m.Proto != "udp" {
 			return "", fmt.Errorf("mapping %d: protocol must be tcp or udp", m.ID)

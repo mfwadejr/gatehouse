@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"gatehouse/internal/store"
+	"nopewarden/internal/store"
 )
 
 func newEngine(t *testing.T) *Engine {

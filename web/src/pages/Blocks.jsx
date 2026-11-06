@@ -1,22 +1,42 @@
 import React, { useEffect, useState } from 'react';
 import { hashQuery, setHashQuery, useWantedEdit } from '../hashtab.js';
 import { del, post, put, useData } from '../api.js';
-import { Button, Card, Empty, Field, Input, Modal, Note, Pill, Segmented, Select, ToggleRow, useAction, confirmBox } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, Pill, Segmented, Select, ToggleRow, useAction, useUndoDelete, fmt, Limited } from '../ui.jsx';
 import { PolicyControls } from '../policykit.jsx';
 
 // Block an app, a topic or a website name for everyone, a network, a profile or one device, always
 // or on a schedule. Today the blocking works by name. Thorough checking is shown but not on yet.
 
+const blockBody = (r) => ({ kind: r.kind, value: r.value, scope: r.scope, target: r.target, allow: r.allow, method: r.method, schedule: r.schedule, enabled: r.enabled });
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const STATUS = { blocking: ['Blocking', 'bad'], allowing: ['Allowed', 'good'], paused: ['Paused', 'warn'], off: ['Off', ''], 'outside hours': ['Not in its hours', ''], waiting: ['Waiting', 'warn'] };
 
 function parseSchedule(s) { try { return s ? JSON.parse(s) : { mode: 'always' }; } catch { return { mode: 'always' }; } }
+
+// The names a topic blocks, searchable, so a person can see what choosing it means.
+function TopicNames({ topic, onClose }) {
+  const [q, setQ] = useState('');
+  const { data, error } = useData(`/api/blocks/topics/${encodeURIComponent(topic.key)}/names?q=${encodeURIComponent(q)}`);
+  return (
+    <Modal title={`Names in ${topic.name}`} onClose={onClose} footer={<Button onClick={onClose}>Close</Button>}>
+      <div className="stack">
+        <Input value={q} onChange={setQ} placeholder="Search these names" aria-label="Search these names" />
+        {!data && !error && <p className="small muted">Loading…</p>}
+        {error && <p className="small muted">{String(error.message || error)}</p>}
+        {data && <p className="small muted">{data.total ? `${fmt.n(data.total)} names are blocked by this topic${data.updated ? `, list updated ${fmt.ago(data.updated)}` : ''}.${data.names.length >= 100 ? ' Showing the first 100 that match; search to narrow it down.' : ''}` : 'The list has not been downloaded yet, so there are no names to show.'}</p>}
+        {data && <div className="list">{data.names.map((n) => <div className="item" key={n.name}><span className="mono">{n.name}</span></div>)}</div>}
+        {data && q && !data.names.length && data.total > 0 && <p className="small muted">None of the names match.</p>}
+      </div>
+    </Modal>
+  );
+}
 
 function BlockForm({ initial, data, onClose, onSaved }) {
   const [f, setF] = useState({ kind: 'app', value: '', scope: 'everyone', target: '', allow: false, method: 'fast', enabled: true, ...initial });
   const sc0 = parseSchedule(initial?.schedule);
   const [sc, setSc] = useState({ mode: sc0.mode || 'always', from: sc0.from || '21:00', to: sc0.to || '07:00', days: sc0.days || [1, 2, 3, 4, 5] });
   const [q, setQ] = useState('');
+  const [browse, setBrowse] = useState(null);
   const [run, busy] = useAction();
   const { data: groups } = useData('/api/dns/groups');
   const { data: ch } = useData('/api/vpn/choices');
@@ -47,11 +67,12 @@ function BlockForm({ initial, data, onClose, onSaved }) {
           </Field>
         )}
         {f.kind === 'topic' && (
-          <Field label="Which topic" hint="Each topic is a list Gatehouse downloads and keeps up to date.">
+          <Field label="Which topic" hint="Each topic is a list NopeWarden downloads and keeps up to date.">
             <div className="stack">
               {(data?.topics || []).map((t) => (
                 <label key={t.key} className="small" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
                   <input type="radio" name="topic" checked={f.value === t.key} onChange={() => setF({ ...f, value: t.key })} /> <span><strong>{t.name}</strong> · {t.descr}</span>
+                  {!t.key.startsWith('cat:') && <button type="button" className="link small" onClick={(e) => { e.preventDefault(); setBrowse(t); }}>View names</button>}
                 </label>
               ))}
             </div>
@@ -65,7 +86,7 @@ function BlockForm({ initial, data, onClose, onSaved }) {
         <ToggleRow title="This is an exception" desc="Lets this app, topic or website through for the chosen device, network or profile, even if a block elsewhere says no." checked={f.allow} onChange={(v) => setF({ ...f, allow: v })} />
         <Field label="How">
           <div className="stack">
-            <label className="small" style={{ display: 'flex', gap: 'var(--space-2)' }}><input type="radio" name="method" checked={f.method === 'fast'} onChange={() => setF({ ...f, method: 'fast' })} /> <span><strong>Option A: By name (fast)</strong>. Gatehouse refuses the app's website names. No slowdown. It can miss an app that uses its own private DNS, or a call already in progress.</span></label>
+            <label className="small" style={{ display: 'flex', gap: 'var(--space-2)' }}><input type="radio" name="method" checked={f.method === 'fast'} onChange={() => setF({ ...f, method: 'fast' })} /> <span><strong>Option A: By name (fast)</strong>. NopeWarden refuses the app's website names. No slowdown. It can miss an app that uses its own private DNS, or a call already in progress.</span></label>
             <label className="small" style={{ display: 'flex', gap: 'var(--space-2)' }}><input type="radio" name="method" checked={f.method === 'thorough'} onChange={() => setF({ ...f, method: 'thorough' })} /> <span><strong>Option B: Thorough</strong>. Looks at the traffic itself. Catches more but can be slower.</span></label>
             <label className="small" style={{ display: 'flex', gap: 'var(--space-2)' }}><input type="radio" name="method" checked={f.method === 'both'} onChange={() => setF({ ...f, method: 'both' })} /> <span><strong>Both</strong>. By name now, and thorough as well once it is on.</span></label>
             {f.method !== 'fast' && <Note tone="warn">{data?.inspection?.note}</Note>}
@@ -90,6 +111,7 @@ function BlockForm({ initial, data, onClose, onSaved }) {
         )}
         <ToggleRow title="Turned on" checked={f.enabled} onChange={(v) => setF({ ...f, enabled: v })} />
       </div>
+      {browse && <TopicNames topic={browse} onClose={() => setBrowse(null)} />}
     </Modal>
   );
 }
@@ -99,6 +121,7 @@ export default function Blocks() {
   const [edit, setEdit] = useState(() => (hashQuery('new') ? {} : null));
   useEffect(() => { if (hashQuery('new')) setHashQuery('new', ''); }, []);
   const [run, busy] = useAction();
+  const undoDelete = useUndoDelete();
   const rules = data?.rules || [];
   useWantedEdit(data && rules, (r, w) => String(r.id) === w, setEdit);
   return (
@@ -106,7 +129,7 @@ export default function Blocks() {
       actions={<Button small icon="plus" onClick={() => setEdit({})}>Add a block</Button>}>
       <Note>If anything goes wrong, nothing is blocked. A fault never cuts a device off.</Note>
       <div className="list">
-        {rules.map((r) => {
+        {<Limited items={rules} noun="blocks" render={(r) => {
           const [word, tone] = STATUS[r.status] || [r.status, ''];
           return (
             <div className="item" key={r.id}>
@@ -119,11 +142,11 @@ export default function Blocks() {
                   onPause={(m) => run(() => post(`/api/blocks/${r.id}/pause`, { minutes: m }), m === 0 ? 'Resumed.' : 'Paused.').then(reload)}
                   onToggle={() => run(() => post(`/api/blocks/${r.id}/enable`, { enabled: !r.enabled })).then(reload)}
                   onEdit={() => setEdit(r)}
-                  onRemove={async () => await confirmBox('Delete this block?') && run(() => del(`/api/blocks/${r.id}`)).then(reload)} />
+                  onRemove={() => undoDelete('The block', () => del(`/api/blocks/${r.id}`), () => put('/api/blocks', blockBody(r)), reload)} />
               </div>
             </div>
           );
-        })}
+        }} />}
         {data && !rules.length && <Empty>Nothing is blocked this way yet.</Empty>}
       </div>
       <p className="small muted">{data?.inspection?.note} {data?.fail_open}</p>

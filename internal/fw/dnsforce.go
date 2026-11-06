@@ -14,9 +14,9 @@ import (
 // sent to a server, whatever their network says.
 
 const (
-	DNSOff       = "off"
-	DNSGatehouse = "gatehouse"
-	DNSServer    = "server"
+	DNSOff        = "off"
+	DNSNopeWarden = "nopewarden"
+	DNSServer     = "server"
 )
 
 // CheckDNSServer says whether text is usable as the server forced DNS is sent to.
@@ -61,7 +61,7 @@ func SaveDNSException(tx *sql.Tx, e DNSException) (int64, error) {
 		return 0, errors.New("pick a device or a device group")
 	}
 	switch e.Mode {
-	case DNSOff, DNSGatehouse:
+	case DNSOff, DNSNopeWarden:
 		e.Target = ""
 	case DNSServer:
 		e.Target = strings.TrimSpace(e.Target)
@@ -181,7 +181,7 @@ func (m *Model) exceptionMACs() (off, gate []string, server map[string][]string,
 		switch e.Mode {
 		case DNSOff:
 			off = append(off, macs...)
-		case DNSGatehouse:
+		case DNSNopeWarden:
 			gate = append(gate, macs...)
 		case DNSServer:
 			if CheckDNSServer(e.Target) == nil {

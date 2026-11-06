@@ -113,7 +113,7 @@ func TestOnChangeAndClear(t *testing.T) {
 }
 
 func gw(tb *Table, ext string) *Gateway {
-	return &Gateway{Table: tb, LAN: netip.MustParsePrefix("192.168.1.0/24"), ExtIP: func() string { return ext }, Name: "Gatehouse", UUID: "u"}
+	return &Gateway{Table: tb, LAN: netip.MustParsePrefix("192.168.1.0/24"), ExtIP: func() string { return ext }, Name: "NopeWarden", UUID: "u"}
 }
 
 func soap(g *Gateway, from, action, body string) *httptest.ResponseRecorder {

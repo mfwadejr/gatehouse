@@ -1,7 +1,7 @@
-// Package ha holds the tested building blocks for running two Gatehouse machines as an
+// Package ha holds the tested building blocks for running two NopeWarden machines as an
 // active/standby pair: the pairing code, the keepalived (VRRP) settings, and the rule for what a
 // standby unit may be asked to do. It is NOT connected to the console yet. Nothing here starts a
-// service or changes a machine, so having this package changes nothing about how Gatehouse runs.
+// service or changes a machine, so having this package changes nothing about how NopeWarden runs.
 package ha
 
 import (
@@ -15,10 +15,10 @@ import (
 	"strings"
 )
 
-const codePrefix = "GATEHOUSE-PAIR-1:"
+const codePrefix = "NOPEWARDEN-PAIR-1:"
 
 // NotifyPath is the script keepalived runs when a unit becomes active or standby.
-const NotifyPath = "/usr/lib/gatehouse/ha-notify"
+const NotifyPath = "/usr/lib/nopewarden/ha-notify"
 
 // VIP is a shared address held by whichever unit is active, on one network.
 type VIP struct {
@@ -52,7 +52,7 @@ func NewSecret() (string, error) {
 // Validate checks a pairing before a code is made from it or after one is read.
 func (p Pairing) Validate() error {
 	if p.V != 1 {
-		return errors.New("this pairing code is from a different version of Gatehouse")
+		return errors.New("this pairing code is from a different version of NopeWarden")
 	}
 	if len(p.Secret) < 24 {
 		return errors.New("the pairing code is damaged: its secret is too short")
@@ -104,7 +104,7 @@ func Decode(code string) (Pairing, error) {
 	var p Pairing
 	code = strings.Join(strings.Fields(code), "")
 	if !strings.HasPrefix(code, codePrefix) {
-		return p, errors.New("that is not a Gatehouse pairing code")
+		return p, errors.New("that is not a NopeWarden pairing code")
 	}
 	b, err := base64.RawURLEncoding.DecodeString(strings.TrimPrefix(code, codePrefix))
 	if err != nil || json.Unmarshal(b, &p) != nil {
@@ -157,7 +157,7 @@ func KeepalivedConfPrefer(p Pairing, role Role, ownAddr string, preferred bool) 
 	vips := append([]VIP(nil), p.VIPs...)
 	sort.Slice(vips, func(i, j int) bool { return vips[i].Iface < vips[j].Iface })
 	var b strings.Builder
-	b.WriteString("# Written by Gatehouse. Changes here are replaced.\n")
+	b.WriteString("# Written by NopeWarden. Changes here are replaced.\n")
 	b.WriteString("global_defs {\n  vrrp_version 3\n  enable_script_security\n  script_user root\n}\n\n")
 	for i, v := range vips {
 		fmt.Fprintf(&b, "vrrp_instance GH_%d {\n", i+1)

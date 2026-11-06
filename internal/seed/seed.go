@@ -9,16 +9,16 @@ import (
 	"regexp"
 	"strings"
 
-	"gatehouse/internal/crypt"
-	"gatehouse/internal/fw"
-	"gatehouse/internal/store"
+	"nopewarden/internal/crypt"
+	"nopewarden/internal/fw"
+	"nopewarden/internal/store"
 )
 
 // LAN says how the port facing the person's own devices behaves.
 type LAN struct {
 	Port string `json:"port"`
-	// Mode is "router" (Gatehouse hands out addresses and is the gateway) or "behind"
-	// (another router does that and Gatehouse acts as firewall and DNS on its network).
+	// Mode is "router" (NopeWarden hands out addresses and is the gateway) or "behind"
+	// (another router does that and NopeWarden acts as firewall and DNS on its network).
 	Mode string `json:"mode"`
 
 	// Router mode.
@@ -120,7 +120,7 @@ func (n *Network) Validate() error {
 		}
 	case "behind":
 		if n.WAN != nil {
-			return errors.New("when Gatehouse sits behind another router, that router provides the internet, so leave the internet port out")
+			return errors.New("when NopeWarden sits behind another router, that router provides the internet, so leave the internet port out")
 		}
 		switch l.Addressing {
 		case "dhcp":
@@ -136,7 +136,7 @@ func (n *Network) Validate() error {
 			return errors.New("choose automatic or fixed for this device's address")
 		}
 	default:
-		return errors.New("choose how Gatehouse is used on your network")
+		return errors.New("choose how NopeWarden is used on your network")
 	}
 	return nil
 }

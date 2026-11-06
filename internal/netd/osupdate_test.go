@@ -107,7 +107,7 @@ func TestSystemUpgradeWhenDebianIsUnreachable(t *testing.T) {
 	fakeApt(t, l, "13")
 	res, err := SystemUpgrade(nil)
 	if err != nil || !strings.Contains(res.Skipped, "could not be reached") {
-		t.Fatalf("the Gatehouse part should still go ahead: %+v %v", res, err)
+		t.Fatalf("the NopeWarden part should still go ahead: %+v %v", res, err)
 	}
 	if _, err := SystemUpgrade([]string{"keepalived"}); err == nil || !strings.Contains(err.Error(), "keepalived") {
 		t.Fatalf("a release that needs a package must not go ahead without it: %v", err)
@@ -158,7 +158,7 @@ func TestPowerActions(t *testing.T) {
 	defer func() { runPowerCmd = old }()
 	runPowerCmd = func(argv []string) error { got = argv; return nil }
 	s := &Service{}
-	for action, want := range map[string]string{"reboot": "systemctl reboot", "poweroff": "systemctl poweroff", "restart-gatehouse": "systemctl restart gatehouse-netd gatehouse gatehouse-screen"} {
+	for action, want := range map[string]string{"reboot": "systemctl reboot", "poweroff": "systemctl poweroff", "restart-nopewarden": "systemctl restart nopewarden-netd nopewarden nopewarden-screen"} {
 		if err := s.Power(action); err != nil || !strings.HasSuffix(strings.Join(got, " "), want) || !strings.Contains(strings.Join(got, " "), "--on-active") {
 			t.Fatalf("%s: %v %v", action, err, got)
 		}

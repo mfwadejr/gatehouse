@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { del, put, useData } from '../api.js';
 import { AddrPicker, tokens } from '../AddrPicker.jsx';
-import { Button, Card, Empty, Field, Input, Note, Pill, Select, ToggleRow, useAction, fmt } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Note, Pill, Select, ToggleRow, useAction, fmt, Limited } from '../ui.jsx';
 
 // Forced DNS: devices that ask a DNS server of their own are quietly sent to the one you chose. It is
 // set for each network, with optional exceptions for single devices or groups.
@@ -14,7 +14,7 @@ const MODES = [
 
 const EX_MODES = [
   { value: 'off', label: 'Leave alone' },
-  { value: 'gatehouse', label: 'Force to Gatehouse' },
+  { value: 'nopewarden', label: 'Force to NopeWarden' },
   { value: 'server', label: 'Force to a different server' },
 ];
 
@@ -33,9 +33,9 @@ function NetworkRow({ n, target, onSave }) {
         <div className="name">{n.name}</div>
         <div className="meta">
           {n.mode === 'off' && 'Devices here may use any DNS server.'}
-          {n.mode === 'force' && `Every lookup goes to ${target || 'Gatehouse'}.`}
+          {n.mode === 'force' && `Every lookup goes to ${target || 'NopeWarden'}.`}
           {n.mode === 'server' && `Every lookup goes to ${n.target}.`}
-          {!n.internet && n.mode !== 'off' && ' This network has no internet, so it always uses Gatehouse.'}
+          {!n.internet && n.mode !== 'off' && ' This network has no internet, so it always uses NopeWarden.'}
         </div>
       </div>
       <div className="actions" style={{ flexWrap: 'wrap' }}>
@@ -96,15 +96,15 @@ export default function ForcedDns({ s, save, pickers, reload }) {
         <b>Exceptions</b>
         {!(data?.exceptions || []).length && !adding && <span className="small muted">None. A device or group can be left alone, or sent to a different server, whatever its network says.</span>}
         <div className="list">
-          {(data?.exceptions || []).map((e) => (
+          {<Limited items={(data?.exceptions || [])} noun="exceptions" render={(e) => (
             <div className="item" key={e.id}>
               <div>
                 <div className="name">{label(e.who)} {gone(e.who) && <Pill tone="warn">No longer exists</Pill>}</div>
-                <div className="meta">{e.mode === 'off' ? 'Left alone: may use any DNS server.' : e.mode === 'gatehouse' ? 'Always sent to Gatehouse.' : `Always sent to ${e.target}.`}</div>
+                <div className="meta">{e.mode === 'off' ? 'Left alone: may use any DNS server.' : e.mode === 'nopewarden' ? 'Always sent to NopeWarden.' : `Always sent to ${e.target}.`}</div>
               </div>
               <div className="actions"><Button small kind="danger" icon="trash" onClick={async () => { await run(() => del(`/api/fw/dnsforce/exception/${e.id}`)); refresh(); }}>Remove</Button></div>
             </div>
-          ))}
+          )} />}
         </div>
         {!adding && <button type="button" className="link small leftalign" onClick={() => setAdding(true)}>Add an exception for a device or group</button>}
         {adding && (
@@ -130,10 +130,10 @@ function DnsTargetPicker({ s, save }) {
   return (
     <div className="stack">
       <Field label="Forced lookups go to">
-        <Select value={mode} onChange={choose} options={[{ value: 'self', label: 'Gatehouse (recommended)' }, { value: 'custom', label: 'A different DNS server' }]} />
+        <Select value={mode} onChange={choose} options={[{ value: 'self', label: 'NopeWarden (recommended)' }, { value: 'custom', label: 'A different DNS server' }]} />
       </Field>
       {mode === 'custom' && (
-        <Field label="DNS server address" hint="For example your Pi-hole. That server's own lookups are not redirected. Networks without internet access still use Gatehouse.">
+        <Field label="DNS server address" hint="For example your Pi-hole. That server's own lookups are not redirected. Networks without internet access still use NopeWarden.">
           <Input value={addr} onChange={setAddr} onBlur={() => addr.trim() && addr.trim() !== s.dns_target && save(addr.trim())} placeholder="192.168.1.2" />
         </Field>
       )}

@@ -14,7 +14,7 @@ export function Hit({ text, words }) {
 
 const RANGES = [{ value: '0', label: 'All' }, { value: '1', label: '1 h' }, { value: '24', label: '24 h' }, { value: '168', label: '7 d' }, { value: '720', label: '30 d' }];
 
-// Admin activity: who did what to Gatehouse, when, and from which address.
+// Admin activity: who did what to NopeWarden, when, and from which address.
 export default function AdminActivity({ onQ }) {
   const [q, setQ] = useState(() => hashQuery('q'));
   useEffect(() => { setHashQuery('q', q.trim()); }, [q]);
@@ -31,15 +31,15 @@ export default function AdminActivity({ onQ }) {
   const words = q.trim().split(/\s+/).filter(Boolean);
   const setBoth = (v) => { setQ(v); onQ?.(v); };
   return (
-    <Card title="Admin activity" desc="Who did what to Gatehouse: sign-ins and failed attempts, and the changes people made. Looking for what the network did? That is the Log tab.">
+    <Card title="Admin activity" desc="Who did what to NopeWarden: sign-ins and failed attempts, and the changes people made. Looking for what the network did? That is the Log tab.">
       <div className="stack">
         <div className="inline">
           <div style={{ flex: '1 1 18rem' }}><Input value={q} onChange={setBoth} placeholder="Search a person, what they did, or an address" aria-label="Search admin activity" /></div>
           <Segmented value={hours} onChange={(v) => { setHours(v); setLimit(100); }} options={RANGES} />
         </div>
-        {d && <p className="small muted">{words.length || hours !== '0' ? `${fmt.n(d.total)} match` : `${fmt.n(d.total)} entries`}. Searched the last {d.days} days, the time Gatehouse keeps its logs.</p>}
+        {d && <p className="small muted">{words.length || hours !== '0' ? `${fmt.n(d.total)} match` : `${fmt.n(d.total)} entries`}. Searched the last {d.days} days, the time NopeWarden keeps its logs.</p>}
         {!d ? <span className="muted">Loading…</span> : !d.rows.length ? (
-          <Empty>{words.length ? 'Nothing matches. System messages about Gatehouse itself are in Diagnostics, System log.' : 'Nothing recorded yet.'}</Empty>
+          <Empty>{words.length ? 'Nothing matches. System messages about NopeWarden itself are in Diagnostics, System log.' : 'Nothing recorded yet.'}</Empty>
         ) : (
           <div className="scroll">
             <table className="table">
@@ -48,7 +48,7 @@ export default function AdminActivity({ onQ }) {
                 {d.rows.map((r) => (
                   <tr key={r.id}>
                     <td className="small">{fmt.dt(r.ts)}</td>
-                    <td><Hit text={r.who || 'Gatehouse'} words={words} /></td>
+                    <td><Hit text={r.who || 'NopeWarden'} words={words} /></td>
                     <td>{r.severity === 'warning' || r.severity === 'error' ? <Pill tone={r.severity === 'error' ? 'bad' : 'warn'}>{r.severity === 'error' ? 'Problem' : 'Check'}</Pill> : null} <Hit text={r.what} words={words} /></td>
                     <td className="small muted"><Hit text={r.detail} words={words} /></td>
                   </tr>

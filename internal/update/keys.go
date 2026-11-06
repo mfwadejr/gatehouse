@@ -1,6 +1,6 @@
-// Package update installs new versions of Gatehouse from a signed package, without an ISO.
+// Package update installs new versions of NopeWarden from a signed package, without an ISO.
 //
-// A release carries gatehouse-update-<version>.tar.gz and a signature file next to it. The
+// A release carries nopewarden-update-<version>.tar.gz and a signature file next to it. The
 // package is trusted only if the signature matches the public key built into the program
 // (update-key.pub), and every file inside matches the hash in its manifest. The root helper
 // checks again before it installs anything, so the daemon is never trusted to have done so.

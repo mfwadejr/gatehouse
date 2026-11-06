@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"gatehouse/internal/fw"
+	"nopewarden/internal/fw"
 )
 
 // Each table that has a limit is filled to it and one past it: the last allowed row saves, the next

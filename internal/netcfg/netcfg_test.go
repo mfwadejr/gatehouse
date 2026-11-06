@@ -34,18 +34,18 @@ func TestGenerate(t *testing.T) {
 			t.Errorf("%s lacks %q:\n%s", file, want, got)
 		}
 	}
-	must("gatehouse-eth0.100.netdev", "Id=100")
-	must("gatehouse-eth0.100.network", "DHCP=yes")
-	must("gatehouse-eth0.100.network", "RouteMetric=100")
-	must("gatehouse-eth0.network", "VLAN=eth0.100")
-	must("gatehouse-eth1.20.netdev", "Id=20")
-	must("gatehouse-eth1.network", "VLAN=eth1.20")
-	must("gatehouse-eth1.network", "DHCPPrefixDelegation=yes")
-	must("gatehouse-eth1.network", "UplinkInterface=eth0.100")
-	must("gatehouse-eth1.network", "Address=192.168.1.1/24")
-	must("gatehouse-eth2.network", "Address=fd00:2::1/64")
-	must("gatehouse-eth2.network", "IPv6SendRA=yes")
-	must("gatehouse-eth3.network", "LinkLocalAddressing=no")
+	must("nopewarden-eth0.100.netdev", "Id=100")
+	must("nopewarden-eth0.100.network", "DHCP=yes")
+	must("nopewarden-eth0.100.network", "RouteMetric=100")
+	must("nopewarden-eth0.network", "VLAN=eth0.100")
+	must("nopewarden-eth1.20.netdev", "Id=20")
+	must("nopewarden-eth1.network", "VLAN=eth1.20")
+	must("nopewarden-eth1.network", "DHCPPrefixDelegation=yes")
+	must("nopewarden-eth1.network", "UplinkInterface=eth0.100")
+	must("nopewarden-eth1.network", "Address=192.168.1.1/24")
+	must("nopewarden-eth2.network", "Address=fd00:2::1/64")
+	must("nopewarden-eth2.network", "IPv6SendRA=yes")
+	must("nopewarden-eth3.network", "LinkLocalAddressing=no")
 	if p := o.PPPPeers["gh-dslbacku"]; !strings.Contains(p, "plugin pppoe.so") || !strings.Contains(p, "nic-eth3") || !strings.Contains(p, "ifname ppp-dslbacku") || !strings.Contains(p, "defaultroute-metric 200") || !strings.Contains(p, "mtu 1492") {
 		t.Errorf("ppp peer:\n%v", o.PPPPeers)
 	}
@@ -99,7 +99,7 @@ func TestStaticWAN(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f := o.Networkd["gatehouse-eth0.network"]
+	f := o.Networkd["nopewarden-eth0.network"]
 	for _, want := range []string{"Address=203.0.113.10/29", "Gateway=203.0.113.9", "Address=2001:db8::2/64", "Gateway=2001:db8::1", "DNS=9.9.9.9"} {
 		if !strings.Contains(f, want) {
 			t.Errorf("missing %q:\n%s", want, f)
@@ -152,15 +152,15 @@ func TestBridgeAndBehindRouter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.Networkd["gatehouse-br-lan.netdev"], "Kind=bridge") {
+	if !strings.Contains(out.Networkd["nopewarden-br-lan.netdev"], "Kind=bridge") {
 		t.Fatalf("no bridge device: %v", out.Networkd)
 	}
 	for _, m := range []string{"enp2s0", "enp3s0"} {
-		if !strings.Contains(out.Networkd["gatehouse-"+m+".network"], "Bridge=br-lan") {
+		if !strings.Contains(out.Networkd["nopewarden-"+m+".network"], "Bridge=br-lan") {
 			t.Fatalf("%s is not in the bridge", m)
 		}
 	}
-	if !strings.Contains(out.Networkd["gatehouse-br-lan.network"], "Address=192.168.1.1/24") {
+	if !strings.Contains(out.Networkd["nopewarden-br-lan.network"], "Address=192.168.1.1/24") {
 		t.Fatal("bridge has no address")
 	}
 	// A port cannot be both a member and set up on its own.
@@ -172,7 +172,7 @@ func TestBridgeAndBehindRouter(t *testing.T) {
 	// Behind another router: automatic address, or a fixed one with a gateway and DNS.
 	auto := &Config{Interfaces: []Interface{{Name: "enp1s0", Kind: "phys", DHCP: true, Enabled: true}}}
 	o, err := Generate(auto)
-	if err != nil || !strings.Contains(o.Networkd["gatehouse-enp1s0.network"], "DHCP=ipv4") {
+	if err != nil || !strings.Contains(o.Networkd["nopewarden-enp1s0.network"], "DHCP=ipv4") {
 		t.Fatalf("dhcp client: %v %v", o, err)
 	}
 	fixed := &Config{Interfaces: []Interface{{Name: "enp1s0", Kind: "phys", IPv4: "192.168.0.50/24", Gateway: "192.168.0.1", DNS: "192.168.0.1", Enabled: true}}}
@@ -180,7 +180,7 @@ func TestBridgeAndBehindRouter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	n := o.Networkd["gatehouse-enp1s0.network"]
+	n := o.Networkd["nopewarden-enp1s0.network"]
 	if !strings.Contains(n, "[Route]\nGateway=192.168.0.1") || !strings.Contains(n, "DNS=192.168.0.1") {
 		t.Fatalf("fixed address behind a router:\n%s", n)
 	}
@@ -206,7 +206,7 @@ func TestTunnelRoutingFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	n := out.Networkd["gatehouse-wg1.network"]
+	n := out.Networkd["nopewarden-wg1.network"]
 	for _, want := range []string{
 		"[Route]\nDestination=0.0.0.0/0\nTable=301",
 		"[Route]\nDestination=10.50.0.0/16\n",
@@ -222,14 +222,14 @@ func TestTunnelRoutingFiles(t *testing.T) {
 	if strings.Contains(n, "Destination=0.0.0.0/0\n\n") || strings.Contains(n, "Destination=0.0.0.0/0\n[") {
 		t.Errorf("default route without a table:\n%s", n)
 	}
-	u := out.Networkd["gatehouse-tun1.network"]
+	u := out.Networkd["nopewarden-tun1.network"]
 	if !strings.Contains(u, "Name=tun1") || !strings.Contains(u, "Table=302") || strings.Contains(u, "Address=") {
 		t.Errorf("tun1.network:\n%s", u)
 	}
 	// No sources: the tunnel keeps its own table (for its health check) but no device is sent there.
 	c.WireGuard[0].Sources = nil
 	out, _ = Generate(c)
-	un := out.Networkd["gatehouse-wg1.network"]
+	un := out.Networkd["nopewarden-wg1.network"]
 	if strings.Contains(un, "From=") || strings.Contains(un, "SuppressPrefixLength") {
 		t.Errorf("unused tunnel still takes devices:\n%s", un)
 	}
