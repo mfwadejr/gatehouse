@@ -1,10 +1,11 @@
 # Installing from a text screen or a serial console
 
-The boot menu has three choices:
+The boot menu has four choices:
 
 1. **Install NopeWarden**: installs on this machine, using its own screen and keyboard.
 2. **Install NopeWarden (basic graphics)**: the same, for screens that show nothing with the first one.
 3. **Install with serial console (115200 8N1)**: for machines with no screen, over a serial cable.
+4. **Install with serial console (9600 8N1)**: the same, for devices whose serial port only runs at 9600. Use this one if the other serial choice shows garbage or nothing.
 
 (The old "install from another computer" choice and its code are gone: the machine asks two questions on its own screen, and everything else is done in a browser after the restart.)
 
@@ -17,7 +18,7 @@ Use the third choice for a machine with no screen, or one you reach through a se
 | Setting | Value |
 |---|---|
 | Port | first serial port (COM1, `ttyS0`) |
-| Speed | 115200 baud |
+| Speed | 9600 baud for the boot menu (set GRUB_SERIAL_SPEED=115200 in the build for 115200); the installer choices say their own speed |
 | Data bits / parity / stop bits | 8 / none / 1 (written 8N1) |
 | Flow control | none |
 | Terminal type | VT100 or ANSI (any terminal program) |

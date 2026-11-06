@@ -6,6 +6,9 @@
 # DIR holds isolinux/ and boot/grub/ (an unpacked ISO, or just those two folders); ARTDIR holds
 # splash.png and theme/. Safe to run twice. Nothing it writes names any other product.
 set -e
+# Speed of the boot menu on the first serial port. 9600 suits devices whose serial console only runs
+# there; set GRUB_SERIAL_SPEED=115200 in the build for machines that use the faster setting.
+GSPEED=${GRUB_SERIAL_SPEED:-9600}
 D=${1:?usage: brand-boot.sh DIR ARTDIR}
 ART=${2:?usage: brand-boot.sh DIR ARTDIR}
 EXTRA="rd.udev.log_level=0 consoleblank=0"
@@ -85,6 +88,16 @@ label serial
   linux $K
   initrd $I
   append $SAFE $EXTRA nomodeset nopewarden.text console=tty0 console=ttyS0,115200n8
+
+label serial9600
+  menu label Install with serial console (9600 8N1)
+  text help
+  For devices whose serial port only runs at 9600. The installer and the start-up messages
+  appear on the first serial port at 9600 baud, 8 data bits, no parity, 1 stop bit.
+  endtext
+  linux $K
+  initrd $I
+  append $SAFE $EXTRA nomodeset nopewarden.text console=tty0 console=ttyS0,9600n8
 CFG
 	fi
 fi
@@ -116,7 +129,7 @@ fi
 set gfxmode=auto
 set gfxpayload=keep
 terminal_output gfxterm
-if serial --unit=0 --speed=115200 --word=8 --parity=no --stop=1; then
+if serial --unit=0 --speed=$GSPEED --word=8 --parity=no --stop=1; then
   terminal_input console serial
   terminal_output gfxterm serial
 fi
@@ -132,6 +145,10 @@ menuentry "Install NopeWarden (basic graphics)" {
 }
 menuentry "Install with serial console (115200 8N1)" {
   linux $SAFE $EXTRA nomodeset nopewarden.text console=tty0 console=ttyS0,115200n8
+  initrd $I
+}
+menuentry "Install with serial console (9600 8N1)" {
+  linux $SAFE $EXTRA nomodeset nopewarden.text console=tty0 console=ttyS0,9600n8
   initrd $I
 }
 CFG

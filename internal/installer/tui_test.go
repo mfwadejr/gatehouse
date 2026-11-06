@@ -101,6 +101,7 @@ func TestReadLineEditing(t *testing.T) {
 func TestSerialFromCmdline(t *testing.T) {
 	cases := map[string][2]any{
 		"boot=live quiet console=tty0 console=ttyS0,115200n8 nopewarden.text": {"ttyS0", 115200},
+		"boot=live quiet console=tty0 console=ttyS0,9600n8 nopewarden.text":   {"ttyS0", 9600},
 		"console=ttyS1,9600 nopewarden.text":                                  {"ttyS1", 9600},
 		"boot=live nopewarden.text":                                           {"ttyS0", 115200},
 	}
