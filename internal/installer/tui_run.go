@@ -14,14 +14,24 @@ import (
 
 var reConsole = regexp.MustCompile(`(?:^|\s)console=(ttyS\d+)(?:,(\d+))?`)
 
+// reSerialSpeed is the speed the boot menu was built for (nopewarden.serial=9600). It is the
+// default when no console=ttyS0,<speed> is named, so every menu choice talks at the speed the
+// menu itself uses.
+var reSerialSpeed = regexp.MustCompile(`(?:^|\s)nopewarden\.serial=(\d+)`)
+
 // SerialFromCmdline finds the serial console the boot menu asked for. With none named, the
-// first serial port at 115200 is used, as the boot menu entry says.
+// first serial port is used at the menu's speed, or 115200 when the menu named none.
 func SerialFromCmdline(cmdline string) (dev string, baud int) {
+	baud = 115200
+	if m := reSerialSpeed.FindStringSubmatch(cmdline); m != nil {
+		if n, err := strconv.Atoi(m[1]); err == nil && n > 0 {
+			baud = n
+		}
+	}
 	m := reConsole.FindStringSubmatch(cmdline)
 	if m == nil {
-		return "ttyS0", 115200
+		return "ttyS0", baud
 	}
-	baud = 115200
 	if n, err := strconv.Atoi(m[2]); err == nil && n > 0 {
 		baud = n
 	}
