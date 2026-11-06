@@ -44,7 +44,13 @@ The text installer answers on the machine's own screen and keyboard **and** on t
 
 ## Choosing the entry on a machine with no screen
 
-The boot menu is also sent to the serial port and waits for you. On a machine with no screen, press the down arrow twice (or Ctrl-N twice) and then Enter to pick the serial choice. On a BIOS machine the menu shows on the serial port only if the firmware's serial redirection is switched on.
+The boot menu is also sent to the serial port and waits for you. Over a serial cable, arrow keys can fail: an arrow is three bytes (`Esc [ B`) and a USB serial adapter sometimes delivers them apart, so GRUB reads a lone Escape and shows `[B` as typed text. Single keys do not have this problem, so each entry has one:
+
+- `i`: Install NopeWarden (screen and keyboard)
+- `b`: Install NopeWarden (basic graphics)
+- `s`: Install with serial console
+
+Press the letter; if the entry is only highlighted, press Enter. On the `-serial9600` image the serial entry is already highlighted when the menu opens, so Enter alone starts the installer. `Ctrl-N` and `Ctrl-P` (down, up) also work. On a BIOS machine the menu shows on the serial port only if the firmware's serial redirection is switched on.
 
 ## The questions
 

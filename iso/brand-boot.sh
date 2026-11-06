@@ -8,6 +8,10 @@
 set -e
 # Serial settings come from serial.conf (speed, port, data bits, parity, stop bits, terminal).
 . "$(dirname "$0")/serial.conf"
+# A non-standard serial speed marks an image for serial-only devices: the serial choice is the one
+# already highlighted, so Enter is enough and no arrow key is needed.
+GRUB_DEFAULT_ENTRY=0
+[ "$SERIAL_SPEED" = "115200" ] || GRUB_DEFAULT_ENTRY=2
 D=${1:?usage: brand-boot.sh DIR ARTDIR}
 ART=${2:?usage: brand-boot.sh DIR ARTDIR}
 EXTRA="rd.udev.log_level=0 consoleblank=0 nopewarden.serial=$SERIAL_SPEED"
@@ -104,7 +108,7 @@ if [ -d "$D"/boot/grub ]; then
 		SAFE=$(echo "$L" | sed 's/ splash//')
 		cat > "$D"/boot/grub/grub.cfg <<CFG
 $KEEP
-set default=0
+set default=$GRUB_DEFAULT_ENTRY
 set timeout=-1
 # On a serial console the menu is plain text: make the chosen entry stand out.
 set menu_color_normal=light-gray/black
@@ -124,15 +128,15 @@ if serial --unit=$SERIAL_UNIT --speed=$SERIAL_SPEED --word=$SERIAL_WORD --parity
 fi
 set theme=/boot/grub/theme/theme.txt
 
-menuentry "Install NopeWarden  (press Enter to start)" {
+menuentry --hotkey=i "Install NopeWarden  (press i)" {
   linux $L $EXTRA nopewarden.text
   initrd $I
 }
-menuentry "Install NopeWarden (basic graphics)" {
+menuentry --hotkey=b "Install NopeWarden (basic graphics, press b)" {
   linux $SAFE $EXTRA nomodeset nopewarden.text
   initrd $I
 }
-menuentry "Install with serial console ($SERIAL_SPEED 8N1, VT100)" {
+menuentry --hotkey=s "Install with serial console ($SERIAL_SPEED 8N1, VT100, press s)" {
   linux $SAFE $EXTRA nomodeset nopewarden.text console=tty0 console=ttyS$SERIAL_UNIT,${SERIAL_SPEED}n8
   initrd $I
 }
