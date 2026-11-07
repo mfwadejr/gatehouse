@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -89,6 +90,10 @@ type Installer struct {
 	EFI      func() bool
 	RebootFn func() // replaces the real restart in tests
 	Binary   string // path to the nopewarden binary, for creating the account inside the target
+	// DevWait is how long to wait for the new partitions to appear. Zero means 20 seconds; tests set it negative.
+	DevWait time.Duration
+	// VerifyFn replaces the final check of the installed files in tests.
+	VerifyFn func() error
 	mu       sync.Mutex
 	st       Status
 	logBuf   strings.Builder
@@ -313,10 +318,24 @@ func (in *Installer) plan(r Request) []step {
 	return []step{
 		{"Erasing the disk", func() error {
 			in.sh("", "swapoff", "-a")
+			// A disk that held another system keeps signatures (RAID, LVM, file systems) inside its old
+			// partitions. They are cleared one by one first, so none can come back to life when new
+			// partitions are made at the same place.
+			if out, err := in.R.Run("", "lsblk", "-ln", "-o", "PATH,TYPE", d); err == nil {
+				for _, l := range strings.Split(out, "\n") {
+					if f := strings.Fields(l); len(f) == 2 && f[1] == "part" {
+						in.sh("", "wipefs", "-a", f[0]) // best effort: the disk itself is wiped next
+					}
+				}
+			}
 			if err := in.sh("", "wipefs", "-a", d); err != nil {
 				return err
 			}
-			return in.sh("", "sgdisk", "--zap-all", d)
+			if err := in.sh("", "sgdisk", "--zap-all", d); err != nil {
+				return err
+			}
+			in.zeroEnds(d)
+			return nil
 		}},
 		{"Creating partitions", func() error {
 			if err := in.sh("", "sgdisk", "-n1:0:+1M", "-t1:ef02", "-c1:bios", "-n2:0:+512M", "-t2:ef00", "-c2:efi", "-n3:0:0", "-t3:8300", "-c3:nopewarden", d); err != nil {
@@ -324,7 +343,7 @@ func (in *Installer) plan(r Request) []step {
 			}
 			in.sh("", "partprobe", d)
 			in.sh("", "udevadm", "settle")
-			return nil
+			return in.waitForPartitions(d, esp, root)
 		}},
 		{"Formatting", func() error {
 			_ = bios
@@ -428,6 +447,12 @@ func (in *Installer) plan(r Request) []step {
 			}
 			return in.chroot("", "chown", "-R", "nopewarden:nopewarden", "/var/lib/nopewarden")
 		}},
+		{"Checking the installation", func() error {
+			if in.VerifyFn != nil {
+				return in.VerifyFn()
+			}
+			return in.verify(efi)
+		}},
 		{"Finishing", func() error {
 			in.sh("", "sync")
 			in.cleanup()
@@ -530,4 +555,87 @@ func (in *Installer) brand(t, serial string) error {
 		return err
 	}
 	return in.chroot("", "plymouth-set-default-theme", "nopewarden")
+}
+
+// zeroEnds clears the first and last mebibyte of the disk. RAID and some other signatures live at the
+// very end, where wiping the partition table does not reach. Failures are logged, not fatal.
+func (in *Installer) zeroEnds(d string) {
+	in.sh("", "dd", "if=/dev/zero", "of="+d, "bs=1M", "count=1", "conv=fsync")
+	out, err := in.R.Run("", "blockdev", "--getsize64", d)
+	if err != nil {
+		return
+	}
+	n, err := strconv.ParseInt(strings.TrimSpace(out), 10, 64)
+	if err != nil || n < 8<<20 {
+		return
+	}
+	in.sh("", "dd", "if=/dev/zero", "of="+d, "bs=1M", "count=1", "seek="+strconv.FormatInt(n>>20-1, 10), "conv=fsync")
+}
+
+// waitForPartitions waits until the new partitions exist as device files. On a slow controller, a USB
+// disk or a RAID card the kernel can take a while to show them, and formatting too early fails.
+func (in *Installer) waitForPartitions(d string, parts ...string) error {
+	wait := in.DevWait
+	if wait < 0 {
+		return nil
+	}
+	if wait == 0 {
+		wait = 20 * time.Second
+	}
+	deadline := time.Now().Add(wait)
+	for tries := 0; ; tries++ {
+		missing := ""
+		for _, p := range parts {
+			if _, err := os.Stat(p); err != nil {
+				missing = p
+				break
+			}
+		}
+		if missing == "" {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("the new partition %s did not appear on %s within %d seconds", missing, d, int(wait.Seconds()))
+		}
+		if tries%6 == 5 {
+			in.R.Run("", "partprobe", d) // ask the kernel to look again
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+}
+
+// verify checks that the installed system has what it needs to start: a kernel and its start-up image,
+// the boot loader and its menu, the program, and a file-system table. A step can finish without error
+// and still leave something out, so "done" is only said after this passes.
+func (in *Installer) verify(efi bool) error {
+	t := in.Target
+	need := map[string][]string{
+		"the kernel":             {"boot/vmlinuz-*"},
+		"the start-up image":     {"boot/initrd.img-*"},
+		"the boot menu":          {"boot/grub/grub.cfg"},
+		"the NopeWarden program": {"usr/local/bin/nopewarden"},
+		"the file-system table":  {"etc/fstab"},
+	}
+	if efi {
+		need["the UEFI boot file"] = []string{"boot/efi/EFI/BOOT/BOOTX64.EFI"}
+	} else {
+		need["the boot loader files"] = []string{"boot/grub/i386-pc/core.img"}
+	}
+	var missing []string
+	for what, pats := range need {
+		found := false
+		for _, p := range pats {
+			if m, _ := filepath.Glob(filepath.Join(t, p)); len(m) > 0 {
+				found = true
+			}
+		}
+		if !found {
+			missing = append(missing, what)
+		}
+	}
+	if len(missing) > 0 {
+		sort.Strings(missing)
+		return fmt.Errorf("the installed system is missing %s", strings.Join(missing, ", "))
+	}
+	return nil
 }

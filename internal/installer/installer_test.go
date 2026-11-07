@@ -56,7 +56,7 @@ func (f *fake) Run(stdin, name string, args ...string) (string, error) {
 
 func newTest(t *testing.T) (*Installer, *fake) {
 	f := &fake{}
-	in := &Installer{R: f, Target: t.TempDir(), Squash: "/live/fs.squashfs", EFI: func() bool { return true }, RebootFn: func() {}}
+	in := &Installer{R: f, Target: t.TempDir(), Squash: "/live/fs.squashfs", EFI: func() bool { return true }, RebootFn: func() {}, DevWait: -1, VerifyFn: func() error { return nil }}
 	os.MkdirAll(filepath.Join(in.Target, "etc"), 0o755)
 	return in, f
 }
@@ -186,5 +186,62 @@ func TestGrubDefaultsAreQuietAndBranded(t *testing.T) {
 	}
 	if strings.Contains(strings.ToLower(grubDefaults), "debian") {
 		t.Error("grub defaults name another product")
+	}
+}
+
+func TestOldSignaturesAreClearedBeforeRepartitioning(t *testing.T) {
+	in, f := newTest(t)
+	if err := in.Start(good()); err != nil {
+		t.Fatal(err)
+	}
+	if s := wait(t, in); s.State != "done" {
+		t.Fatalf("%+v\n%s", s, s.Log)
+	}
+	all := strings.Join(f.snap(), "\n")
+	for _, want := range []string{"wipefs -a /dev/nvme0n1", "sgdisk --zap-all /dev/nvme0n1", "dd if=/dev/zero of=/dev/nvme0n1 bs=1M count=1", "blockdev --getsize64 /dev/nvme0n1"} {
+		if !strings.Contains(all, want) {
+			t.Errorf("missing %q in:\n%s", want, all)
+		}
+	}
+}
+
+func TestInstallWaitsForPartitionsAndGivesUp(t *testing.T) {
+	in := &Installer{R: &fake{}, DevWait: 700 * time.Millisecond}
+	start := time.Now()
+	err := in.waitForPartitions("/dev/nowhere", "/dev/nowhere2", "/dev/nowhere3")
+	if err == nil || !strings.Contains(err.Error(), "did not appear") {
+		t.Fatalf("want a give-up error, got %v", err)
+	}
+	if time.Since(start) < 500*time.Millisecond {
+		t.Fatal("gave up without waiting")
+	}
+	f := filepath.Join(t.TempDir(), "p")
+	os.WriteFile(f, nil, 0o644)
+	if err := in.waitForPartitions("/dev/x", f); err != nil {
+		t.Fatalf("a partition that exists should pass: %v", err)
+	}
+}
+
+func TestVerifyFindsWhatIsMissing(t *testing.T) {
+	root := t.TempDir()
+	in := &Installer{R: &fake{}, Target: root}
+	err := in.verify(true)
+	if err == nil {
+		t.Fatal("an empty target passed")
+	}
+	for _, want := range []string{"the kernel", "the boot menu", "the UEFI boot file", "the NopeWarden program"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("%q not named in %v", want, err)
+		}
+	}
+	for _, f := range []string{"boot/vmlinuz-6.12.0", "boot/initrd.img-6.12.0", "boot/grub/grub.cfg", "usr/local/bin/nopewarden", "etc/fstab", "boot/efi/EFI/BOOT/BOOTX64.EFI"} {
+		os.MkdirAll(filepath.Dir(filepath.Join(root, f)), 0o755)
+		os.WriteFile(filepath.Join(root, f), []byte("x"), 0o644)
+	}
+	if err := in.verify(true); err != nil {
+		t.Fatalf("a complete target failed: %v", err)
+	}
+	if err := in.verify(false); err == nil || !strings.Contains(err.Error(), "boot loader files") {
+		t.Fatalf("BIOS install without core.img should fail: %v", err)
 	}
 }

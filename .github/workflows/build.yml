@@ -71,9 +71,7 @@ jobs:
             apt-get install -y --no-install-recommends live-build debootstrap squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin mtools dosfstools syslinux syslinux-common isolinux ca-certificates
             # Optional traffic-labelling program. A failure here only means the image has no gh-ndpi.
             (apt-get install -y --no-install-recommends gcc libc6-dev libndpi-dev libpcap-dev pkg-config >/dev/null 2>&1 && sh iso/ndpi/build.sh /src/iso/config/includes.chroot/usr/lib/nopewarden) || echo "gh-ndpi: skipped"
-            # Two images: the standard one (serial console at 115200) and one for devices that only run at 9600.
             OUT=/src/out iso/build.sh /src/bin/nopewarden "${VERSION}"
-            SERIAL_SPEED=9600 OUT=/src/out iso/build.sh /src/bin/nopewarden "${VERSION}"
           '
         env:
           VERSION: ${{ needs.binary.outputs.version }}

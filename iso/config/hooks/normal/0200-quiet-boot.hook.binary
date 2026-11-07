@@ -6,6 +6,10 @@ set -e
 if [ -f ./serial.conf ]; then . ./serial.conf; fi
 GRUB_DEFAULT_ENTRY=0
 [ "${SERIAL_SPEED:-115200}" = "115200" ] || GRUB_DEFAULT_ENTRY=2
+GRUB_TIMEOUT=2
+ISO_TIMEOUT=$((GRUB_TIMEOUT * 10))
+ISO_DEFAULT=nopewarden
+[ "$GRUB_DEFAULT_ENTRY" = "0" ] || ISO_DEFAULT=serial
 : "${SERIAL_UNIT:=0}" "${SERIAL_SPEED:=115200}" "${SERIAL_WORD:=8}" "${SERIAL_PARITY:=no}" "${SERIAL_STOP:=1}" "${SERIAL_TERM:=vt100}"
 
 EXTRA="rd.udev.log_level=0 consoleblank=0 nopewarden.serial=$SERIAL_SPEED"
@@ -39,10 +43,11 @@ if [ -f binary/isolinux/live.cfg ]; then
 		cat > binary/isolinux/isolinux.cfg <<CFG
 path
 prompt 0
+menu hidden
 noescape 1
-timeout 0
+timeout $ISO_TIMEOUT
 ui vesamenu.c32
-default nopewarden
+default $ISO_DEFAULT
 menu title
 menu background splash.png
 menu margin 0
@@ -105,7 +110,8 @@ if [ -d binary/boot/grub ]; then
 		cat > binary/boot/grub/grub.cfg <<CFG
 $KEEP
 set default=$GRUB_DEFAULT_ENTRY
-set timeout=-1
+set timeout=$GRUB_TIMEOUT
+set timeout_style=hidden
 # On a serial console the menu is plain text: make the chosen entry stand out.
 set menu_color_normal=light-gray/black
 set menu_color_highlight=black/light-gray

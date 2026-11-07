@@ -12,6 +12,12 @@ set -e
 # already highlighted, so Enter is enough and no arrow key is needed.
 GRUB_DEFAULT_ENTRY=0
 [ "$SERIAL_SPEED" = "115200" ] || GRUB_DEFAULT_ENTRY=2
+# The menu is hidden and the installer starts by itself after 2 seconds. Esc shows the menu (for the
+# basic-graphics choice if a screen stays blank). The serial image starts its serial choice.
+GRUB_TIMEOUT=2
+ISO_TIMEOUT=$((GRUB_TIMEOUT * 10))
+ISO_DEFAULT=nopewarden
+[ "$GRUB_DEFAULT_ENTRY" = "0" ] || ISO_DEFAULT=serial
 D=${1:?usage: brand-boot.sh DIR ARTDIR}
 ART=${2:?usage: brand-boot.sh DIR ARTDIR}
 EXTRA="rd.udev.log_level=0 consoleblank=0 nopewarden.serial=$SERIAL_SPEED"
@@ -43,10 +49,11 @@ if [ -f "$D"/isolinux/live.cfg ]; then
 		cat > "$D"/isolinux/isolinux.cfg <<CFG
 path
 prompt 0
+menu hidden
 noescape 1
-timeout 0
+timeout $ISO_TIMEOUT
 ui vesamenu.c32
-default nopewarden
+default $ISO_DEFAULT
 menu title
 menu background splash.png
 menu margin 0
@@ -109,7 +116,8 @@ if [ -d "$D"/boot/grub ]; then
 		cat > "$D"/boot/grub/grub.cfg <<CFG
 $KEEP
 set default=$GRUB_DEFAULT_ENTRY
-set timeout=-1
+set timeout=$GRUB_TIMEOUT
+set timeout_style=hidden
 # On a serial console the menu is plain text: make the chosen entry stand out.
 set menu_color_normal=light-gray/black
 set menu_color_highlight=black/light-gray

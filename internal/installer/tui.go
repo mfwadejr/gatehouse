@@ -564,6 +564,13 @@ func textOnce(t *Term, env *TextEnv) error {
 		if len(opts) == 0 {
 			t.p("\n  %sNo disk to install on was found.%s\n", amber, reset)
 			t.p("  The disk must be at least 4 GB, and not the USB stick you started from.\n\n")
+			if hints := env.In.DiskHints(); len(hints) > 0 {
+				t.p("  What this machine can see:\n")
+				for _, h := range hints {
+					t.p("    %s\n", h)
+				}
+				t.p("\n  If a controller says \"none loaded\", the system has no driver for it. If the BIOS has\n  the disk controller in RAID mode, set it to AHCI. Send these lines when asking for help.\n\n")
+			}
 			t.p("  Press Enter to look again. ")
 			if _, err := t.readLine(true); err != nil {
 				return err
