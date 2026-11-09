@@ -527,7 +527,7 @@ details.more > .card { margin-top: var(--space-3); }
 .logpre { max-height: 28rem; overflow: auto; background: var(--color-bg-inset); border: var(--border-width-thin) solid var(--color-border-default); border-radius: var(--radius-md, 8px); padding: var(--space-3); white-space: pre-wrap; word-break: break-word; margin: 0; }
 
 /* A card the search just took you to. */
-.srch-hit { outline: var(--border-width-thick, 2px) solid var(--color-accent-selected-border); outline-offset: var(--space-1); border-radius: var(--radius-md); animation: srchhit 2.8s ease-out; }
+.srch-hit { outline: var(--border-width-thick) solid var(--color-accent-selected-border); outline-offset: var(--space-1); border-radius: var(--radius-md); animation: srchhit 2.8s ease-out; }
 @keyframes srchhit { 0% { background: var(--color-accent-selected-bg); } 100% { background: transparent; } }
 @media (prefers-reduced-motion: reduce) { .srch-hit { animation: none; } }
 
@@ -588,3 +588,8 @@ mark { background: color-mix(in srgb, var(--color-status-warning) 35%, transpare
 }
 .trafpanel { display: grid; grid-template-columns: minmax(14rem, 18rem) 1fr; gap: var(--space-5); align-items: start; }
 @media (max-width: 760px) { .trafpanel { grid-template-columns: 1fr; } }
+
+/* A small spinner for work that takes a while (Resolve directly). */
+.spinner { width: var(--space-4); height: var(--space-4); flex: none; border-radius: var(--radius-full); border: var(--border-width-thick) solid var(--color-border-default); border-top-color: var(--color-accent-default); animation: nwspin 0.9s linear infinite; }
+@keyframes nwspin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }

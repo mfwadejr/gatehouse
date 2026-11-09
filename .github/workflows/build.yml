@@ -106,6 +106,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            # A release for this tag may already exist (a tag pushed again); replace it so the run cannot fail.
+            gh release delete "${GITHUB_REF_NAME}" --yes 2>/dev/null || true
             gh release create "${GITHUB_REF_NAME}" out/* --title "NopeWarden ${GITHUB_REF_NAME}" --generate-notes
           else
             gh release delete nightly --yes --cleanup-tag 2>/dev/null || true

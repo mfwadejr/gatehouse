@@ -109,3 +109,19 @@ func TestADNSSECFailureIsExplained(t *testing.T) {
 		t.Fatalf("no explanation without Unbound: %q", why)
 	}
 }
+
+func TestResolverViewReportsTheStepInProgress(t *testing.T) {
+	c, _, _ := siteBox(t, "192.168.1.1/24")
+	a := c.app
+	if got := a.resolverView().Step; got != "" {
+		t.Fatalf("no change under way, but step = %q", got)
+	}
+	a.setUbStep("Setting up Unbound")
+	if got := a.resolverView().Step; got != "Setting up Unbound" {
+		t.Fatalf("step = %q", got)
+	}
+	a.setUbStep("")
+	if got := a.resolverView().Step; got != "" {
+		t.Fatalf("step not cleared: %q", got)
+	}
+}

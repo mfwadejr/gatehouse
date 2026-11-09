@@ -1,6 +1,14 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.12',
+    title: 'Resolve directly tells you what it is doing',
+    items: [
+      'Choosing Resolve directly (or switching back) now shows what NopeWarden is doing while you wait: setting up Unbound, waiting for its first answer, then switching your devices over. The switch is locked until it finishes, and if it cannot be done the message says why and that your lookups are unchanged.',
+      'This update also carries the corrected map (Both) colours and the help wording fix that 0.9.4.11 was rebuilt with.',
+    ],
+  },
+  {
     version: '0.9.4.11',
     title: 'Resolve directly works on a new install, and a tidier console',
     items: [

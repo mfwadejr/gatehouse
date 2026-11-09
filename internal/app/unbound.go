@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -36,6 +37,14 @@ type unboundCtl struct {
 	oks      int
 	last     time.Time
 	lastErr  string
+	step     string // what a change in progress is doing now; empty when none
+}
+
+// setUbStep records, for the console, what a Resolve directly change is doing right now.
+func (a *App) setUbStep(s string) {
+	a.ub.mu.Lock()
+	a.ub.step = s
+	a.ub.mu.Unlock()
 }
 
 // ubExchange asks Unbound a question; tests replace it.
@@ -197,6 +206,7 @@ type resolverView struct {
 	Reason    string `json:"reason,omitempty"`
 	LastProbe int64  `json:"last_probe,omitempty"`
 	LastError string `json:"last_error,omitempty"`
+	Step      string `json:"step,omitempty"` // set while a change is in progress
 }
 
 func (a *App) resolverView() resolverView {
@@ -209,6 +219,7 @@ func (a *App) resolverView() resolverView {
 	}
 	a.ub.mu.Lock()
 	v.Fallback, v.Reason, v.LastError = a.ub.fallback, a.ub.reason, a.ub.lastErr
+	v.Step = a.ub.step
 	if !a.ub.since.IsZero() && a.ub.fallback {
 		v.Since = a.ub.since.Unix()
 	}
@@ -286,6 +297,12 @@ func (a *App) registerResolverRoutes() {
 			fail(w, errors.New("choose your encrypted forwarders, or resolve directly"))
 			return
 		}
+		defer a.setUbStep("")
+		if in.Mode == "direct" {
+			a.setUbStep("Setting up Unbound: checking its settings and DNSSEC key, then enabling and starting it")
+		} else {
+			a.setUbStep("Switching back to your encrypted forwarders")
+		}
 		prevMode, prevSec := a.resolveMode(), a.setting(dnssecSetting, "1")
 		a.Config.SetSetting(resolveModeSetting, in.Mode)
 		if in.DNSSEC != nil {
@@ -310,6 +327,7 @@ func (a *App) registerResolverRoutes() {
 			// switch only when Unbound really answers; give it a few seconds to start
 			var perr error
 			for i := 0; i < 6; i++ {
+				a.setUbStep("Waiting for Unbound to answer its first question (try " + strconv.Itoa(i+1) + " of 6)")
 				ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 				perr = a.ubProbe(ctx)
 				cancel()
@@ -326,6 +344,7 @@ func (a *App) registerResolverRoutes() {
 				return
 			}
 		}
+		a.setUbStep("Switching your devices over")
 		a.DNS.Cache().Flush()
 		a.loadUpstreams()
 		a.auditEvent(c.User.Username, "info", "Name lookups changed", map[string]string{"direct": "Now resolving directly with Unbound.", "forward": "Now using the encrypted forwarders."}[in.Mode])

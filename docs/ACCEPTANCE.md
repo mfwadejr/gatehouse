@@ -71,3 +71,4 @@ Record the machine, the version (Settings, About) and the date at the top of eac
 | 64 | Dismiss, remind later | Dismiss a suggestion (stays hidden until it changes, comes back with Show dismissed); Remind me later on an amber row hides it for a day or a week; red rows have neither; the left-menu dots stay | | |
 | 65 | Map Both | Overview map: Outgoing, Incoming and Both; Both shows green and amber lines, one list with out and in counts, a click opens Logs for the country | | |
 | 66 | Undo a deleted DNS list | Delete a DNS list, press Undo: the waiting removal disappears from Review; no second waiting change appears | | |
+| 67 | Resolve directly shows progress | DNS: choose Resolve directly; at once the card shows Working on it with the current step and a spinner, the choice is locked, then it turns green with a message | | |

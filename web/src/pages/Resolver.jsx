@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { post, put, useData } from '../api.js';
+import React, { useEffect, useState } from 'react';
+import { get, post, put, useData } from '../api.js';
 import { Button, Card, Field, Note, Pill, Segmented, ToggleRow, useAction, fmt } from '../ui.jsx';
 
 // How names are looked up: by asking encrypted forwarders (the default), or by resolving directly with
@@ -8,9 +8,19 @@ export default function ResolverCard() {
   const { data, reload } = useData('/api/dns/resolver', { every: 10000 });
   const [run, busy] = useAction();
   const [tests, setTests] = useState(null);
+  const [step, setStep] = useState('');
+  // While a change is under way the program can take up to a minute. Ask it once a second what it is
+  // doing, so the card says so instead of sitting silent.
+  useEffect(() => {
+    if (!busy) { setStep(''); return undefined; }
+    let live = true;
+    const ask = () => get('/api/dns/resolver').then((r) => { if (live && r && r.step) setStep(r.step); }).catch(() => {});
+    const t = setInterval(ask, 1000);
+    return () => { live = false; clearInterval(t); };
+  }, [busy]);
   if (!data) return null;
   const direct = data.mode === 'direct';
-  const choose = (mode) => run(() => put('/api/dns/resolver', { mode, dnssec: data.dnssec }), mode === 'direct' ? 'Now resolving directly.' : 'Now using your encrypted forwarders.').then(() => { setTests(null); reload(); });
+  const choose = (mode) => mode !== data.mode && run(() => put('/api/dns/resolver', { mode, dnssec: data.dnssec }), mode === 'direct' ? 'Now resolving directly.' : 'Now using your encrypted forwarders.').then(() => { setTests(null); reload(); });
   const sec = (v) => run(() => put('/api/dns/resolver', { mode: data.mode, dnssec: v }), v ? 'Signatures are checked.' : 'Signatures are not checked.').then(reload);
   const test = async () => { const r = await run(() => post('/api/dns/resolver/test')); if (r) setTests(r.tests); };
   return (
@@ -18,8 +28,14 @@ export default function ResolverCard() {
       <Field label="Look names up by" hint={direct
         ? 'NopeWarden asks the internet’s root servers itself (using Unbound on this machine), so no single company sees every name your devices look up. Unbound checks DNSSEC signatures so forged answers are refused.'
         : 'NopeWarden asks the encrypted forwarders listed below, one company at a time. Fast and simple.'}>
-        <Segmented value={data.mode} onChange={choose} options={[{ value: 'forward', label: 'Encrypted forwarders' }, { value: 'direct', label: 'Resolve directly' }]} />
+        <Segmented value={data.mode} onChange={choose} options={[{ value: 'forward', label: 'Encrypted forwarders', disabled: busy }, { value: 'direct', label: 'Resolve directly', disabled: busy }]} />
       </Field>
+      {busy && (
+        <div className="inline small" role="status" aria-live="polite">
+          <span className="spinner" aria-hidden="true" />
+          <span><b>Working on it.</b> {step || 'Starting…'} <span className="muted">This can take up to a minute; nothing else needs doing.</span></span>
+        </div>
+      )}
       {!data.installed && direct === false && <p className="small muted">{data.why}</p>}
       {direct && (
         <div className="stack">
