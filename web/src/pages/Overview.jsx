@@ -248,10 +248,12 @@ function SecurityTile({ sec, fw, h }) {
 
 // Colour for a country: grey for none, then blue, then green for the busiest going out; amber then
 // orange for what comes in. The square root keeps one huge country from hiding all the others.
-function mapFill(dir, t, share = 0) {
+function mapFill(dir, t, share = 0, floor = 35) {
   const base = mapBase(dir, t);
-  // Red for what was blocked: the larger the blocked share of a country, the redder it is.
-  return share > 0 ? `color-mix(in srgb, var(--color-status-blocked) ${Math.round(Math.max(35, share * 100))}%, ${base})` : base;
+  // Red for what was blocked: the larger the blocked share of a country, the redder it is. On one direction
+  // a little blocked traffic still shows (floor); in Both the share is used as it is, so a few blocked
+  // attempts do not tint a country whose outgoing traffic is almost all let through.
+  return share > 0 ? `color-mix(in srgb, var(--color-status-blocked) ${Math.round(Math.max(floor, share * 100))}%, ${base})` : base;
 }
 function mapBase(dir, t) {
   const pct = (x) => Math.round(Math.max(0, Math.min(1, x)) * 100);
@@ -319,13 +321,13 @@ function WorldCard() {
     const t = Math.sqrt(st.n / Math.max(1, top));
     // Both: one scale for the two added together; the colour follows whichever direction is busier there.
     const d = both ? (st.nOut >= st.nIn ? 'out' : 'in') : dir;
-    return { t, d, fill: mapFill(d, t, st.blocked / Math.max(1, st.n)) };
+    return { t, d, fill: mapFill(d, t, st.blocked / Math.max(1, st.n), both ? 0 : 35) };
   };
   const dirWord = { out: 'Outgoing connections', in: 'Incoming attempts', both: 'Outgoing connections and incoming attempts' }[dir];
   return (
     <div className="ov-gm">
       <Card title="Where connections go"
-        desc={dir === 'out' ? 'Where your devices are connecting' : dir === 'in' ? 'Where connection attempts from the internet come from' : 'Where your devices connect, and where attempts from the internet come from'}
+        desc={dir === 'out' ? 'Where your devices are connecting' : dir === 'in' ? 'Where connection attempts from the internet come from' : 'Where your devices connect and attempts come from'}
         actions={<div className="inline"><Segmented value={dir} onChange={setDir} options={[{ value: 'out', label: 'Outgoing' }, { value: 'in', label: 'Incoming' }, { value: 'both', label: 'Both' }]} /><Segmented value={range} onChange={setRange} options={[{ value: '5m', label: '5 min' }, { value: '15m', label: '15 min' }, { value: '1h', label: '1 h' }, { value: '24h', label: '24 h' }, { value: '7d', label: '7 d' }, { value: '30d', label: '30 d' }]} /></div>}>
         {geo && !geo.ready && (
           <Note tone={geo.error ? 'warn' : ''} title="Country data not downloaded yet">
