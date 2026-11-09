@@ -9,3 +9,4 @@ keepalived
 conntrackd
 iputils-arping
 unbound
+dns-root-data

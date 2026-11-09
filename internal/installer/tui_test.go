@@ -517,6 +517,25 @@ func TestACheckThatCouldNotRunIsSaidAndNeverBlocks(t *testing.T) {
 	}
 }
 
+// The first real test: both ports already had addresses from a server, but nothing was heard, and the
+// screen said "no DHCP server answers here". That wrong "none" defaulted DHCP on. Now it says it could not tell,
+// and DHCP defaults to off.
+func TestAnAddressWithNothingHeardIsCouldNotTellAndDHCPDefaultsOff(t *testing.T) {
+	lan := ProbeResult{Port: "enp2s0", HasAddress: netip.MustParseAddr("192.168.2.66")}
+	_, no, out := lanScreen(t, ProbeResult{Port: "enp1s0"}, lan, twoLinkedPorts, "\r\r")
+	if !no {
+		t.Fatalf("DHCP must default to off when the port already has an address:\n%s", out)
+	}
+	if !strings.Contains(out, "DHCP is off because enp2s0 already has an address") || !strings.Contains(out, "(192.168.2.66)") || strings.Contains(out, "No other DHCP server answered") {
+		t.Fatalf("it must say what is known, not claim there is none:\n%s", out)
+	}
+	// still the person's choice
+	_, no, _ = lanScreen(t, ProbeResult{Port: "enp1s0"}, lan, twoLinkedPorts, "\ry\r")
+	if no {
+		t.Fatal("answering y must turn DHCP on")
+	}
+}
+
 func TestBothPortsOnOneNetworkWarnsButContinues(t *testing.T) {
 	one := []Offer{offerFrom("192.168.1.1", "192.168.1.155/24")}
 	a, no, out := lanScreen(t, ProbeResult{Port: "enp1s0", Offers: one}, ProbeResult{Port: "enp2s0", Offers: one}, twoLinkedPorts, "\r\r")
@@ -650,5 +669,19 @@ func TestPlainHeaderLeavesOutTheBadge(t *testing.T) {
 	}
 	if !strings.Contains(got, "N O P E W A R D E N") {
 		t.Fatal("the name must stay")
+	}
+}
+
+func TestPortListNoteForAnAddressWithNothingHeard(t *testing.T) {
+	b := newProbeBook()
+	addr := netip.MustParseAddr("192.168.103.65")
+	b.kick(twoLinkedPorts, func(p Port) ProbeResult { return ProbeResult{Port: p.Name, HasAddress: addr} })
+	b.wait("enp1s0", time.Second)
+	b.wait("enp2s0", time.Second)
+	for _, forWAN := range []bool{true, false} {
+		n := portNote(b, twoLinkedPorts[1], forWAN, "enp1s0")
+		if !strings.Contains(n, "192.168.103.65") || strings.Contains(n, "no DHCP server answers here") {
+			t.Fatalf("forWAN=%v: %q", forWAN, n)
+		}
 	}
 }

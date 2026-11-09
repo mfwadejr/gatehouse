@@ -1,6 +1,19 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.11',
+    title: 'Resolve directly works on a new install, and a tidier console',
+    items: [
+      'Resolve directly now works on a fresh install. Unbound\'s DNSSEC key file was missing, so it refused to start; NopeWarden now puts it in place, and says so in plain words if it cannot.',
+      'The Overview box was reworked. The status line says how many things need your attention and links to where. The box has two lists (needs your attention, and suggestions), a hide arrow, Dismiss for suggestions and Remind me later for amber items. Your choices are saved under your account, so they follow you to every browser. The dots in the left menu always stay.',
+      'The Overview map has Both, with green lines for what your devices connect to and amber lines for attempts from the internet.',
+      'A larger badge and name on sign-in, setup and the browser installer, and a larger header in the left menu. The box at the bottom of the menu is tidier, with a Sign out button.',
+      'The text installer: grey notes use the normal text colour so they read on any terminal, and the DHCP check listens longer, asks again, and reads the address the live system already has. If a port has an address but no server answered, it says so and leaves DHCP off instead of claiming there is none.',
+      'The installer image no longer flashes an Automatic boot countdown on older (BIOS) machines.',
+      'Undo on a deleted DNS list cancels the waiting removal instead of adding a second waiting change.',
+    ],
+  },
+  {
     version: '0.9.4.10',
     title: 'An installer that checks for other DHCP servers',
     items: [

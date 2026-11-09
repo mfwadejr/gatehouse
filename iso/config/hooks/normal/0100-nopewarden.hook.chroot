@@ -45,6 +45,14 @@ server:
     val-log-level: 2
     module-config: "validator iterator"
 EOU
+# Unbound's DNSSEC key file is normally made the first time the service starts. The service stays off until
+# the console turns it on, and Unbound's own settings check fails without the file, so it is put in place now
+# from the key the dns-root-data package ships (the console does the same if it is ever missing).
+mkdir -p /var/lib/unbound
+if [ -s /usr/share/dns/root.key ] && [ ! -s /var/lib/unbound/root.key ]; then
+    cp /usr/share/dns/root.key /var/lib/unbound/root.key
+fi
+chown -R unbound:unbound /var/lib/unbound 2>/dev/null || true
 systemctl disable unbound.service 2>/dev/null || true
 systemctl mask unbound-resolvconf.service 2>/dev/null || true
 

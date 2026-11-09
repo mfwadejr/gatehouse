@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useMemo } from 'react';
-import { useData } from './api.js';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { put, useData } from './api.js';
 import { linkState } from './linkstate.js';
 
 // What needs the person, worked out once for the whole console. The Overview's status line and
@@ -25,40 +25,40 @@ export function AttentionProvider({ children }) {
   const { data: ov } = useData('/api/overview/security', { every: 30000 });
   const value = useMemo(() => {
     const a = [];
-    const add = (level, t, s, to) => a.push({ level, t, s, to });
+    const add = (level, id, t, s, to) => a.push({ level, id, t, s, to });
     const wanList = wans?.wans || [];
     const links = net?.links || {};
-    if (net && !wanList.length) add('bad', 'No internet connection is set up yet', 'Devices cannot reach the internet until you add one.', 'internet');
-    if (fw && !fw.zones?.length) add('warn', 'No networks defined in the firewall', 'Create your first network so devices are protected.', 'networks');
-    if (fw?.status?.last_error) add('bad', 'The last firewall change did not apply', `${fw.status.last_error} Open Diagnostics to see what else is wrong.`, 'firewall');
-    if (fw?.status?.dirty) add('warn', 'Firewall changes are waiting to be applied', 'Open the Review page and commit them.', 'review');
-    if (net?.status?.dirty) add('warn', 'Internet settings are waiting to be applied', 'Open the Review page and commit them.', 'review');
-    (rogue || []).forEach((r) => add('warn', `Another DHCP server is answering on ${r.name}`, `${r.found.map((f) => f.server).join(', ')} hands out addresses too. Switch it off, or devices may get the wrong settings.`, 'dhcp'));
+    if (net && !wanList.length) add('bad', 'no-wan', 'No internet connection is set up yet', 'Devices cannot reach the internet until you add one.', 'internet');
+    if (fw && !fw.zones?.length) add('warn', 'no-zones', 'No networks defined in the firewall', 'Create your first network so devices are protected.', 'networks');
+    if (fw?.status?.last_error) add('bad', 'fw-error', 'The last firewall change did not apply', `${fw.status.last_error} Open Diagnostics to see what else is wrong.`, 'firewall');
+    if (fw?.status?.dirty) add('warn', 'fw-dirty', 'Firewall changes are waiting to be applied', 'Open the Review page and commit them.', 'review');
+    if (net?.status?.dirty) add('warn', 'net-dirty', 'Internet settings are waiting to be applied', 'Open the Review page and commit them.', 'review');
+    (rogue || []).forEach((r) => add('warn', `rogue:${r.name}`, `Another DHCP server is answering on ${r.name}`, `${r.found.map((f) => f.server).join(', ')} hands out addresses too. Switch it off, or devices may get the wrong settings.`, 'dhcp'));
     wanList.filter((w) => w.enabled).forEach((w) => {
       const s = linkState(links[w.name]);
-      if (s.tone === 'bad') add('bad', `${w.name}: ${s.text}`, s.detail, 'internet');
+      if (s.tone === 'bad') add('bad', `wan:${w.name}`, `${w.name}: ${s.text}`, s.detail, 'internet');
     });
     (vpn?.vpns || []).forEach((v) => {
       if (!v.enabled) return;
-      if (v.state === 'down') add('warn', `VPN ${v.label} is down`, v.message, 'vpn');
-      else if (v.state === 'degraded') add('warn', `VPN ${v.label} is not passing traffic`, v.message, 'vpn');
+      if (v.state === 'down') add('warn', `vpn:${v.label}`, `VPN ${v.label} is down`, v.message, 'vpn');
+      else if (v.state === 'degraded') add('warn', `vpn:${v.label}`, `VPN ${v.label} is not passing traffic`, v.message, 'vpn');
     });
     (util || []).forEach((s) => {
       if (!s.size || s.active / s.size <= 0.8) return;
       const left = Math.max(0, s.size - s.active);
-      add(left === 0 ? 'bad' : 'warn', left === 0 ? `${s.name} has no addresses left` : `${s.name} is nearly out of addresses`,
+      add(left === 0 ? 'bad' : 'warn', `dhcp-full:${s.name}`, left === 0 ? `${s.name} has no addresses left` : `${s.name} is nearly out of addresses`,
         `${s.active} of ${s.size} in use, ${left} left. ${left === 0 ? 'New devices cannot join until some are freed. ' : ''}Widen the range or shorten how long addresses are kept.`, 'dhcp');
     });
-    if (dns?.upstreams?.length && !dns.upstreams.some((u) => u.state === 'healthy')) add('bad', 'No DNS server is answering', 'Devices cannot look up names until one answers. Open DNS and press Test.', 'dns');
-    if (upd?.needs_reboot) add('warn', 'A restart is needed', 'The system was updated and needs a restart to finish.', 'settings');
-    else if (upd?.available && upd.mode !== 'off' && upd.state === 'idle') add('info', 'Updates are ready to install', [upd.nopewarden_new && upd.latest ? `NopeWarden ${upd.latest.version}` : '', upd.system_count > 0 ? `${upd.system_count} system update${upd.system_count === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and '), 'settings');
+    if (dns?.upstreams?.length && !dns.upstreams.some((u) => u.state === 'healthy')) add('bad', 'dns-down', 'No DNS server is answering', 'Devices cannot look up names until one answers. Open DNS and press Test.', 'dns');
+    if (upd?.needs_reboot) add('warn', 'reboot', 'A restart is needed', 'The system was updated and needs a restart to finish.', 'settings');
+    else if (upd?.available && upd.mode !== 'off' && upd.state === 'idle') add('info', 'updates', 'Updates are ready to install', [upd.nopewarden_new && upd.latest ? `NopeWarden ${upd.latest.version}` : '', upd.system_count > 0 ? `${upd.system_count} system update${upd.system_count === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and '), 'settings');
     // The security check and threat alerts both live on Protection.
     const bad = (sec?.items || []).filter((i) => i.level === 'bad').length;
     const warn = (sec?.items || []).filter((i) => i.level === 'warn').length;
-    if (bad) add('bad', `Security check: ${bad} to fix now${warn ? `, ${warn} worth fixing` : ''}`, 'Open Protection to see what and how to fix it.', 'protection');
-    else if (warn) add('warn', `Security check: ${warn} worth fixing`, 'Open Protection to see what and how to fix it.', 'protection');
-    if (ov?.threat_alerts_24h > 0) add('warn', `Threat watching raised ${ov.threat_alerts_24h} alert${ov.threat_alerts_24h === 1 ? '' : 's'} in the last day`, `${ov.threat_devices_24h || 1} device${ov.threat_devices_24h === 1 ? '' : 's'} involved. Open Protection to look.`, 'protection');
-    if (setup?.items?.length && setup.left > 0) add('info', `Finish setting up: ${setup.items.length - setup.left} of ${setup.items.length} done`, 'You can do these in any order.', 'settings');
+    if (bad) add('bad', 'security', `Security check: ${bad} to fix now${warn ? `, ${warn} worth fixing` : ''}`, 'Open Protection to see what and how to fix it.', 'protection');
+    else if (warn) add('warn', 'security', `Security check: ${warn} worth fixing`, 'Open Protection to see what and how to fix it.', 'protection');
+    if (ov?.threat_alerts_24h > 0) add('warn', 'threat', `Threat watching raised ${ov.threat_alerts_24h} alert${ov.threat_alerts_24h === 1 ? '' : 's'} in the last day`, `${ov.threat_devices_24h || 1} device${ov.threat_devices_24h === 1 ? '' : 's'} involved. Open Protection to look.`, 'protection');
+    if (setup?.items?.length && setup.left > 0) add('info', 'setup', `Finish setting up: ${setup.items.length - setup.left} of ${setup.items.length} done`, 'You can do these in any order.', 'settings');
     const byPage = {};
     a.forEach((x) => { if (!byPage[x.to] || RANK[x.level] > RANK[byPage[x.to]]) byPage[x.to] = x.level; });
     const worst = a.reduce((m, x) => (RANK[x.level] > (RANK[m] || 0) ? x.level : m), '');
@@ -70,3 +70,57 @@ export function AttentionProvider({ children }) {
 }
 
 export const levelText = { bad: 'Something is broken', warn: 'Needs you', info: 'A suggestion' };
+
+// The words for where an item's "Open" goes (the left menu's names).
+export const pageLabel = { internet: 'Internet', networks: 'Networks', firewall: 'Firewall', review: 'Review', dhcp: 'DHCP', vpn: 'VPN', dns: 'DNS', settings: 'Settings', protection: 'Protection' };
+
+// Short fingerprint of what an item says, so a dismissed suggestion comes back when its wording changes.
+const sigOf = (it) => { let h = 5381; const t = `${it.t}|${it.s}`; for (let i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0; return h.toString(36); };
+
+export const SNOOZES = { day: 24 * 3600 * 1000, week: 7 * 24 * 3600 * 1000 };
+
+// What the person has chosen to do with the Overview box, kept on the machine under their account
+// (/api/prefs/attention), so it follows them to every device:
+//   open  whether the box is open (default open)
+//   hide  by item: a dismissed suggestion (k "d" and the fingerprint of what it said) or a snoozed
+//         needs-you item (k "s" and the time it comes back).
+// Broken (red) items can never be dismissed or snoozed. The dots in the left menu ignore all of this.
+export function useAttentionChoices(items) {
+  const { data } = useData('/api/prefs/attention');
+  const [mine, setMine] = useState(null);
+  useEffect(() => { if (data && mine === null) setMine({ open: data.open !== false, hide: data.hide || {} }); }, [data, mine]);
+  const state = mine || { open: true, hide: {} };
+  const save = useCallback((next) => {
+    const now = Date.now();
+    const ids = new Set(items.map((x) => x.id));
+    const hide = {};
+    for (const [id, h] of Object.entries(next.hide)) if (ids.has(id) && (h.k === 'd' || h.until > now)) hide[id] = h;
+    const clean = { open: next.open, hide };
+    setMine(clean);
+    put('/api/prefs/attention', clean).catch(() => {});
+  }, [items]);
+  const now = Date.now();
+  const view = useMemo(() => {
+    const status = (it) => {
+      const h = state.hide[it.id];
+      if (it.level === 'info') return h?.k === 'd' && h.sig === sigOf(it) ? 'dismissed' : 'shown';
+      if (it.level === 'warn') return h?.k === 's' && h.until > now ? 'snoozed' : 'shown';
+      return 'shown';
+    };
+    const tagged = items.map((it) => ({ ...it, state: status(it), until: state.hide[it.id]?.until }));
+    return {
+      needs: tagged.filter((x) => x.level !== 'info' && x.state === 'shown'),
+      snoozed: tagged.filter((x) => x.state === 'snoozed'),
+      suggestions: tagged.filter((x) => x.level === 'info' && x.state === 'shown'),
+      dismissed: tagged.filter((x) => x.state === 'dismissed'),
+    };
+  }, [items, state, now]);
+  return {
+    ...view,
+    open: state.open,
+    setOpen: (open) => save({ ...state, open }),
+    dismiss: (it) => save({ ...state, hide: { ...state.hide, [it.id]: { k: 'd', sig: sigOf(it) } } }),
+    snooze: (it, ms) => save({ ...state, hide: { ...state.hide, [it.id]: { k: 's', until: Date.now() + ms } } }),
+    bringBack: (it) => { const hide = { ...state.hide }; delete hide[it.id]; save({ ...state, hide }); },
+  };
+}

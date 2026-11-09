@@ -105,12 +105,18 @@ func TestDHCPHelper(t *testing.T) {
 	os.Stdout.WriteString("ready\n")
 	buf := make([]byte, 1500)
 	c.SetDeadline(time.Now().Add(20 * time.Second))
+	// NW_IGNORE=1 makes a server that misses the first discover and answers the second, as a slow router can.
+	ignore := os.Getenv("NW_IGNORE") == "1"
 	for {
 		n, _, err := c.ReadFromUDP(buf)
 		if err != nil {
 			return
 		}
 		if n >= 240 && buf[0] == 1 {
+			if ignore {
+				ignore = false
+				continue
+			}
 			c.WriteToUDP(fakeOffer(buf[:n], server, give, 24, true), &net.UDPAddr{IP: net.IPv4bcast, Port: 68})
 		}
 	}
@@ -150,7 +156,7 @@ func TestProbeAgainstARealServer(t *testing.T) {
 		t.Fatal(err)
 	}
 	srv := exec.Command("ip", "netns", "exec", "nwprobe", exe, "-test.run=^TestDHCPHelper$", "-test.v")
-	srv.Env = append(os.Environ(), "NW_DHCP_HELPER=1", "NW_DEV=nwp1", "NW_SERVER=192.168.77.1", "NW_GIVE=192.168.77.50")
+	srv.Env = append(os.Environ(), "NW_DHCP_HELPER=1", "NW_DEV=nwp1", "NW_SERVER=192.168.77.1", "NW_GIVE=192.168.77.50", "NW_IGNORE=1")
 	out, _ := srv.StdoutPipe()
 	if err := srv.Start(); err != nil {
 		t.Fatal(err)
@@ -166,7 +172,9 @@ func TestProbeAgainstARealServer(t *testing.T) {
 	}
 	time.Sleep(300 * time.Millisecond)
 
-	res := ProbeDHCP("nwp0", 3*time.Second)
+	// The server misses the first discover (NW_IGNORE) and answers the next one, so this also proves the
+	// discover is sent again.
+	res := ProbeDHCP("nwp0", 6*time.Second)
 	if res.Err != nil {
 		t.Fatalf("probe failed: %v", res.Err)
 	}
@@ -190,5 +198,52 @@ func TestProbeAgainstARealServer(t *testing.T) {
 	// A port that does not exist cannot be listened on; that is "could not check", not a crash.
 	if bad := ProbeDHCP("nwnone0", time.Second); bad.Err == nil {
 		t.Fatal("a missing port should report that it could not be checked")
+	}
+}
+
+// The live system's own DHCP client already holds a lease on the port; its file names the server.
+func TestHeldLeaseNamesTheServer(t *testing.T) {
+	sys, leases := t.TempDir(), t.TempDir()
+	oldS, oldL := sysNetDir, leaseDir
+	sysNetDir, leaseDir = sys, leases
+	t.Cleanup(func() { sysNetDir, leaseDir = oldS, oldL })
+	os.MkdirAll(sys+"/enp2s0", 0o755)
+	os.WriteFile(sys+"/enp2s0/ifindex", []byte("3\n"), 0o644)
+	os.WriteFile(leases+"/3", []byte("# This is private data. Do not parse.\nADDRESS=192.168.2.66\nNETMASK=255.255.255.0\nROUTER=192.168.2.1\nSERVER_ADDRESS=192.168.2.1\nT1=21600\n"), 0o644)
+	o, ok := heldLease("enp2s0")
+	if !ok || o.Server != netip.MustParseAddr("192.168.2.1") || o.Given != netip.MustParsePrefix("192.168.2.66/24") || o.Router != netip.MustParseAddr("192.168.2.1") {
+		t.Fatalf("%v %+v", ok, o)
+	}
+	if o.Network() != netip.MustParsePrefix("192.168.2.0/24") {
+		t.Fatalf("network %v", o.Network())
+	}
+	// no lease file, no index, or a lease with no server: nothing heard
+	if _, ok := heldLease("enp9s0"); ok {
+		t.Fatal("a port with no index has no lease")
+	}
+	os.MkdirAll(sys+"/enp3s0", 0o755)
+	os.WriteFile(sys+"/enp3s0/ifindex", []byte("4"), 0o644)
+	if _, ok := heldLease("enp3s0"); ok {
+		t.Fatal("no lease file")
+	}
+	os.WriteFile(leases+"/4", []byte("ADDRESS=10.0.0.5\n"), 0o644)
+	if _, ok := heldLease("enp3s0"); ok {
+		t.Fatal("a lease that names no server is not a server heard")
+	}
+}
+
+func TestUnsureMeansAddressButNothingHeard(t *testing.T) {
+	a := netip.MustParseAddr("192.168.103.65")
+	if !(ProbeResult{HasAddress: a}).Unsure() {
+		t.Fatal("an address with nothing heard is unsure")
+	}
+	if (ProbeResult{}).Unsure() {
+		t.Fatal("no address and nothing heard is a clear none")
+	}
+	if (ProbeResult{HasAddress: a, Offers: []Offer{offerFrom("192.168.103.1", "192.168.103.65/24")}}).Unsure() {
+		t.Fatal("a server was heard")
+	}
+	if (ProbeResult{HasAddress: a, Err: os.ErrPermission}).Unsure() {
+		t.Fatal("a failed check is its own case")
 	}
 }

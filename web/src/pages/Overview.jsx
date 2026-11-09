@@ -8,7 +8,7 @@ import { Chart, fmtBits, fmtBytes } from '../charts.jsx';
 import { linkMeasure, linkState } from '../linkstate.js';
 import { PRESET_KEY } from './Logs.jsx';
 import { WhatsNewCard } from '../whatsnew.jsx';
-import { useAttention } from '../attention.jsx';
+import { SNOOZES, pageLabel, useAttention, useAttentionChoices } from '../attention.jsx';
 
 const regionName = (cc) => { try { return new Intl.DisplayNames(undefined, { type: 'region' }).of(cc); } catch { return cc; } };
 const SERIES = ['var(--color-chart-series-1)', 'var(--color-chart-series-2)', 'var(--color-chart-series-3)', 'var(--color-chart-series-4)'];
@@ -271,38 +271,62 @@ const mapLegend = (dir) => (dir === 'out'
 const RANGE_HOURS = { '5m': '1', '15m': '1', '1h': '1', '24h': '24', '7d': '168', '30d': '720' };
 
 function WorldCard() {
-  const [dir, setDir] = useState('out');
+  const [dir, setDir] = useState('out'); // out, in, or both
   const [range, setRange] = useState('24h');
-  const { data } = useData(`/api/overview/map?dir=${dir}&range=${range}`, { every: range === '5m' || range === '15m' ? 10000 : 60000 });
+  const every = range === '5m' || range === '15m' ? 10000 : 60000;
+  const { data: dOut } = useData(`/api/overview/map?dir=out&range=${range}`, { every, enabled: dir !== 'in' });
+  const { data: dIn } = useData(`/api/overview/map?dir=in&range=${range}`, { every, enabled: dir !== 'out' });
+  const both = dir === 'both';
   const { data: geo, reload: reloadGeo } = useData('/api/fw/geo', { every: 5000 });
   const [dl, dlBusy] = useAction();
   const [hover, setHover] = useState(null);
   const [mouse, setMouse] = useState(null); // where the pointer is inside the map, so the details sit next to it
   const { data: homePt } = useData('/api/overview/home');
-  const by = useMemo(() => Object.fromEntries((data?.countries || []).map((c) => [c.country, c])), [data]);
-  const top = data?.top || 0;
-  const word = dir === 'out' ? 'connections' : 'attempts';
+  const byOut = useMemo(() => Object.fromEntries((dOut?.countries || []).map((c) => [c.country, c])), [dOut]);
+  const byIn = useMemo(() => Object.fromEntries((dIn?.countries || []).map((c) => [c.country, c])), [dIn]);
+  // What the map and the list show for one country. Both adds the two directions together.
+  const stat = (cc) => {
+    const o = dir !== 'in' ? byOut[cc] : null, i = dir !== 'out' ? byIn[cc] : null;
+    if (!o && !i) return null;
+    return { country: cc, n: (o?.n || 0) + (i?.n || 0), nOut: o?.n || 0, nIn: i?.n || 0, blocked: (o?.blocked || 0) + (i?.blocked || 0), allowed: (o?.allowed || 0) + (i?.allowed || 0), up: o?.up || 0, down: o?.down || 0 };
+  };
+  const list = useMemo(() => {
+    const ccs = new Set([...(dir !== 'in' ? Object.keys(byOut) : []), ...(dir !== 'out' ? Object.keys(byIn) : [])]);
+    return [...ccs].map(stat).filter(Boolean).sort((x, y) => y.n - x.n);
+  }, [byOut, byIn, dir]); // eslint-disable-line react-hooks/exhaustive-deps
+  const top = list[0]?.n || 0;
+  const loaded = dir === 'out' ? !!dOut : dir === 'in' ? !!dIn : !!(dOut && dIn);
+  const word = dir === 'out' ? 'connections' : dir === 'in' ? 'attempts' : 'connections and attempts';
   const open = (cc) => {
-    try { sessionStorage.setItem(PRESET_KEY, JSON.stringify({ flt: { country: cc, direction: dir === 'out' ? 'outbound' : 'inbound' }, hours: RANGE_HOURS[range] })); } catch { /* ignore */ }
+    try { sessionStorage.setItem(PRESET_KEY, JSON.stringify({ flt: both ? { country: cc } : { country: cc, direction: dir === 'out' ? 'outbound' : 'inbound' }, hours: RANGE_HOURS[range] })); } catch { /* ignore */ }
     go('logs');
   };
-  const rows = (data?.countries || []).slice(0, 8);
-  const tip = hover && by[hover];
+  const rows = list.slice(0, 8);
+  const tip = hover && stat(hover);
   // Where "you" are: the place set in Settings, else the middle of the country the browser is set to.
   const home = useMemo(() => {
     if (homePt?.set) return [homePt.x, homePt.y];
     const region = (navigator.language || '').split('-')[1]?.toUpperCase();
     return (region && centreOf(region)) || null;
   }, [homePt]);
-  const arcs = useMemo(() => {
+  const arcsFor = (d, rowsOf) => {
     if (!home) return [];
-    return (data?.countries || []).slice(0, 6).map((c) => ({ c, to: centreOf(c.country) })).filter((x) => x.to && Math.hypot(x.to[0] - home[0], x.to[1] - home[1]) > 14).slice(0, 5);
-  }, [data, home]);
+    return (rowsOf?.countries || []).slice(0, 6).map((c) => ({ c, d, to: centreOf(c.country) })).filter((x) => x.to && Math.hypot(x.to[0] - home[0], x.to[1] - home[1]) > 14).slice(0, 5);
+  };
+  const arcs = useMemo(() => [...(dir !== 'in' ? arcsFor('out', dOut) : []), ...(dir !== 'out' ? arcsFor('in', dIn) : [])], [dOut, dIn, dir, home]); // eslint-disable-line react-hooks/exhaustive-deps
+  const topOf = (d) => (d === 'out' ? dOut : dIn)?.top || 0;
+  const fillFor = (st) => {
+    const t = Math.sqrt(st.n / Math.max(1, top));
+    // Both: one scale for the two added together; the colour follows whichever direction is busier there.
+    const d = both ? (st.nOut >= st.nIn ? 'out' : 'in') : dir;
+    return { t, d, fill: mapFill(d, t, st.blocked / Math.max(1, st.n)) };
+  };
+  const dirWord = { out: 'Outgoing connections', in: 'Incoming attempts', both: 'Outgoing connections and incoming attempts' }[dir];
   return (
     <div className="ov-gm">
       <Card title="Where connections go"
-        desc={dir === 'out' ? 'Where your devices are connecting' : 'Where connection attempts from the internet come from'}
-        actions={<div className="inline"><Segmented value={dir} onChange={setDir} options={[{ value: 'out', label: 'Outgoing' }, { value: 'in', label: 'Incoming' }]} /><Segmented value={range} onChange={setRange} options={[{ value: '5m', label: '5 min' }, { value: '15m', label: '15 min' }, { value: '1h', label: '1 h' }, { value: '24h', label: '24 h' }, { value: '7d', label: '7 d' }, { value: '30d', label: '30 d' }]} /></div>}>
+        desc={dir === 'out' ? 'Where your devices are connecting' : dir === 'in' ? 'Where connection attempts from the internet come from' : 'Where your devices connect, and where attempts from the internet come from'}
+        actions={<div className="inline"><Segmented value={dir} onChange={setDir} options={[{ value: 'out', label: 'Outgoing' }, { value: 'in', label: 'Incoming' }, { value: 'both', label: 'Both' }]} /><Segmented value={range} onChange={setRange} options={[{ value: '5m', label: '5 min' }, { value: '15m', label: '15 min' }, { value: '1h', label: '1 h' }, { value: '24h', label: '24 h' }, { value: '7d', label: '7 d' }, { value: '30d', label: '30 d' }]} /></div>}>
         {geo && !geo.ready && (
           <Note tone={geo.error ? 'warn' : ''} title="Country data not downloaded yet">
             {geo.busy ? 'Downloading the country address lists now. The map fills in once they arrive.' : geo.error ? `The last try failed: ${geo.error}` : 'NopeWarden needs the country address lists to place connections on the map.'}
@@ -310,26 +334,25 @@ function WorldCard() {
           </Note>
         )}
         <div className="ov-map" onMouseLeave={() => { setHover(null); setMouse(null); }} onMouseMove={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMouse({ x: e.clientX - r.left, y: e.clientY - r.top, w: r.width, h: r.height }); }}>
-          <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} role="img" aria-label={`${dir === 'out' ? 'Outgoing connections' : 'Incoming attempts'} by country`}>
+          <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} role="img" aria-label={`${dirWord} by country`}>
             {Object.entries(COUNTRIES).filter(([cc]) => cc !== 'AQ').map(([cc, c]) => {
-              const n = by[cc]?.n || 0;
-              const t = n ? Math.sqrt(n / Math.max(1, top)) : 0;
-              const style = n ? { fill: mapFill(dir, t, (by[cc].blocked || 0) / n) } : undefined;
-              return <path key={cc} d={c.d} className={`${n ? 'hit' : ''} ${t > 0.45 ? `hot ${dir}` : ''}`} style={style} onMouseEnter={() => setHover(cc)} onClick={n ? () => open(cc) : undefined} />;
+              const st = stat(cc);
+              const f = st && st.n ? fillFor(st) : null;
+              return <path key={cc} d={c.d} className={`${f ? 'hit' : ''} ${f && f.t > 0.45 ? `hot ${f.d}` : ''}`} style={f ? { fill: f.fill } : undefined} onMouseEnter={() => setHover(cc)} onClick={f ? () => open(cc) : undefined} />;
             })}
-            {home && arcs.map(({ c, to }, i) => {
+            {home && arcs.map(({ c, d: ad, to }, i) => {
               const mx = (home[0] + to[0]) / 2, my = Math.min(home[1], to[1]) - Math.abs(to[0] - home[0]) * 0.22 - 18;
-              const d = dir === 'out' ? `M${home[0]},${home[1]} Q${mx},${my} ${to[0]},${to[1]}` : `M${to[0]},${to[1]} Q${mx},${my} ${home[0]},${home[1]}`;
-              const w = 0.8 + 2.2 * Math.sqrt(c.n / Math.max(1, top));
+              const d = ad === 'out' ? `M${home[0]},${home[1]} Q${mx},${my} ${to[0]},${to[1]}` : `M${to[0]},${to[1]} Q${mx},${my} ${home[0]},${home[1]}`;
+              const w = 0.8 + 2.2 * Math.sqrt(c.n / Math.max(1, topOf(ad)));
               return (
-                <g key={c.country} className={`ov-arc ${dir}`} pointerEvents="none">
+                <g key={`${ad}-${c.country}`} className={`ov-arc ${ad}`} pointerEvents="none">
                   <path d={d} strokeWidth={w} />
                   <circle className="ov-travel" r={w + 1.1}><animateMotion dur={`${3 + i * 0.6}s`} repeatCount="indefinite" path={d} /></circle>
                 </g>
               );
             })}
             {home && (
-              <g className={`ov-home ${dir}`} pointerEvents="none">
+              <g className={`ov-home ${both ? 'out' : dir}`} pointerEvents="none">
                 <circle className="ov-ping" cx={home[0]} cy={home[1]} r="4" />
                 <circle className="ov-pin" cx={home[0]} cy={home[1]} r="4.5" />
               </g>
@@ -338,7 +361,8 @@ function WorldCard() {
           {tip && (
             <div className="ov-maptip small" style={mouse ? { left: mouse.x, top: mouse.y, transform: `translate(${mouse.x > mouse.w * 0.6 ? 'calc(-100% - 14px)' : '14px'}, ${mouse.y > mouse.h * 0.6 ? 'calc(-100% - 14px)' : '14px'})`, maxWidth: '16rem' } : undefined}>
               <b>{regionName(hover)}</b><br />
-              {fmt.n(tip.n)} {word}{tip.up + tip.down > 0 ? <><br />{fmtBytes(tip.up)} sent · {fmtBytes(tip.down)} received</> : null}
+              {both ? <>{fmt.n(tip.nOut)} outgoing connections<br />{fmt.n(tip.nIn)} incoming attempts</> : <>{fmt.n(tip.n)} {word}</>}
+              {tip.up + tip.down > 0 ? <><br />{fmtBytes(tip.up)} sent · {fmtBytes(tip.down)} received</> : null}
               <><br />{fmt.n(tip.blocked || 0)} blocked · {fmt.n(tip.allowed || 0)} allowed</>
               <br /><span className="muted">Click to see them</span>
             </div>
@@ -346,20 +370,24 @@ function WorldCard() {
         </div>
         {!homePt?.set && <p className="small muted" style={{ margin: 0 }}>Lines start from {home ? 'the middle of your country' : 'you'}. {home ? 'To place yourself exactly, ' : 'To show where you are, '}<button type="button" className="link" onClick={() => go('settings')}>set your location in Settings</button>.</p>}
         <div className="ov-scale small muted">
-          <span>None</span><i style={{ background: mapLegend(dir) }} /><span>{fmt.n(top)} {word}</span>
+          {both
+            ? <><span>None</span><i style={{ background: mapLegend('out') }} /><span>Outgoing</span><i style={{ background: mapLegend('in') }} /><span>Incoming · deeper is busier, up to {fmt.n(top)}</span></>
+            : <><span>None</span><i style={{ background: mapLegend(dir) }} /><span>{fmt.n(top)} {word}</span></>}
           <span><i className="sw" style={{ background: 'var(--color-status-blocked)', display: 'inline-block', width: '.65rem', height: '.65rem', borderRadius: 'var(--radius-full)' }} /> Red: blocked</span>
           <span className="grow" />
           <span>The country is approximate for CDN, cloud and VPN traffic.</span>
         </div>
       </Card>
-      <Card title={dir === 'out' ? 'Top countries (outgoing)' : 'Top countries (incoming)'} desc={dir === 'out' ? 'By connections, with the data sent and received · your devices talking out' : 'Attempts from the internet'}>
-        {!rows.length ? <Empty>{data ? 'Nothing recorded in this time.' : 'Loading…'}</Empty> : (
+      <Card title={dir === 'out' ? 'Top countries (outgoing)' : dir === 'in' ? 'Top countries (incoming)' : 'Top countries (outgoing and incoming)'} desc={dir === 'out' ? 'By connections, with the data sent and received · your devices talking out' : dir === 'in' ? 'Attempts from the internet' : 'Each country once, outgoing and incoming added together'}>
+        {!rows.length ? <Empty>{loaded ? 'Nothing recorded in this time.' : 'Loading…'}</Empty> : (
           <div className="stack gap2">
             {rows.map((c) => (
               <button type="button" className="ov-cr" key={c.country} onClick={() => open(c.country)}>
                 <span className="muted small">{c.country}</span>
                 <span><span className="name">{regionName(c.country)}</span><Bar pct={(100 * c.n) / (rows[0].n || 1)} thin /></span>
-                <span className="num">{fmt.n(c.n)}{c.up + c.down > 0 && <span className="small muted"> · {fmtBytes(c.up + c.down)}</span>}</span>
+                {both
+                  ? <span className="num">{fmt.n(c.nOut)} out<span className="small muted"> · {fmt.n(c.nIn)} in</span></span>
+                  : <span className="num">{fmt.n(c.n)}{c.up + c.down > 0 && <span className="small muted"> · {fmtBytes(c.up + c.down)}</span>}</span>}
               </button>
             ))}
           </div>
@@ -531,6 +559,65 @@ function MachineCard({ sys, upd }) {
 
 // ---------------------------------------------------------------- the page
 
+
+// The "needs you" status line and the box under it. The line is always true and is the way back to every
+// item: one item links straight to its page, several show the first and "and N more", which opens the box.
+// The box has two lists (what needs you, and suggestions), can be collapsed, and the person's choices
+// (collapsed, dismissed suggestions, "remind me later") are kept under their account. Broken things can
+// never be dismissed or snoozed, and the dots in the left menu never hide.
+function AttentionArea({ items, stamp }) {
+  const c = useAttentionChoices(items);
+  const [showDismissed, setShowDismissed] = useState(false);
+  const [asking, setAsking] = useState(null);
+  const { needs, snoozed, suggestions, dismissed } = c;
+  const rows = needs.length + snoozed.length + suggestions.length + dismissed.length;
+  const tone = !needs.length ? 'good' : needs.some((x) => x.level === 'bad') ? 'bad' : 'warn';
+  const first = needs[0];
+  const n = (k, one, many) => `${k} ${k === 1 ? one : many}`;
+  const text = needs.length ? `${needs.length === 1 ? '1 thing needs' : `${needs.length} things need`} your attention` : snoozed.length ? 'Nothing needs you right now' : 'Everything is working';
+  const row = (a, actions) => (
+    <div className="spread" key={a.id} style={{ alignItems: 'flex-start' }}>
+      <div className="inline" style={{ alignItems: 'flex-start', flexWrap: 'nowrap' }}><i className={`navdot ${a.level}`} style={{ marginLeft: 0, marginTop: '.4rem', animation: 'none' }} /><div><div className="name">{a.t}</div><div className="small muted">{a.s}</div></div></div>
+      <div className="inline" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>{actions}</div>
+    </div>
+  );
+  const open = (a) => <button key="o" className="btn small" onClick={() => go(a.to)}>Open</button>;
+  const when = (t) => new Date(t).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+  return (
+    <>
+      <div className="ov-statusline">
+        <span className={`ov-state ${tone}`}><i className="dot" />{text}</span>
+        {needs.length === 1 && <button type="button" className="link" onClick={() => go(first.to)}>Open {pageLabel[first.to] || 'it'} →</button>}
+        {needs.length > 1 && <button type="button" className="link" onClick={() => go(first.to)}>{first.t} →</button>}
+        {needs.length > 1 && !c.open && <button type="button" className="link" onClick={() => c.setOpen(true)}>and {needs.length - 1} more</button>}
+        {!needs.length && !c.open && suggestions.length > 0 && <button type="button" className="link" onClick={() => c.setOpen(true)}>{n(suggestions.length, 'suggestion', 'suggestions')}</button>}
+        {!c.open && snoozed.length > 0 && <button type="button" className="link muted" onClick={() => c.setOpen(true)}>{snoozed.length} snoozed</button>}
+        <UpdatedAgo stamp={stamp} />
+        {rows > 0 && <button type="button" className="chevbtn" onClick={() => c.setOpen(!c.open)} aria-expanded={c.open} aria-label={c.open ? 'Hide the list' : 'Show the list'} title={c.open ? 'Hide the list' : 'Show the list'} style={{ transform: c.open ? 'none' : 'rotate(-90deg)' }}><Icon d="M6 9l6 6 6-6" size={16} /></button>}
+      </div>
+      {rows > 0 && c.open && (
+        <Card className={`ov-attn ${needs.length ? '' : 'calm'}`}>
+          <div className="stack gap2">
+            {needs.length > 0 && <div className="attnlabel">Needs your attention</div>}
+            {needs.map((a) => row(a, <>
+              {open(a)}
+              {a.level === 'warn' && (asking === a.id
+                ? <><button className="btn small" onClick={() => { c.snooze(a, SNOOZES.day); setAsking(null); }}>In a day</button><button className="btn small" onClick={() => { c.snooze(a, SNOOZES.week); setAsking(null); }}>In a week</button></>
+                : <button className="btn small" onClick={() => setAsking(a.id)}>Remind me later</button>)}
+            </>))}
+            {snoozed.length > 0 && <div className="attnlabel">Reminding you later</div>}
+            {snoozed.map((a) => row(a, <><span className="small muted">Back {when(a.until)}</span><button className="btn small" onClick={() => c.bringBack(a)}>Remind me now</button></>))}
+            {suggestions.length > 0 && <div className="attnlabel">Suggestions</div>}
+            {suggestions.map((a) => row(a, <>{open(a)}<button className="btn small" onClick={() => c.dismiss(a)}>Dismiss</button></>))}
+            {dismissed.length > 0 && <button type="button" className="link small leftalign" onClick={() => setShowDismissed(!showDismissed)}>{showDismissed ? 'Hide' : 'Show'} {n(dismissed.length, 'dismissed suggestion', 'dismissed suggestions')}</button>}
+            {showDismissed && dismissed.map((a) => row(a, <button className="btn small" onClick={() => c.bringBack(a)}>Bring back</button>))}
+          </div>
+        </Card>
+      )}
+    </>
+  );
+}
+
 export default function Overview() {
   const { data: dns, setData: setDns, updatedAt: dnsAt } = useData('/api/dns/summary', { every: 5000 });
   useStream(['dns.stats'], (t, p) => p && setDns((d) => (d ? { ...d, stats: p } : d)));
@@ -549,31 +636,14 @@ export default function Overview() {
 
   const links = net?.links || {};
   const wanList = wans?.wans || [];
-  const { items: attention, needs, worst } = useAttention();
+  const { items: attention } = useAttention();
   const stamp = Math.max(thrAt || 0, netAt || 0, dnsAt || 0) || null;
-  const first = needs[0];
 
   return (
     <Page title="Overview"
       sub={`${devs?.online ?? 0} device${devs?.online === 1 ? '' : 's'} online`}
       actions={<LiveDot stamp={stamp} />}>
-      <div className="ov-statusline">
-        <span className={`ov-state ${needs.length ? (worst === 'bad' ? 'bad' : 'warn') : 'good'}`}><i className="dot" />{needs.length ? `${needs.length} thing${needs.length === 1 ? '' : 's'} need${needs.length === 1 ? 's' : ''} you` : 'Everything is working'}</span>
-        {first && <button type="button" className="link" onClick={() => go(first.to)}>{first.t} →</button>}
-        <UpdatedAgo stamp={stamp} />
-      </div>
-      {attention.length > 0 && (
-        <Card className={`ov-attn ${needs.length ? '' : 'calm'}`}>
-          <div className="stack gap2">
-            {attention.map((a, i) => (
-              <div className="spread" key={i} style={{ alignItems: 'flex-start' }}>
-                <div className="inline" style={{ alignItems: 'flex-start', flexWrap: 'nowrap' }}><i className={`navdot ${a.level}`} style={{ marginLeft: 0, marginTop: '.4rem', animation: 'none' }} /><div><div className="name">{a.t}</div><div className="small muted">{a.s}</div></div></div>
-                <button className="btn small" onClick={() => go(a.to)}>Open</button>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
+      <AttentionArea items={attention} stamp={stamp} />
       <WhatsNewCard current={upd?.current} />
       <Hero wanList={wanList} links={links} thr={thr} />
       <section className="ov-g4" aria-label="Status">

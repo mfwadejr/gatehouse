@@ -16,8 +16,8 @@ function Shell({ title, children, step }) {
   return (
     <main className="auth">
       <section className="card" ref={ref} style={{ width: 'min(100%, 40rem)' }}>
-        <div className="brand" style={{ padding: 0 }}><Logo size={24} /><span>NopeWarden installer</span></div>
-        {step && <div className="small muted">Step {step} of 2</div>}
+        <div className="brand" style={{ padding: 0 }}><Logo size={56} /><span>NopeWarden installer</span></div>
+        {step && <div className="small muted step">Step {step} of 2</div>}
         <h1>{title}</h1>
         {children}
       </section>

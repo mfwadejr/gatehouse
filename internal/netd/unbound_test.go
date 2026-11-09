@@ -32,6 +32,8 @@ func TestUnboundApplyChecksBeforeStarting(t *testing.T) {
 	}
 	os.MkdirAll(filepath.Join(root, "usr/sbin"), 0o755)
 	os.WriteFile(filepath.Join(root, unboundBinary), []byte("x"), 0o755)
+	os.MkdirAll(filepath.Join(root, "usr/share/dns"), 0o755)
+	os.WriteFile(filepath.Join(root, unboundAnchorShipped), []byte(". 86400 IN DS 20326 8 2 AAAA\n"), 0o644)
 	var calls []string
 	reject := false
 	old := sysRun
@@ -101,5 +103,71 @@ func TestImageUnboundSettingsMatchWhatNopeWardenWrites(t *testing.T) {
 	}
 	if !strings.Contains(s, "unbound-resolvconf") {
 		t.Error("the hook must keep unbound-resolvconf from rewriting resolv.conf")
+	}
+}
+
+// A fresh install has no trust anchor file yet (the service makes it on its first start), and Unbound's own
+// settings check fails without it. It must be made first, from the key Debian ships.
+func TestUnboundApplyMakesTheMissingTrustAnchor(t *testing.T) {
+	root := t.TempDir()
+	s := &Service{Root: root}
+	os.MkdirAll(filepath.Join(root, "usr/sbin"), 0o755)
+	os.WriteFile(filepath.Join(root, unboundBinary), []byte("x"), 0o755)
+	os.MkdirAll(filepath.Join(root, "usr/share/dns"), 0o755)
+	os.WriteFile(filepath.Join(root, unboundAnchorShipped), []byte(". 86400 IN DS 20326 8 2 AAAA\n"), 0o644)
+	old := sysRun
+	t.Cleanup(func() { sysRun = old })
+	sysRun = func(_ time.Duration, name string, args ...string) (string, error) {
+		if name == "unbound-checkconf" {
+			if _, err := os.Stat(filepath.Join(root, unboundAnchor)); err != nil {
+				return "auto-trust-anchor-file does not exist", os.ErrInvalid
+			}
+		}
+		return "active", nil
+	}
+	if err := s.UnboundApply(UnboundPlan{Enabled: true, DNSSEC: true}); err != nil {
+		t.Fatalf("a fresh install must be able to turn Resolve directly on: %v", err)
+	}
+	b, err := os.ReadFile(filepath.Join(root, unboundAnchor))
+	if err != nil || !strings.Contains(string(b), "20326") {
+		t.Fatalf("the key was not copied: %v %q", err, b)
+	}
+	// a key that is already there is left alone
+	os.WriteFile(filepath.Join(root, unboundAnchor), []byte("kept"), 0o644)
+	if err := s.UnboundApply(UnboundPlan{Enabled: true, DNSSEC: true}); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(root, unboundAnchor)); string(b) != "kept" {
+		t.Fatalf("an existing key was overwritten: %q", b)
+	}
+}
+
+// With no shipped key the package's helper is asked, and when nothing can make the file the person is told
+// in plain words (not Unbound's own error), and nothing is written or restarted.
+func TestUnboundApplyExplainsWhenTheTrustAnchorCannotBeMade(t *testing.T) {
+	root := t.TempDir()
+	s := &Service{Root: root}
+	os.MkdirAll(filepath.Join(root, "usr/sbin"), 0o755)
+	os.WriteFile(filepath.Join(root, unboundBinary), []byte("x"), 0o755)
+	var calls []string
+	old := sysRun
+	t.Cleanup(func() { sysRun = old })
+	sysRun = func(_ time.Duration, name string, args ...string) (string, error) {
+		calls = append(calls, name+" "+strings.Join(args, " "))
+		return "", os.ErrInvalid
+	}
+	err := s.UnboundApply(UnboundPlan{Enabled: true})
+	if err == nil || !strings.Contains(err.Error(), "DNSSEC key file") || strings.Contains(err.Error(), "checkconf") {
+		t.Fatalf("plain message expected: %v", err)
+	}
+	j := strings.Join(calls, "|")
+	if !strings.Contains(j, "unbound-helper root_trust_anchor_update") || !strings.Contains(j, "unbound-anchor -a") {
+		t.Fatalf("both fallbacks should be tried: %s", j)
+	}
+	if strings.Contains(j, "restart") || strings.Contains(j, "unbound-checkconf") {
+		t.Fatalf("must stop before checking or starting: %s", j)
+	}
+	if _, err := os.Stat(filepath.Join(root, unboundConf)); err == nil {
+		t.Fatal("no settings file should be left")
 	}
 }

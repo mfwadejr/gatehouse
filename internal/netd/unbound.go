@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -17,6 +19,12 @@ const (
 	unboundConf   = "etc/unbound/unbound.conf.d/nopewarden.conf"
 	unboundBinary = "usr/sbin/unbound"
 	unboundUnit   = "unbound.service"
+	// Debian's Unbound package points DNSSEC at this file. The service creates it when it first starts,
+	// but ours stays off until the console turns it on, so it is made here before Unbound's settings are
+	// checked (a check against a missing file fails).
+	unboundAnchor = "var/lib/unbound/root.key"
+	// The root trust anchor Debian ships with the dns-root-data package: the same key, no network needed.
+	unboundAnchorShipped = "usr/share/dns/root.key"
 	// UnboundPort is where Unbound listens (this machine only).
 	UnboundPort = 5335
 )
@@ -96,6 +104,40 @@ func (s *Service) UnboundStatus() UnboundInfo {
 	return info
 }
 
+// ensureUnboundAnchor makes sure Unbound's DNSSEC trust anchor file exists, so a fresh install can turn
+// "Resolve directly" on. It copies the key Debian ships (no network needed), and falls back to the package's
+// own helper and then to unbound-anchor. Unbound keeps the file up to date itself once it runs.
+func (s *Service) ensureUnboundAnchor() error {
+	dst := s.rootPath(unboundAnchor)
+	if fi, err := os.Stat(dst); err == nil && fi.Size() > 0 {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return err
+	}
+	if b, err := os.ReadFile(s.rootPath(unboundAnchorShipped)); err == nil && len(b) > 0 {
+		if err := writeFileAtomic(dst, b, 0o644); err != nil {
+			return err
+		}
+	} else {
+		// Not shipped on this machine: ask the package's own helper, then unbound-anchor itself.
+		sysRun(60*time.Second, "/usr/libexec/unbound-helper", "root_trust_anchor_update")
+		if fi, err := os.Stat(dst); err != nil || fi.Size() == 0 {
+			sysRun(60*time.Second, "unbound-anchor", "-a", dst)
+		}
+		if fi, err := os.Stat(dst); err != nil || fi.Size() == 0 {
+			return errors.New("Unbound's DNSSEC key file is missing and could not be created")
+		}
+	}
+	// Unbound runs as its own user and must be able to update the file.
+	if u, err := user.Lookup("unbound"); err == nil {
+		uid, _ := strconv.Atoi(u.Uid)
+		gid, _ := strconv.Atoi(u.Gid)
+		os.Chown(dst, uid, gid)
+	}
+	return nil
+}
+
 // UnboundApply writes Unbound's settings and starts it, or stops it.
 func (s *Service) UnboundApply(p UnboundPlan) error {
 	conf := s.rootPath(unboundConf)
@@ -109,6 +151,9 @@ func (s *Service) UnboundApply(p UnboundPlan) error {
 	}
 	if err := os.MkdirAll(filepath.Dir(conf), 0o755); err != nil {
 		return err
+	}
+	if err := s.ensureUnboundAnchor(); err != nil {
+		return fmt.Errorf("%v. Your name lookups are unchanged", err)
 	}
 	old, hadOld := os.ReadFile(conf)
 	if err := writeFileAtomic(conf, []byte(UnboundConfig(p)), 0o644); err != nil {

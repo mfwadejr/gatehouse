@@ -8,7 +8,7 @@ function Frame({ title, children }) {
   return (
     <main className="auth">
       <section className="card">
-        <div className="brand" style={{ padding: 0 }}><Logo size={24} /><span>NopeWarden</span></div>
+        <div className="brand" style={{ padding: 0 }}><Logo size={56} /><span>NopeWarden</span></div>
         <h1>{title}</h1>
         {children}
       </section>

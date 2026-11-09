@@ -493,6 +493,14 @@ func (t *Term) askMgmtAddr(env *TextEnv, mgmt, wan Port) (addr string, noDHCP bo
 		}
 		t.p("  Two servers on one network give computers conflicting\n  addresses. You can turn it on, and change it later in setup.\n\n")
 		handOut, err = t.yesno("Hand out addresses on "+mgmt.Name+" anyway?", false)
+	case lan.Unsure():
+		// The port already has an address, so something on this cable handed it out, but nothing answered
+		// the check. A wrong "none" is the harmful mistake, so say what is known and default to off.
+		for _, l := range wrap(fmt.Sprintf("DHCP is off because %s already has an address (%s) from a DHCP server that did not answer the check.", mgmt.Name, lan.HasAddress), textWidth) {
+			t.p("  %s%s%s\n", amber, l, reset)
+		}
+		t.p("  Two servers on one network give computers conflicting\n  addresses. You can turn it on, and change it later in setup.\n\n")
+		handOut, err = t.yesno("Hand out addresses on "+mgmt.Name+" anyway?", false)
 	case lan.Err != nil:
 		t.p("  Could not check whether another DHCP server is on %s.\n", mgmt.Name)
 		t.p("  If one is, answer n. You can change this later in setup.\n\n")

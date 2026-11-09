@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useId, useMemo, useState, useCallback, useRef } from 'react';
-import { get, refreshAll, useFailing, useData } from './api.js';
+import { get, post, refreshAll, useFailing, useData } from './api.js';
 
 export const ICONS = {
   overview: 'M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z',
@@ -30,6 +30,7 @@ export const ICONS = {
   sun: 'M12 8a4 4 0 100 8 4 4 0 000-8zM12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
   moon: 'M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z',
   menu: 'M4 6h16M4 12h16M4 18h16',
+  logout: 'M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9',
   logo: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM9 12h6',
 };
 
@@ -479,9 +480,20 @@ export function StepUp({ su, code, setCode, password, setPassword, autoFocus }) 
 export function useUndoDelete() {
   const toast = useToast();
   return useCallback(async (what, remove, restore, refresh) => {
+    // Some deletes only wait on the Review page. Undoing one of those cancels the waiting line, instead of
+    // adding a second waiting change that puts the thing back.
+    const lastLine = async () => { try { const s = await get('/api/staged'); return (s.items || []).at(-1)?.id || 0; } catch { return 0; } };
+    const before = await lastLine();
     try { await remove(); } catch (e) { toast(e.message || 'Something went wrong.', 'bad'); return false; }
+    const after = await lastLine();
+    const staged = after && after !== before ? after : 0;
     refresh && refresh();
-    toast(`${what} deleted.`, '', { undo: async () => { await restore(); refresh && refresh(); toast(`${what} is back.`); } });
+    toast(`${what} deleted.`, '', { undo: async () => {
+      if (staged && (await lastLine()) === staged) await post('/api/staged/discard', { from: staged });
+      else await restore();
+      refresh && refresh();
+      toast(`${what} is back.`);
+    } });
     return true;
   }, [toast]);
 }

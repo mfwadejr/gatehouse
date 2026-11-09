@@ -15,8 +15,8 @@ function Frame({ title, step, of = 3, children }) {
   return (
     <main className="auth">
       <section className="card" ref={ref} style={{ width: 'min(100%, 40rem)' }}>
-        <div className="brand" style={{ padding: 0 }}><Logo size={24} /><span>NopeWarden</span></div>
-        {step && <div className="small muted">Step {step} of {of}</div>}
+        <div className="brand" style={{ padding: 0 }}><Logo size={56} /><span>NopeWarden</span></div>
+        {step && <div className="small muted step">Step {step} of {of}</div>}
         <h1>{title}</h1>
         {children}
       </section>

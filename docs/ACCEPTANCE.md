@@ -60,3 +60,14 @@ Record the machine, the version (Settings, About) and the date at the top of eac
 | 53 | Installer: serial console header | Over a 115200 serial console every installer screen shows only the NopeWarden name (no block badge); on a monitor the smooth badge shows | | |
 | 54 | Installer: centred | On a monitor and on a large serial terminal window the screens are centred left to right and top to bottom, and nothing is cut off on a 24-line terminal | | |
 | 55 | One colour source | After changing a badge colour in tokens.json and running the web build, the favicon, logo file, console palette and boot pictures follow (boot pictures after `python3 brand/make_brand.py`) | | |
+| 56 | Resolve directly on a fresh install | On a freshly installed machine open DNS, choose Resolve directly: no "root.key" error; the card says Using Unbound; Test it passes | | |
+| 57 | In-app update fixes it | On a machine installed from 0.9.4.10 (before the fix), use Update now (no new ISO), then choose Resolve directly: it works with no commands typed | | |
+| 58 | Boot countdown | Legacy BIOS boot of the installer image: no "Automatic boot in N seconds" text appears; Esc still shows the menu | | |
+| 59 | Installer text readable | The grey notes (subtitle, hints, step line, DHCP notes, port notes) read clearly on a monitor and a serial terminal | | |
+| 60 | DHCP check on real hardware | Both ports plugged into a home network with a router: both notes name the router (or say the port already has an address); DHCP defaults to off for the LAN port with the reason on screen | | |
+| 61 | Logo size | Sign-in, setup and browser installer: 56 px badge centred above the name, heading centred below; the left menu header is larger; on a phone only the larger badge shows in the top bar | | |
+| 62 | Account box | Left menu bottom: avatar, name and role, theme button, Sign out button (tooltip "Sign out", one click signs out), one non-wrapping "Version … · What's new" line, in dark and light, and on a phone | | |
+| 63 | Overview box | Status line reads "1 thing needs your attention" (or "N things need"), links to the page, "and N more" opens the box; the arrow hides it and it stays hidden after reload and in another browser signed in as you | | |
+| 64 | Dismiss, remind later | Dismiss a suggestion (stays hidden until it changes, comes back with Show dismissed); Remind me later on an amber row hides it for a day or a week; red rows have neither; the left-menu dots stay | | |
+| 65 | Map Both | Overview map: Outgoing, Incoming and Both; Both shows green and amber lines, one list with out and in counts, a click opens Logs for the country | | |
+| 66 | Undo a deleted DNS list | Delete a DNS list, press Undo: the waiting removal disappears from Review; no second waiting change appears | | |

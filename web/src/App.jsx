@@ -84,7 +84,7 @@ function Shell({ me, onSignOut, reloadMe }) {
   return (
     <div className="shell">
       <aside className={`side ${open ? 'open' : ''}`}>
-        <div className="brand"><Logo size={24} /><span>NopeWarden</span></div>
+        <div className="brand"><Logo size={32} /><span>NopeWarden</span></div>
         <button type="button" className="srchbtn" onClick={() => setFinding(true)} aria-label="Search"><Icon name="search" /><span>Search</span><kbd>/</kbd></button>
         <button type="button" className="menubtn" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls="primary-nav"><Icon name={open ? 'x' : 'menu'} /><span>Menu</span></button>
         <nav className="nav" id="primary-nav" aria-label="Primary">
@@ -102,14 +102,14 @@ function Shell({ me, onSignOut, reloadMe }) {
           ))}
         </nav>
         <div className="me">
-          <button type="button" className="themebtn" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} aria-label={theme === 'light' ? 'Switch to the dark look' : 'Switch to the light look'} title={theme === 'light' ? 'Switch to the dark look' : 'Switch to the light look'}><Icon name={theme === 'light' ? 'moon' : 'sun'} /></button>
           <div className="avatar">{initials}</div>
           <div className="who">
-            <span>{me.user.username}</span>
-            <span className="small muted">{me.user.role === 'admin' ? 'Admin' : 'Viewer'}{me.user.totp_enabled ? ' · 2-step on' : ''}</span>
-            <button className="link small leftalign" onClick={onSignOut}>Sign out</button>
-            {upd?.current && <button className="link small leftalign" onClick={() => setNotes(true)}>What's new in {upd.current}</button>}
+            <span title={me.user.username}>{me.user.username}</span>
+            <span className="small muted" title={`${me.user.role === 'admin' ? 'Admin' : 'Viewer'}${me.user.totp_enabled ? ' · 2-step on' : ''}`}>{me.user.role === 'admin' ? 'Admin' : 'Viewer'}{me.user.totp_enabled ? ' · 2-step' : ''}</span>
           </div>
+          <button type="button" className="themebtn" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} aria-label={theme === 'light' ? 'Switch to the dark look' : 'Switch to the light look'} title={theme === 'light' ? 'Switch to the dark look' : 'Switch to the light look'}><Icon name={theme === 'light' ? 'moon' : 'sun'} size={16} /></button>
+          <button type="button" className="signoutbtn" onClick={onSignOut} aria-label="Sign out" title="Sign out"><Icon name="logout" size={16} /></button>
+          {upd?.current && <button type="button" className="link small verline" onClick={() => setNotes(true)}>Version {upd.current} · What's new</button>}
         </div>
       </aside>
       <main className="main" id="main">

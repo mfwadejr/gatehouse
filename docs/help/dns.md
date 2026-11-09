@@ -35,6 +35,7 @@ A shopping site does not load. Type its name under **Why is this blocked?**; it 
 ## Resolve directly (your own resolver)
 Under **Servers**, **Resolve directly** turns on NopeWarden's own Unbound resolver. Instead of asking a forwarder such as your provider or Cloudflare, it asks the internet's root servers itself, so no single company sees every name you look up. It is off until you turn it on, and it only listens inside the box (port 5335), never on your network.
 
+- It works on a fresh install: the key Unbound uses to check signatures (the DNSSEC root key) is put in place for you when you first turn it on. If it cannot be, the message says so in plain words and your name lookups stay as they were.
 - **Check DNSSEC**: names signed with DNSSEC are verified. When a check fails, the query log says why in plain words (for example, the site's signature has expired) rather than just failing.
 - Automatic fallback: if direct lookups stop working, NopeWarden switches to your encrypted forwarders by itself and raises an alert. It switches back when direct lookups work again.
 - **Your own names** keep working (split-horizon): names you define, like nas.lan, are answered locally and never sent out.

@@ -70,8 +70,8 @@ menu color unsel 0 #ffc3c2b7 #00000000 none
 menu color sel 0 #ffffffff #ff3987e5 none
 menu color hotsel 0 #ffffffff #ff3987e5 none
 menu color hotkey 0 #ffc3c2b7 #00000000 none
-menu color timeout 0 #ff898781 #00000000 none
-menu color timeout_msg 0 #ff898781 #00000000 none
+menu color timeout 0 #00000000 #00000000 none
+menu color timeout_msg 0 #00000000 #00000000 none
 menu color tabmsg 0 #ff898781 #00000000 none
 menu color cmdmark 0 #00000000 #00000000 none
 menu color cmdline 0 #00000000 #00000000 none

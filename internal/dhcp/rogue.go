@@ -58,9 +58,18 @@ func Probe(ctx context.Context, iface string, ignore []net.IP, wait time.Duratio
 	p.Set(OptClientID, append([]byte{1}, mac...))
 	p.Set(OptParamList, []byte{OptSubnetMask, OptRouter, OptDNS})
 	_ = ifi
-	if _, err := pc.WriteTo(p.Marshal(), &net.UDPAddr{IP: net.IPv4bcast, Port: 67}); err != nil {
+	discover := p.Marshal()
+	send := func() error {
+		_, err := pc.WriteTo(discover, &net.UDPAddr{IP: net.IPv4bcast, Port: 67})
+		return err
+	}
+	if err := send(); err != nil {
 		return nil, err
 	}
+	// Some servers answer slowly (a router checks that an address is free first) or miss the first
+	// broadcast, so the same discover (same transaction) is sent again every couple of seconds.
+	const resendEvery = 2 * time.Second
+	nextSend := time.Now().Add(resendEvery)
 	deadline := time.Now().Add(wait)
 	var out []RogueFinding
 	seen := map[string]bool{}
@@ -69,9 +78,22 @@ func Probe(ctx context.Context, iface string, ignore []net.IP, wait time.Duratio
 		if ctx.Err() != nil {
 			break
 		}
-		pc.SetReadDeadline(deadline)
+		until := deadline
+		if nextSend.Before(until) {
+			until = nextSend
+		}
+		pc.SetReadDeadline(until)
 		n, _, err := pc.ReadFrom(buf)
 		if err != nil {
+			if ne, ok := err.(net.Error); ok && ne.Timeout() && time.Now().Before(deadline) {
+				if time.Now().Before(nextSend) {
+					continue
+				}
+				if send() == nil {
+					nextSend = time.Now().Add(resendEvery)
+					continue
+				}
+			}
 			break
 		}
 		r, err := Parse(buf[:n])

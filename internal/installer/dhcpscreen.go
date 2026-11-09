@@ -12,8 +12,10 @@ import (
 // errNoProbe is the answer when the installer has nothing to probe with (tests, or a build without it).
 var errNoProbe = errors.New("not checked")
 
-// probeWait is how long the installer listens on each port.
-const probeWait = 3 * time.Second
+// probeWait is how long the installer listens on each port. The check runs in the background while the person
+// reads the port list, and sends its discover again every two seconds, because a router can take a few seconds
+// to answer (it checks that an address is free first).
+const probeWait = 8 * time.Second
 
 // DefaultProbe listens on a port for other DHCP servers.
 func DefaultProbe(p Port) ProbeResult { return ProbeDHCP(p.Name, probeWait) }
@@ -130,6 +132,10 @@ func portNote(b *probeBook, p Port, forWAN bool, wan string) string {
 		return dim + "      checking for a DHCP server…" + reset
 	case res.Err != nil:
 		return ""
+	case res.Unsure() && forWAN:
+		return dim + "      has an address (" + res.HasAddress.String() + ") from a server that did not answer the check" + reset
+	case res.Unsure():
+		return amber + "      has an address (" + res.HasAddress.String() + "), so a DHCP server is probably here; could not tell" + reset
 	case res.Heard() && forWAN:
 		return dim + "      a DHCP server answers here (" + addrList(res.Servers()) + ")" + reset
 	case res.Heard():

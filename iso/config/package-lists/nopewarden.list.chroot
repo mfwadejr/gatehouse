@@ -37,6 +37,7 @@ traceroute
 
 # Own resolver for "Resolve directly" (off until the console turns it on; listens only on 5335)
 unbound
+dns-root-data
 
 # High availability for a pair of units (inert until the console sets it up)
 keepalived

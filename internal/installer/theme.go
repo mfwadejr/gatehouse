@@ -26,7 +26,10 @@ const palette = gfx.PaletteEscapes
 
 const (
 	reset = "\x1b[0m"
-	dim   = "\x1b[0;90m" // muted
+	// dim is the secondary text (notes, hints, step lines). It is the normal text colour, not "bright black"
+	// (colour 90): many terminal themes draw that very dark, and a serial terminal ignores our palette, so
+	// grey notes could not be read. Headings stay brighter (bold), which keeps the order of importance.
+	dim   = "\x1b[0;37m"
 	fg    = "\x1b[0;37m" // text
 	bold  = "\x1b[0;97m" // bright text
 	blue  = "\x1b[0;34m"

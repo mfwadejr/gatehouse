@@ -2,6 +2,7 @@ package installer
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -99,5 +100,23 @@ func TestLoopingAndPort(t *testing.T) {
 	os.WriteFile(ConsolePortFile, []byte("8443\n"), 0o644)
 	if got := ReadConsolePort(""); got != "8443" {
 		t.Fatalf("saved %s", got)
+	}
+}
+
+// Grey "bright black" (colour 90) is drawn very dark by many terminal themes and ignored by serial
+// terminals' palettes, so no installer text may use it.
+func TestNoInstallerTextUsesBrightBlack(t *testing.T) {
+	files, _ := filepath.Glob("*.go")
+	for _, f := range files {
+		if strings.HasSuffix(f, "_test.go") {
+			continue
+		}
+		b, _ := os.ReadFile(f)
+		if strings.Contains(string(b), "[0;90m") || strings.Contains(string(b), "[90m") {
+			t.Errorf("%s draws text in colour 90 (too dark on many terminals)", f)
+		}
+	}
+	if dim == "\x1b[0;90m" {
+		t.Error("dim must be readable")
 	}
 }
