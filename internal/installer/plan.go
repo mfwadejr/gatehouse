@@ -23,6 +23,7 @@ const InstallNetFile = "var/lib/nopewarden/install-net"
 type InstallNet struct {
 	WanPort  string // the internet port, found again by its MAC address
 	MgmtAddr string // the management port's address with its size, like 192.168.50.1/24
+	NoDHCP   bool   // addresses are not handed out on the management network (another server does it)
 }
 
 // resolvePort finds a port by its MAC address, falling back to the name it had at install time.
@@ -53,6 +54,8 @@ func ReadInstallNet() InstallNet {
 				mac = f[2]
 			}
 			n.WanPort = resolvePort(f[1], mac)
+		case len(f) >= 2 && f[0] == "dhcp":
+			n.NoDHCP = f[1] == "off"
 		case len(f) >= 2 && f[0] == "mgmt":
 			if p, err := ParseMgmtAddr(f[1]); err == nil {
 				n.MgmtAddr = p.String()
@@ -70,6 +73,9 @@ func (r *Request) installNetBody() string {
 	}
 	if r.MgmtAddr != "" {
 		fmt.Fprintf(&b, "mgmt %s\n", r.MgmtAddr)
+	}
+	if r.NoDHCP {
+		b.WriteString("dhcp off\n")
 	}
 	return b.String()
 }

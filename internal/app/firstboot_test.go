@@ -111,3 +111,35 @@ func TestSetupPortHandsOutAddressesUntilTheWizardIsDone(t *testing.T) {
 		t.Fatalf("no offer after the wizard: %v %v", off, err)
 	}
 }
+
+// When the person chose not to hand out addresses at install time (another DHCP server already does it
+// on that network), NopeWarden serves nothing on the management port while setup is unfinished.
+func TestSetupPortStaysSilentWhenDHCPWasTurnedOffAtInstall(t *testing.T) {
+	dir := t.TempDir()
+	installer.InstallNetPath = dir + "/install-net"
+	installer.MgmtPortPath = dir + "/mgmt-port"
+	os.WriteFile(installer.InstallNetPath, []byte("wan enp1s0 aa:aa\nmgmt 192.168.50.1/24\ndhcp off\n"), 0o644)
+	os.WriteFile(installer.MgmtPortPath, []byte("enp2s0 bb:bb\n"), 0o644)
+	defer func() {
+		installer.InstallNetPath = "/var/lib/nopewarden/install-net"
+		installer.MgmtPortPath = "/var/lib/nopewarden/mgmt-port"
+	}()
+	web, dnsAddr := freeAddr(t), freeAddr(t)
+	a, err := New(Config{DataDir: t.TempDir(), WebAddr: web, DNSAddrs: []string{dnsAddr}, Net: &fakeNet{}, FW: &fakeFW{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	var n int
+	a.Config.QueryRow(`SELECT count(*) FROM dhcp_scopes WHERE name='Setup'`).Scan(&n)
+	if n != 0 {
+		t.Fatal("a setup pool was created although DHCP was turned off at install")
+	}
+	in := dhcp.Ingress{Iface: "enp2s0", ServerIP: net.ParseIP("192.168.50.1").To4()}
+	hw, _ := net.ParseMAC("de:ad:be:ef:00:01")
+	disc := &dhcp.Packet{Op: 1, HType: 1, HLen: 6, XID: 9, CHAddr: hw, CIAddr: net.IPv4zero.To4(), YIAddr: net.IPv4zero.To4(), SIAddr: net.IPv4zero.To4(), GIAddr: net.IPv4zero.To4()}
+	disc.Set(dhcp.OptMsgType, []byte{dhcp.Discover})
+	if off, _ := a.DHCP.Handle(disc, in); off != nil {
+		t.Fatal("NopeWarden answered a DHCP request although it was told another server does that")
+	}
+}

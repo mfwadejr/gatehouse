@@ -14,13 +14,14 @@ import (
 type RogueFinding struct {
 	Server net.IP `json:"server"`
 	Offer  net.IP `json:"offer"`
+	Mask   net.IP `json:"mask,omitempty"` // the network size the server offered with it, when it said
 	MAC    string `json:"mac"`
 }
 
 // Probe broadcasts a DISCOVER on iface and returns every OFFER heard within wait, whoever sent it.
 // Offers whose server identifier is one of ours (ignore) are skipped. It never completes a lease:
-// no REQUEST is sent, so no address is taken. It needs to bind port 68 on the interface; if the
-// host already runs a client there, the call fails with an error instead of guessing.
+// no REQUEST is sent, so no address is taken. It binds port 68 on the interface, sharing it with any
+// client already there; if it cannot bind, the call fails with an error instead of guessing.
 func Probe(ctx context.Context, iface string, ignore []net.IP, wait time.Duration) ([]RogueFinding, error) {
 	ifi, err := net.InterfaceByName(iface)
 	if err != nil {
@@ -29,6 +30,13 @@ func Probe(ctx context.Context, iface string, ignore []net.IP, wait time.Duratio
 	lc := net.ListenConfig{Control: func(network, address string, c syscall.RawConn) error {
 		var serr error
 		if err := c.Control(func(fd uintptr) {
+			// Share the client port with a DHCP client that may be running on this machine (the installer's
+			// own network setup, for one), so listening does not depend on it being idle.
+			for _, opt := range []int{unix.SO_REUSEADDR, unix.SO_REUSEPORT} {
+				if serr = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, opt, 1); serr != nil {
+					return
+				}
+			}
 			if serr = unix.SetsockoptString(int(fd), unix.SOL_SOCKET, unix.SO_BINDTODEVICE, iface); serr != nil {
 				return
 			}
@@ -84,7 +92,7 @@ func Probe(ctx context.Context, iface string, ignore []net.IP, wait time.Duratio
 			continue
 		}
 		seen[sid.String()] = true
-		out = append(out, RogueFinding{Server: sid, Offer: r.YIAddr})
+		out = append(out, RogueFinding{Server: sid, Offer: r.YIAddr, Mask: r.IPOption(OptSubnetMask)})
 	}
 	return out, nil
 }

@@ -53,3 +53,10 @@ Record the machine, the version (Settings, About) and the date at the top of eac
 | 46 | Edit a route | Edit a route and Save: it saves (no invalid request body) | | |
 | 47 | VPN import | Import the PIA and several other providers' .ovpn files | | |
 | 48 | Rename | Console, installer, services and folders all say NopeWarden | | |
+| 49 | Installer: internet port always chosen | Install in a VM or on a machine with two cabled ports: pressing Enter alone at "Which port is the internet (WAN)?" chooses nothing; a note under each connected port says whether a DHCP server answers there (it may first say "checking") | | |
+| 50 | Installer: another DHCP server on the LAN port | Plug the LAN port into a network that has a DHCP server (a home router): the screen says "DHCP is off because another DHCP server (address) answered"; Enter keeps it off; the setup wizard then opens with address handing-out off and a note saying so; during setup NopeWarden hands out no addresses on that port | | |
+| 51 | Installer: no other server | LAN port on its own network: "No other DHCP server answered", default yes; the setup page loads from a laptop plugged in, which gets an address from NopeWarden | | |
+| 52 | Installer: both ports on one network | VM with both adapters on the same bridge as the home network: the installer warns the two ports look like one network and the suggested LAN address avoids the internet port's network; the install can still be completed | | |
+| 53 | Installer: serial console header | Over a 115200 serial console every installer screen shows only the NopeWarden name (no block badge); on a monitor the smooth badge shows | | |
+| 54 | Installer: centred | On a monitor and on a large serial terminal window the screens are centred left to right and top to bottom, and nothing is cut off on a 24-line terminal | | |
+| 55 | One colour source | After changing a badge colour in tokens.json and running the web build, the favicon, logo file, console palette and boot pictures follow (boot pictures after `python3 brand/make_brand.py`) | | |

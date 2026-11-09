@@ -63,6 +63,10 @@ type Request struct {
 	WanPort  string `json:"wan_port,omitempty"`
 	WanMAC   string `json:"wan_mac,omitempty"`
 	MgmtAddr string `json:"mgmt_addr,omitempty"`
+	// NoDHCP is set when the person chose not to hand out addresses on the management network, because
+	// another DHCP server is already doing it there. The new system then serves none during setup, and
+	// the setup wizard starts with address handing-out turned off.
+	NoDHCP bool `json:"no_dhcp,omitempty"`
 	// Serial, like "ttyS0,115200", is set when the person ran the installer over a serial console.
 	// The new system then also shows its status screen and boot messages there.
 	Serial string `json:"serial,omitempty"`

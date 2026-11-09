@@ -71,7 +71,9 @@ func (a *App) ensureSetupScope() {
 		return
 	}
 	n, port := installer.ReadInstallNet(), installer.MgmtPort()
-	if n.MgmtAddr == "" || port == "" {
+	if n.MgmtAddr == "" || port == "" || n.NoDHCP {
+		// With NoDHCP the person said another server already hands out addresses on this network, so the
+		// setup pool must not run beside it.
 		return
 	}
 	p, err := netip.ParsePrefix(n.MgmtAddr)
@@ -214,6 +216,9 @@ func (a *App) registerSetupRoutes() {
 		// it is offered again and the network keeps working while it is applied.
 		chosen := installer.ReadInstallNet()
 		install := map[string]string{"lan_port": installer.MgmtPort(), "wan_port": chosen.WanPort, "address": chosen.MgmtAddr}
+		if chosen.NoDHCP {
+			install["no_dhcp"] = "true"
+		}
 		if chosen.MgmtAddr != "" {
 			suggested = chosen.MgmtAddr
 		}

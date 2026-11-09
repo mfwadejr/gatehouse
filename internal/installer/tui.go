@@ -31,9 +31,13 @@ type Term struct {
 
 	last  string // the last screen drawn, so an unchanged one is not sent again
 	drawn bool   // a screen is already showing, so the next one can be drawn over it
+
+	probes *probeBook // what listening for other DHCP servers found, port by port
 }
 
-func NewTerm(r io.Reader, w io.Writer) *Term { return &Term{r: bufio.NewReader(r), w: w, W: 80, H: 24} }
+func NewTerm(r io.Reader, w io.Writer) *Term {
+	return &Term{r: bufio.NewReader(r), w: w, W: 80, H: 24, probes: newProbeBook()}
+}
 
 // show draws a finished screen and leaves the cursor visible for the next prompt.
 //
@@ -215,9 +219,10 @@ type TextEnv struct {
 	Ports       func() []Port
 	Refresh     func() // bring ports up so cables are noticed
 	Poll        time.Duration
-	Settle      time.Duration // how long to wait for a port to come up before listing
-	Serial      string        // description of the serial console, shown on the first screen
-	RestartWait time.Duration // how long to wait for the restart; tests shorten it
+	Settle      time.Duration          // how long to wait for a port to come up before listing
+	Probe       func(Port) ProbeResult // listens on a port for other DHCP servers; nil means not checked
+	Serial      string                 // description of the serial console, shown on the first screen
+	RestartWait time.Duration          // how long to wait for the restart; tests shorten it
 	// SerialUsed says which serial console ("ttyS0,115200") the person typed on during this
 	// installation, or "". The installed machine then talks on that port too.
 	SerialUsed func() string
@@ -232,7 +237,7 @@ func (e *TextEnv) restartWait() time.Duration {
 }
 
 func NewTextEnv(in *Installer, serial string) *TextEnv {
-	return &TextEnv{In: in, Ports: WiredPorts, Refresh: EnsureLinksUp, Poll: 500 * time.Millisecond, Settle: time.Second, Serial: serial}
+	return &TextEnv{In: in, Ports: WiredPorts, Refresh: EnsureLinksUp, Poll: 500 * time.Millisecond, Settle: time.Second, Serial: serial, Probe: DefaultProbe}
 }
 
 // portLine describes a port for the list.
@@ -323,27 +328,27 @@ func (t *Term) pickPort(env *TextEnv, a portAsk) (Port, error) {
 		}
 		t.p("\n")
 		def = 0
-		withLink, withAddr := 0, 0
+		withLink := 0
 		var cand int
 		for i, p := range ports {
 			t.p("    %d) %s\n", i+1, portLine(p))
+			if note := portNote(t.probes, p, a.wan, a.exclude); note != "" {
+				t.p("%s\n", note)
+			}
 			if p.Link {
 				withLink++
 				if !a.wan {
 					cand = i + 1
 				}
 			}
-			if a.wan && p.Link && p.Addr != "" {
-				withAddr++
-				cand = i + 1
-			}
 		}
-		switch {
-		case a.wan && withAddr == 1:
-			def = cand
-		case !a.wan && withLink == 1:
+		// The internet port is always the person's choice: a port that has an address, or hears a DHCP
+		// server, is only a hint (a virtual machine with both ports on one network has two of them).
+		// The LAN port is suggested when only one cable is connected.
+		if !a.wan && withLink == 1 {
 			def = cand
 		}
+
 		if !a.wan && withLink == 0 {
 			t.p("\n  %sNo cable is connected yet.%s\n", amber, reset)
 		}
@@ -365,7 +370,8 @@ func (t *Term) pickPort(env *TextEnv, a portAsk) (Port, error) {
 				ports = append(ports, p)
 			}
 		}
-		if s := portsSignature(all); s != sig {
+		t.probes.kick(all, env.Probe)
+		if s := portsSignature(all) + t.probes.signature(); s != sig {
 			sig = s
 			draw()
 		}
@@ -427,10 +433,14 @@ func usedNetworks(ports []Port) []netip.Prefix {
 	return out
 }
 
-// askMgmtAddr asks for the management port's address. The suggestion avoids every network the
-// ports are on now, and a typed address that overlaps one is refused, because the machine could
-// not tell the two networks apart.
-func (t *Term) askMgmtAddr(env *TextEnv, mgmt Port) (string, error) {
+// askMgmtAddr asks for the management network: the port's address, then whether NopeWarden hands out
+// addresses on it. The suggested address avoids every network the ports are on now (and the network the
+// internet port was offered, when it has no address yet), and a typed address that overlaps one is refused,
+// because the machine could not tell the two networks apart.
+//
+// If another DHCP server answered on this port, handing out addresses is switched off by default and the
+// screen says why. It can be turned on anyway.
+func (t *Term) askMgmtAddr(env *TextEnv, mgmt, wan Port) (addr string, noDHCP bool, err error) {
 	var others []Port
 	for _, p := range env.Ports() {
 		if p.Name != mgmt.Name { // what this port is on now is replaced by the new network
@@ -438,9 +448,26 @@ func (t *Term) askMgmtAddr(env *TextEnv, mgmt Port) (string, error) {
 		}
 	}
 	used := usedNetworks(others)
+	if t.cur[0] != nil {
+		t.again(env) // a clean screen: this step has several things to say, and a 24-line terminal would scroll
+		t.p("  Internet (WAN)      %s%s%s\n  Your network (LAN)  %s%s%s\n", bold, wan.Name, reset, bold, mgmt.Name, reset)
+	}
+	lan := t.probes.wait(mgmt.Name, probeWait+3*time.Second)
+	wanRes := t.probes.wait(wan.Name, probeWait+3*time.Second)
+	for _, o := range wanRes.Offers { // the network the internet side is on, even before it has an address
+		if n := o.Network(); n.IsValid() {
+			used = append(used, n)
+		}
+	}
 	def := SuggestMgmtAddr(used)
+	if w := networkWarning(wanRes, lan, wan.Name, mgmt.Name); w != nil {
+		t.p("\n")
+		for _, l := range w {
+			t.p("  %s%s%s\n", amber, l, reset)
+		}
+	}
 	t.p("\n  This is the address of NopeWarden on your own network, and the\n")
-	t.p("  one you open in a browser. A computer plugged into %s%s%s gets\n  its address from NopeWarden.\n\n", bold, mgmt.Name, reset)
+	t.p("  one you open in a browser.\n\n")
 	v, err := t.ask("Address", def, func(s string) error {
 		p, err := ParseMgmtAddr(s)
 		if err != nil {
@@ -452,10 +479,32 @@ func (t *Term) askMgmtAddr(env *TextEnv, mgmt Port) (string, error) {
 		return nil
 	})
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	p, _ := ParseMgmtAddr(v)
-	return p.String(), nil
+
+	// Should NopeWarden hand out addresses to computers on this network?
+	t.p("\n")
+	handOut := true
+	switch {
+	case lan.Heard():
+		for _, l := range wrap(fmt.Sprintf("DHCP is off because another DHCP server (%s) answered on %s.", addrList(lan.Servers()), mgmt.Name), textWidth) {
+			t.p("  %s%s%s\n", amber, l, reset)
+		}
+		t.p("  Two servers on one network give computers conflicting\n  addresses. You can turn it on, and change it later in setup.\n\n")
+		handOut, err = t.yesno("Hand out addresses on "+mgmt.Name+" anyway?", false)
+	case lan.Err != nil:
+		t.p("  Could not check whether another DHCP server is on %s.\n", mgmt.Name)
+		t.p("  If one is, answer n. You can change this later in setup.\n\n")
+		handOut, err = t.yesno("Should NopeWarden hand out addresses (DHCP) on "+mgmt.Name+"?", true)
+	default:
+		t.p("  No other DHCP server answered on %s.\n\n", mgmt.Name)
+		handOut, err = t.yesno("Should NopeWarden hand out addresses (DHCP) on "+mgmt.Name+"?", true)
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return p.String(), !handOut, nil
 }
 
 // again redraws the current heading on a clean screen, so a long step does not scroll its
@@ -516,9 +565,11 @@ func textOnce(t *Term, env *TextEnv) error {
 		return err
 	}
 
+	t.probes = newProbeBook()
+
 	// 1. The internet port
-	wan, err := t.pickPort(env, portAsk{step: 1, title: "Which network port is the internet?",
-		intro: []string{"Choose the port your modem's cable goes into.",
+	wan, err := t.pickPort(env, portAsk{step: 1, title: "Which port is the internet (WAN)?",
+		intro: []string{"Choose the port your modem or internet router plugs into.",
 			"It can be unplugged for now. You can change it later."},
 		wan: true})
 	if err != nil {
@@ -526,15 +577,14 @@ func textOnce(t *Term, env *TextEnv) error {
 	}
 
 	// 2. The management port and its address
-	mp, err := t.pickPort(env, portAsk{step: 2, title: "Which port will you manage NopeWarden from?",
-		intro: []string{"This port is your own network. Plug it into your",
-			"computer or a switch, not into another router.",
+	mp, err := t.pickPort(env, portAsk{step: 2, title: "Which port is your own network (LAN)?",
+		intro: []string{"Plug it into your computer or a switch, not into another router.",
 			"After the restart you finish setup from a computer on it."},
 		exclude: wan.Name})
 	if err != nil {
 		return err
 	}
-	mgmtAddr, err := t.askMgmtAddr(env, mp)
+	mgmtAddr, noDHCP, err := t.askMgmtAddr(env, mp, wan)
 	if err != nil {
 		return err
 	}
@@ -588,7 +638,7 @@ func textOnce(t *Term, env *TextEnv) error {
 	}
 
 	// 4. Confirm
-	req := Request{Disk: disk.Path, MgmtPort: mp.Name, MgmtMAC: mp.MAC, WanPort: wan.Name, WanMAC: wan.MAC, MgmtAddr: mgmtAddr}
+	req := Request{Disk: disk.Path, MgmtPort: mp.Name, MgmtMAC: mp.MAC, WanPort: wan.Name, WanMAC: wan.MAC, MgmtAddr: mgmtAddr, NoDHCP: noDHCP}
 	if env.SerialUsed != nil {
 		req.Serial = env.SerialUsed()
 	}
@@ -600,6 +650,11 @@ func textOnce(t *Term, env *TextEnv) error {
 		}
 		t.p("  Internet     %s%s%s  %s(%s)%s\n", bold, wan.Name, reset, dim, wanState, reset)
 		t.p("  Your network %s%s%s  %s(NopeWarden is at %s)%s\n", bold, mp.Name, reset, dim, strings.Split(mgmtAddr, "/")[0], reset)
+		dhcpState := "NopeWarden hands out addresses"
+		if noDHCP {
+			dhcpState = "off, another server does it"
+		}
+		t.p("  Addresses    %s%s%s\n", bold, dhcpState, reset)
 		t.p("  Disk         %s%s %s%s  %s(everything on it will be erased)%s\n", bold, disk.Path, humanSize(disk.Size), reset, red, reset)
 		t.p("\n  To go ahead, type %s%s%s below.\n  %sAnything else cancels.%s\n\n", bold, disk.Path, reset, dim, reset)
 		c, err := t.ask("Disk name", "", nil)

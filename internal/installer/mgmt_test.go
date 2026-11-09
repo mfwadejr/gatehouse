@@ -131,8 +131,18 @@ func TestInstallNetRoundTrip(t *testing.T) {
 	r := &Request{WanPort: "enp1s0", WanMAC: "00:00:00:00:00:01", MgmtAddr: "192.168.50.1/24"}
 	os.WriteFile(InstallNetPath, []byte(r.installNetBody()), 0o644)
 	n := ReadInstallNet()
-	if n.WanPort != "enp1s0" || n.MgmtAddr != "192.168.50.1/24" {
+	if n.WanPort != "enp1s0" || n.MgmtAddr != "192.168.50.1/24" || n.NoDHCP {
 		t.Fatalf("read back: %+v", n)
+	}
+	r.NoDHCP = true
+	os.WriteFile(InstallNetPath, []byte(r.installNetBody()), 0o644)
+	if n := ReadInstallNet(); !n.NoDHCP || n.MgmtAddr != "192.168.50.1/24" {
+		t.Fatalf("the DHCP choice was not kept: %+v", n)
+	}
+	// An older file with no dhcp line means addresses are handed out, as before.
+	os.WriteFile(InstallNetPath, []byte("wan enp1s0 00:00:00:00:00:01\nmgmt 192.168.50.1/24\n"), 0o644)
+	if n := ReadInstallNet(); n.NoDHCP {
+		t.Fatal("a file without the line must mean DHCP on")
 	}
 }
 

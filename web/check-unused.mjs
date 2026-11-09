@@ -11,7 +11,7 @@ const css = readFileSync('src/styles.css', 'utf8');
 const tok = readFileSync('src/tokens.css', 'utf8');
 
 // Names that are assembled in code, so a text search cannot see their use.
-const KEEP_TOKENS = [/^color-chart-series-\d+$/];
+const KEEP_TOKENS = [/^color-chart-series-\d+$/, /^console-/]; // console-*: read by tokens/build-brand.mjs for the installer's palette
 const KEEP_CLASSES = new Set(['lim']); // st-${state} and the matrix cell states are built in FirewallRules.jsx
 
 const defs = [...new Set([...tok.matchAll(/--([\w-]+)\s*:/g)].map((m) => m[1]))];

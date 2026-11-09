@@ -4,14 +4,41 @@
 Run from the repository root:  python3 brand/make_brand.py
 The PNGs it writes are committed, so building the ISO does not need Pillow.
 """
-import math, os, shutil
+import json, math, os, shutil
 from PIL import Image, ImageDraw, ImageFont
 
-BG = (18, 18, 17)        # tokens neutral 925
-TEXT = (240, 239, 236)   # neutral 100
-MUTED = (195, 194, 183)  # neutral 300
-DIM = (137, 135, 129)    # neutral 500
-BLUE = (57, 135, 229)    # blue 400
+def _tokens():
+    """Colours come from tokens/tokens.json, as for the console and the website."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(here, "..", "tokens", "tokens.json")) as f:
+        raw = json.load(f)
+    flat = {}
+    def walk(node, path):
+        for k, v in node.items():
+            if k.startswith("$") or k == "themes":
+                continue
+            if isinstance(v, dict) and "$value" in v:
+                flat[".".join(path + [k])] = str(v["$value"])
+            elif isinstance(v, dict):
+                walk(v, path + [k])
+    walk(raw, [])
+    def val(key):
+        v = flat[key]
+        return val(v[1:-1]) if v.startswith("{") else v
+    def rgb(key):
+        h = val(key).lstrip("#")
+        return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+    return rgb
+
+_rgb = _tokens()
+BG = _rgb("primitive.neutral.925")
+TEXT = _rgb("primitive.neutral.100")
+MUTED = _rgb("primitive.neutral.300")
+DIM = _rgb("primitive.neutral.500")
+BLUE = _rgb("primitive.blue.400")
+BADGE_START = _rgb("brand.badge-start")
+BADGE_END = _rgb("brand.badge-end")
+BADGE_MARK = _rgb("brand.badge-mark")
 FONTS = ["/usr/share/fonts/opentype/inter/Inter-Regular.otf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"]
 FONTS_B = ["/usr/share/fonts/opentype/inter/Inter-SemiBold.otf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"]
 
@@ -58,8 +85,8 @@ def logo(size, color=None, width=None):
     pts += [(27, 6.5)]
     mask = Image.new("L", (n, n), 0)
     ImageDraw.Draw(mask).polygon([(x * k, y * k) for x, y in pts], fill=255)
-    # diagonal gradient #4d8dff -> #9a82ff, top-left to bottom-right
-    a, b = (0x4d, 0x8d, 0xff), (0x9a, 0x82, 0xff)
+    # diagonal gradient, top-left to bottom-right
+    a, b = BADGE_START, BADGE_END
     grad = Image.new("RGB", (n, n))
     px = grad.load()
     for y in range(n):
@@ -70,10 +97,10 @@ def logo(size, color=None, width=None):
     im.paste(grad, (0, 0), mask)
     d = ImageDraw.Draw(im)
     w = int(2.6 * k)
-    d.line([(11 * k, 15.5 * k), (21 * k, 15.5 * k)], fill=(255, 255, 255, 255), width=w)
+    d.line([(11 * k, 15.5 * k), (21 * k, 15.5 * k)], fill=BADGE_MARK + (255,), width=w)
     for x in (11, 21):
         r = w / 2
-        d.ellipse((x * k - r, 15.5 * k - r, x * k + r, 15.5 * k + r), fill=(255, 255, 255, 255))
+        d.ellipse((x * k - r, 15.5 * k - r, x * k + r, 15.5 * k + r), fill=BADGE_MARK + (255,))
     return im.resize((size, size), Image.LANCZOS)
 
 def centered(d, w, y, text, f, fill):

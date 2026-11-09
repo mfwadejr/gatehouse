@@ -77,6 +77,7 @@ export default function Wizard({ data, me, onDone }) {
     const has = (name) => wired.some((p) => p.name === name);
     const n = empty((has(ins.lan_port) && ins.lan_port) || data.here || (wired.find((p) => p.link) || wired[0])?.name || '');
     n.lan.address = data.suggested_lan || '192.168.1.1/24';
+    if (ins.no_dhcp === 'true') n.lan.no_dhcp = true; // the installer found another DHCP server on this network
     if (has(ins.wan_port) && ins.wan_port !== n.lan.port) n.wan = { type: 'dhcp', addr: '', gateway: '', dns: '', pppoe_user: '', pppoe_pass: '', port: ins.wan_port };
     return n;
   });
@@ -214,6 +215,7 @@ export default function Wizard({ data, me, onDone }) {
               <Input className="mono" value={lan.address} onChange={setLan('address')} placeholder="192.168.1.1/24" />
             </Field>
             <ToggleRow title="Give devices their addresses (DHCP)" desc={lan.no_dhcp ? 'Off. Devices need an address set by hand, or another server on this network must hand them out.' : 'Recommended. Devices that connect get an address, the gateway and DNS automatically.'} checked={!lan.no_dhcp} onChange={(v) => setLan('no_dhcp')(!v)} />
+            {data.install?.no_dhcp === 'true' && lan.no_dhcp && <Note title="Turned off during install">The installer found, or you told it, that another server already hands out addresses on this network, so NopeWarden is not handing out any. Turn this on if NopeWarden should be the one that does.</Note>}
           </>
         ) : (
           <>

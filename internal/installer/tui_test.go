@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,6 +35,7 @@ func TestTextInstallHappyPath(t *testing.T) {
 		"1",            // internet port: enp1s0, which has no cable yet (allowed)
 		"",             // management port: the only other one with a cable
 		"",             // management address: the suggestion
+		"",             // hand out addresses on it: the default
 		"1",            // disk: the only usable one (must be typed; Enter alone does not choose)
 		"/dev/nvme0n1", // confirm
 		"",             // reboot
@@ -42,7 +44,7 @@ func TestTextInstallHappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
-	for _, want := range []string{"115200", "Installation complete", "will be erased", "Remove the USB stick", "administrator account", "enp2s0", "cable connected", "Which network port is the internet", "not plugged in yet", "Review and confirm", "192.168.50.1"} {
+	for _, want := range []string{"115200", "Installation complete", "will be erased", "Remove the USB stick", "administrator account", "enp2s0", "cable connected", "Which port is the internet (WAN)?", "not plugged in yet", "Review and confirm", "192.168.50.1"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output lacks %q", want)
 		}
@@ -63,7 +65,7 @@ func TestTextInstallHappyPath(t *testing.T) {
 
 func TestTextWrongConfirmationStartsOverAndErasesNothing(t *testing.T) {
 	in, f := newTest(t)
-	script := strings.Join([]string{"", "1", "", "", "1", "nope"}, "\n") + "\n"
+	script := strings.Join([]string{"", "1", "", "", "", "1", "nope"}, "\n") + "\n"
 	_, err := run(t, script, testEnv(in))
 	if !errors.Is(err, errClosed) {
 		t.Fatalf("expected the script to run out after starting over, got %v", err)
@@ -195,7 +197,7 @@ func TestManagementPortIsRememberedOnTheNewSystem(t *testing.T) {
 	env.Ports = func() []Port {
 		return []Port{{Name: "enp1s0", MAC: "aa:bb:cc:00:00:01"}, {Name: "enp2s0", MAC: "aa:bb:cc:00:00:02", Link: true}}
 	}
-	script := strings.Join([]string{"", "1", "", "", "1", "/dev/nvme0n1", ""}, "\r") + "\r"
+	script := strings.Join([]string{"", "1", "", "", "", "1", "/dev/nvme0n1", ""}, "\r") + "\r"
 	if out, err := run(t, script, env); err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
@@ -209,6 +211,36 @@ func TestManagementPortIsRememberedOnTheNewSystem(t *testing.T) {
 	}
 	nb, err := os.ReadFile(filepath.Join(in.Target, InstallNetFile))
 	if err != nil || string(nb) != "wan enp1s0 aa:bb:cc:00:00:01\nmgmt 192.168.50.1/24\n" {
+		t.Fatalf("network choices file: %q %v", nb, err)
+	}
+}
+
+// The DHCP choice made at the machine reaches the new system: another server on the LAN port turns it off
+// by default, and the setup wizard is told.
+func TestDHCPChoiceIsLeftOnTheNewSystem(t *testing.T) {
+	in, _ := newTest(t)
+	env := testEnv(in)
+	env.Ports = func() []Port {
+		return []Port{{Name: "enp1s0", MAC: "aa:bb:cc:00:00:01"}, {Name: "enp2s0", MAC: "aa:bb:cc:00:00:02", Link: true}}
+	}
+	env.Probe = func(p Port) ProbeResult {
+		return ProbeResult{Port: p.Name, Offers: []Offer{offerFrom("192.168.88.1", "192.168.88.30/24")}}
+	}
+	// internet port 1, LAN port (the only one with a cable), address, DHCP default (off), disk, confirm.
+	script := strings.Join([]string{"", "1", "", "", "", "1", "/dev/nvme0n1", ""}, "\r") + "\r"
+	out, err := run(t, script, env)
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if !strings.Contains(out, "off, another server does it") {
+		t.Fatalf("the confirm screen should show that DHCP is off:\n%s", out)
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for in.Status().State != "done" && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	nb, err := os.ReadFile(filepath.Join(in.Target, InstallNetFile))
+	if err != nil || !strings.Contains(string(nb), "dhcp off\n") {
 		t.Fatalf("network choices file: %q %v", nb, err)
 	}
 }
@@ -393,14 +425,18 @@ func TestAMachineWithOnePortIsToldItNeedsTwo(t *testing.T) {
 	}
 }
 
-func TestInternetPortDefaultsToTheOneThatHasAnAddress(t *testing.T) {
+func TestInternetPortIsAlwaysChosenByThePerson(t *testing.T) {
 	env := &TextEnv{Ports: func() []Port {
 		return []Port{{Name: "enp1s0", Link: true}, {Name: "enp2s0", Link: true, Addr: "203.0.113.9/24"}}
 	}, Refresh: func() {}, Poll: 5 * time.Millisecond, Settle: time.Millisecond}
 	var out bytes.Buffer
-	p, err := NewTerm(strings.NewReader("\r"), &out).pickPort(env, portAsk{step: 1, title: "x", wan: true})
+	// Enter alone chooses nothing, even though one port has an address.
+	p, err := NewTerm(strings.NewReader("\r2\r"), &out).pickPort(env, portAsk{step: 1, title: "x", wan: true})
 	if err != nil || p.Name != "enp2s0" {
 		t.Fatalf("%+v %v\n%s", p, err, out.String())
+	}
+	if !strings.Contains(out.String(), "Pick the port the internet") {
+		t.Fatalf("Enter was taken as a choice:\n%s", out.String())
 	}
 	if !strings.Contains(out.String(), "address 203.0.113.9") || !strings.Contains(out.String(), "no address yet") {
 		t.Fatalf("addresses not shown:\n%s", out.String())
@@ -413,11 +449,206 @@ func TestManagementAddressAvoidsAndRefusesClashes(t *testing.T) {
 	}}
 	var out bytes.Buffer
 	// The suggestion skips the network the internet port is on; a typed clash is refused.
-	a, err := NewTerm(strings.NewReader("192.168.50.1\r\r"), &out).askMgmtAddr(env, Port{Name: "enp2s0"})
-	if err != nil || a != "192.168.77.1/24" {
-		t.Fatalf("%q %v\n%s", a, err, out.String())
+	a, noDHCP, err := NewTerm(strings.NewReader("192.168.50.1\r\r\r"), &out).askMgmtAddr(env, Port{Name: "enp2s0"}, Port{Name: "enp1s0"})
+	if err != nil || a != "192.168.77.1/24" || noDHCP {
+		t.Fatalf("%q %v %v\n%s", a, noDHCP, err, out.String())
 	}
 	if !strings.Contains(out.String(), "overlaps") {
 		t.Fatalf("a clash was not refused:\n%s", out.String())
+	}
+}
+
+// lanScreen runs the address and DHCP questions for a LAN port (enp2s0) and an internet port (enp1s0)
+// with the given probe results, and answers with input.
+func lanScreen(t *testing.T, wanRes, lanRes ProbeResult, ports []Port, input string) (string, bool, string) {
+	t.Helper()
+	env := &TextEnv{Ports: func() []Port { return ports }, Refresh: func() {}, Poll: time.Millisecond, Settle: time.Millisecond,
+		Probe: func(p Port) ProbeResult {
+			if p.Name == "enp1s0" {
+				return wanRes
+			}
+			return lanRes
+		}}
+	var out bytes.Buffer
+	tm := NewTerm(strings.NewReader(input), &out)
+	tm.probes.kick(ports, env.Probe)
+	a, no, err := tm.askMgmtAddr(env, ports[1], ports[0])
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out.String())
+	}
+	return a, no, out.String()
+}
+
+var twoLinkedPorts = []Port{{Name: "enp1s0", Link: true, MAC: "52:54:00:00:00:01"}, {Name: "enp2s0", Link: true, MAC: "52:54:00:00:00:02"}}
+
+func offerFrom(server, given string) Offer {
+	return Offer{Server: netip.MustParseAddr(server), Given: netip.MustParsePrefix(given)}
+}
+
+func TestAnotherServerOnTheLANPortTurnsDHCPOffAndSaysWhy(t *testing.T) {
+	lan := ProbeResult{Port: "enp2s0", Offers: []Offer{offerFrom("192.168.88.1", "192.168.88.30/24")}}
+	// Enter at the address, Enter at the question: the default is no.
+	_, no, out := lanScreen(t, ProbeResult{Port: "enp1s0"}, lan, twoLinkedPorts, "\r\r")
+	if !no {
+		t.Fatalf("DHCP should default to off when another server answers:\n%s", out)
+	}
+	if !strings.Contains(out, "DHCP is off because another DHCP server (192.168.88.1)") || !strings.Contains(out, "answered on enp2s0") {
+		t.Fatalf("the reason was not given:\n%s", out)
+	}
+	// It can be turned on anyway.
+	_, no, _ = lanScreen(t, ProbeResult{Port: "enp1s0"}, lan, twoLinkedPorts, "\ry\r")
+	if no {
+		t.Fatal("answering y must turn DHCP on")
+	}
+}
+
+func TestNoOtherServerMeansDHCPOnByDefault(t *testing.T) {
+	_, no, out := lanScreen(t, ProbeResult{Port: "enp1s0", Offers: []Offer{offerFrom("203.0.113.1", "203.0.113.9/24")}}, ProbeResult{Port: "enp2s0"}, twoLinkedPorts, "\r\r")
+	if no || !strings.Contains(out, "No other DHCP server answered on enp2s0") {
+		t.Fatalf("no=%v\n%s", no, out)
+	}
+}
+
+func TestACheckThatCouldNotRunIsSaidAndNeverBlocks(t *testing.T) {
+	bad := ProbeResult{Port: "enp2s0", Err: errors.New("operation not permitted")}
+	_, no, out := lanScreen(t, ProbeResult{Port: "enp1s0"}, bad, twoLinkedPorts, "\r\r")
+	if no || !strings.Contains(out, "Could not check whether another DHCP server is on enp2s0") {
+		t.Fatalf("no=%v\n%s", no, out)
+	}
+}
+
+func TestBothPortsOnOneNetworkWarnsButContinues(t *testing.T) {
+	one := []Offer{offerFrom("192.168.1.1", "192.168.1.155/24")}
+	a, no, out := lanScreen(t, ProbeResult{Port: "enp1s0", Offers: one}, ProbeResult{Port: "enp2s0", Offers: one}, twoLinkedPorts, "\r\r")
+	if !strings.Contains(out, "look like one network") || !strings.Contains(out, "192.168.1.1") {
+		t.Fatalf("no warning:\n%s", out)
+	}
+	if !no {
+		t.Fatal("another server answers on the LAN port, so DHCP should default to off")
+	}
+	// The suggested LAN address stays out of the network the internet port was offered.
+	if strings.HasPrefix(a, "192.168.1.") {
+		t.Fatalf("the LAN address %s is inside the internet port's network", a)
+	}
+}
+
+func TestNetworkOfferedToTheInternetPortIsAvoided(t *testing.T) {
+	// The internet port has no address yet, but the server offered 192.168.50.0/24: do not suggest it.
+	wan := ProbeResult{Port: "enp1s0", Offers: []Offer{offerFrom("192.168.50.1", "192.168.50.20/24")}}
+	a, _, _ := lanScreen(t, wan, ProbeResult{Port: "enp2s0"}, twoLinkedPorts, "\r\r")
+	if strings.HasPrefix(a, "192.168.50.") {
+		t.Fatalf("suggested %s, which is the internet port's network", a)
+	}
+}
+
+func TestPortListSaysWhatWasHeardOnEachPort(t *testing.T) {
+	b := newProbeBook()
+	one := []Offer{offerFrom("192.168.1.1", "192.168.1.155/24")}
+	b.kick(twoLinkedPorts, func(p Port) ProbeResult { return ProbeResult{Port: p.Name, Offers: one} })
+	b.wait("enp1s0", time.Second)
+	b.wait("enp2s0", time.Second)
+	if n := portNote(b, twoLinkedPorts[0], true, ""); !strings.Contains(n, "a DHCP server answers here (192.168.1.1)") {
+		t.Fatalf("internet side note: %q", n)
+	}
+	n := portNote(b, twoLinkedPorts[1], false, "enp1s0")
+	if !strings.Contains(n, "another DHCP server answers here") || !strings.Contains(n, "one network?") {
+		t.Fatalf("LAN side note: %q", n)
+	}
+	if portNote(b, Port{Name: "enp3s0"}, false, "") != "" {
+		t.Fatal("a port with no cable gets no note")
+	}
+}
+
+// plainRows returns the rows of a rendered screen with the colour codes and the tags taken out.
+func plainRows(s *Screen) []string {
+	out := s.String()
+	out = strings.TrimPrefix(out, asciiReset+"\x1b[?25l\x1b[0m\x1b[2J\x1b[H")
+	var rows []string
+	for _, r := range strings.Split(out, "\r\n") {
+		var b strings.Builder
+		for i := 0; i < len(r); i++ {
+			if r[i] == 0x1b {
+				for i < len(r) && !(r[i] >= 'A' && r[i] <= 'Z' || r[i] >= 'a' && r[i] <= 'z') {
+					i++
+				}
+				continue
+			}
+			b.WriteByte(r[i])
+		}
+		rows = append(rows, b.String())
+	}
+	return rows
+}
+
+func firstRow(rows []string, want string) int {
+	for i, r := range rows {
+		if strings.Contains(r, want) {
+			return i
+		}
+	}
+	return -1
+}
+
+func TestScreenIsCentredTopToBottom(t *testing.T) {
+	for _, h := range []int{24, 40, 60} {
+		s := NewScreen(80, h)
+		s.add("first")
+		s.add("last")
+		s.lines = append(s.lines, "\x00footerbottom")
+		rows := plainRows(s)
+		a, b := firstRow(rows, "first"), firstRow(rows, "last")
+		if b != a+1 {
+			t.Fatalf("h=%d: lines are not together: %d %d", h, a, b)
+		}
+		above, below := a, (h-2)-b-1 // rows above the content, and between it and the footer row
+		if d := above - below; d < -1 || d > 1 {
+			t.Fatalf("h=%d: not centred: %d rows above, %d below", h, above, below)
+		}
+		if firstRow(rows, "bottom") != h-2 {
+			t.Fatalf("h=%d: footer not on the last row", h)
+		}
+	}
+}
+
+func TestTallScreenDropsTheBadgeFirst(t *testing.T) {
+	s := NewScreen(80, 24)
+	s.header("Installer")
+	for i := 0; i < 14; i++ {
+		s.add(fmt.Sprintf("choice %d", i))
+	}
+	s.lines = append(s.lines, "\x00footerfoot")
+	rows := plainRows(s)
+	joined := strings.Join(rows, "\n")
+	if strings.Contains(joined, shield[0]) {
+		t.Fatal("the badge should be dropped when the screen is too short for it")
+	}
+	if firstRow(rows, "N O P E W A R D E N") < 0 || firstRow(rows, "choice 13") < 0 {
+		t.Fatalf("the name and the last choice must both show:\n%s", joined)
+	}
+	if len(rows) > 24 {
+		t.Fatalf("%d rows on a 24-row screen", len(rows))
+	}
+}
+
+func TestBadgeStaysWhenThereIsRoom(t *testing.T) {
+	s := NewScreen(80, 40)
+	s.header("Installer")
+	s.add("choice")
+	if !strings.Contains(strings.Join(plainRows(s), "\n"), shield[0]) {
+		t.Fatal("the badge should show on a roomy screen")
+	}
+}
+
+func TestPlainHeaderLeavesOutTheBadge(t *testing.T) {
+	defer func() { PlainHeader = false }()
+	PlainHeader = true
+	s := NewScreen(80, 40)
+	s.header("Installer")
+	got := strings.Join(plainRows(s), "\n")
+	if strings.Contains(got, shield[0]) {
+		t.Fatal("no badge on a serial console")
+	}
+	if !strings.Contains(got, "N O P E W A R D E N") {
+		t.Fatal("the name must stay")
 	}
 }

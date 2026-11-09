@@ -1,6 +1,17 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.10',
+    title: 'An installer that checks for other DHCP servers',
+    items: [
+      'The installer always asks which port is the internet (WAN) and which is your own network (LAN). Beside each connected port it says whether a DHCP server answers there.',
+      'For your own network it asks for NopeWarden\'s address and whether NopeWarden should hand out addresses (DHCP). If another DHCP server already answers on that network, the default is off and the screen says why. Setup then starts with address handing-out off, with a note, and NopeWarden hands out no addresses while you finish setup.',
+      'If both ports look like one network (a virtual machine with both adapters on the same bridge as your home network), the installer warns you. It still lets you continue, and it never suggests a LAN address inside the internet port\'s network.',
+      'Installer screens are centred top to bottom as well as across, whatever the screen size. Over a serial console they show just the NopeWarden name, and the installer asks the terminal how big it is.',
+      'The badge, favicon, console colours and boot pictures now come from one set of design tokens, so changing a colour changes them together.',
+    ],
+  },
+  {
     version: '0.9.4',
     title: 'One update schedule, a resolver of its own, and staged DNS changes',
     items: [

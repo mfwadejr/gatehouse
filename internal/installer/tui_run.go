@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 var reConsole = regexp.MustCompile(`(?:^|\s)console=(ttyS\d+)(?:,(\d+))?`)
@@ -71,6 +72,10 @@ func RunTextInstaller() error {
 	pr, pw := io.Pipe()
 	var wg sync.WaitGroup
 	var serialUsed atomic.Bool
+	var probing atomic.Bool // while true, the serial input is searched for the terminal's size report
+	var filt cprFilter
+	var filtMu sync.Mutex
+	sizeCh := make(chan [2]int, 1)
 	pump := func(f *os.File) {
 		wg.Add(1)
 		go func() {
@@ -86,7 +91,20 @@ func RunTextInstaller() error {
 							}
 						}
 					}
-					pw.Write(buf[:n])
+					data := buf[:n]
+					if probing.Load() && f.Name() == "/dev/"+sdev {
+						filtMu.Lock()
+						out, r, c := filt.Feed(data)
+						filtMu.Unlock()
+						if r > 0 {
+							select {
+							case sizeCh <- [2]int{r, c}:
+							default:
+							}
+						}
+						data = out
+					}
+					pw.Write(data)
 				}
 				if err != nil {
 					return
@@ -95,6 +113,7 @@ func RunTextInstaller() error {
 		}()
 	}
 	serial := ""
+	serialRows, serialCols := 24, 80 // what a terminal that does not answer is taken to be
 	disp := openGraphics()
 	if f, err := os.OpenFile("/dev/tty1", os.O_RDWR, 0); err == nil {
 		rawTTY("/dev/tty1", 0)
@@ -110,18 +129,35 @@ func RunTextInstaller() error {
 		if f, err := os.OpenFile("/dev/"+sdev, os.O_RDWR|0x100 /* O_NOCTTY */, 0); err == nil {
 			rawTTY("/dev/"+sdev, baud)
 			outs = append(outs, f)
+			probing.Store(true)
 			pump(f)
+			io.WriteString(f, sizeQuery)
+			select {
+			case sz := <-sizeCh:
+				if sane(sz[0], sz[1]) {
+					serialRows, serialCols = sz[0], sz[1]
+				}
+			case <-time.After(1500 * time.Millisecond):
+			}
+			probing.Store(false)
+			filtMu.Lock()
+			if len(filt.pending) > 0 {
+				pw.Write(filt.pending)
+				filt.pending = nil
+			}
+			filtMu.Unlock()
 			serial = fmt.Sprintf("%s, %d baud, 8 data bits, no parity, 1 stop bit (8N1), no flow control", sdev, baud)
 		}
 	}
 	if len(outs) == 0 {
 		return fmt.Errorf("no console to use")
 	}
+	PlainHeader = serial != "" // the badge's block characters only draw properly on the graphical screen
 	t := NewTerm(pr, io.MultiWriter(outs...))
 	if len(outs) > 0 {
 		t.W, t.H = screenSize(disp)
 		if serial != "" {
-			t.W, t.H = min(t.W, 80), min(t.H, 24) // the serial terminal's size is unknown
+			t.W, t.H = min(t.W, serialCols), min(t.H, serialRows) // as the terminal reported, or 80x24
 		}
 	}
 	env := NewTextEnv(New(), serial)

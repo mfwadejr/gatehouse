@@ -19,21 +19,10 @@ import (
 // every lowercase letter into a box glyph.
 const asciiReset = "\x0f\x1b(B\x1b)B"
 
-// Colours come from the design tokens. Only the sixteen console colours exist, so each
-// meaning gets one slot, and "bold" is never used for colour (the console would swap in a
+// Colours come from the design tokens (tokens/tokens.json, console.*). Only the sixteen console colours
+// exist, so each meaning gets one slot, and "bold" is never used for colour (the console would swap in a
 // default colour for it).
-const palette = "" +
-	"\x1b]P0121211" + // background
-	"\x1b]P1e5484d" + // red
-	"\x1b]P24cb06a" + // green
-	"\x1b]P3e5b43a" + // amber
-	"\x1b]P43987e5" + // blue
-	"\x1b]P5a78bfa" +
-	"\x1b]P622b8cf" +
-	"\x1b]P7c3c2b7" + // text
-	"\x1b]P8898781" + // muted
-	"\x1b]P9e5484d\x1b]PA4cb06a\x1b]PBe5b43a\x1b]PC3987e5\x1b]PDa78bfa\x1b]PE22b8cf" +
-	"\x1b]PFf0efec" // bright text
+const palette = gfx.PaletteEscapes
 
 const (
 	reset = "\x1b[0m"
@@ -76,6 +65,15 @@ func centre(s string, w int) string {
 
 var shield = gfx.Shield
 
+// PlainHeader leaves the block-character badge out of the headers. The badge is a stand-in that only the
+// graphical screen turns into the real logo; on a serial terminal it arrives as raw block characters and
+// does not draw cleanly, so the installer sets this whenever a serial console is attached. The name stays.
+var PlainHeader bool
+
+// badgeMark tags the badge's lines (and the blank line under them) so a screen that is too tall for the
+// display can drop them first. The tag never reaches the display.
+const badgeMark = "\x00badge"
+
 // Screen collects lines and turns them into one frame.
 type Screen struct {
 	W, H  int
@@ -116,10 +114,12 @@ func (s *Screen) midBox(ls []string) {
 
 // header draws the shield, the name and what this screen is for.
 func (s *Screen) header(sub string) {
-	for _, l := range shield {
-		s.mid(blue + l + reset)
+	if !PlainHeader {
+		for _, l := range shield {
+			s.lines = append(s.lines, badgeMark+centre(blue+l+reset, s.W))
+		}
+		s.lines = append(s.lines, badgeMark)
 	}
-	s.blank()
 	s.mid(bold + "N O P E W A R D E N" + reset)
 	if sub != "" {
 		s.mid(dim + sub + reset)
@@ -151,17 +151,44 @@ func portsLine(ports []Port) string {
 // String lays the lines out: centred vertically on tall screens, the last line pinned to the
 // bottom (the footer), and never taller than the screen.
 func (s *Screen) String() string {
-	lines := s.lines
+	lines := append([]string(nil), s.lines...)
 	footer := ""
 	if n := len(lines); n > 0 && strings.HasPrefix(lines[n-1], "\x00footer") {
 		footer = strings.TrimPrefix(lines[n-1], "\x00footer")
 		lines = lines[:n-1]
 	}
-	top := (s.H - 24) / 3
+	room := s.H - 1 // the last row is left alone so the screen never scrolls
+	avail := room
+	if footer != "" {
+		avail = room - 1
+	}
+	// Too tall for the display: the badge goes first, then blank lines from the bottom up, so the name and
+	// the choices are never the part that is cut off.
+	if len(lines) > avail {
+		kept := lines[:0:0]
+		for _, l := range lines {
+			if !strings.HasPrefix(l, badgeMark) {
+				kept = append(kept, l)
+			}
+		}
+		lines = kept
+	}
+	for len(lines) > avail {
+		i := len(lines) - 1
+		for i >= 0 && lines[i] != "" {
+			i--
+		}
+		if i < 0 {
+			lines = lines[:avail]
+			break
+		}
+		lines = append(lines[:i], lines[i+1:]...)
+	}
+	// Centred top to bottom in the space above the footer.
+	top := (avail - len(lines)) / 2
 	if top < 0 {
 		top = 0
 	}
-	room := s.H - 1
 	var b strings.Builder
 	b.WriteString(asciiReset + "\x1b[?25l\x1b[0m\x1b[2J\x1b[H")
 	used := 0
@@ -170,10 +197,7 @@ func (s *Screen) String() string {
 		used++
 	}
 	for _, l := range lines {
-		if used >= room-1 {
-			break
-		}
-		b.WriteString(l + reset + "\r\n")
+		b.WriteString(strings.TrimPrefix(l, badgeMark) + reset + "\r\n")
 		used++
 	}
 	if footer != "" {

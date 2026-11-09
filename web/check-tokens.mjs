@@ -17,7 +17,6 @@ for (const f of files.filter((x) => !x.endsWith('.css'))) for (const m of readFi
 const ALLOW = [
   'src/worldmap.js', // map drawing data
   'src/providers.js',
-  'src/logo.jsx', // the brand badge artwork
 ];
 const prefixOK = (v) => v === '--color-chart-series-' || v === '--c'; // built from a number or set per element
 let bad = 0;

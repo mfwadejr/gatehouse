@@ -54,18 +54,29 @@ Press the letter; if the entry is only highlighted, press Enter. `Ctrl-N` and `C
 
 ## The questions
 
-1. Which disk to install on. The USB stick you started from is never offered.
-2. Which network port you will manage NopeWarden from. Plug a cable into it; the list updates by itself and shows the cable as soon as it is connected. A port with a cable is required (you can insist on one without, after a warning).
-3. A confirmation: type the disk name; anything else starts over.
-4. Progress, then "Remove the USB stick now, then press Enter to restart."
+1. **The internet port (WAN).** Choose the port your modem or internet router plugs into. You always choose it yourself; nothing is picked for you. It may be unplugged for now. Beside each connected port the installer says whether a DHCP server answers on it (it listens for a few seconds, in the background, and never asks for an address). An internet connection normally has one.
+2. **Your own network port (LAN).** Plug a cable into it; the list updates by itself and shows the cable as soon as it is connected. A port with a cable is required (you can insist on one without, after a warning). Only one LAN port is chosen here. Other ports are set up in the browser after the restart: a second internet connection, separate LAN or VLAN networks, or extra ports in the main LAN.
+3. **NopeWarden's address on that network** (the suggestion is fine), which never overlaps the network the internet port is on.
+4. **Whether NopeWarden hands out addresses (DHCP) on that network.** The default is yes. If another DHCP server answered on the LAN port, the default is no and the screen says "DHCP is off because another DHCP server (address) answered on the port". You can answer yes anyway, and change it later in setup. If the check could not run, the screen says so and the default stays yes.
+5. **The disk.** The USB stick you started from is never offered. You must type its number.
+6. **A confirmation:** type the disk name; anything else starts over.
+7. Progress, then "Remove the USB stick now, then press Enter to restart."
 
 Ctrl-C at any question starts over. Nothing on the disk changes until you confirm.
 
-After the restart the machine's screen shows an address. Open it in a browser on a computer connected to the port you chose, to create your administrator account and finish setup. The installed system does not use a serial console.
+### The same network on both ports
+
+If the same DHCP server answers on both the internet port and the LAN port, the two ports are on one network. This happens in a virtual machine when both network adapters are attached to the same bridge as your home network. NopeWarden only protects a network that traffic must pass through it to leave, so the installer warns you. It does not stop you, because a test setup may want this. For real use, or a useful test, put the LAN adapter on its own virtual network.
+
+After the restart the machine's screen shows an address. Open it in a browser on a computer connected to the port you chose, to create your administrator account and finish setup. The setup wizard opens with your choices filled in (the internet port, the address, and DHCP turned off if you turned it off), and you confirm or change them. The installed system does not use a serial console.
+
+## What the screens look like
+
+On a monitor the installer shows the NopeWarden badge. On a serial console it shows only the name, because the badge is drawn with block characters that serial terminals do not draw cleanly. Screens are centred whatever the screen size. Over a serial cable the installer asks the terminal how big it is and uses that, or 80 by 24 if the terminal does not answer. If a screen is too short for everything, the badge is dropped first, so the name and the choices always show.
 
 ## First start after the installation
 
-The port you chose asks the network for an address like any wired port. If no router answers within about 30 seconds, NopeWarden gives that port the address **192.168.100.1** and hands out addresses on it, so a laptop plugged straight into the machine can open https://192.168.100.1. The screen always shows the address to use.
+The port you chose gets the address you chose in the installer, and until setup is finished NopeWarden hands out addresses on it so a laptop plugged straight in can open the setup page. If you turned DHCP off in the installer, it does not hand out any: set a fixed address on your computer in the same network, or use an address from the other DHCP server on that network, and open the address shown on the machine's screen. (If the installer was run without choosing an address, the port asks the network for one, and if no router answers within about 30 seconds NopeWarden gives it **192.168.100.1** and hands out addresses so a laptop plugged straight in can open https://192.168.100.1.) The screen always shows the address to use.
 
 Until the administrator account exists, the setup page only answers on the management port. Once the account exists the setup page is closed for good and the address shows the normal sign-in page. The temporary address goes away when setup is finished.
 

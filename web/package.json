@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node check-hooks.mjs && node ../tokens/build-tokens.mjs ../tokens/tokens.json src/tokens.css && node check-tokens.mjs && node check-unused.mjs && node check-wiring.mjs && node check-search.mjs && node check-logrows.mjs && node build-docs.mjs && node check-docs.mjs && rm -rf dist/assets dist/index.html dist/terminal.html && vite build",
+    "build": "node check-hooks.mjs && node ../tokens/build-tokens.mjs ../tokens/tokens.json src/tokens.css && node ../tokens/build-brand.mjs && node ../tokens/build-brand.mjs --check && node check-tokens.mjs && node check-unused.mjs && node check-wiring.mjs && node check-search.mjs && node check-logrows.mjs && node build-docs.mjs && node check-docs.mjs && rm -rf dist/assets dist/index.html dist/terminal.html && vite build",
     "lint:tokens": "node ../tokens/check-tokens.mjs src/*.css src/*.jsx src/pages/*.jsx"
   },
   "dependencies": {
