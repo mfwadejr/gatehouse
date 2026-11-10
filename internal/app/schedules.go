@@ -120,6 +120,7 @@ func (a *App) threatRulesUpdate() error {
 		return err
 	}
 	a.schedMarkDone("threat")
+	a.threatRulesUpdatedNote(time.Now())
 	return nil
 }
 

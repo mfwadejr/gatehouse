@@ -1,6 +1,19 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.14',
+    title: 'Calmer DNS health, a Threats overview, and clearer installs',
+    items: [
+      'The red \"No DNS server is answering\" message now appears only when every DNS server is really down and none has answered for 30 seconds. A slow server is no longer treated as a dead one, a server needs several failed lookups over at least 10 seconds before it is marked down, and Resolve directly is never called slow just because a new name takes a moment to find. Servers are tested every 30 seconds.',
+      'Installing or removing threat watching shows a ticked list of steps (checking the package list, downloading, installing, keeping it off until you turn it on, checking it is in place), and the install box now shows the real download size instead of 0 MB.',
+      'The Off / Watch and tell switch moves the moment you click it and says what it is doing while the program starts or stops.',
+      'The Overview box for the internet shows the name you gave the connection, for example T-Mobile (enp0s20f0).',
+      'The Overview map opens on Both and the last 15 minutes.',
+      'Threats opens on a new Overview, laid out like the DNS one: status, traffic watched, load on the machine, rules and alerts, charts, what was seen, which devices were involved, and what the program has been doing.',
+      'The Protection tab "Apps & topics" is now called Blocks, and the screens say category instead of topic.',
+    ],
+  },
+  {
     version: '0.9.4.12',
     title: 'Resolve directly tells you what it is doing',
     items: [

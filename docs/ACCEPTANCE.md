@@ -72,3 +72,10 @@ Record the machine, the version (Settings, About) and the date at the top of eac
 | 65 | Map Both | Overview map: Outgoing, Incoming and Both; Both shows green and amber lines, one list with out and in counts, a click opens Logs for the country | | |
 | 66 | Undo a deleted DNS list | Delete a DNS list, press Undo: the waiting removal disappears from Review; no second waiting change appears | | |
 | 67 | Resolve directly shows progress | DNS: choose Resolve directly; at once the card shows Working on it with the current step and a spinner, the choice is locked, then it turns green with a message | | |
+| 68 | DNS health calm | With Resolve directly on, and then with forwarders, leave it for an hour: the red "No DNS server is answering" does not appear while lookups work; a slow server shows amber, not red | | |
+| 69 | Overview connection name | Rename the internet connection (for example T-Mobile): the Overview Internet box shows "T-Mobile (port)" | | |
+| 70 | Map defaults | Open Overview: the map is on Both and 15 min | | |
+| 71 | Install steps and size | Protection, Threats, Install threat watching: the box shows a real download size (not 0 MB); during the install a ticked step list moves from the package list to downloading to installing | | |
+| 72 | Switch responds at once | Off / Watch and tell: the highlight moves the moment you click and a "Working on it" line shows until it finishes | | |
+| 73 | Threats Overview | Protection, Threats opens on Overview: Status, Traffic watched, Load, Rules and Alerts cards, charts, What was seen, Devices involved and What it has been doing; with watching off, the cards say so | | |
+| 74 | Blocks tab | The Protection tab reads Blocks, and the screens say category (not topic) | | |

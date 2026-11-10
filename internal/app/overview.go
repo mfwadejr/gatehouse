@@ -336,6 +336,9 @@ func (a *App) histPoints(now time.Time) []histPoint {
 		add("devices.online", float64(on))
 	}
 	add("dns.qps", a.DNS.Stats().Snapshot().QPS)
+	for _, p := range a.threatHistPoints() {
+		add(p.Key, p.Val)
+	}
 	if a.DHCP != nil {
 		used := 0
 		for _, u := range a.DHCP.Utilisation() {

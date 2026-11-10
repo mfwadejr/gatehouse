@@ -49,7 +49,11 @@ export function AttentionProvider({ children }) {
       add(left === 0 ? 'bad' : 'warn', `dhcp-full:${s.name}`, left === 0 ? `${s.name} has no addresses left` : `${s.name} is nearly out of addresses`,
         `${s.active} of ${s.size} in use, ${left} left. ${left === 0 ? 'New devices cannot join until some are freed. ' : ''}Widen the range or shorten how long addresses are kept.`, 'dhcp');
     });
-    if (dns?.upstreams?.length && !dns.upstreams.some((u) => u.state === 'healthy')) add('bad', 'dns-down', 'No DNS server is answering', 'Devices cannot look up names until one answers. Open DNS and press Test.', 'dns');
+    // Red only when every server is down and none has answered for 30 seconds. A slow server still works.
+    if (dns?.upstreams?.length && dns.upstreams.every((u) => u.state === 'down') && dns.upstreams.every((u) => !u.last_ok || Date.now() / 1000 - u.last_ok > 30)) {
+      const names = dns.upstreams.map((u) => u.name).filter(Boolean).join(', ');
+      add('bad', 'dns-down', 'No DNS server is answering', `${names ? `${names} did not answer. ` : ''}Devices cannot look up names until one answers. Open DNS and press Test.`, 'dns');
+    }
     if (upd?.needs_reboot) add('warn', 'reboot', 'A restart is needed', 'The system was updated and needs a restart to finish.', 'settings');
     else if (upd?.available && upd.mode !== 'off' && upd.state === 'idle') add('info', 'updates', 'Updates are ready to install', [upd.nopewarden_new && upd.latest ? `NopeWarden ${upd.latest.version}` : '', upd.system_count > 0 ? `${upd.system_count} system update${upd.system_count === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and '), 'settings');
     // The security check and threat alerts both live on Protection.

@@ -36,6 +36,10 @@ type Upstream struct {
 	mu        sync.Mutex
 	idle      []idleConn // kept-open encrypted connections, newest last
 	lastFail  time.Time
+	firstFail time.Time // when the current run of failed queries began
+	// NoSlow keeps latency from ever calling this server slow: Unbound looks names up from the root
+	// servers, so a first lookup of a name is slow by nature while the server is fine.
+	NoSlow    bool
 	failures  uint64
 	ewma      time.Duration
 	samples   int
@@ -71,7 +75,21 @@ type UpstreamStatus struct {
 	Reused bool `json:"reused"`
 }
 
-const degradedAbove = 150 * time.Millisecond
+// degradedAbove is the average answer time over which a server is called slow. It is measured on real
+// lookups, which include names the server must find from scratch, so it is generous.
+const degradedAbove = 400 * time.Millisecond
+
+// sampleCap stops one very slow answer (a name found from scratch, a new connection) from moving the
+// average much.
+const sampleCap = time.Second
+
+// A server is called down only after this many failed queries in a row spread over at least
+// downAfterSpan (or twice as many, whatever the time), so a short hiccup on the link does not take
+// every server out at once.
+const (
+	downAfterFails = 3
+	downAfterSpan  = 10 * time.Second
+)
 
 // idleConn is an open encrypted connection waiting for the next query.
 type idleConn struct {
@@ -89,13 +107,16 @@ func (u *Upstream) record(d time.Duration, err error, now time.Time) {
 	defer u.mu.Unlock()
 	u.queries++
 	if err != nil {
+		if u.fails == 0 {
+			u.firstFail = now
+		}
 		u.fails++
 		u.failures++
 		u.lastFail = now
 		u.lastErr = err.Error()
-		if u.fails >= 2 {
+		if u.fails >= downAfterFails && (now.Sub(u.firstFail) >= downAfterSpan || u.fails >= 2*downAfterFails) {
 			// Back off: 5s, 10s, ... capped at 60s.
-			backoff := time.Duration(u.fails-1) * 5 * time.Second
+			backoff := time.Duration(u.fails-downAfterFails+1) * 5 * time.Second
 			if backoff > time.Minute {
 				backoff = time.Minute
 			}
@@ -107,6 +128,9 @@ func (u *Upstream) record(d time.Duration, err error, now time.Time) {
 	u.lastErr = ""
 	u.lastOK = now
 	u.downUntil = time.Time{}
+	if d > sampleCap {
+		d = sampleCap
+	}
 	if u.samples == 0 {
 		u.ewma = d
 	} else {
@@ -128,13 +152,13 @@ func (u *Upstream) status(now time.Time) UpstreamStatus {
 		st.LastFail = u.lastFail.Unix()
 	}
 	switch {
-	case now.Before(u.downUntil) || (u.fails >= 2 && u.samples == 0):
+	case now.Before(u.downUntil) || (u.fails >= downAfterFails && u.samples == 0 && now.Sub(u.firstFail) >= downAfterSpan):
 		st.State = "down"
 		if now.Before(u.downUntil) {
 			st.RetryIn = int(u.downUntil.Sub(now).Seconds()) + 1
 		}
 		st.Reason = fmt.Sprintf("Did not answer the last %d queries: %s", u.fails, friendlyErr(u.lastErr))
-	case u.ewma > degradedAbove:
+	case u.ewma > degradedAbove && !u.NoSlow:
 		st.State = "degraded"
 		st.Reason = fmt.Sprintf("Answers take %d ms on average, slower than the %d ms NopeWarden treats as slow. It still works, and is tried after faster ones.", u.ewma.Milliseconds(), degradedAbove.Milliseconds())
 		if u.Proto != "udp" && u.Proto != "" {

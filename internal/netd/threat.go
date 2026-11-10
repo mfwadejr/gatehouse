@@ -30,21 +30,22 @@ const (
 
 // ThreatInfo is what the console shows about the engine.
 type ThreatInfo struct {
-	Installed    bool   `json:"installed"`
-	Version      string `json:"version"`
-	Running      bool   `json:"running"`
-	State        string `json:"state"`   // idle, installing, removing, updating or failed
-	Message      string `json:"message"` // what is happening, or why it failed
-	DiskFreeMB   int64  `json:"disk_free_mb"`
-	MemoryMB     int64  `json:"memory_mb"`
-	CPUs         int    `json:"cpus"`
-	RulesUpdated int64  `json:"rules_updated"`
-	RulesCount   int    `json:"rules_count"`
-	Why          string `json:"why"`     // plain reason it is not running, when it should be
-	Failing      bool   `json:"failing"` // crashing and being restarted, not just starting
-	HasPrevious  bool   `json:"has_previous"`
-	CPUNSec      uint64 `json:"cpu_nsec"` // processor time used so far
-	MemoryBytes  uint64 `json:"memory_bytes"`
+	Installed    bool         `json:"installed"`
+	Version      string       `json:"version"`
+	Running      bool         `json:"running"`
+	State        string       `json:"state"`   // idle, installing, removing, updating or failed
+	Message      string       `json:"message"` // what is happening, or why it failed
+	Steps        []ThreatStep `json:"steps,omitempty"`
+	DiskFreeMB   int64        `json:"disk_free_mb"`
+	MemoryMB     int64        `json:"memory_mb"`
+	CPUs         int          `json:"cpus"`
+	RulesUpdated int64        `json:"rules_updated"`
+	RulesCount   int          `json:"rules_count"`
+	Why          string       `json:"why"`     // plain reason it is not running, when it should be
+	Failing      bool         `json:"failing"` // crashing and being restarted, not just starting
+	HasPrevious  bool         `json:"has_previous"`
+	CPUNSec      uint64       `json:"cpu_nsec"` // processor time used so far
+	MemoryBytes  uint64       `json:"memory_bytes"`
 }
 
 // ThreatPreview is what installing would do, shown before anything happens.
@@ -58,6 +59,7 @@ type ThreatPreview struct {
 var threatState = struct {
 	sync.Mutex
 	state, msg string
+	steps      []ThreatStep
 	rulesAt    time.Time
 	rulesN     int
 }{state: "idle"}
@@ -65,6 +67,65 @@ var threatState = struct {
 func setThreat(state, msg string) {
 	threatState.Lock()
 	threatState.state, threatState.msg = state, msg
+	if state == "idle" {
+		threatState.steps = nil
+	}
+	threatState.Unlock()
+}
+
+// ThreatStep is one stage of an install or removal, shown to the person as a ticked list.
+type ThreatStep struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+	State string `json:"state"` // done, active, pending or failed
+}
+
+// beginSteps starts a list of stages with the first one active.
+func beginSteps(labels ...string) {
+	st := make([]ThreatStep, len(labels))
+	for i, l := range labels {
+		st[i] = ThreatStep{ID: strconv.Itoa(i), Label: l, State: "pending"}
+	}
+	if len(st) > 0 {
+		st[0].State = "active"
+	}
+	threatState.Lock()
+	threatState.steps = st
+	threatState.Unlock()
+}
+
+// stepTo marks every stage before i done, i active and the rest pending.
+func stepTo(i int) {
+	threatState.Lock()
+	for k := range threatState.steps {
+		switch {
+		case k < i:
+			threatState.steps[k].State = "done"
+		case k == i:
+			threatState.steps[k].State = "active"
+		default:
+			threatState.steps[k].State = "pending"
+		}
+	}
+	threatState.Unlock()
+}
+
+// failStep marks the stage that was running as failed.
+func failStep() {
+	threatState.Lock()
+	for k := range threatState.steps {
+		if threatState.steps[k].State == "active" {
+			threatState.steps[k].State = "failed"
+		}
+	}
+	threatState.Unlock()
+}
+
+func allStepsDone() {
+	threatState.Lock()
+	for k := range threatState.steps {
+		threatState.steps[k].State = "done"
+	}
 	threatState.Unlock()
 }
 
@@ -85,7 +146,7 @@ var reMemTotal = regexp.MustCompile(`MemTotal:\s+(\d+) kB`)
 // ThreatStatus describes the engine and the machine it would run on.
 func (s *Service) ThreatStatus() ThreatInfo {
 	threatState.Lock()
-	info := ThreatInfo{State: threatState.state, Message: threatState.msg}
+	info := ThreatInfo{State: threatState.state, Message: threatState.msg, Steps: append([]ThreatStep(nil), threatState.steps...)}
 	threatState.Unlock()
 	info.CPUs = runtime.NumCPU()
 	if out, err := sysRun(10*time.Second, "df", "-Pm", "/var"); err == nil {
@@ -155,7 +216,10 @@ func countRules(path string) int {
 }
 
 var reAfter = regexp.MustCompile(`After this operation, ([\d.,]+) ([kMG])B of additional disk space`)
-var reNeed = regexp.MustCompile(`Need to get ([\d.,]+) ([kMG])B`)
+
+// "Need to get 21.4 MB of archives" or, when some are already downloaded, "Need to get 0 B/21.4 MB": the
+// total after the slash is the size of the whole download.
+var reNeed = regexp.MustCompile(`Need to get (?:[\d.,]+ ?[kMG]?B/)?([\d.,]+) ?([kMG]?)B`)
 
 // sumURISizes adds up the sizes in "apt-get --print-uris" lines: 'url' file size hash.
 func sumURISizes(out []byte) float64 {
@@ -191,6 +255,8 @@ func sumInstalledSize(out []byte) float64 {
 func toMB(num, unit string) float64 {
 	v, _ := strconv.ParseFloat(strings.ReplaceAll(num, ",", ""), 64)
 	switch unit {
+	case "":
+		return v / (1024 * 1024) // plain bytes
 	case "k":
 		return v / 1024
 	case "G":
@@ -223,7 +289,7 @@ func (s *Service) ThreatInstallPreview() (ThreatPreview, error) {
 	if p.DownloadMB == 0 || p.DiskMB == 0 {
 		names := append(parseInst(b), p.Packages...)
 		if p.DownloadMB == 0 {
-			if u, err := aptRun(2*time.Minute, "apt-get", aptArgs("install", "--no-install-recommends", "--print-uris", "-qq", strings.Join(p.Packages, " "))...); err == nil || len(u) > 0 {
+			if u, err := aptRun(2*time.Minute, "apt-get", aptArgs(append([]string{"install", "--no-install-recommends", "--print-uris", "-qq"}, p.Packages...)...)...); err == nil || len(u) > 0 {
 				p.DownloadMB = sumURISizes(u)
 			}
 		}
@@ -250,23 +316,36 @@ func (s *Service) ThreatInstallStart() error {
 		return errors.New("something is already being installed or removed")
 	}
 	setThreat("installing", "Downloading and installing. This takes a minute or two.")
+	beginSteps("Checking Debian's package list", "Downloading threat watching", "Installing it", "Making sure it stays off until you turn it on", "Checking it is in place")
+	pkgs := []string{"suricata", "suricata-update"}
 	go func() {
+		fail := func(msg string) { failStep(); setThreat("failed", msg) }
 		noAutoUpgrade()
 		if b, err := aptRun(5*time.Minute, "apt-get", aptArgs("update")...); err != nil {
-			setThreat("failed", "Debian's package servers could not be reached: "+lastLine(b, err))
+			fail("Debian's package servers could not be reached: " + lastLine(b, err))
 			return
 		}
-		b, err := aptRun(30*time.Minute, "apt-get", aptArgs("install", "--no-install-recommends", "suricata", "suricata-update")...)
+		stepTo(1)
+		if b, err := aptRun(30*time.Minute, "apt-get", aptArgs(append([]string{"install", "--download-only", "--no-install-recommends"}, pkgs...)...)...); err != nil {
+			fail("The download did not work: " + lastLine(b, err))
+			return
+		}
+		stepTo(2)
+		b, err := aptRun(30*time.Minute, "apt-get", aptArgs(append([]string{"install", "--no-install-recommends"}, pkgs...)...)...)
 		if err != nil {
-			setThreat("failed", "The install did not work: "+lastLine(b, err))
+			fail("The install did not work: " + lastLine(b, err))
 			return
 		}
+		stepTo(3)
 		// The package turns its own service on; ours is the only one that should run.
 		aptRun(time.Minute, "systemctl", "disable", "--now", threatStockUnit)
+		stepTo(4)
 		if !s.threatInstalled() {
-			setThreat("failed", "The install finished, but the program is not where it should be.")
+			fail("The install finished, but the program is not where it should be.")
 			return
 		}
+		allStepsDone()
+		time.Sleep(2 * time.Second) // so the last tick can be seen before the page changes
 		setThreat("idle", "")
 	}()
 	return nil
@@ -278,18 +357,22 @@ func (s *Service) ThreatRemove() error {
 		return errors.New("something is already being installed or removed")
 	}
 	setThreat("removing", "Removing.")
+	beginSteps("Switching watching off", "Removing its settings", "Removing the program")
 	defer func() {
 		if threatState.state == "removing" {
 			setThreat("idle", "")
 		}
 	}()
 	sysRun(30*time.Second, "systemctl", "disable", "--now", threatcfg.UnitName)
+	stepTo(1)
 	os.Remove(s.rootPath(threatcfg.UnitFile))
 	os.Remove(s.rootPath(threatcfg.IncludeFile))
 	os.Remove(s.rootPath(threatcfg.DisableConf))
 	sysRun(30*time.Second, "systemctl", "daemon-reload")
+	stepTo(2)
 	if s.threatInstalled() {
 		if b, err := aptRun(10*time.Minute, "apt-get", aptArgs("remove", "suricata", "suricata-update")...); err != nil {
+			failStep()
 			setThreat("failed", "The removal did not work: "+lastLine(b, err))
 			return errors.New(threatState.msg)
 		}

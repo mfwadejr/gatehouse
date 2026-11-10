@@ -4,7 +4,7 @@
 One list of everything you have set up to allow, block, route or open something for your devices, written in plain words. Firewall rules, routes, blocks and open ports are four kinds of the same thing: who it covers, where to, what for, and when.
 
 ## What is on the page
-- **Create policy** asks what you want to do (allow or block traffic, send traffic through a VPN or connection, open a port, or block an app, topic or website) and opens the right form.
+- **Create policy** asks what you want to do (allow or block traffic, send traffic through a VPN or connection, open a port, or block an app, category or website) and opens the right form.
 - **Your policies** shows every policy with its kind, whether it is working, and one sentence saying what it does. A warning shows on the row when something needs a look.
 - **All kinds** narrows the list to one kind.
 - Each row has **Pause…**, **Turn off** (or **Turn on**), **Edit** and **Remove**. **Edit** opens the form on the page that owns that kind of policy. **Remove** can be undone for a few seconds, except blocks and open ports, which ask first.

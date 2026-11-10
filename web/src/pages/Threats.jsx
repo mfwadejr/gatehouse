@@ -2,7 +2,8 @@ import { useHashTab } from '../hashtab.js';
 import React, { useEffect, useState } from 'react';
 import { del, post, put, get, useData } from '../api.js';
 import { ScheduleEditor } from '../ScheduleEditor.jsx';
-import { Button, Card, Empty, Field, Input, Modal, Note, NumberInput, Pill, Segmented, Switch, Tabs, Limited, useAction, fmt } from '../ui.jsx';
+import { Chart, fmtBits } from '../charts.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, NumberInput, Pill, Segmented, Steps, Switch, Tabs, Limited, Bar, useAction, fmt } from '../ui.jsx';
 
 // Threat watching. An engine (Suricata) is installed only when the owner asks. It watches copies of
 // the traffic and NopeWarden says what it noticed in plain words. It never holds traffic up, so a
@@ -19,10 +20,10 @@ function InstallPrompt({ data, reload }) {
   return (
     <Card title="Threat watching" desc="Watches for infected devices, break-in attempts and probing, and tells you in plain words.">
       <div className="stack">
-        {working ? <Note title={p.state === 'installing' ? 'Installing' : 'Removing'}>{p.message || 'Working. This can take a few minutes. You can leave this page.'}</Note> : (
+        {working ? <Note title={p.state === 'installing' ? 'Installing' : 'Removing'}>{p.steps?.length ? <><Steps steps={p.steps} label={p.state === 'installing' ? 'Install progress' : 'Removal progress'} /><span className="small muted">This takes a minute or two. You can leave this page.</span></> : (p.message || 'Working. This can take a few minutes. You can leave this page.')}</Note> : (
           <>
             <p className="small">This is not installed. It is an extra program, installed only if you ask. Nothing else in NopeWarden needs it.</p>
-            {p.state === 'failed' && <Note tone="warn" title="The last install did not finish">{p.message}</Note>}
+            {p.state === 'failed' && <Note tone="warn" title="The last install did not finish">{p.steps?.length > 0 && <Steps steps={p.steps} label="What happened" />}{p.message}</Note>}
             <div className="actions"><Button kind="primary" disabled={busy} onClick={look}>Install threat watching</Button></div>
           </>
         )}
@@ -336,10 +337,90 @@ function Advanced({ data, reload }) {
   );
 }
 
+const dur = (secs) => {
+  if (!secs || secs < 0) return '–';
+  if (secs < 90) return 'under a minute';
+  if (secs < 5400) return `${Math.round(secs / 60)} minutes`;
+  if (secs < 129600) return `${Math.round(secs / 3600)} hours`;
+  return `${Math.round(secs / 86400)} days`;
+};
+const when = (ts) => (ts ? new Date(ts * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'never');
+
+// The Overview tab, built like the DNS one: the numbers first, then charts, then who and what.
+function ThreatOverview({ data, goTab }) {
+  const { data: ov } = useData('/api/threat/overview', { every: 10000 });
+  const [range, setRange] = useState('1h');
+  const { data: h } = useData(`/api/overview/history?range=${range}`, { every: 30000 });
+  if (!ov) return null;
+  const now = Date.now() / 1000;
+  const watching = ov.mode === 'watch';
+  const state = !watching ? 'Off' : ov.running ? 'Watching' : ov.failing ? 'Failing' : 'Not running';
+  const up = watching && ov.running && ov.since ? dur(now - ov.since) : '';
+  const ser = (key) => h?.series?.[key] || [];
+  const last = (key) => { const p = ser(key); return p.length ? p[p.length - 1][1] : null; };
+  const watched = last('threat.watched');
+  const cpuTone = ov.cpu_now >= ov.cpu_limit * 0.9 ? 'bad' : ov.cpu_now >= ov.cpu_limit * 0.7 ? 'warn' : '';
+  return (
+    <>
+      <section className="dns-tiles">
+        <div className="card tile"><span className="lbl">Status</span><div><span className="val">{state}</span></div><span className="foot">{!watching ? 'Switch it on above' : up ? `Seen running for ${up}` : ov.why || 'Waiting for the program'}</span></div>
+        <div className="card tile"><span className="lbl">Traffic watched</span><div><span className="val">{watched == null ? '–' : fmtBits(watched).split(' ')[0]}</span><span className="unit">{watched == null ? '' : fmtBits(watched).split(' ')[1]}</span></div><span className="foot">{ov.ports?.length ? `On ${ov.ports.length} port${ov.ports.length === 1 ? '' : 's'}: ${ov.ports.join(', ')}` : 'No ports yet'}</span></div>
+        <div className="card tile"><span className="lbl">Load on this machine</span><div><span className="val">{watching && ov.running ? fmt.d1(ov.cpu_now) : '–'}</span><span className="unit">% processor</span></div><span className="foot">{watching && ov.running ? `${fmt.n(ov.mem_now_mb)} MB of ${fmt.n(ov.mem_limit_mb)} MB memory${cpuTone ? '. Close to its limit' : ''}` : `Limits: ${ov.cpu_limit}% and ${fmt.n(ov.mem_limit_mb)} MB`}</span></div>
+        <div className="card tile"><span className="lbl">Rules</span><div><span className="val">{fmt.n(ov.rules_count)}</span><span className="unit">loaded</span></div><span className="foot">{ov.rules_updated ? `Updated ${when(ov.rules_updated)}` : 'Not updated yet'}{ov.rules_next ? ` · next ${when(ov.rules_next)}` : ''}</span></div>
+        <div className="card tile"><span className="lbl">Alerts</span><div><span className="val">{fmt.n(ov.alerts.hour)}</span><span className="unit">last hour</span></div><span className="foot">{fmt.n(ov.alerts.day)} in a day · {fmt.n(ov.alerts.week)} in a week</span></div>
+      </section>
+      <Card title="Over time" desc={range === '1h' ? 'Last hour' : range === '24h' ? 'Last 24 hours' : 'Last 7 days'}
+        actions={<Segmented value={range} onChange={setRange} options={[{ value: '1h', label: '1 h' }, { value: '24h', label: '24 h' }, { value: '7d', label: '7 d' }]} />}>
+        <div className="dns-cards">
+          <div className="stack gap1"><b className="small">Traffic on the watched ports</b>
+            <Chart series={[{ key: 'threat.watched', name: 'Traffic watched', color: 'var(--color-chart-series-1)', pts: ser('threat.watched') }]} from={h?.from || 0} to={h?.to || 1} kind="bits" height={110} compact label="Traffic on the watched ports" empty="Nothing saved yet. Points appear once watching has been on for a minute." /></div>
+          <div className="stack gap1"><b className="small">Processor used by the program (%)</b>
+            <Chart series={[{ key: 'threat.cpu', name: 'Processor', color: 'var(--color-chart-series-2)', pts: ser('threat.cpu') }]} from={h?.from || 0} to={h?.to || 1} unit="%" height={110} compact label="Processor used by the program" empty="Nothing saved yet. Points appear once watching has been on for a minute." /></div>
+        </div>
+      </Card>
+      <div className="dns-cards">
+        <Card title="What was seen" desc="Alerts by kind, last 7 days"
+          actions={<button type="button" className="link small" onClick={() => goTab('alerts')}>Open alerts →</button>}>
+          {!ov.kinds.length ? <Empty>Nothing suspicious has been seen.</Empty> : (
+            <div className="stack">
+              {ov.kinds.map((k) => (
+                <div key={k.kind} className="stack gap1">
+                  <div className="spread small"><span>{k.label}{k.quiet ? ' (usually harmless)' : ''}</span><span className="muted">{fmt.n(k.count)}</span></div>
+                  <Bar pct={(100 * k.count) / Math.max(1, ov.kinds[0].count)} thin />
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+        <Card title="Devices involved" desc="Alerts that matter, last 7 days. Odd and usually harmless traffic is left out.">
+          {!ov.devices.length ? <Empty>No device has been named in an alert.</Empty> : (
+            <div className="list">
+              {ov.devices.map((d) => <div className="item" key={d.device}><div><div className="name">{d.device}</div></div><div className="meta">{fmt.n(d.count)} alert{d.count === 1 ? '' : 's'}</div></div>)}
+            </div>
+          )}
+        </Card>
+      </div>
+      <Card title="What it has been doing" desc="Updates, switch-offs and changes. Individual alerts are on the Alerts tab.">
+        {!ov.feed.length ? <Empty>Nothing yet.</Empty> : (
+          <div className="list">
+            {ov.feed.map((f, i) => (
+              <div className="item" key={`${f.ts}-${i}`}><div><div className="name">{f.title}</div>{f.detail && <div className="meta">{f.detail}</div>}</div><div className="meta">{when(f.ts)}</div></div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </>
+  );
+}
+
 export default function Threats() {
-  const [tab, setTab] = useHashTab('protection', ['alerts','settings','rules','advanced'], 'alerts',2);
+  const [tab, setTab] = useHashTab('protection', ['overview','alerts','settings','rules','advanced'], 'overview',2);
   const [run, busy] = useAction();
-  const { data, reload } = useData('/api/threat', { every: 5000 });
+  const [fast, setFast] = useState(false);
+  const { data, reload } = useData('/api/threat', { every: fast ? 1500 : 5000 });
+  const [pending, setPending] = useState(null); // the choice just made, shown at once while the program catches up
+  const working = data?.program?.state === 'installing' || data?.program?.state === 'removing';
+  useEffect(() => { setFast(!!working); }, [working]);
   if (!data) return null;
   const p = data.program || {};
   if (!p.installed) return <InstallPrompt data={data} reload={reload} />;
@@ -347,14 +428,18 @@ export default function Threats() {
   return (
     <Card title="Threat watching" desc="Watches for infected devices, break-in attempts and probing, and tells you in plain words.">
       <div className="stack">
-        <Segmented value={data.mode} onChange={(v) => run(() => put('/api/threat/settings', { mode: v }), v === 'watch' ? 'Watching is on.' : 'Watching is off.').then(reload)} options={[{ value: 'off', label: 'Off' }, { value: 'watch', label: 'Watch and tell' }, { value: 'protect', label: 'Protect (not yet)', disabled: true }]} disabled={busy || p.state === 'installing' || p.state === 'removing'} />
+        <Segmented value={pending || data.mode} onChange={(v) => { if (v === data.mode || busy) return; setPending(v); run(() => put('/api/threat/settings', { mode: v }), v === 'watch' ? 'Watching is on.' : 'Watching is off.').then(reload).finally(() => setPending(null)); }} options={[{ value: 'off', label: 'Off' }, { value: 'watch', label: 'Watch and tell' }, { value: 'protect', label: 'Protect (not yet)', disabled: true }]} disabled={busy || p.state === 'installing' || p.state === 'removing'} />
+        {pending && (
+          <div className="inline small" role="status" aria-live="polite"><span className="spinner" aria-hidden="true" /><span><b>Working on it.</b> {pending === 'watch' ? 'Starting the watching program and checking its rules' : 'Stopping the watching program'}. <span className="muted">This can take a few seconds.</span></span></div>
+        )}
         {data.paused_reason && !watching && <Note tone="warn" title="NopeWarden switched watching off">{data.paused_reason} Your traffic was never held up.</Note>}
         {watching && !p.running && <Note tone={p.failing ? 'bad' : 'warn'} title={p.failing ? 'The program keeps failing' : 'The program is not running'}>{p.why} Your traffic is not affected. See Advanced, Program log, or Diagnostics in the left menu.</Note>}
         {p.state === 'updating' && <Note>Updating the rules. {p.message}</Note>}
         {p.state === 'failed' && <Note tone="warn">{p.message}</Note>}
         <Note tone={data.engine?.state === 'missing' && watching ? 'warn' : undefined}>{data.engine?.text}</Note>
         <p className="small muted">{data.blocking} {data.fail_open} {data.limits}</p>
-        <Tabs value={tab} onChange={setTab} tabs={[{ value: 'alerts', label: 'Alerts' }, { value: 'settings', label: 'Settings' }, { value: 'rules', label: 'Rules' }, { value: 'advanced', label: 'Advanced' }]} />
+        <Tabs value={tab} onChange={setTab} tabs={[{ value: 'overview', label: 'Overview' }, { value: 'alerts', label: 'Alerts' }, { value: 'settings', label: 'Settings' }, { value: 'rules', label: 'Rules' }, { value: 'advanced', label: 'Advanced' }]} />
+        {tab === 'overview' && <ThreatOverview data={data} goTab={setTab} />}
         {tab === 'alerts' && <Alerts data={data} reload={reload} />}
         {tab === 'settings' && <Settings data={data} reload={reload} />}
         {tab === 'rules' && <Rules data={data} reload={reload} goSettings={() => setTab('settings')} />}

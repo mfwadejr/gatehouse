@@ -12,7 +12,7 @@ The picture is an example from a new, empty box; yours will show your own device
 - **Account & sign-in**: **Two-factor sign-in**, **Password**, **Where you are signed in** (the round arrow button at the bottom of the left menu signs you out of this browser at once) and **Remote login** (SSH, off unless you turn it on; if the machine has no SSH identity yet, NopeWarden makes one when you turn it on).
 - **Alerts & logs**: **Alerts** (ntfy or email, with quiet hours), **Send logs elsewhere**, **Send traffic records (NetFlow / IPFIX)**, SNMP and **Storage** (what is kept on this machine's disk, about how much room each kind takes, and when it is removed).
 - **Backup & recovery**: **Backups**, **Changes** (a copy before every change, to go back to), **My network** (a printable summary with a map) and **Reset to default**.
-- **Advanced**: **High availability** (two boxes as a pair), **Bridge mode** (all the detailed settings), **Traffic labels**, **Guest sign-in page** and **Lists used for blocking** (the version of the app names and topic lists NopeWarden blocks by).
+- **Advanced**: **High availability** (two boxes as a pair), **Bridge mode** (all the detailed settings), **Traffic labels**, **Guest sign-in page** and **Lists used for blocking** (the version of the app names and category lists NopeWarden blocks by).
 
 Administrators see all five tabs. Other accounts see only their own sign-in settings and Appearance. The page reopens on the tab you used last.
 

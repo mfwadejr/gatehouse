@@ -7,7 +7,7 @@ import (
 
 // upstreamProbeEvery is how often every upstream DNS server gets a quick test query, so speed and
 // health stay current even when a server is not being used for real lookups.
-const upstreamProbeEvery = time.Minute
+const upstreamProbeEvery = 30 * time.Second
 
 // internetLooksDown is true only when links are being checked and none of them is up; then a
 // failed test would say nothing about the server.
@@ -33,7 +33,7 @@ func (a *App) internetLooksDown() bool {
 }
 
 // upstreamProbeLoop tests every upstream shortly after start, after any change to the list, and
-// once a minute.
+// every 30 seconds.
 func (a *App) upstreamProbeLoop(ctx context.Context) {
 	t := time.NewTicker(upstreamProbeEvery)
 	defer t.Stop()

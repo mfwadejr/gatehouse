@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"nopewarden/internal/api"
+	"nopewarden/internal/netd"
 	"nopewarden/internal/threatcfg"
 )
 
@@ -132,6 +133,10 @@ type threatWatch struct {
 	lastAt  time.Time
 	hot     int
 	stopped int
+	// What the Overview tab shows: when NopeWarden first saw it running, and its latest load.
+	runningSince time.Time
+	cpuPct       float64
+	memMB        int64
 }
 
 // threatWatchTick looks at the engine once a minute. If it has used its whole processor limit for ten
@@ -143,10 +148,12 @@ func (a *App) threatWatchTick(info netdThreat, now time.Time) {
 	defer w.mu.Unlock()
 	if a.threatMode() != "watch" || !info.Installed {
 		w.hot, w.stopped, w.lastAt = 0, 0, time.Time{}
+		w.runningSince, w.cpuPct, w.memMB = time.Time{}, 0, 0
 		return
 	}
 	if !info.Running {
 		w.hot, w.lastAt = 0, time.Time{}
+		w.runningSince, w.cpuPct, w.memMB = time.Time{}, 0, 0
 		w.stopped++
 		if w.stopped == 3 {
 			a.event("system", "warning", "Threat watching is not running", "The engine stopped. Your traffic is not affected, because it only watches. NopeWarden keeps trying to start it.")
@@ -154,10 +161,15 @@ func (a *App) threatWatchTick(info netdThreat, now time.Time) {
 		return
 	}
 	w.stopped = 0
+	if w.runningSince.IsZero() {
+		w.runningSince = now
+	}
+	w.memMB = int64(info.MemoryBytes / (1024 * 1024))
 	if !w.lastAt.IsZero() && info.CPUNSec >= w.lastNS {
 		secs := now.Sub(w.lastAt).Seconds()
 		if secs > 0 {
 			pct := float64(info.CPUNSec-w.lastNS) / 1e9 / secs * 100
+			w.cpuPct = pct
 			limit := float64(a.threatInt(threatCPUSetting, 50, 10, 400))
 			if pct >= limit*0.9 {
 				w.hot++
@@ -266,21 +278,22 @@ func (a *App) threatSearchRules(q string, limit int) ([]threatRule, int) {
 }
 
 type netdThreat = struct {
-	Installed    bool   `json:"installed"`
-	Version      string `json:"version"`
-	Running      bool   `json:"running"`
-	State        string `json:"state"`
-	Message      string `json:"message"`
-	DiskFreeMB   int64  `json:"disk_free_mb"`
-	MemoryMB     int64  `json:"memory_mb"`
-	CPUs         int    `json:"cpus"`
-	RulesUpdated int64  `json:"rules_updated"`
-	RulesCount   int    `json:"rules_count"`
-	Why          string `json:"why"`
-	Failing      bool   `json:"failing"`
-	HasPrevious  bool   `json:"has_previous"`
-	CPUNSec      uint64 `json:"cpu_nsec"`
-	MemoryBytes  uint64 `json:"memory_bytes"`
+	Installed    bool              `json:"installed"`
+	Version      string            `json:"version"`
+	Running      bool              `json:"running"`
+	State        string            `json:"state"`
+	Message      string            `json:"message"`
+	Steps        []netd.ThreatStep `json:"steps,omitempty"`
+	DiskFreeMB   int64             `json:"disk_free_mb"`
+	MemoryMB     int64             `json:"memory_mb"`
+	CPUs         int               `json:"cpus"`
+	RulesUpdated int64             `json:"rules_updated"`
+	RulesCount   int               `json:"rules_count"`
+	Why          string            `json:"why"`
+	Failing      bool              `json:"failing"`
+	HasPrevious  bool              `json:"has_previous"`
+	CPUNSec      uint64            `json:"cpu_nsec"`
+	MemoryBytes  uint64            `json:"memory_bytes"`
 }
 
 func (a *App) threatInfo() netdThreat {

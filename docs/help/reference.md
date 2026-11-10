@@ -25,7 +25,7 @@ Changes to networks and the firewall are saved first and applied when you press 
 
 ## When a protection feature fails
 
-Blocking apps and topics, and threat watching, only add protection. If they fail, your internet carries on and the protection is lost; your traffic is never held up. A block that cannot be worked out lets the lookup through, and the Logs say so (once an hour). Threat watching reads copies of the traffic, so if it stops, crashes or is removed nothing changes for your devices; if it uses all of its processor share for ten minutes NopeWarden switches it off and says why. Details are in the Protection chapter.
+Blocking apps and categories, and threat watching, only add protection. If they fail, your internet carries on and the protection is lost; your traffic is never held up. A block that cannot be worked out lets the lookup through, and the Logs say so (once an hour). Threat watching reads copies of the traffic, so if it stops, crashes or is removed nothing changes for your devices; if it uses all of its processor share for ten minutes NopeWarden switches it off and says why. Details are in the Protection chapter.
 
 ## Updates
 

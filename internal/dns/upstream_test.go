@@ -83,17 +83,65 @@ func TestStatusSaysWhyAServerIsSlowOrDown(t *testing.T) {
 	p := NewPool(nil)
 	p.Set(twoUpstreams())
 	now := time.Now()
-	p.ups[0].record(195*time.Millisecond, nil, now)
+	p.ups[0].record(495*time.Millisecond, nil, now)
 	st := p.Status()[0]
-	if st.State != "degraded" || !strings.Contains(st.Reason, "195 ms") || !strings.Contains(st.Reason, "150 ms") {
+	if st.State != "degraded" || !strings.Contains(st.Reason, "495 ms") || !strings.Contains(st.Reason, "400 ms") {
 		t.Fatalf("degraded reason: %+v", st)
 	}
 	for i := 0; i < 3; i++ {
-		p.ups[1].record(0, errors.New("read tcp: i/o timeout"), now)
+		p.ups[1].record(0, errors.New("read tcp: i/o timeout"), now.Add(time.Duration(i)*6*time.Second))
 	}
 	st = p.Status()[1]
 	if st.State != "down" || !strings.Contains(st.Reason, "no reply in time") || st.RetryIn <= 0 || st.Failures != 3 {
 		t.Fatalf("down reason: %+v", st)
+	}
+}
+
+func TestAShortHiccupDoesNotMarkAServerDown(t *testing.T) {
+	p := NewPool(nil)
+	p.Set(twoUpstreams())
+	u := p.ups[0]
+	now := time.Now()
+	u.record(20*time.Millisecond, nil, now)
+	// two failed queries in a row, close together: not down
+	u.record(0, errors.New("i/o timeout"), now.Add(time.Second))
+	u.record(0, errors.New("i/o timeout"), now.Add(2*time.Second))
+	if st := u.status(now.Add(2 * time.Second)); st.State == "down" {
+		t.Fatalf("two quick failures must not mark a server down: %+v", st)
+	}
+	// three close together are still a hiccup; a run that lasts 10 s or more is not
+	u.record(0, errors.New("i/o timeout"), now.Add(3*time.Second))
+	if st := u.status(now.Add(3 * time.Second)); st.State == "down" {
+		t.Fatalf("three failures within a few seconds must not mark it down: %+v", st)
+	}
+	u.record(0, errors.New("i/o timeout"), now.Add(13*time.Second))
+	if st := u.status(now.Add(13 * time.Second)); st.State != "down" {
+		t.Fatalf("a run of failures over 10 s should mark it down: %+v", st)
+	}
+}
+
+func TestOneSlowAnswerDoesNotMakeAServerSlow(t *testing.T) {
+	p := NewPool(nil)
+	p.Set(twoUpstreams())
+	u := p.ups[0]
+	now := time.Now()
+	for i := 0; i < 5; i++ {
+		u.record(30*time.Millisecond, nil, now)
+	}
+	u.record(5*time.Second, nil, now) // a name found from scratch
+	if st := u.status(now); st.State != "healthy" {
+		t.Fatalf("one slow answer among fast ones should leave it healthy: %+v", st)
+	}
+}
+
+func TestUnboundIsNeverCalledSlow(t *testing.T) {
+	p := NewPool(nil)
+	p.Set(twoUpstreams())
+	u := p.ups[0]
+	u.NoSlow = true
+	u.record(900*time.Millisecond, nil, time.Now())
+	if st := u.status(time.Now()); st.State != "healthy" {
+		t.Fatalf("a resolver that looks names up itself is slow on first lookups by nature: %+v", st)
 	}
 }
 

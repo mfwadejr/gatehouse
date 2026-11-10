@@ -462,7 +462,7 @@ export default function DNS() {
     <Page title="DNS" sub="Translates names to addresses for every device, and blocks the ones you do not want.">
       <Tabs value={tab} onChange={setTab} tabs={[{ value: 'overview', label: 'Overview' }, { value: 'lists', label: 'Blocking' }, { value: 'records', label: 'Your names' }, { value: 'groups', label: 'Profiles' }, { value: 'settings', label: 'Settings' }]} />
       {tab === 'overview' && <Overview />}
-      {tab === 'lists' && <><Lists /><p className="small muted">Blocking an app or a topic for one device or at set hours is under <a href="#/protection">Protection</a>.</p></>}
+      {tab === 'lists' && <><Lists /><p className="small muted">Blocking an app or a category for one device or at set hours is under <a href="#/protection">Protection</a>.</p></>}
       {tab === 'records' && <Records />}
       {tab === 'groups' && <Groups />}
       {tab === 'settings' && <SettingsTab />}

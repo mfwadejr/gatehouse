@@ -180,6 +180,18 @@ export function Segmented({ value, onChange, options }) {
   );
 }
 
+// A ticked list of the stages of something that takes a while (an install, a removal).
+export function Steps({ steps, label = 'Progress' }) {
+  const mark = { done: '✓', active: '●', pending: '○', failed: '✕' };
+  return (
+    <ol className="usteps" aria-label={label}>
+      {steps.map((st) => (
+        <li key={st.id} className={st.state}><span aria-hidden="true">{mark[st.state] || '○'}</span> {st.label}</li>
+      ))}
+    </ol>
+  );
+}
+
 export function Tabs({ value, onChange, tabs }) {
   return (
     <div className="tabs" role="tablist">

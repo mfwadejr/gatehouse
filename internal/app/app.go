@@ -402,7 +402,7 @@ func (a *App) Run(ctx context.Context) error {
 	// a DNS server answers.
 	a.Lists.Online = func() bool {
 		for _, u := range a.DNS.Pool().Status() {
-			if u.State == "healthy" {
+			if u.State != "down" {
 				return true
 			}
 		}

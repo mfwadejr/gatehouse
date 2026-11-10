@@ -230,6 +230,10 @@ func TestThreatPreviewWorksOutSizesWhenAptPrintsNoTotals(t *testing.T) {
 		c := name + " " + strings.Join(args, " ")
 		switch {
 		case strings.Contains(c, "--print-uris"):
+			// each package is its own argument; one argument holding both names finds nothing
+			if !strings.HasSuffix(c, "-qq suricata suricata-update") || len(args) < 2 || args[len(args)-2] != "suricata" || args[len(args)-1] != "suricata-update" {
+				return nil, errors.New("E: Unable to locate package suricata suricata-update")
+			}
 			return []byte("'http://deb.debian.org/debian/pool/main/s/suricata/suricata_7.deb' suricata_7.deb 10485760 SHA256:aa\n'http://deb.debian.org/debian/pool/main/s/suricata-update/su.deb' su.deb 5242880 SHA256:bb\n"), nil
 		case strings.HasPrefix(c, "apt-cache show"):
 			return []byte("Package: suricata\nInstalled-Size: 51200\n\nPackage: suricata-update\nInstalled-Size: 10240\n"), nil
@@ -239,5 +243,84 @@ func TestThreatPreviewWorksOutSizesWhenAptPrintsNoTotals(t *testing.T) {
 	p, err := s.ThreatInstallPreview()
 	if err != nil || p.DownloadMB != 15 || p.DiskMB != 60 {
 		t.Fatalf("%+v %v", p, err)
+	}
+}
+
+func TestThreatInstallShowsItsSteps(t *testing.T) {
+	s, _ := fakeThreatBox(t)
+	gate := make(chan struct{})
+	var seen []string
+	aptRun = func(_ time.Duration, name string, args ...string) ([]byte, error) {
+		c := name + " " + strings.Join(args, " ")
+		seen = append(seen, c)
+		if strings.Contains(c, " install ") && !strings.Contains(c, "--download-only") && !strings.Contains(c, "-s ") {
+			<-gate // hold the install itself so the steps can be read
+			installFakeBinary(t, s)
+		}
+		return nil, nil
+	}
+	if err := s.ThreatInstallStart(); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	var info ThreatInfo
+	for time.Now().Before(deadline) {
+		info = s.ThreatStatus()
+		if len(info.Steps) == 5 && info.Steps[2].State == "active" {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if len(info.Steps) != 5 || info.Steps[0].State != "done" || info.Steps[1].State != "done" || info.Steps[2].State != "active" || info.Steps[3].State != "pending" {
+		t.Fatalf("steps while installing: %+v", info.Steps)
+	}
+	if info.Steps[1].Label != "Downloading threat watching" || info.Steps[2].Label != "Installing it" {
+		t.Fatalf("labels: %+v", info.Steps)
+	}
+	close(gate)
+	for time.Now().Before(deadline.Add(5 * time.Second)) {
+		if s.ThreatStatus().State == "idle" {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("install did not finish: %+v", s.ThreatStatus())
+}
+
+func TestThreatInstallFailureMarksTheStep(t *testing.T) {
+	s, _ := fakeThreatBox(t)
+	aptRun = func(_ time.Duration, name string, args ...string) ([]byte, error) {
+		if strings.Contains(strings.Join(args, " "), "--download-only") {
+			return []byte("E: Failed to fetch"), errors.New("exit 100")
+		}
+		return nil, nil
+	}
+	if err := s.ThreatInstallStart(); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) && s.ThreatStatus().State != "failed" {
+		time.Sleep(10 * time.Millisecond)
+	}
+	info := s.ThreatStatus()
+	if info.State != "failed" || len(info.Steps) != 5 || info.Steps[1].State != "failed" || info.Steps[0].State != "done" || !strings.Contains(info.Message, "download did not work") {
+		t.Fatalf("%+v", info)
+	}
+}
+
+func TestNeedToGetReadsTheTotalAfterTheSlash(t *testing.T) {
+	for line, want := range map[string]float64{
+		"Need to get 21.4 MB of archives.":        21.4,
+		"Need to get 0 B/21.4 MB of archives.":    21.4,
+		"Need to get 1,024 kB/12 MB of archives.": 12,
+		"Need to get 3,145,728 B of archives.":    3,
+	} {
+		m := reNeed.FindStringSubmatch(line)
+		if m == nil {
+			t.Fatalf("no match: %q", line)
+		}
+		if got := toMB(m[1], m[2]); got < want-0.01 || got > want+0.01 {
+			t.Fatalf("%q: got %v want %v", line, got, want)
+		}
 	}
 }

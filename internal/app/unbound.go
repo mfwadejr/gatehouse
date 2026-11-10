@@ -75,7 +75,7 @@ func (a *App) directActive() bool {
 
 // unboundUpstream is the one "server" the pool uses in direct mode.
 func unboundUpstream() *dnssrv.Upstream {
-	return &dnssrv.Upstream{ID: -100, Name: "Resolve directly (Unbound)", Addr: "127.0.0.1:5335", Proto: "udp", Position: 1}
+	return &dnssrv.Upstream{ID: -100, Name: "Resolve directly (Unbound)", Addr: "127.0.0.1:5335", Proto: "udp", Position: 1, NoSlow: true}
 }
 
 func (a *App) unboundApplyPlan() error {

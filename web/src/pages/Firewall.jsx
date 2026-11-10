@@ -218,7 +218,7 @@ function Protection({ ov, reload, pickers }) {
       <ToggleRow title="Ask for a code before changing the firewall" desc="Requires your authenticator code to apply network changes." checked={s.step_up} onChange={save('step_up')} />
       <ToggleRow title="Log blocked traffic" desc="Useful when troubleshooting. Uses more disk space." checked={s.log_drops} onChange={save('log_drops')} />
     </Card>
-    <Card title="Threat watching, apps and topics" desc="These now have their own page."><p className="small">Block apps and topics, and watch for threats, under <a href="#/protection">Protection</a>.</p></Card>
+    <Card title="Threat watching, apps and categories" desc="These now have their own page."><p className="small">Block apps and categories, and watch for threats, under <a href="#/protection">Protection</a>.</p></Card>
     </>
   );
 }

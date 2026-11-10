@@ -196,8 +196,10 @@ function DnsTile({ dns, h }) {
   const st = dns?.stats;
   const ups = dns?.upstreams || [];
   const ok = ups.filter((u) => u.state === 'healthy').length;
-  const pill = !ups.length ? '' : ok === ups.length ? 'Working' : ok ? `${ups.length - ok} slow or down` : 'No server answering';
-  const tone = !ups.length ? '' : ok === ups.length ? 'good' : ok ? 'warn' : 'bad';
+  const down = ups.filter((u) => u.state === 'down').length;
+  // Slow is not dead: only when every server is down does the tile say nothing is answering.
+  const pill = !ups.length ? '' : ok === ups.length ? 'Working' : down === ups.length ? 'No server answering' : down ? `${down} down` : `${ups.length - ok} slow`;
+  const tone = !ups.length ? '' : ok === ups.length ? 'good' : down === ups.length ? 'bad' : 'warn';
   return (
     <Tile title="DNS" pill={pill} tone={tone} big={<CountUp value={st?.hour_total ?? 0} />} unit="lookups in the last hour" to="dns"
       sub={`${fmt.d1(st?.qps)}/s now · ${ups.length} server${ups.length === 1 ? '' : 's'} · ${fmt.d1(st?.blocked_pct)} % blocked · ${fmt.d1(st?.cached_pct)} % cached`}
@@ -273,8 +275,8 @@ const mapLegend = (dir) => (dir === 'out'
 const RANGE_HOURS = { '5m': '1', '15m': '1', '1h': '1', '24h': '24', '7d': '168', '30d': '720' };
 
 function WorldCard() {
-  const [dir, setDir] = useState('out'); // out, in, or both
-  const [range, setRange] = useState('24h');
+  const [dir, setDir] = useState('both'); // out, in, or both
+  const [range, setRange] = useState('15m');
   const every = range === '5m' || range === '15m' ? 10000 : 60000;
   const { data: dOut } = useData(`/api/overview/map?dir=out&range=${range}`, { every, enabled: dir !== 'in' });
   const { data: dIn } = useData(`/api/overview/map?dir=in&range=${range}`, { every, enabled: dir !== 'out' });
@@ -434,7 +436,7 @@ function NetworksCard({ fw, wanList, links, devs, h24 }) {
         </table></div>
       <div className="ov-net mt3">
           <div className="spread"><b>Internet</b>{enabled.length ? <Pill tone={ok ? 'good' : states.every((s) => s.health === 'unknown' || s.health === 'none') ? '' : 'bad'}>{ok ? (enabled.length > 1 ? `${ok} of ${enabled.length} working` : 'Connected') : states.every((s) => s.health === 'unknown' || s.health === 'none') ? 'Checking…' : 'Down'}</Pill> : <Pill>Not set up</Pill>}</div>
-          <div className="small muted">{enabled.map((w) => w.iface).join(', ') || 'no port yet'} · managed automatically</div>
+          <div className="small muted">{enabled.map((w) => (w.name ? `${w.name} (${w.iface})` : w.iface)).join(', ') || 'no port yet'} · managed automatically</div>
         </div>
       <button type="button" className="link small leftalign" onClick={() => go('networks')}>Open networks →</button>
     </Card>
