@@ -65,17 +65,28 @@ func unitState(unit string) unitInfo {
 	return u
 }
 
+// reOwnError matches the error lines programs print themselves (Suricata's "E: ...", "<Error> ...").
+var reOwnError = regexp.MustCompile(`(?:^|\s)(?:E|Error|Critical):|<Error>|<Critical>`)
+
 var reErrLine = regexp.MustCompile(`(?i)<error>|<critical>|error|failed|fatal|cannot|can't|unable`)
 
 // lastUnitError is the most recent line in a service's log that reads like a complaint.
 func lastUnitError(unit string) string {
 	j, _ := sysRun(10*time.Second, "journalctl", "-u", unit, "-n", "60", "--no-pager", "-o", "cat")
-	last := ""
+	last, specific := "", ""
 	for _, l := range strings.Split(j, "\n") {
 		l = strings.TrimSpace(l)
-		if l != "" && reErrLine.MatchString(l) {
-			last = l
+		if l == "" || !reErrLine.MatchString(l) {
+			continue
 		}
+		last = l
+		// The program's own error says why; systemd's "Failed with result 'exit-code'" does not.
+		if reOwnError.MatchString(l) && !strings.Contains(l, ".service:") {
+			specific = l
+		}
+	}
+	if specific != "" {
+		last = specific
 	}
 	if len(last) > 240 {
 		last = last[:240]

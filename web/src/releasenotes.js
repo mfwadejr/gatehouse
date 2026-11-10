@@ -1,6 +1,14 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.15',
+    title: 'Threat watching starts properly',
+    items: [
+      'Fixed threat watching stopping again and again on a real install. NopeWarden\'s settings for the engine replaced its built-in list of address and port groups, so none of the real rules could load and it exited. It now keeps them, and the engine starts with the full rule set. An update fixes it by itself: NopeWarden rewrites the settings and restarts the engine.',
+      'When the engine does fail, the message now shows its own reason (for example which rule could not load) instead of a general line from the system.',
+    ],
+  },
+  {
     version: '0.9.4.14',
     title: 'Calmer DNS health, a Threats overview, and clearer installs',
     items: [

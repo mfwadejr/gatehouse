@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/binary"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -94,4 +95,33 @@ func splitLines(b []byte) [][]byte {
 		out = append(out, b[start:])
 	}
 	return out
+}
+
+// The rules NopeWarden loads use the engine's own address and port groups (HTTP_PORTS, SHELLCODE_PORTS
+// and so on). Our settings file must leave them defined, or the engine refuses to load any rule and
+// exits. This runs the engine's own configuration test with rules that use them.
+func TestRealEngineLoadsRulesThatUseItsOwnVariables(t *testing.T) {
+	bin, err := exec.LookPath("suricata")
+	if err != nil {
+		t.Skip("the threat-watching engine is not installed here")
+	}
+	dir := t.TempDir()
+	inc := filepath.Join(dir, "nopewarden.yaml")
+	os.WriteFile(inc, []byte(threatcfg.Include()), 0o644)
+	var rules string
+	sid := 1
+	for _, v := range []string{"HTTP_PORTS", "SHELLCODE_PORTS", "ORACLE_PORTS", "SSH_PORTS", "FILE_DATA_PORTS", "FTP_PORTS", "GENEVE_PORTS", "VXLAN_PORTS", "TEREDO_PORTS"} {
+		rules += fmt.Sprintf("alert tcp $HOME_NET any -> $EXTERNAL_NET $%s (msg:\"p %s\"; content:\"a%d\"; sid:%d; rev:1;)\n", v, v, sid, sid)
+		sid++
+	}
+	for _, v := range []string{"HTTP_SERVERS", "SQL_SERVERS", "DNS_SERVERS", "SMTP_SERVERS", "TELNET_SERVERS", "AIM_SERVERS", "DC_SERVERS"} {
+		rules += fmt.Sprintf("alert tcp $EXTERNAL_NET any -> $%s any (msg:\"s %s\"; content:\"a%d\"; sid:%d; rev:1;)\n", v, v, sid, sid)
+		sid++
+	}
+	rf := filepath.Join(dir, "all.rules")
+	os.WriteFile(rf, []byte(rules), 0o644)
+	out, err := exec.Command(bin, "-T", "-c", "/etc/suricata/suricata.yaml", "--include", inc, "-S", rf, "-i", "lo", "-l", dir).CombinedOutput()
+	if err != nil {
+		t.Fatalf("the engine would not start with our settings and the rules: %v\n%s", err, out)
+	}
 }

@@ -65,3 +65,14 @@ func TestACustomSetupIsThePresetPlusChanges(t *testing.T) {
 		t.Fatal("unknown group accepted")
 	}
 }
+
+// A setting in the include file replaces the engine's whole block of that name. Setting "vars" there
+// once removed HTTP_PORTS and every other port group, so the real rules failed to load and the engine
+// exited. The include must not define it.
+func TestIncludeDoesNotReplaceTheEnginesVariables(t *testing.T) {
+	for _, l := range strings.Split(Include(), "\n") {
+		if strings.HasPrefix(l, "vars:") || strings.HasPrefix(l, "address-groups:") || strings.HasPrefix(l, "port-groups:") {
+			t.Fatalf("the include must not define the engine's variables: %q", l)
+		}
+	}
+}

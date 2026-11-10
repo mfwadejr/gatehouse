@@ -81,15 +81,16 @@ func (p *Plan) Check() error {
 }
 
 // Include is the settings file added on top of the engine's own. It keeps only alerts in the log
-// (no flow, DNS or HTTP records), switches statistics off and asks for low memory use.
+// (no flow, DNS or HTTP records), switches statistics off and asks for low memory use. Each top-level
+// block in it replaces the engine's own block of that name, so it must only hold blocks that are
+// meant to be replaced whole.
 func Include() string {
 	return `%YAML 1.1
 ---
 # Written by NopeWarden. Watch only: the engine reads copies of packets and changes nothing.
-vars:
-  address-groups:
-    HOME_NET: "[192.168.0.0/16,10.0.0.0/8,172.16.0.0/12]"
-    EXTERNAL_NET: "!$HOME_NET"
+# Do not set "vars" here: a setting in this file replaces the engine's whole block of the same name, and
+# the rules need every address and port group the engine defines itself (HTTP_PORTS and many more).
+# The engine's own HOME_NET already is the usual private ranges.
 outputs:
   - eve-log:
       enabled: yes

@@ -79,3 +79,4 @@ Record the machine, the version (Settings, About) and the date at the top of eac
 | 72 | Switch responds at once | Off / Watch and tell: the highlight moves the moment you click and a "Working on it" line shows until it finishes | | |
 | 73 | Threats Overview | Protection, Threats opens on Overview: Status, Traffic watched, Load, Rules and Alerts cards, charts, What was seen, Devices involved and What it has been doing; with watching off, the cards say so | | |
 | 74 | Blocks tab | The Protection tab reads Blocks, and the screens say category (not topic) | | |
+| 75 | Threat engine stays up | After updating, with Watch and tell on: within a few minutes Threats shows Watching (not Failing); the Overview shows traffic and load; "keeps failing" does not appear | | |
