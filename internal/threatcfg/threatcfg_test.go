@@ -76,3 +76,11 @@ func TestIncludeDoesNotReplaceTheEnginesVariables(t *testing.T) {
 		}
 	}
 }
+
+// A pid file left by a failed start made the engine refuse every later start.
+func TestUnitAsksForNoPidFile(t *testing.T) {
+	u := Unit(Plan{Ifaces: []string{"lan0"}, CPUPercent: 50, MemoryMB: 2048})
+	if strings.Contains(u, "pidfile") {
+		t.Fatalf("the unit must not ask the engine for a pid file:\n%s", u)
+	}
+}

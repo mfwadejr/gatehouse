@@ -76,13 +76,16 @@ func lastUnitError(unit string) string {
 	last, specific := "", ""
 	for _, l := range strings.Split(j, "\n") {
 		l = strings.TrimSpace(l)
-		if l == "" || !reErrLine.MatchString(l) {
+		if l == "" {
 			continue
 		}
-		last = l
-		// The program's own error says why; systemd's "Failed with result 'exit-code'" does not.
+		// The program's own error says why; systemd's "Failed with result 'exit-code'" does not. Its
+		// wording need not hold a word like "failed" ("E: pidfile: ... appears stale ... Aborting!").
 		if reOwnError.MatchString(l) && !strings.Contains(l, ".service:") {
 			specific = l
+		}
+		if reErrLine.MatchString(l) {
+			last = l
 		}
 	}
 	if specific != "" {

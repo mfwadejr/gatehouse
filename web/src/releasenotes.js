@@ -1,6 +1,14 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.16',
+    title: 'Threat watching recovers after a failed start',
+    items: [
+      'Fixed threat watching staying stuck on \"keeps failing\" even after the settings fix in 0.9.4.15. When the engine failed to start it left a process-ID file behind, and it then refused every later start with \"pid file exists but appears stale\". NopeWarden no longer asks the engine for that file, clears the old one, and restarts the engine.',
+      'The failure message now shows the engine\'s own words even when they do not contain a word like \"failed\".',
+    ],
+  },
+  {
     version: '0.9.4.15',
     title: 'Threat watching starts properly',
     items: [

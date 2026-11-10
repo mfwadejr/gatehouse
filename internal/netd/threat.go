@@ -215,6 +215,9 @@ func countRules(path string) int {
 	return n
 }
 
+// threatStalePidFile is where the first versions of the service asked the engine to write its pid.
+const threatStalePidFile = "run/nopewarden-suricata.pid"
+
 var reAfter = regexp.MustCompile(`After this operation, ([\d.,]+) ([kMG])B of additional disk space`)
 
 // "Need to get 21.4 MB of archives" or, when some are already downloaded, "Need to get 0 B/21.4 MB": the
@@ -428,8 +431,12 @@ func (s *Service) ThreatApply(p threatcfg.Plan) error {
 	sysRun(30*time.Second, "systemctl", "enable", threatcfg.UnitName)
 	verb := "start"
 	if changed {
+		// Stop first, then clear the pid file an earlier version of the service asked the engine to
+		// write: a failed start leaves it behind and the engine then refuses every later start.
+		sysRun(120*time.Second, "systemctl", "stop", threatcfg.UnitName)
 		verb = "restart"
 	}
+	os.Remove(s.rootPath(threatStalePidFile))
 	if out, err := sysRun(90*time.Second, "systemctl", verb, threatcfg.UnitName); err != nil {
 		return fmt.Errorf("the threat-watching program did not start: %s", strings.TrimSpace(out))
 	}

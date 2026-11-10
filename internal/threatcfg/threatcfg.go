@@ -105,7 +105,10 @@ detect:
 `
 }
 
-// Unit is the service that runs the engine with a processor and memory limit.
+// Unit is the service that runs the engine with a processor and memory limit. It must not ask the
+// engine for a pid file: a start that fails (or a stop that is cut short) leaves the file behind, and
+// the engine then refuses every later start with "pid file exists but appears stale". systemd already
+// knows the process, so no pid file is needed.
 func Unit(p Plan) string {
 	var args strings.Builder
 	for _, i := range p.Ifaces {
@@ -116,7 +119,7 @@ Description=NopeWarden threat watching (Suricata, watch only)
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/suricata -c /etc/suricata/suricata.yaml --include /etc/nopewarden/suricata.yaml --pidfile /run/nopewarden-suricata.pid%s
+ExecStart=/usr/bin/suricata -c /etc/suricata/suricata.yaml --include /etc/nopewarden/suricata.yaml%s
 Restart=on-failure
 RestartSec=30
 Nice=10
