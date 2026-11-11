@@ -50,6 +50,7 @@ type NetController interface {
 	UnboundApply(p netd.UnboundPlan) error
 	SSHLog(since int64) ([]string, error)
 	HAApply(p netd.HAPlan) error
+	MgmtApply(p netd.MgmtPlan) error
 	NDPIApply(p netd.NDPIPlan) error
 	NDPIInstalled() bool
 	ThreatStatus() netd.ThreatInfo

@@ -69,6 +69,8 @@ type fakeNet struct {
 	flowAcct     []bool
 	flowDump     string
 	sqmPlans     []netd.SQMPlan
+	mgmtPlans    []netd.MgmtPlan
+	mgmtErr      error
 	sqmErr       error
 }
 
@@ -107,6 +109,13 @@ func (f *fakeNet) NDPIApply(p netd.NDPIPlan) error {
 	f.ndpiPlans = append(f.ndpiPlans, p)
 	return nil
 }
+func (f *fakeNet) MgmtApply(p netd.MgmtPlan) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.mgmtPlans = append(f.mgmtPlans, p)
+	return f.mgmtErr
+}
+
 func (f *fakeNet) OverrideApply(p netd.OverridePlan) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()

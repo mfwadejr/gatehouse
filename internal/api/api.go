@@ -45,6 +45,9 @@ type Server struct {
 	// Gate, when set, may refuse a signed-in request before it runs. It is how the standby unit of a
 	// high-availability pair stays read-only. It returns false and a plain reason to refuse.
 	Gate func(method, path string) (bool, string)
+	// Seen is told about every request that was signed in and allowed, before it runs. The
+	// management port uses it to learn that its new address works.
+	Seen func(r *http.Request)
 	// Topics a signed-in user may stream. Subsystems register theirs.
 	topics map[string]bool
 	mux    *http.ServeMux
@@ -120,6 +123,9 @@ func (s *Server) guard(h HandlerFunc, needFull, needAdmin bool) http.HandlerFunc
 		if needAdmin && c.User.Role != "admin" {
 			Error(w, http.StatusForbidden, "administrator access required")
 			return
+		}
+		if s.Seen != nil {
+			s.Seen(r)
 		}
 		if s.Gate != nil {
 			if ok, why := s.Gate(r.Method, r.URL.Path); !ok {

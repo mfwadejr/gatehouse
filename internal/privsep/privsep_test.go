@@ -248,6 +248,7 @@ func (f *fakeNetCtl) FlowAcct(on bool) error                  { return nil }
 func (f *fakeNetCtl) ConntrackDump() (string, error)          { return "", nil }
 func (f *fakeNetCtl) SQMApply(p netd.SQMPlan) (string, error) { return "cake", nil }
 func (f *fakeNetCtl) OverrideApply(p netd.OverridePlan) error { return nil }
+func (f *fakeNetCtl) MgmtApply(p netd.MgmtPlan) error         { return nil }
 func (f *fakeNetCtl) ThreatStatus() netd.ThreatInfo {
 	return netd.ThreatInfo{Installed: true, State: "idle"}
 }

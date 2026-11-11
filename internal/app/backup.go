@@ -472,7 +472,7 @@ func (a *App) verifyBackup(path, password string) (*BackupReport, error) {
 // ---- restoring ----
 
 // settings the restore leaves as they are on this machine.
-var restoreKeepAlways = []string{"update.", "console.port", "mgmt.rescue_iface", "backup.", "ha."}
+var restoreKeepAlways = []string{"update.", "console.port", "mgmt.rescue_iface", "mgmt.port", "backup.", "ha."}
 
 // settings that belong with the accounts, and are kept while the accounts are kept.
 var restoreKeepWithAccounts = []string{"auth.", "session_", "fw.stepup", "system.timezone"}

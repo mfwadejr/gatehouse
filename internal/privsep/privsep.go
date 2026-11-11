@@ -49,6 +49,7 @@ type NetController interface {
 	UnboundApply(p netd.UnboundPlan) error
 	SSHLog(since int64) ([]string, error)
 	HAApply(p netd.HAPlan) error
+	MgmtApply(p netd.MgmtPlan) error
 	NDPIApply(p netd.NDPIPlan) error
 	NDPIInstalled() bool
 	OverrideApply(p netd.OverridePlan) error
@@ -341,6 +342,12 @@ func (s *Server) dispatchNet(r request) (any, error) {
 			return nil, errors.New("bad parameters")
 		}
 		return nil, s.Net.HAApply(p)
+	case "mgmt.apply":
+		var p netd.MgmtPlan
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return nil, s.Net.MgmtApply(p)
 	case "ndpi.apply":
 		var p netd.NDPIPlan
 		if err := json.Unmarshal(r.Params, &p); err != nil {
@@ -681,6 +688,11 @@ func (c *Client) UnboundApply(p netd.UnboundPlan) error {
 // HAApply installs or removes the high-availability services.
 func (c *Client) HAApply(p netd.HAPlan) error {
 	return c.callWithin(2*time.Minute, "ha.apply", p, nil)
+}
+
+// MgmtApply sets up or removes the management port's address.
+func (c *Client) MgmtApply(p netd.MgmtPlan) error {
+	return c.callWithin(time.Minute, "mgmt.apply", p, nil)
 }
 
 // NDPIApply starts or stops the traffic-labelling program.

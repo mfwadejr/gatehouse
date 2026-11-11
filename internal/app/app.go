@@ -232,6 +232,7 @@ func New(cfg Config) (*App, error) {
 	a.registerHAWarmRoutes()
 	a.registerDDNSRoutes()
 	a.registerNetFilterRoutes()
+	a.registerMgmtRoutes()
 	a.loadSyslog()
 	a.prepareSetup()
 
@@ -440,6 +441,7 @@ func (a *App) Run(ctx context.Context) error {
 	run(func() { a.dynLoop(ctx) })
 	run(func() { a.rogueLoop(ctx) })
 	run(func() { a.sshLoop(ctx) })
+	run(func() { a.mgmtLoop(ctx) })
 
 	a.con.begin(ctx)
 	cs, err := a.startConsole(ctx, a.consoleAddr())

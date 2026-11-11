@@ -7,6 +7,7 @@ import AddNetwork from '../AddNetwork.jsx';
 import { go } from '../App.jsx';
 import { linkState } from '../linkstate.js';
 import ForcedDns from './ForcedDns.jsx';
+import MgmtPort from './MgmtPort.jsx';
 import Countries from './Countries.jsx';
 import UPnPCard from './UPnPCard.jsx';
 import Forwards from './Forwards.jsx';
@@ -263,7 +264,7 @@ export default function Firewall({ me }) {
       {tab === 'rules' && <RulesList ov={ov} rules={(rules || []).filter((r) => !r.countries)} countryRules={countryRules} pickers={pickers} reloadPickers={reloadPickers} reload={all} filter={filter} setFilter={setFilter} startNew={(init) => setNewRule(init)} goPorts={() => setTab('ports')} />}
       {tab === 'groups' && <GroupsAndLists pickers={pickers} reloadPickers={reloadPickers} reload={all} />}
       {tab === 'ports' && <><NatNotice compact /><Forwards reload={reload} /><UPnPCard /></>}
-      {tab === 'protection' && <Protection ov={ov} reload={reload} pickers={pickers} />}
+      {tab === 'protection' && <><MgmtPort /><Protection ov={ov} reload={reload} pickers={pickers} /></>}
       {tab === 'countries' && <Countries reload={all} />}
       {tab === 'discovery' && <Discovery reload={all} />}
       {tab === 'history' && <History />}

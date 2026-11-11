@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -257,6 +258,25 @@ func validElem(e string) (string, error) {
 	return "", fmt.Errorf("%q is not an address", e)
 }
 
+var reIfname = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,14}$`)
+
+// validIfname accepts a port name and writes it the way a set of names wants it.
+func validIfname(e string) (string, error) {
+	if !reIfname.MatchString(e) {
+		return "", fmt.Errorf("%q is not a port name", e)
+	}
+	return `"` + e + `"`, nil
+}
+
+// validPort accepts a TCP port number.
+func validPort(e string) (string, error) {
+	n, err := strconv.Atoi(e)
+	if err != nil || n < 1 || n > 65535 {
+		return "", fmt.Errorf("%q is not a port", e)
+	}
+	return strconv.Itoa(n), nil
+}
+
 // BuildSetScript turns set contents into nft commands. Names and elements are checked, so a
 // value from the DNS or the lease table can never add anything but an address to a set.
 func BuildSetScript(fills map[string]SetFill, only map[string]bool) (string, error) {
@@ -279,7 +299,16 @@ func BuildSetScript(fills map[string]SetFill, only map[string]bool) (string, err
 		}
 		var elems []string
 		for _, e := range f.Elems {
-			v, err := validElem(e)
+			var v string
+			var err error
+			switch n {
+			case MgmtIfSet:
+				v, err = validIfname(e)
+			case LanGateSet:
+				v, err = validPort(e)
+			default:
+				v, err = validElem(e)
+			}
 			if err != nil {
 				return "", err
 			}

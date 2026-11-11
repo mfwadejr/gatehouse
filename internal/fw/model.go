@@ -135,6 +135,9 @@ type Model struct {
 	// the internet. Only networks that are not internet-facing, not management and not the setup
 	// port are ever used (see PortalNets).
 	PortalIfaces []string
+	// CloseLAN means the console rules for the management networks and the setup port go through
+	// LanGateSet, which the program empties while the management port is healthy.
+	CloseLAN bool
 	// MgmtAllow, when not empty, limits management (console and SSH) to these address ranges.
 	// Empty means every management network may manage. The setup port is never limited by it.
 	MgmtAllow []string
@@ -229,6 +232,13 @@ type DNSException struct {
 const (
 	// PortalSet holds the addresses of devices that have accepted the sign-in page.
 	PortalSet = "portal_ok"
+	// MgmtIfSet holds the name of the management port (if there is one). The rules for it always
+	// exist in the ruleset; the set decides whether any port is covered, so the port can be set up,
+	// moved or removed without changing the ruleset.
+	MgmtIfSet = "mgmt_if"
+	// LanGateSet holds the console ports while the console is open on the LAN. It exists only when
+	// "close the console on the LAN" is chosen; empty, the LAN rules for the console match nothing.
+	LanGateSet = "lan_console"
 	// PortalPort is where the sign-in page listens on this router.
 	PortalPort = 8099
 )

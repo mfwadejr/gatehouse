@@ -1,6 +1,16 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.19',
+    title: 'A management port of its own',
+    items: [
+      'Firewall, Protection has a new Management port card. Set one spare port aside so the console and remote login answer there and nothing is routed through it. It takes an address from DHCP or a fixed one, and a fixed address that overlaps a network this device already serves is refused.',
+      'A change waits for you to open the console on the new address. If nobody does within a minute it is undone on its own, and Undo now does it sooner.',
+      'Close the console on the LAN while this port is healthy is off until you turn it on, and can only be turned on from the management address. The LAN console closes after the port has been healthy for half a minute and opens again if it stops answering for a minute.',
+      'The port is listed under the protected rules, is kept when you restore a backup or reset the network, and is not used in bridge mode.',
+    ],
+  },
+  {
     version: '0.9.4.18',
     title: 'Keep delay low follows what your line really delivers',
     items: [

@@ -26,7 +26,7 @@ var factoryExtra = []string{"recovery_codes", "sessions", "users", "device_group
 
 // networkKeep are the settings a network reset leaves alone: how people sign in, the time zone,
 // the update settings, and the way back into the console.
-var networkKeep = []string{"update.", "console.port", "auth.", "session_", "system.timezone", "fw.stepup", "mgmt.rescue_iface"}
+var networkKeep = []string{"update.", "console.port", "auth.", "session_", "system.timezone", "fw.stepup", "mgmt.rescue_iface", "mgmt.port"}
 
 // factoryKeep is all a factory reset leaves: where releases come from. The installed version and
 // the key updates are checked against are part of the program, not the settings.

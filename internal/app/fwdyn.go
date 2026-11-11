@@ -161,6 +161,16 @@ func (a *App) setContents(m *fw.Model, withGeo bool) map[string]fw.SetFill {
 	if len(m.PortalNets()) > 0 {
 		out[fw.PortalSet] = a.portalFill(leases)
 	}
+	out[fw.MgmtIfSet] = fw.SetFill{Replace: true, Elems: a.mgmtIfElems()}
+	if m.CloseLAN {
+		gate := fw.SetFill{Replace: true}
+		if a.mgmtLanOpen() {
+			for _, p := range m.ConsolePorts {
+				gate.Elems = append(gate.Elems, istr(p))
+			}
+		}
+		out[fw.LanGateSet] = gate
+	}
 	if withGeo && len(wantGeo) > 0 {
 		pref := a.geoPrefixes(wantGeo)
 		for _, ds := range m.DynamicSets() {

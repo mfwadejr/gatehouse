@@ -93,6 +93,18 @@ func (a *App) protectedRules(m *fw.Model) []protectedRule {
 	}
 	out = append(out, protectedRule{Title: "Always reach this console", Text: text, Active: len(names) > 0,
 		Note: "This rule sits above every rule you can edit. It cannot be removed, reordered or switched off."})
+	if mc := a.mgmtCfg(); mc.Iface != "" {
+		on, note := true, "This rule sits above every rule you can edit. Nothing is routed through this port."
+		text := fmt.Sprintf("The console answers on %s, on %s, apart from every network.", portsText(m.ConsolePorts), mc.Iface)
+		if m.CloseLAN {
+			if a.mgmtLanOpen() {
+				note = "Closing the LAN is on, but the console stays open there until this port has been healthy for half a minute."
+			} else {
+				text += " It is closed on the LAN while this port is healthy."
+			}
+		}
+		out = append(out, protectedRule{Title: "The management port", Text: text, Active: on, Note: note})
+	}
 	if len(m.MgmtAllow) > 0 {
 		out = append(out, protectedRule{Title: "Only these addresses may manage", Text: "Management is limited to " + strings.Join(m.MgmtAllow, ", ") + ". Everyone else on those networks is turned away.", Active: true,
 			Note: "Empty the list to allow every management network again."})

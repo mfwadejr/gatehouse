@@ -62,6 +62,13 @@ func Load(db Queryer) (*Model, error) {
 	m := &Model{Groups: map[string][]string{}, ConsolePorts: ConsolePortsFrom(db, time.Now())}
 	m.RescueIface = rescueDevice(db, strings.TrimSpace(setting(db, "mgmt.rescue_iface", "")))
 	m.MgmtAllow = MgmtAllowFrom(db).Resolved
+	var mp struct {
+		Iface    string `json:"iface"`
+		CloseLAN bool   `json:"close_lan"`
+	}
+	if json.Unmarshal([]byte(setting(db, "mgmt.port", "")), &mp) == nil {
+		m.CloseLAN = mp.CloseLAN && mp.Iface != ""
+	}
 	m.DNSRedirect = setting(db, "fw.dns_redirect", "1") == "1"
 	m.BlockDoT = setting(db, "fw.block_dot", "1") == "1"
 	m.BlockDoH = setting(db, "fw.block_doh", "0") == "1"

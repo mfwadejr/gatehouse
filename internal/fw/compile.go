@@ -172,6 +172,10 @@ func (c *compiler) build() string {
 	if len(m.PortalNets()) > 0 {
 		c.line(1, "set %s { type ipv4_addr; flags timeout; size 8192; }", PortalSet)
 	}
+	c.line(1, "set %s { type ifname; }", MgmtIfSet)
+	if m.CloseLAN {
+		c.line(1, "set %s { type inet_service; }", LanGateSet)
+	}
 	c.input()
 	c.forward()
 	c.line(1, "chain output {")
@@ -267,8 +271,25 @@ func (c *compiler) input() {
 			limits = append(limits, " ip6 saddr "+setLit(a6))
 		}
 	}
+	// With "close the console on the LAN", the console rules for the management networks match the
+	// ports in a set that is emptied while the management port is healthy.
+	consolePorts := portList(m.ConsolePorts)
+	if m.CloseLAN {
+		consolePorts = "@" + LanGateSet
+	}
+	// The management port: a management address only. The console, remote login if it is on, and
+	// ping; nothing else, and nothing is ever routed through it.
 	for _, lim := range limits {
-		c.line(2, "iifname %s%s tcp dport %s accept comment \"protected: management console\"", ifSet(mgmt), lim, portList(m.ConsolePorts))
+		c.line(2, "iifname @%s%s tcp dport %s accept comment \"protected: management port console\"", MgmtIfSet, lim, portList(m.ConsolePorts))
+		if m.SSHEnabled {
+			c.line(2, "iifname @%s%s tcp dport 22 ct state new add @ssh_rate4 { ip saddr limit rate over 8/minute burst 5 packets } drop comment \"protected: management port ssh limit\"", MgmtIfSet, lim)
+			c.line(2, "iifname @%s%s tcp dport 22 accept comment \"protected: management port ssh\"", MgmtIfSet, lim)
+		}
+	}
+	c.line(2, "iifname @%s icmp type echo-request limit rate 20/second accept comment \"protected: management port ping\"", MgmtIfSet)
+	c.line(2, "iifname @%s udp sport 67 udp dport 68 accept comment \"protected: management port address from dhcp\"", MgmtIfSet)
+	for _, lim := range limits {
+		c.line(2, "iifname %s%s tcp dport %s accept comment \"protected: management console\"", ifSet(mgmt), lim, consolePorts)
 		if m.SNMPEnabled {
 			c.line(2, "iifname %s%s udp dport 161 accept comment \"protected: management snmp\"", ifSet(mgmt), lim)
 		}
@@ -285,7 +306,7 @@ func (c *compiler) input() {
 	// The last resort: the port the device was set up from keeps reaching the console, whatever
 	// the networks look like. Never on an internet-facing port or one already covered above.
 	if r := m.RescueIface; r != "" && !contains(m.WanIfaces(), r) && !contains(mgmt, r) {
-		c.line(2, "iifname %s tcp dport %s accept comment \"protected: setup port\"", ifSet([]string{r}), portList(m.ConsolePorts))
+		c.line(2, "iifname %s tcp dport %s accept comment \"protected: setup port\"", ifSet([]string{r}), consolePorts)
 	}
 
 	// The cable to the partner unit: its address on that port only, for the link and the table copy.
@@ -359,6 +380,9 @@ func (c *compiler) forward() {
 	c.line(1, "chain forward {")
 	c.line(2, "type filter hook forward priority filter; policy drop;")
 	c.line(2, "ct state invalid drop")
+	// The management port is never routed through, in either direction.
+	c.line(2, "iifname @%s counter drop comment \"protected: the management port is not routed\"", MgmtIfSet)
+	c.line(2, "oifname @%s counter drop comment \"protected: the management port is not routed\"", MgmtIfSet)
 	// A guest who has not accepted the sign-in page gets nothing through, even on a connection that
 	// was open before the sign-in expired. Web pages fail at once so the phone shows the page.
 	if pn := m.PortalNets(); len(pn) > 0 {

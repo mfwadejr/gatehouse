@@ -35,3 +35,13 @@ NopeWarden refuses a change that would leave you no way to manage it, and always
 
 ## Letting devices open ports (UPnP)
 **Let devices open ports by themselves (UPnP)** lets a game console or media app ask for a port instead of you opening it by hand. It opens that port for that device only, and it is off until you switch it on. Turn it off if you want every open port to be your own choice.
+
+## A port just for managing the device
+**Management port** (on the **Protection** tab) sets one spare port aside for managing NopeWarden and nothing else. The console and remote login answer on it, and nothing is routed through it: no internet, no DHCP server, no sharing with your other networks.
+
+1. Plug a cable from a management computer or switch into a spare port.
+2. Choose the port, then choose **From DHCP** or **Fixed address**. A fixed address needs a range no network on this device already uses; NopeWarden refuses one that overlaps. If no DHCP server answers, the port has no address, so use a fixed address if you need to be sure of reaching it.
+3. Press **Save and test**. Open the console on the new address within a minute. If nobody does, the change is undone on its own, or press **Undo now**.
+4. The firewall rules for the port go live with the next firewall apply.
+
+Once the port is proven you can turn on **Close the console on the LAN while this port is healthy**. You can only do this from the management address, so you cannot shut yourself out. The LAN console closes after the port has been healthy for half a minute, and opens again by itself if the port stops answering for a minute. Bridge mode has its own out-of-band port, so a management port is not used there.
