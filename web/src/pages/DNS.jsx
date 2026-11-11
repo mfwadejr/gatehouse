@@ -122,7 +122,7 @@ function UpstreamRow({ u, num, first, last, ordered, onMove, onRemove, reload })
         <div style={{ minWidth: 0 }}>
           <div className="name">{u.name}</div>
           <div className="meta">{u.addr} · {u.proto.toUpperCase()}{u.reused ? ' · connection kept open' : ''}</div>
-          {u.state !== 'healthy' && u.reason && <div className="small" style={{ color: u.state === 'down' ? 'var(--color-status-serious)' : 'var(--color-status-warning)', marginTop: '0.25rem' }}>{u.reason}{u.state === 'down' && u.retry_in ? ` Trying again in ${u.retry_in} s.` : ''}</div>}
+          {u.state !== 'healthy' && u.reason && <div className="small" style={{ color: u.state === 'down' ? 'var(--color-status-bad)' : 'var(--color-status-warning)', marginTop: '0.25rem' }}>{u.reason}{u.state === 'down' && u.retry_in ? ` Trying again in ${u.retry_in} s.` : ''}</div>}
           {(u.state !== 'healthy' || res) && <div className="small muted" style={{ marginTop: '0.2rem' }}>Last answered {ago(u.last_ok)}{u.failures ? ` · ${fmt.n(u.failures)} failed so far` : ''}</div>}
           {res && (
             <div className="small" style={{ marginTop: '0.35rem' }} role="status">

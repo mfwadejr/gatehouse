@@ -594,7 +594,7 @@ function Outbound({ v, reload, setModal }) {
     <Card>
       <div className="stack">
         <Header v={v} /><VpnTraffic v={v} />
-        <p className={v.state === 'up' ? 'sec' : ''} style={v.state === 'down' || v.state === 'degraded' ? { color: 'var(--color-status-serious)' } : undefined}>
+        <p className={v.state === 'up' ? 'sec' : ''} style={v.state === 'down' || v.state === 'degraded' ? { color: 'var(--color-status-bad)' } : undefined}>
           {v.state === 'connecting' ? v.message.replace(/[.…\s]+$/, '') : v.message}{v.state === 'connecting' && <Dots />}{v.state === 'up' && v.rtt_ms ? ` · ${v.rtt_ms} ms` : ''}
         </p>
         {(v.log || []).length > 0 && (
@@ -626,7 +626,7 @@ function Outbound({ v, reload, setModal }) {
             <div className="stack gap1">
               {!checked ? <span className="small muted">Checking…</span> : (
                 <>
-                  <span className="small" style={{ color: checked.verdict === 'leak' || checked.verdict === 'address' ? 'var(--color-status-serious)' : undefined }}>{checked.device ? `${checked.device}: ` : ''}{checked.sentence}</span>
+                  <span className="small" style={{ color: checked.verdict === 'leak' || checked.verdict === 'address' ? 'var(--color-status-bad)' : undefined }}>{checked.device ? `${checked.device}: ` : ''}{checked.sentence}</span>
                   {checked.others?.length > 0 && <span className="small muted">Went out through: {checked.others.map((o) => `${o.label} (${o.n})`).join(', ')}</span>}
                   {checked.leaked?.map((l, i) => <span key={i} className="small muted mono">{fmt.ago(l.ts)} · {l.what} · {l.via}</span>)}
                   {(checked.dns_through > 0 || checked.dns_direct > 0) && <span className="small muted">Name lookups: {checked.dns_through} through the VPN, {checked.dns_direct} the normal way.</span>}

@@ -14,9 +14,10 @@ import Forwards from './Forwards.jsx';
 import Discovery from './Discovery.jsx';
 import NatNotice from '../natnotice.jsx';
 import { GroupsAndLists, Matrix, PairModal, RuleForm, RulesList } from './FirewallRules.jsx';
-import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Problems, Select, Tabs, ToggleRow, useAction, useToast, fmt, confirmBox, Limited } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Problems, Select, Tabs, ToggleRow, useAction, useToast, fmt, confirmBox, Limited, usePortNames } from '../ui.jsx';
 
 function ZoneForm({ initial, presets, ifaces, taken, onClose, onSaved }) {
+  const pn = usePortNames();
   const [z, setZ] = useState({ kind: 'trusted', name: '', ifaces: [], internet: true, management: true, intra_allow: true, gateway: true, upnp: false, ssh: false, dns_force: true, description: '', ...initial });
   const [run, busy] = useAction();
   const set = (k) => (v) => setZ((x) => ({ ...x, [k]: v }));
@@ -42,7 +43,7 @@ function ZoneForm({ initial, presets, ifaces, taken, onClose, onSaved }) {
             <label key={i.id} className="inline small">
               <input type="checkbox" checked={z.ifaces.includes(i.name)} disabled={!!other}
                 onChange={(e) => set('ifaces')(e.target.checked ? [...z.ifaces, i.name] : z.ifaces.filter((n) => n !== i.name))} />
-              <span>{i.name} <span className="muted">{i.ipv4}{other ? ` · used by ${taken[i.name]}` : ''}</span></span>
+              <span>{pn(i.name)} <span className="muted">{i.ipv4}{other ? ` · used by ${taken[i.name]}` : ''}</span></span>
             </label>
           );
         })}
@@ -61,6 +62,7 @@ function ZoneForm({ initial, presets, ifaces, taken, onClose, onSaved }) {
 }
 
 function InternetRow({ ov }) {
+  const pn = usePortNames();
   const { data: wd } = useData('/api/net/wans', { topics: ['net.status'] });
   const { data: st } = useData('/api/net/status', { topics: ['net.status'], every: 5000 });
   const wans = (wd?.wans || []).filter((w) => w.enabled);
@@ -77,7 +79,7 @@ function InternetRow({ ov }) {
     <div className="item">
       <div>
         <div className="name">Internet <Pill>Internet</Pill><Pill tone={tone}>{text}</Pill></div>
-        <div className="meta">{wans.length ? wans.map((w) => `${w.name} (${w.iface})`).join(', ') : 'no connection yet'} · managed automatically</div>
+        <div className="meta">{wans.length ? wans.map((w) => `${w.name} (${pn(w.iface)})`).join(', ') : 'no connection yet'} · managed automatically</div>
         <div className="meta">Devices on your networks can go out. Nothing from the internet can come in unless you open a port.</div>
       </div>
       <div className="actions"><Button small icon="edit" onClick={() => go('internet')}>Edit</Button></div>
@@ -86,6 +88,7 @@ function InternetRow({ ov }) {
 }
 
 function Networks({ ov, presets, reload }) {
+  const pn = usePortNames();
   const { data: ifs } = useData('/api/net/interfaces');
   const [edit, setEdit] = useState(null);
   const [addNet, setAddNet] = useState(false);
@@ -119,7 +122,7 @@ function Networks({ ov, presets, reload }) {
             <div className="item" key={z.id}>
               <div>
                 <div className="name">{z.name} <Pill>{kindTitle(z.kind)}</Pill>{z.management && <Pill tone="good">Can manage NopeWarden</Pill>}{!z.ifaces?.length && <Pill tone="warn">Not attached to anything</Pill>}</div>
-                <div className="meta">{z.ifaces?.length ? z.ifaces.join(', ') : 'Not attached to a port, so nothing is on it. Remove it if you no longer need it.'}</div>
+                <div className="meta">{z.ifaces?.length ? z.ifaces.map(pn).join(', ') : 'Not attached to a port, so nothing is on it. Remove it if you no longer need it.'}</div>
               </div>
               <div className="actions"><Button small icon="edit" onClick={() => setEdit(z)}>Edit</Button>
                 <Button small kind="danger" icon="trash" onClick={async () => await confirmRemoval(`/api/fw/zones/${z.id}/removal`, `Remove ${z.name}?`, { zoneRemoval: true }) && run(() => del(`/api/fw/zones/${z.id}`)).then(reload)}>Remove</Button></div>
@@ -140,6 +143,7 @@ function Networks({ ov, presets, reload }) {
 }
 
 function Protected({ reload }) {
+  const pn = usePortNames();
   const { data, reload: again } = useData('/api/fw/protected', { topics: ['fw.status'] });
   const [run, busy] = useAction();
   const toast = useToast();
@@ -190,7 +194,7 @@ function Protected({ reload }) {
           <Field label="Addresses or ranges" hint="One per line, like 192.168.1.0/24 or 10.8.0.5. You are connecting from the address shown below.">
             <textarea className="in mono" rows={3} value={cidrs} onChange={(e) => setCidrs(e.target.value)} spellCheck={false} placeholder="192.168.1.0/24" />
           </Field>
-          <span className="small muted">You are connecting from {data.you.ip}{data.you.iface ? ` (${data.you.iface})` : ''}.</span>
+          <span className="small muted">You are connecting from {data.you.ip}{data.you.iface ? ` (${pn(data.you.iface)})` : ''}.</span>
           <div className="actions"><SaveChoice busy={busy} onSave={save} /><Button onClick={() => setEdit(false)}>Cancel</Button></div>
         </div>
       )}

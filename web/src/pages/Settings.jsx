@@ -3,7 +3,7 @@ import MapLocation from './MapLocation.jsx';
 import { useTheme } from '../theme.js';
 import React, { useEffect, useState } from 'react';
 import { del, get, post, put, useData } from '../api.js';
-import { Guard, Button, Card, Empty, Field, Form, Input, Modal, Note, Page, Pill, Segmented, Select, Tabs, ToggleRow, useAction, fmt, useStepUp, stepReady, StepUp } from '../ui.jsx';
+import { Guard, Button, Card, Empty, Field, Form, Input, Modal, Note, Page, Pill, Segmented, Select, Tabs, ToggleRow, useAction, useCheck, CheckLine, fmt, useStepUp, stepReady, StepUp } from '../ui.jsx';
 import { Enrol } from './Auth.jsx';
 import Backups from './Backups.jsx';
 import Changes from './Changes.jsx';
@@ -280,6 +280,7 @@ function UpdateSteps({ steps, rollingBack }) {
 function Updates({ me }) {
   const { data, reload } = useData('/api/system/update', { every: 15000 });
   const [run, busy] = useAction();
+  const [chk, chkGo] = useCheck();
   const [asking, setAsking] = useState(false);
   const [code, setCode] = useState('');
   const [job, setJob] = useState(null); // { since } while an update is going on
@@ -346,9 +347,10 @@ function Updates({ me }) {
   const res = outcome?.result || kept;
   return (
     <Card title="Updates" desc="NopeWarden and the system underneath it update together, from one button. Nothing is installed until you press Update now, unless you choose Automatic below. Your settings are kept."
-      actions={<Button small disabled={busy || working || d.checking || !d.key_set} onClick={() => run(() => post('/api/system/update/check', {})).then(() => { reload(); })}>Check now</Button>}>
+      actions={<Button small disabled={busy || working || d.checking || !d.key_set} onClick={() => chkGo(async () => { await post('/api/system/update/check', {}); await reload(); }, 'Looking for a new version…', 'Checked just now.')}>Check now</Button>}>
       <div className="stack">
         <div className="inline"><span>You are running version <b>{d.current}</b>.</span>{d.checked_at > 0 && <span className="small muted">Checked {fmt.ago(d.checked_at)}</span>}</div>
+        <CheckLine st={chk} />
         {!d.key_set && <Note tone="warn" title="Updates are not set up in this build">This copy of NopeWarden has no update signing key, so it cannot install updates. Build a new installer once with a key (docs/UPDATES.md); after that, updates need no installer.</Note>}
         {d.key_set && d.error && <Note tone="warn" title="Could not look for NopeWarden updates">{d.error}</Note>}
         {d.key_set && d.system_error && <Note tone="warn" title="Could not look at the system updates">{d.system_error}</Note>}

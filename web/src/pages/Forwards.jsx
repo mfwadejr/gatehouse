@@ -140,7 +140,7 @@ export function OpenPortModal({ initial, preset, apps, connections, existing, on
       footer={<><Button onClick={onClose}>Cancel</Button>{(more || editing) && !clash && <Button kind="primary" onClick={() => submit({})} disabled={busy || !ready}>Save</Button>}</>}>
       <div className="stack">
         {clash && (
-          <div className="stack" style={{ padding: 'var(--space-3)', border: 'var(--border-width-thin) solid var(--color-status-serious)', borderRadius: 'var(--radius-md)' }}>
+          <div className="stack" style={{ padding: 'var(--space-3)', border: 'var(--border-width-thin) solid var(--color-status-bad)', borderRadius: 'var(--radius-md)' }}>
             <strong>{clash.port} is already used by {clash.used_by}.</strong>
             <Field label="Enter the outside port for this one">
               <Input value={typed} onChange={setTyped} className="in mono" placeholder="Type a port" />

@@ -233,7 +233,7 @@ export function ServicePicker({ value, onChange, pickers, reload }) {
           placeholder="Search a service, or type ports like tcp/80, tcp/443, udp/1000-2000" aria-label="Find a service"
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); if (/[,\s]/.test(q.trim()) || isPort) { if (addMany(q)) return; } if (mine.length + known.length === 1) add((mine[0] || known[0]).tok); } }} />
         <span className="small muted">Separate several with a comma or a space. Use tcp/ or udp/ before the port number. A range looks like tcp/8000-8100.</span>
-        {err && <span className="small" role="alert" style={{ color: 'var(--color-status-serious)' }}>{err}</span>}
+        {err && <span className="small" role="alert" style={{ color: 'var(--color-status-bad)' }}>{err}</span>}
         {showList && (
           <div className="pickmenu" role="listbox">
             {isPort && !has(typed) && <button type="button" role="option" onMouseDown={(e) => e.preventDefault()} onClick={() => add(typed)}>Use the port <span className="mono">{typed}</span></button>}

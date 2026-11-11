@@ -14,12 +14,22 @@ for (const f of css) for (const m of readFileSync(f, 'utf8').matchAll(/(--[a-z0-
 // custom properties set from a screen (style={{ '--x': ... }}) count as defined
 for (const f of files.filter((x) => !x.endsWith('.css'))) for (const m of readFileSync(f, 'utf8').matchAll(/['"](--[a-z0-9-]+)['"]\s*:/g)) defined.add(m[1]);
 
+// Status colours are red, yellow, green and blue and nothing else (decided 11 Nov 2026). Blue is the
+// ordinary accent, so the status tokens are green (good), yellow (warning) and red (bad, blocked).
+// A new status colour, or the old coral, fails here so it cannot creep back.
+const STATUS_OK = new Set(['good', 'warning', 'bad', 'bad-border', 'blocked']);
+let bad = 0;
+for (const f of css) {
+  for (const m of readFileSync(f, 'utf8').matchAll(/--color-status-([a-z-]+)\s*:/g)) {
+    if (!STATUS_OK.has(m[1])) { console.log(`${f}: --color-status-${m[1]} is not one of the four status colours (red, yellow, green, blue)`); bad++; }
+  }
+  if (/coral|serious/i.test(readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, ''))) { console.log(`${f}: the coral status colour is gone; use red (--color-status-bad)`); bad++; }
+}
 const ALLOW = [
   'src/worldmap.js', // map drawing data
   'src/providers.js',
 ];
 const prefixOK = (v) => v === '--color-chart-series-' || v === '--c'; // built from a number or set per element
-let bad = 0;
 for (const f of files) {
   if (f.endsWith('tokens.css') || ALLOW.includes(f)) continue;
   readFileSync(f, 'utf8').split('\n').forEach((line, i) => {

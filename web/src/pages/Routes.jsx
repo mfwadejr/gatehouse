@@ -13,6 +13,7 @@ const STATE = {
   'target-off': { tone: 'bad', label: 'Not working' },
   'one-connection': { tone: 'warn', label: 'Needs two connections' },
   paused: { tone: 'warn', label: 'Paused' },
+  attention: { tone: 'bad', label: 'Needs attention' },
 };
 
 // routeBody is what the server stores for a route: its own fields only. The routes list also carries

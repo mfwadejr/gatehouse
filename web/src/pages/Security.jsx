@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useData } from '../api.js';
-import { Button, Card, Pill } from '../ui.jsx';
+import { Button, Card, CheckLine, Pill, useCheck } from '../ui.jsx';
 
 // The security check: one sentence of verdict, then each risk with a button that goes to where it
 // is fixed. Things that are fine are folded away.
@@ -9,13 +9,16 @@ const tone = { bad: 'bad', warn: 'warn', ok: 'good' };
 export default function Security({ bare }) {
   const { data, reload } = useData('/api/security/check', { topics: ['fw.status'], every: 60000 });
   const [all, setAll] = useState(false);
+  const [chk, chkGo] = useCheck();
+  const again = () => chkGo(async () => { await reload(); }, 'Checking…', 'Checked just now.');
   if (!data) return null;
   const risks = data.items.filter((i) => i.level !== 'ok');
   const fine = data.items.filter((i) => i.level === 'ok');
   const Wrap = bare ? ({ children }) => <div>{children}</div> : (p) => <Card {...p} />;
   return (
-    <Wrap title="Security check" desc={data.summary} actions={<Button small onClick={reload}>Check again</Button>}>
-      {bare && <p className="small muted">{data.summary} <button type="button" className="link" onClick={reload}>Check again</button></p>}
+    <Wrap title="Security check" desc={data.summary} actions={<Button small disabled={chk.phase === 'working'} onClick={again}>Check again</Button>}>
+      <CheckLine st={chk} />
+      {bare && <p className="small muted">{data.summary} <button type="button" className="link" onClick={again}>Check again</button></p>}
       <div className="list">
         {risks.map((i) => (
           <div className="item" key={i.id}>

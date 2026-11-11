@@ -128,7 +128,7 @@ function History({ links }) {
                 {(data || []).slice(0, 15).map((r) => (
                   <tr key={r.id}>
                     <td>{fmt.dt(r.ts)}</td><td>{r.link}</td>
-                    {r.error ? <td colSpan={4} style={{ color: 'var(--color-status-serious)' }}>{r.error}</td> : <><td>{fmtBits(r.down_bps)}</td><td>{fmtBits(r.up_bps)}</td><td>{Math.round(r.delay_ms)} ms</td><td>{r.grade && <Pill tone={GRADE[r.grade]}>{r.grade}</Pill>}</td></>}
+                    {r.error ? <td colSpan={4} style={{ color: 'var(--color-status-bad)' }}>{r.error}</td> : <><td>{fmtBits(r.down_bps)}</td><td>{fmtBits(r.up_bps)}</td><td>{Math.round(r.delay_ms)} ms</td><td>{r.grade && <Pill tone={GRADE[r.grade]}>{r.grade}</Pill>}</td></>}
                     <td className="small muted">{r.server}</td><td className="small muted">{srcWord(r)}{r.quick ? ' · short' : ''}</td>
                   </tr>
                 ))}

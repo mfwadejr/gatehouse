@@ -1,6 +1,18 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.21',
+    title: 'One colour code, the names you gave your ports, and a better New service form',
+    items: [
+      'Status colours are now only red, yellow, green and blue everywhere, including the dots in the menu. The coral that was hard to tell from red is gone, and the build refuses a screen that brings it back.',
+      'A port you renamed shows that name everywhere, written Name (enp2s0): in rules and the sentences about built-in rules, Policies, Review, the logs, Routes and Networks.',
+      'Threats says Suricata, with its version, on The program card.',
+      'Update rules now, Check now and Check again show the same ticked progress as System updates, so you can see that something is happening.',
+      'Fixed: renaming a service now also updates the routes that use it. A service a route uses cannot be deleted, and the message names the route. A route whose service list has gone sends nothing, and shows Needs attention instead of sending everything.',
+      'New service: choose TCP, UDP, TCP and UDP or ICMP, type a port or range, and press Add. Each entry is a line you can remove, mistakes are explained under the box, and known names and pasted lists still work.',
+    ],
+  },
+  {
     version: '0.9.4.20',
     title: 'Speed control, a redesigned Usage page and controls that match',
     items: [

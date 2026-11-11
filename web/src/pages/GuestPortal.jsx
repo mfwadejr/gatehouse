@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { post, put, useData } from '../api.js';
-import { Button, Card, Field, Input, NumberInput, Note, ToggleRow, useAction } from '../ui.jsx';
+import { Button, Card, Field, Input, NumberInput, Note, ToggleRow, useAction, usePortNames } from '../ui.jsx';
 
 // A sign-in page for guests: on the networks you pick, a device sees your page first and gets
 // internet only after it taps Connect. Off by default.

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { post, put, useData } from '../api.js';
-import { Button, Card, Field, Input, Note, Pill, Segmented, Select, ToggleRow, useAction } from '../ui.jsx';
+import { Button, Card, Field, Input, Note, Pill, Segmented, Select, ToggleRow, useAction, usePortNames } from '../ui.jsx';
 
 // A spare port that carries only a management address. Nothing is routed through it. When asked,
 // the console is closed on the LAN while this port is healthy, and opens there again if it is not.
@@ -8,6 +8,7 @@ import { Button, Card, Field, Input, Note, Pill, Segmented, Select, ToggleRow, u
 const TONE = { ok: 'good', waiting: 'warn', quiet: 'warn', down: 'bad', off: '' };
 
 export default function MgmtPort() {
+  const pn = usePortNames();
   const { data, reload } = useData('/api/mgmt/port', { topics: ['fw.status'], every: 5000 });
   const [run, busy] = useAction();
   const [f, setF] = useState(null);
@@ -44,7 +45,7 @@ export default function MgmtPort() {
         )}
         <Field label="Port">
           <Select value={f.iface} onChange={set('iface')} aria-label="Management port"
-            options={[{ value: '', label: 'None' }, ...choices.map((c) => ({ value: c, label: c }))]} />
+            options={[{ value: '', label: 'None' }, ...choices.map((c) => ({ value: c, label: pn(c) }))]} />
         </Field>
         {f.iface && (
           <>

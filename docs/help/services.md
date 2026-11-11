@@ -13,7 +13,7 @@ The picture is an example from a new, empty box; yours will show your own device
 - **Built in**: names NopeWarden already knows. They cannot be changed.
 
 ## Common tasks
-1. Make a service: **New service**, give it a **Name**, enter **Ports**, one per line (for example tcp/32400 or udp/27000-27050), **Save**.
+1. Make a service: **New service**, give it a **Name**. Under **Ports** choose **Protocol** (TCP, UDP, **TCP and UDP**, or ICMP for ping), type a port or a range such as 27000-27050, and press **Add**. Each port appears in the list below, and ✕ removes one. A wrong entry is explained in words under the box. For a known name such as https use **add a known name**; for a long list use **paste a list**, one entry per line like tcp/32400. Then **Save**.
 2. Use it: in any rule or open port, type its name in the "What for" box. Several can go in one box, separated by commas or spaces.
 3. Find a built-in one: type its name in **Search services**.
 
@@ -23,4 +23,4 @@ The picture is an example from a new, empty box; yours will show your own device
 Make "console-game" with udp/3074 and tcp/3074, then use it in a rule for your console.
 
 ## If something goes wrong
-A service that a rule uses cannot be deleted until the rule changes; NopeWarden names the rules.
+A service that a rule, an open port or a route uses cannot be deleted until that changes; NopeWarden names it.

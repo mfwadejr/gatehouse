@@ -43,7 +43,7 @@ code, .mono { font-family: var(--font-family-mono); font-size: var(--font-size-s
 .nav a:hover { background: var(--color-state-hover); }
 .nav a.on { background: var(--color-accent-selected-bg); color: var(--color-text-primary); }
 .navdot { margin-left: auto; width: .55rem; height: .55rem; border-radius: var(--radius-full); flex: none; --dotc: var(--color-accent-default); background: var(--dotc); animation: navdotpulse 2.4s ease-out 1; }
-.navdot.warn { --dotc: var(--color-status-warning); } .navdot.bad { --dotc: var(--color-status-serious); }
+.navdot.warn { --dotc: var(--color-status-warning); } .navdot.bad { --dotc: var(--color-status-bad); }
 @keyframes navdotpulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--dotc) 60%, transparent); } 100% { box-shadow: 0 0 0 .6rem transparent; } }
 @media (prefers-reduced-motion: reduce) { .navdot { animation: none; } }
 .me { margin-top: auto; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-2); border: var(--border-width-thin) solid var(--color-border-default); border-radius: var(--radius-lg); }
@@ -88,7 +88,7 @@ code, .mono { font-family: var(--font-family-mono); font-size: var(--font-size-s
 .btn:hover:not(:disabled) { background: var(--color-state-hover); }
 .btn.primary { background: var(--color-accent-default); border-color: var(--color-accent-default); color: var(--color-text-on-accent); font-weight: var(--font-weight-medium); }
 .btn.primary:hover:not(:disabled) { background: var(--color-accent-fill); }
-.btn.danger { color: var(--color-status-serious); border-color: var(--color-status-serious-border); }
+.btn.danger { color: var(--color-status-bad); border-color: var(--color-status-bad-border); }
 .btn.small { height: var(--size-control-sm); padding: 0 var(--space-2-5); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 /* The Pause drop-down sits in a row of small buttons, so it is sized and drawn like one. */
@@ -142,10 +142,10 @@ textarea.in { height: auto; padding: var(--space-2-5) var(--component-input-padd
 .pill { display: inline-flex; align-items: center; gap: var(--space-1-5); padding: var(--space-0-5) var(--space-2-5); border-radius: var(--radius-full); font-size: var(--font-size-sm); border: var(--border-width-thin) solid var(--color-border-default); color: var(--color-text-secondary); white-space: nowrap; }
 .pill.good { color: var(--color-status-good); }
 .pill.warn { color: var(--color-status-warning); }
-.pill.bad { color: var(--color-status-serious); border-color: var(--color-status-serious-border); }
+.pill.bad { color: var(--color-status-bad); border-color: var(--color-status-bad-border); }
 .dot { width: var(--size-bar-md); height: var(--size-bar-md); border-radius: var(--radius-full); background: var(--color-status-good); display: inline-block; flex: none; }
 .dot.warn { background: var(--color-status-warning); }
-.dot.bad { background: var(--color-status-serious); }
+.dot.bad { background: var(--color-status-bad); }
 .dot.off { background: var(--color-text-muted); }
 
 .bar { height: var(--size-bar-lg); border-radius: var(--radius-full); background: var(--color-chart-track); overflow: hidden; display: flex; }
@@ -155,7 +155,7 @@ textarea.in { height: auto; padding: var(--space-2-5) var(--component-input-padd
 /* ---------- messages ---------- */
 .note { border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); border: var(--border-width-thin) solid var(--color-border-default); background: var(--color-bg-inset); font-size: var(--font-size-base); display: flex; gap: var(--space-3); align-items: flex-start; }
 .note.warn { border-color: var(--color-status-warning); }
-.note.bad { border-color: var(--color-status-serious-border); color: var(--color-status-serious); }
+.note.bad { border-color: var(--color-status-bad-border); color: var(--color-status-bad); }
 .note.good { border-color: var(--color-status-good); }
 .note ul { margin: var(--space-1) 0 0; padding-left: var(--space-4-5); }
 
@@ -166,7 +166,7 @@ textarea.in { height: auto; padding: var(--space-2-5) var(--component-input-padd
 .toasts { position: fixed; right: var(--space-6); top: var(--space-5); z-index: var(--z-toast); display: flex; flex-direction: column; gap: var(--space-2); pointer-events: none; }
 .toasts .toast { pointer-events: auto; cursor: pointer; box-shadow: var(--shadow-toast); }
 .toast { background: var(--color-bg-surface); border: var(--border-width-thin) solid var(--color-border-strong); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); max-width: 24rem; }
-.toast.bad { border-color: var(--color-status-serious-border); }
+.toast.bad { border-color: var(--color-status-bad-border); }
 
 .confirmbar { position: sticky; bottom: var(--space-4); z-index: var(--z-dropdown); background: var(--color-bg-surface); border: var(--border-width-thin) solid var(--color-accent-selected-border); border-radius: var(--radius-xl); padding: var(--space-4) var(--space-5); display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: center; justify-content: space-between; }
 .confirmbar.countdown { border-color: var(--color-status-warning); }
@@ -259,12 +259,19 @@ button.wg-member { width: 100%; text-align: left; cursor: pointer; color: inheri
 .protected .lock { font-size: var(--font-size-lg); }
 
 /* Update progress list */
+.checkline { margin: var(--space-2) 0 0; color: var(--color-text-secondary); }
+.checkline span { display: inline-block; width: 1.25rem; }
+.checkline.working span { color: var(--color-accent-default); animation: checkpulse 1.2s ease-in-out infinite; }
+@keyframes checkpulse { 50% { opacity: .3; } }
+.checkline.done { color: inherit; } .checkline.done span { color: var(--color-status-good); }
+.checkline.failed { color: var(--color-status-bad); font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { .checkline.working span { animation: none; } }
 .usteps { list-style: none; margin: .25rem 0 0; padding: 0; display: grid; gap: .25rem; }
 .usteps li { color: var(--color-text-secondary); }
 .usteps li.done { opacity: .75; }
 .usteps li.active { font-weight: 600; color: inherit; }
 .usteps li.done span { color: var(--color-status-good); }
-.usteps li.failed { color: var(--color-status-serious); font-weight: 600; }
+.usteps li.failed { color: var(--color-status-bad); font-weight: 600; }
 .usteps li span { display: inline-block; width: 1.25rem; }
 .ulist { margin: 0 0 .5rem; padding-left: 1.1rem; display: grid; gap: .25rem; }
 
@@ -355,7 +362,7 @@ details.more > summary { cursor: pointer; color: var(--color-text-secondary); ma
 .ov-state .dot { width: .6rem; height: .6rem; border-radius: 50%; background: var(--color-text-muted); }
 .ov-state.good { color: var(--color-status-good); } .ov-state.good .dot { background: var(--color-status-good); animation: ovpulse 2.4s infinite; }
 .ov-state.warn { color: var(--color-status-warning); } .ov-state.warn .dot { background: var(--color-status-warning); }
-.ov-state.bad { color: var(--color-status-serious); } .ov-state.bad .dot { background: var(--color-status-serious); }
+.ov-state.bad { color: var(--color-status-bad); } .ov-state.bad .dot { background: var(--color-status-bad); }
 @keyframes ovpulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-status-good) 50%, transparent); } 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
 @media (prefers-reduced-motion: reduce) { .ov-state .dot { animation: none !important; } }
 .ov-big { font-size: 2.4rem; font-weight: var(--font-weight-semibold); letter-spacing: var(--font-tracking-tighter); line-height: 1.1; font-variant-numeric: tabular-nums; }
@@ -384,7 +391,7 @@ details.more > summary { cursor: pointer; color: var(--color-text-secondary); ma
 .ov-ev:first-child { border-top: 0; }
 .ov-ev.warn > span:nth-child(2) { color: var(--color-text-primary); }
 .ov-map path.hot { filter: drop-shadow(0 0 3px color-mix(in srgb, var(--color-chart-series-3) 70%, transparent)); }
-.ov-map path.hot.in { filter: drop-shadow(0 0 3px color-mix(in srgb, var(--color-status-serious) 70%, transparent)); }
+.ov-map path.hot.in { filter: drop-shadow(0 0 3px color-mix(in srgb, var(--color-status-bad) 70%, transparent)); }
 .ov-map .ov-arc path { fill: none; stroke-linecap: round; stroke-dasharray: 3 4; stroke: var(--color-chart-series-3); opacity: .85; stroke-width: inherit; }
 .ov-map .ov-arc.in path { stroke: var(--color-status-warning); }
 .ov-map .ov-travel { fill: var(--color-text-primary); }
@@ -544,7 +551,7 @@ mark { background: color-mix(in srgb, var(--color-status-warning) 35%, transpare
 .mt3 { margin-top: var(--space-3); }
 .gap1 { gap: var(--space-1); }
 .gap2 { gap: var(--space-2); }
-.errtext { color: var(--color-status-serious); }
+.errtext { color: var(--color-status-bad); }
 .leftalign { text-align: left; }
 .endalign { justify-content: flex-end; }
 .startalign { align-items: flex-start; }
@@ -629,3 +636,17 @@ mark { background: color-mix(in srgb, var(--color-status-warning) 35%, transpare
 .calnote { padding: 0 var(--space-3) var(--space-3); margin: 0; }
 .dtf { display: flex; gap: var(--space-2); }
 .dtf .timebtn { min-width: 6rem; width: auto; }
+
+/* New service form: protocol box, port box and Add on one line, then the entries as a small table. */
+.svc-add { display: grid; grid-template-columns: 11rem 1fr auto; gap: var(--space-2); align-items: start; }
+.field-err { color: var(--color-status-bad); font-size: var(--font-size-sm); margin-top: var(--space-1); }
+.hint { color: var(--color-text-muted); font-size: var(--font-size-sm); margin-top: var(--space-2); }
+.svc-list { border: var(--border-width-thin) solid var(--color-border-default); border-radius: var(--radius-md); overflow: hidden; margin-top: var(--space-3); }
+.svc-row { display: grid; grid-template-columns: 6rem 1fr 7rem 2rem; gap: var(--space-3); padding: var(--space-2) var(--space-3); align-items: center; border-bottom: var(--border-width-thin) solid var(--color-border-default); }
+.svc-row:last-child { border-bottom: 0; }
+.svc-row.head { color: var(--color-text-muted); font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); }
+.svc-proto { font-size: var(--font-size-sm); border: var(--border-width-thin) solid var(--color-border-default); border-radius: var(--radius-sm); padding: 0 var(--space-2); }
+.svc-x { background: none; border: 0; color: var(--color-text-muted); cursor: pointer; font: inherit; }
+.svc-x:hover { color: var(--color-status-bad); }
+@media (max-width: 560px) { .svc-add { grid-template-columns: 1fr; } }
+.svc-extra-go { margin-top: var(--space-2); }

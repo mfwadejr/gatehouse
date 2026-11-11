@@ -7,6 +7,7 @@ import { Bar, Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page,
 const HOURS = [{ value: 3600, label: '1 hour' }, { value: 14400, label: '4 hours' }, { value: 43200, label: '12 hours' }, { value: 86400, label: '1 day' }, { value: 604800, label: '1 week' }];
 
 export function ScopeForm({ initial, ifaces, onClose, onSaved }) {
+  const pn = usePortNames();
   const [s, setS] = useState({ mode: 'serve', lease_seconds: 43200, domain: 'lan', enabled: true, dns: '', ntp: '', relay_addr: '', ...initial });
   const [run, busy] = useAction();
   const set = (k) => (v) => setS((x) => ({ ...x, [k]: v }));
@@ -22,7 +23,7 @@ export function ScopeForm({ initial, ifaces, onClose, onSaved }) {
       footer={<><Button onClick={onClose}>Cancel</Button><SaveChoice busy={busy} onSave={async (later) => { if (await run(() => (later ? holdAnd(() => put('/api/dhcp/scopes', s)) : put('/api/dhcp/scopes', s)), later ? SAVED_LATER : 'Saved.')) { onSaved(); onClose(); } }} /></>}>
       <div className="formgrid">
         <Field label="Name"><Input value={s.name} onChange={set('name')} /></Field>
-        <Field label="Port or VLAN"><Select value={s.iface} onChange={set('iface')} options={[{ value: '', label: 'Choose…' }, ...ifaces.map((i) => i.name)]} /></Field>
+        <Field label="Port or VLAN"><Select value={s.iface} onChange={set('iface')} options={[{ value: '', label: 'Choose…' }, ...ifaces.map((i) => ({ value: i.name, label: pn(i.name) }))]} /></Field>
       </div>
       <Field label="Who hands out addresses here?">
         <Select value={s.mode} onChange={set('mode')} options={[{ value: 'serve', label: 'NopeWarden' }, { value: 'relay', label: 'Another router, relayed to NopeWarden' }, { value: 'off', label: 'Another device (NopeWarden stays out of it)' }]} />

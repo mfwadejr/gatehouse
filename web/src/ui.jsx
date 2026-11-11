@@ -426,6 +426,36 @@ export function Paged({ items, step = 15, children }) {
   );
 }
 
+// For a button that checks or fetches something and takes a moment: shows "working", then a green
+// tick (or a red cross with the reason) next to the button, the same way an update shows its steps.
+// run(fn, doneText) returns what fn returned, or undefined when it failed.
+export function useCheck() {
+  const [st, setSt] = useState({ phase: 'idle', msg: '' });
+  const timer = useRef(null);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const go = useCallback(async (fn, workingText, doneText) => {
+    clearTimeout(timer.current);
+    setSt({ phase: 'working', msg: workingText });
+    try {
+      const r = await fn();
+      if (r === false) { setSt({ phase: 'idle', msg: '' }); return r; }
+      setSt({ phase: 'done', msg: typeof doneText === 'function' ? doneText(r) : doneText });
+      timer.current = setTimeout(() => setSt({ phase: 'idle', msg: '' }), 20000);
+      return r === undefined ? true : r;
+    } catch (e) {
+      setSt({ phase: 'failed', msg: e.message || 'Something went wrong.' });
+      return undefined;
+    }
+  }, []);
+  return [st, go];
+}
+
+export function CheckLine({ st }) {
+  if (!st || st.phase === 'idle') return null;
+  const mark = { working: '●', done: '✓', failed: '✕' }[st.phase];
+  return <p className={`checkline ${st.phase}`} role="status" aria-live="polite"><span aria-hidden="true">{mark}</span> {st.msg}</p>;
+}
+
 export function useAction() {
   const toast = useToast();
   const [busy, setBusy] = useState(false);

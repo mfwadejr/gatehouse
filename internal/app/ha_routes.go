@@ -435,7 +435,7 @@ func (a *App) registerHARoutes() {
 				good = good || ch == in.Dev
 			}
 			if !good {
-				fail(w, errors.New(in.Dev+" cannot be used for the cable: it must be a wired port that nothing else uses"))
+				fail(w, errors.New(a.portName(in.Dev)+" cannot be used for the cable: it must be a wired port that nothing else uses"))
 				return
 			}
 			own, _, ok := (&haLocal{Pairing: st.Pairing, Role: st.Role, HeartDev: in.Dev}).heart()

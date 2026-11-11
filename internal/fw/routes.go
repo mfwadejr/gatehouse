@@ -466,6 +466,10 @@ func (c *compiler) routeMarks() {
 // serviceTerms turns a route's service words into firewall matches, one per protocol and port
 // range. No service words gives a single empty match, which is everything.
 func (c *compiler) serviceTerms(service string) []string {
+	if len(MissingServiceLists(service, c.m.PortLists)) > 0 {
+		// A list that no longer exists must never turn into "everything": the route sends nothing.
+		return nil
+	}
 	specs, _ := ParseServices(service, c.m.PortLists)
 	if len(specs) == 0 {
 		return []string{""}
@@ -550,6 +554,19 @@ func whereToDests(where string) []RouteDest {
 		case strings.EqualFold(t, "any"):
 		default:
 			out = append(out, RouteDest{Kind: "ip", Value: t})
+		}
+	}
+	return out
+}
+
+// MissingServiceLists names the saved lists a "what for" field points at that do not exist.
+func MissingServiceLists(service string, lists map[string][]string) []string {
+	var out []string
+	for _, part := range strings.Split(service, ",") {
+		if name, ok := strings.CutPrefix(strings.TrimSpace(part), "list:"); ok {
+			if _, found := lists[name]; !found {
+				out = append(out, name)
+			}
 		}
 	}
 	return out

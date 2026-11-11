@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useData, useStream, useThroughput, put, post, get } from '../api.js';
-import { Button, Card, Empty, Icon, Note, Page, Pill, Segmented, fmt, Bar, useAction } from '../ui.jsx';
+import { Button, Card, Empty, Icon, Note, Page, Pill, Segmented, fmt, Bar, useAction, usePortNames } from '../ui.jsx';
 import { go } from '../App.jsx';
 import { COUNTRIES, MAP_H, MAP_W } from '../worldmap.js';
 import { centreOf } from '../mapgeo.js';
@@ -71,6 +71,7 @@ function lastOf(arr, n = 2) {
 }
 
 function Hero({ wanList, links, thr, onStamp }) {
+  const pn = usePortNames();
   const [dir, setDir] = useState('rx');
   const [range, setRange] = useState('1h');
   const { data: hist } = useData(`/api/overview/history?range=${LIVE[range] ? '1h' : range}`, { every: EVERY[LIVE[range] ? '1h' : range], enabled: !LIVE[range] });
@@ -136,7 +137,7 @@ function Hero({ wanList, links, thr, onStamp }) {
                 <div>
                   <b>{x.w.name}</b>{' '}
                   <Pill tone={x.s.tone}>{x.s.health === 'working' ? (x.l?.active ? 'Working · in use' : 'Standing by') : x.s.text}</Pill>
-                  <div className="small muted">{[x.w.iface, x.w.addr && x.w.addr !== 'dhcp' ? x.w.addr.split('/')[0] : '', m].filter(Boolean).join(' · ')}</div>
+                  <div className="small muted">{[pn(x.w.iface), x.w.addr && x.w.addr !== 'dhcp' ? x.w.addr.split('/')[0] : '', m].filter(Boolean).join(' · ')}</div>
                 </div>
                 <div className="num small">{x.l?.active || thr?.links?.[x.w.name] ? <>{fmtBits(rx)} ↓<br />{fmtBits(tx)} ↑</> : '–'}</div>
               </div>
@@ -266,11 +267,11 @@ function mapBase(dir, t) {
   }
   return t < 0.5
     ? `color-mix(in srgb, var(--color-status-warning) ${Math.max(22, pct(t * 2))}%, var(--color-border-strong))`
-    : `color-mix(in srgb, var(--color-status-serious) ${pct((t - 0.5) * 2)}%, var(--color-status-warning))`;
+    : `color-mix(in srgb, var(--color-status-bad) ${pct((t - 0.5) * 2)}%, var(--color-status-warning))`;
 }
 const mapLegend = (dir) => (dir === 'out'
   ? 'linear-gradient(90deg, var(--color-border-strong), var(--color-chart-series-1), var(--color-chart-series-3))'
-  : 'linear-gradient(90deg, var(--color-border-strong), var(--color-status-warning), var(--color-status-serious))');
+  : 'linear-gradient(90deg, var(--color-border-strong), var(--color-status-warning), var(--color-status-bad))');
 
 const RANGE_HOURS = { '5m': '1', '15m': '1', '1h': '1', '24h': '24', '7d': '168', '30d': '720' };
 
@@ -404,6 +405,7 @@ function WorldCard() {
 // ---------------------------------------------------------------- lower cards
 
 function NetworksCard({ fw, wanList, links, devs, h24 }) {
+  const pn = usePortNames();
   const { data: speed } = useData('/api/net/zone-speed', { every: 1000 });
   const order = (fw?.matrix_zones || []).map((z) => z.name);
   const stored = (fw?.zones || []).filter((z) => z.kind !== 'wan');
@@ -421,7 +423,7 @@ function NetworksCard({ fw, wanList, links, devs, h24 }) {
               return (
                 <tr key={z.id}>
                   <td><b>{z.name}</b></td>
-                  <td className="small muted">{z.ifaces?.length ? z.ifaces.join(', ') : 'no ports yet'}</td>
+                  <td className="small muted">{z.ifaces?.length ? z.ifaces.map(pn).join(', ') : 'no ports yet'}</td>
                   <td className="num">{devs?.by_network?.[z.name] ?? 0}</td>
                   <td className="num">{sp ? fmtBits(sp.down) : '–'}</td>
                   <td className="num">{sp ? fmtBits(sp.up) : '–'}</td>
@@ -436,7 +438,7 @@ function NetworksCard({ fw, wanList, links, devs, h24 }) {
         </table></div>
       <div className="ov-net mt3">
           <div className="spread"><b>Internet</b>{enabled.length ? <Pill tone={ok ? 'good' : states.every((s) => s.health === 'unknown' || s.health === 'none') ? '' : 'bad'}>{ok ? (enabled.length > 1 ? `${ok} of ${enabled.length} working` : 'Connected') : states.every((s) => s.health === 'unknown' || s.health === 'none') ? 'Checking…' : 'Down'}</Pill> : <Pill>Not set up</Pill>}</div>
-          <div className="small muted">{enabled.map((w) => (w.name ? `${w.name} (${w.iface})` : w.iface)).join(', ') || 'no port yet'} · managed automatically</div>
+          <div className="small muted">{enabled.map((w) => (w.name ? `${w.name} (${pn(w.iface)})` : pn(w.iface))).join(', ') || 'no port yet'} · managed automatically</div>
         </div>
       <button type="button" className="link small leftalign" onClick={() => go('networks')}>Open networks →</button>
     </Card>

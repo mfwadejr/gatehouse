@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { get, post, put, useData } from '../api.js';
 import FailbackPrompt from './FailbackPrompt.jsx';
-import { Button, Card, Field, Input, Note, Pill, Segmented, Select, ToggleRow, useAction, confirmBox } from '../ui.jsx';
+import { Button, Card, Field, Input, Note, Pill, Segmented, Select, ToggleRow, useAction, confirmBox, usePortNames } from '../ui.jsx';
 
 // High availability: two NopeWarden machines, one active at a time. The first-time setup is a short
 // list of steps; once it runs, this card is the status page.
@@ -9,6 +9,7 @@ const guess = (cidr, n) => { const m = /^(\d+\.\d+\.\d+)\.\d+\/\d+$/.exec(cidr |
 const ago = (t) => (t ? `${Math.max(0, Math.round(Date.now() / 1000 - t))} seconds ago` : 'not yet');
 
 export default function HighAvailability({ me }) {
+  const pn = usePortNames();
   const { data, reload } = useData('/api/ha', { topics: ['fw.status', 'net.status'], every: 5000 });
   const { data: net, reload: rn } = useData('/api/net/status', { topics: ['net.status'], every: 4000 });
   const { data: fwo, reload: rf } = useData('/api/fw/overview', { topics: ['fw.status'] });
@@ -112,14 +113,14 @@ export default function HighAvailability({ me }) {
         <div className="list">
           <div className="item"><div><div className="name">This unit ({data.primary ? 'main' : 'backup'}) {data.active ? <Pill tone="good">Active</Pill> : <Pill>Standby</Pill>}</div><div className="meta">{data.own_addr} · version {data.version}</div></div></div>
           <div className="item"><div><div className="name">Partner {peer.reachable ? (peer.active ? <Pill tone="good">Active</Pill> : <Pill>Standby</Pill>) : <Pill tone="bad">Not reachable</Pill>}</div><div className="meta">{data.peer_addr}{peer.version ? ` · version ${peer.version}` : ''}</div></div></div>
-          <div className="item"><div><div className="name">Shared addresses</div><div className="meta">{(data.vips || []).map((v) => `${v.cidr} on ${v.iface}`).join(' · ')}</div></div></div>
+          <div className="item"><div><div className="name">Shared addresses</div><div className="meta">{(data.vips || []).map((v) => `${v.cidr} on ${pn(v.iface)}`).join(' · ')}</div></div></div>
           <div className="item"><div><div className="name">Settings copied</div><div className="meta">{ago(data.synced_at)}. Changes are made on the active unit and copied across.</div></div></div>
         </div>
         <ToggleRow title="Keep the spare's internet connection ready" desc="The spare keeps its internet port connected but silent, copies the active unit's hardware address and takes over faster. Set it on the active unit. A login connection (PPPoE) and a Wi-Fi connection are not part of this; they start fresh on takeover." checked={!!data.warm} disabled={busy || !data.active} onChange={(v) => run(async () => { await put('/api/ha/warm', { on: v }); all(); }, v ? 'The spare is kept ready.' : 'Back to keeping the spare\'s internet port down.')} />
         <Field label="Cable between the two units (optional)" hint="Plug a cable between one spare port on each unit and choose that port on both. The two units then talk over the cable (settings copy, updates, connection copy) and fall back to your shared network if it is unplugged. An unplugged cable never makes either unit take over.">
           <div className="inline">
             <Select value={data.heart?.dev || ''} onChange={(v) => run(async () => { await put('/api/ha/heart', { dev: v }); all(); }, v ? 'The cable port is set on this unit. Set the other unit too.' : 'The cable is no longer used.')}
-              options={[{ value: '', label: 'No cable' }, ...((data.heart_choices || []).concat(data.heart?.dev && !(data.heart_choices || []).includes(data.heart.dev) ? [data.heart.dev] : [])).map((p) => ({ value: p, label: p }))]} />
+              options={[{ value: '', label: 'No cable' }, ...((data.heart_choices || []).concat(data.heart?.dev && !(data.heart_choices || []).includes(data.heart.dev) ? [data.heart.dev] : [])).map((p) => ({ value: p, label: pn(p) }))]} />
             {data.heart && <Pill tone={data.heart.connected ? 'good' : 'warn'}>{data.heart.connected ? 'Cable connected' : 'Cable not connected'}</Pill>}
           </div>
         </Field>

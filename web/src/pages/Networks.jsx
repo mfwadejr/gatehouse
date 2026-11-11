@@ -45,6 +45,7 @@ function PortRow({ p, onSaved }) {
 }
 
 function EditNetwork({ n, zones, onClose, onSaved }) {
+  const pn = usePortNames();
   const [f, setF] = useState({ ...n.iface });
   const [run, busy] = useAction();
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
@@ -102,13 +103,13 @@ function EditNetwork({ n, zones, onClose, onSaved }) {
                 return (
                   <label key={p.name} className="small" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', opacity: reason ? 0.6 : 1 }}>
                     <input type="checkbox" checked={on} disabled={!!reason} onChange={(e) => tick(p.name, e.target.checked)} />
-                    <span className="mono">{p.name}</span>
+                    <span className="mono">{pn(p.name)}</span>
                     <span className="muted">{p.link ? `cable connected${p.speed > 0 ? `, ${p.speed} Mb/s` : ''}` : 'no cable'}{reason ? ` · ${reason}` : on && !first.includes(p.name) ? ' · will join' : ''}</span>
                   </label>
                 );
               })}
               {mem.length === 0 && <Note tone="warn">A network needs at least one port.</Note>}
-              {(dropped.length > 0 || added.length > 0) && <Note tone="warn">{dropped.length ? `Taking ${dropped.join(', ')} out cuts off devices plugged into ${dropped.length === 1 ? 'it' : 'them'}. ` : ''}If you manage NopeWarden through one of these ports, keep another way in until you have applied and checked it. NopeWarden puts the change back by itself if you cannot confirm it.</Note>}
+              {(dropped.length > 0 || added.length > 0) && <Note tone="warn">{dropped.length ? `Taking ${dropped.map(pn).join(', ')} out cuts off devices plugged into ${dropped.length === 1 ? 'it' : 'them'}. ` : ''}If you manage NopeWarden through one of these ports, keep another way in until you have applied and checked it. NopeWarden puts the change back by itself if you cannot confirm it.</Note>}
             </div>
           </Field>
         )}
@@ -120,7 +121,7 @@ function EditNetwork({ n, zones, onClose, onSaved }) {
                 return (
                   <label key={p.name} className="small" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', opacity: reason ? 0.6 : 1 }}>
                     <input type="checkbox" checked={extra.includes(p.name)} disabled={!!reason} onChange={(e) => tickExtra(p.name, e.target.checked)} />
-                    <span className="mono">{p.name}</span>
+                    <span className="mono">{pn(p.name)}</span>
                     <span className="muted">{p.link ? `cable connected${p.speed > 0 ? `, ${p.speed} Mb/s` : ''}` : 'no cable'}{reason ? ` · ${reason}` : ''}</span>
                   </label>
                 );
@@ -136,7 +137,7 @@ function EditNetwork({ n, zones, onClose, onSaved }) {
             {movable && (
               <>
                 <Field label="Port" hint="The physical port this network is plugged into.">
-                  <Select value={port} onChange={setPort} options={[...new Set([port, ...((sug && sug.ports) || []).map((p) => p.name)])].map((x) => ({ value: x, label: x }))} />
+                  <Select value={port} onChange={setPort} options={[...new Set([port, ...((sug && sug.ports) || []).map((p) => p.name)])].map((x) => ({ value: x, label: pn(x) }))} />
                 </Field>
                 <Field label="VLAN number" hint="Leave empty to use the whole port. Your switch must pass the number you choose.">
                   <Input value={vlan} onChange={(v) => setVlan(v.replace(/\D/g, ''))} className="in mono" />
@@ -145,7 +146,7 @@ function EditNetwork({ n, zones, onClose, onSaved }) {
               </>
             )}
             <p className="small muted">
-              {f.kind === 'vlan' ? <>This network is a VLAN: number {f.vlan} on port {f.parent}. Your switch must pass that number.</> : f.kind === 'bridge' ? <>This network spreads over several ports ({(f.members || []).join(', ')}), carried by {f.name}.</> : <>This network uses the whole port {f.name}. To add another network to the same port, add a network and choose this port: NopeWarden then uses a VLAN number for it.</>}
+              {f.kind === 'vlan' ? <>This network is a VLAN: number {f.vlan} on port {pn(f.parent)}. Your switch must pass that number.</> : f.kind === 'bridge' ? <>This network spreads over several ports ({(f.members || []).map(pn).join(', ')}), carried by {f.name}.</> : <>This network uses the whole port {pn(f.name)}. To add another network to the same port, add a network and choose this port: NopeWarden then uses a VLAN number for it.</>}
             </p>
           </div>
         </details>
@@ -220,7 +221,7 @@ export default function Networks({ me }) {
               <div className="item" key={n.iface.id}>
                 <div className="fill">
                   <div className="name">{n.title} {!n.iface.enabled && <Pill>Off</Pill>}{!n.zone && <Pill tone="warn">Not assigned to a firewall network</Pill>}</div>
-                  <div className="meta">{n.iface.ipv4 || 'no address'} · {n.iface.kind === 'vlan' ? `VLAN ${n.iface.vlan} on ${n.iface.parent}` : `port ${pn(n.iface.name)}`}</div>
+                  <div className="meta">{n.iface.ipv4 || 'no address'} · {n.iface.kind === 'vlan' ? `VLAN ${n.iface.vlan} on ${pn(n.iface.parent)}` : `port ${pn(n.iface.name)}`}</div>
                   <div className="meta">{dhcpText(n.scope)}{n.zone ? ` · ${n.online} device${n.online === 1 ? '' : 's'} online${n.total > n.online ? `, ${n.total} known` : ''}` : ''}</div>
                 </div>
                 <div className="actions">

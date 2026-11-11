@@ -64,7 +64,6 @@
   /* primitive.status */
   --primitive-status-green: #0ca30c;
   --primitive-status-yellow: #fab219;
-  --primitive-status-coral: #ec835a;
   --primitive-status-red: #d03b3b;
 
   /* primitive.alpha */
@@ -76,7 +75,7 @@
   --primitive-alpha-blue-16: rgba(57, 135, 229, 0.16);
   --primitive-alpha-blue-30: rgba(57, 135, 229, 0.30);
   --primitive-alpha-blue-50: rgba(57, 135, 229, 0.50);
-  --primitive-alpha-coral-45: rgba(236, 131, 90, 0.45);
+  --primitive-alpha-red-45: rgba(229, 72, 77, 0.45);
 
   /* color.bg */
   --color-bg-page: #0d0d0d;
@@ -111,9 +110,9 @@
   /* color.status */
   --color-status-good: #0ca30c;
   --color-status-warning: #fab219;
-  --color-status-serious: #ec835a;
+  --color-status-bad: #e5484d;
   --color-status-critical: #d03b3b;
-  --color-status-serious-border: rgba(236, 131, 90, 0.45);
+  --color-status-bad-border: rgba(229, 72, 77, 0.45);
 
   /* color.control */
   --color-control-switch-off: #383835;

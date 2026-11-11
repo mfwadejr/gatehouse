@@ -35,6 +35,15 @@ func (a *App) portName(n string) string {
 	return n
 }
 
+// portNameList names each port the way people named it, for sentences that join them their own way.
+func (a *App) portNameList(ns []string) []string {
+	out := make([]string, len(ns))
+	for i, n := range ns {
+		out[i] = a.portName(n)
+	}
+	return out
+}
+
 func (a *App) portNames(ns []string) string {
 	var out []string
 	for _, n := range ns {

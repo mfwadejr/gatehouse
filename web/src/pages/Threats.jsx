@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { del, post, put, get, useData } from '../api.js';
 import { ScheduleEditor } from '../ScheduleEditor.jsx';
 import { Chart, fmtBits } from '../charts.jsx';
-import { Button, Card, Empty, Field, Input, Modal, Note, NumberInput, Page, Pill, Segmented, Steps, Switch, Tabs, Limited, Bar, useAction, fmt } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, NumberInput, Page, Pill, Segmented, Steps, Switch, Tabs, Limited, Bar, useAction, useCheck, CheckLine, fmt } from '../ui.jsx';
 
 // Threat watching. An engine (Suricata) is installed only when the owner asks. It watches copies of
 // the traffic and NopeWarden says what it noticed in plain words. It never holds traffic up, so a
@@ -20,11 +20,11 @@ function ProgramCard({ data, reload }) {
   const working = p.state === 'installing' || p.state === 'removing';
   const look = async () => { const r = await run(() => post('/api/threat/install/preview')); if (r) setPre(r); };
   return (
-    <Card title={p.installed && !working ? 'The program' : 'Install threat watching'} desc={p.installed && !working ? 'Threat watching is an extra program. It can be removed at any time.' : 'An extra program, installed only if you ask. Nothing else in NopeWarden needs it.'}>
+    <Card title={p.installed && !working ? 'The program' : 'Install threat watching'} desc={p.installed && !working ? 'Threat watching is an extra program, Suricata. It can be removed at any time.' : 'An extra program, installed only if you ask. Nothing else in NopeWarden needs it.'}>
       <div className="stack">
         {working ? <Note title={p.state === 'installing' ? 'Installing' : 'Removing'}>{p.steps?.length ? <><Steps steps={p.steps} label={p.state === 'installing' ? 'Install progress' : 'Removal progress'} /><span className="small muted">This takes a minute or two. You can leave this page.</span></> : (p.message || 'Working. This can take a few minutes. You can leave this page.')}</Note> : p.installed ? (
           <>
-            <p className="small">{p.running ? 'Running' : 'Not running'}{p.version ? `. Version ${p.version}` : ''}{p.memory_bytes ? `. Using ${mb(Math.round(p.memory_bytes / 1048576))} of memory` : ''}.</p>
+            <p className="small">{p.running ? 'Running' : 'Not running'}. Based on Suricata{p.version ? `, version ${p.version}` : ''}{p.memory_bytes ? `. Using ${mb(Math.round(p.memory_bytes / 1048576))} of memory` : ''}.</p>
             <div className="actions"><Button kind="danger" disabled={busy} onClick={() => setRemoving(true)}>Remove threat watching</Button></div>
           </>
         ) : (
@@ -262,6 +262,7 @@ function GroupsCard({ groups, reload, goSettings }) {
 
 function Rules({ data, reload, goSettings }) {
   const [run, busy] = useAction();
+  const [chk, chkGo] = useCheck();
   const [q, setQ] = useState('');
   const [found, setFound] = useState(null);
   const p = data.program || {};
@@ -272,9 +273,10 @@ function Rules({ data, reload, goSettings }) {
     <div className="stack">
       <Card title="Rules" desc={p.rules_updated ? `${fmt.n(p.rules_count)} checks, updated ${fmt.dt(p.rules_updated)}.` : 'The list of things to look for. It is updated on the schedule below while watching is on.'}>
         <div className="actions">
-          <Button disabled={busy || !p.installed} onClick={() => run(() => post('/api/threat/rules/update'), 'Updating the rules. This can take a minute.').then(reload)}>Update rules now</Button>
+          <Button disabled={busy || chk.phase === 'working' || !p.installed} onClick={() => chkGo(async () => { await post('/api/threat/rules/update'); await reload(); }, 'Updating the rules. This can take a minute.', 'The rules are up to date.')}>Update rules now</Button>
           <Button disabled={busy || !p.has_previous} onClick={() => run(() => post('/api/threat/rules/rollback'), 'Went back to the previous rules.').then(reload)} title="Use the rules from before the last update">Roll back to the previous rules</Button>
         </div>
+        <CheckLine st={chk} />
         {!p.has_previous && <p className="small muted">There is no earlier set to go back to yet.</p>}
         <ScheduleEditor id="threat" label="How often to update the rules" hideRun />
       </Card>

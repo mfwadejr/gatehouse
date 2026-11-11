@@ -292,6 +292,7 @@ func SavePortList(tx *sql.Tx, p PortListRow) (int64, error) {
 		for _, u := range ups {
 			tx.Exec(`UPDATE fw_rules SET service=? WHERE id=?`, u.svc, u.id)
 		}
+		renameListInRoutes(tx, old, p.Name)
 	}
 	return p.ID, nil
 }
@@ -363,6 +364,9 @@ func DeletePortList(tx *sql.Tx, id int64) error {
 	for _, g := range ForwardsUsingApp(tx, name) {
 		used = append(used, "open port "+g)
 	}
+	for _, r := range routesUsingList(tx, name) {
+		used = append(used, "route "+r)
+	}
 	if err := inUse("The list "+name, used); err != nil {
 		return err
 	}
@@ -374,6 +378,59 @@ func DeletePortList(tx *sql.Tx, id int64) error {
 // spaces in their names, so only commas separate entries here.
 func RulesUsingService(db Queryer, list string) []string {
 	rows, err := db.Query(`SELECT name,service FROM fw_rules ORDER BY position,id`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var name, svc string
+		rows.Scan(&name, &svc)
+		for _, x := range strings.Split(svc, ",") {
+			if strings.EqualFold(strings.TrimSpace(x), "list:"+list) {
+				out = append(out, name)
+				break
+			}
+		}
+	}
+	return out
+}
+
+// renameListInRoutes makes the routes that use a saved list follow its new name.
+func renameListInRoutes(tx *sql.Tx, old, name string) {
+	rows, err := tx.Query(`SELECT id,service FROM routes`)
+	if err != nil {
+		return
+	}
+	type upd struct {
+		id  int64
+		svc string
+	}
+	var ups []upd
+	for rows.Next() {
+		var id int64
+		var svc string
+		rows.Scan(&id, &svc)
+		parts := strings.Split(svc, ",")
+		changed := false
+		for i, x := range parts {
+			if strings.TrimSpace(x) == "list:"+old {
+				parts[i], changed = "list:"+name, true
+			}
+		}
+		if changed {
+			ups = append(ups, upd{id, strings.Join(parts, ",")})
+		}
+	}
+	rows.Close()
+	for _, u := range ups {
+		tx.Exec(`UPDATE routes SET service=? WHERE id=?`, u.svc, u.id)
+	}
+}
+
+// routesUsingList names the routes whose service field includes the saved list.
+func routesUsingList(db Queryer, list string) []string {
+	rows, err := db.Query(`SELECT name,service FROM routes ORDER BY position,id`)
 	if err != nil {
 		return nil
 	}

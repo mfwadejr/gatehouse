@@ -88,6 +88,7 @@ func labelOr(l, d string) string {
 
 func (a *App) routesView() map[string]any {
 	rows, _ := fw.Routes(a.Config)
+	savedLists := portListsOf(a.Config)
 	targets := a.routeTargets(a.Config)
 	byKey := map[string]routeTarget{}
 	nWan, nOn := 0, 0
@@ -175,9 +176,13 @@ func (a *App) routesView() map[string]any {
 		if r.Sched != nil {
 			v.Plain += ", " + strings.ToLower(r.Sched.Describe())
 		}
+		missing := fw.MissingServiceLists(r.Service, savedLists)
 		switch {
 		case !r.Enabled:
 			v.State = "off"
+		case len(missing) > 0:
+			v.State = "attention"
+			v.Warnings = append(v.Warnings, "The service list "+strings.Join(missing, ", ")+" no longer exists, so this route sends nothing. Choose another service or put the list back.")
 		case r.PausedUntil > time.Now().Unix():
 			v.State = "paused"
 		case !have:

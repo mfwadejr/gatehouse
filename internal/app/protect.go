@@ -89,13 +89,13 @@ func (a *App) protectedRules(m *fw.Model) []protectedRule {
 	}
 	text := "No management network is set. Mark one network as able to manage this device."
 	if len(names) > 0 {
-		text = fmt.Sprintf("Devices on %s can always open this console on %s (through %s).", joinNames(names), portsText(m.ConsolePorts), joinNames(ifaces))
+		text = fmt.Sprintf("Devices on %s can always open this console on %s (through %s).", joinNames(names), portsText(m.ConsolePorts), joinNames(a.portNameList(ifaces)))
 	}
 	out = append(out, protectedRule{Title: "Always reach this console", Text: text, Active: len(names) > 0,
 		Note: "This rule sits above every rule you can edit. It cannot be removed, reordered or switched off."})
 	if mc := a.mgmtCfg(); mc.Iface != "" {
 		on, note := true, "This rule sits above every rule you can edit. Nothing is routed through this port."
-		text := fmt.Sprintf("The console answers on %s, on %s, apart from every network.", portsText(m.ConsolePorts), mc.Iface)
+		text := fmt.Sprintf("The console answers on %s, on %s, apart from every network.", portsText(m.ConsolePorts), a.portName(mc.Iface))
 		if m.CloseLAN {
 			if a.mgmtLanOpen() {
 				note = "Closing the LAN is on, but the console stays open there until this port has been healthy for half a minute."
@@ -117,7 +117,7 @@ func (a *App) protectedRules(m *fw.Model) []protectedRule {
 		case contains(ifaces, r):
 			on, note = false, "Not needed right now: this port already belongs to a management network. It takes over if that changes."
 		}
-		out = append(out, protectedRule{Title: "The port you set this up from", Text: fmt.Sprintf("The device was first set up from %s, so devices plugged into %s can always open the console on %s, whatever else changes.", r, r, portsText(m.ConsolePorts)), Active: on, Note: note})
+		out = append(out, protectedRule{Title: "The port you set this up from", Text: fmt.Sprintf("The device was first set up from %s, so devices plugged into %s can always open the console on %s, whatever else changes.", a.portName(r), a.portName(r), portsText(m.ConsolePorts)), Active: on, Note: note})
 	}
 	if ssh {
 		out = append(out, protectedRule{Title: "Remote login (SSH)", Text: "Allowed from the networks you marked for remote login.", Active: true})
@@ -263,7 +263,7 @@ func (a *App) registerProtectRoutes() {
 		}
 		add(mg > 0, "%d network(s) can manage this device.", mg)
 		if checked, safe, ifc := sessionSafe(m, c.IP); checked {
-			add(safe, "You are connected through %s; it %s manage this device.", ifc, map[bool]string{true: "can", false: "can NOT"}[safe])
+			add(safe, "You are connected through %s; it %s manage this device.", a.portName(ifc), map[bool]string{true: "can", false: "can NOT"}[safe])
 		} else {
 			add(true, "You are connected from this device itself, so the network cannot affect you.")
 		}
