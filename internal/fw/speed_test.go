@@ -3,6 +3,7 @@ package fw
 import (
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -109,6 +110,9 @@ func TestNetnsSpeedLimitAndPriorityMark(t *testing.T) {
 		{ID: 2, Kind: "priority", Prio: "high", Ifaces: []string{"eth1"}},
 	}
 	l.apply(m)
+	// A probe table that counts packets whose connection carries the High mark. It reads the mark
+	// from the firewall itself, so it does not depend on the connection table being readable.
+	l.must("ghfw", "nft add table inet probe && nft add chain inet probe f '{ type filter hook forward priority 10; }' && nft add rule inet probe f ct mark and 0xff000000 == 0xa1000000 counter")
 	slow := l.sendMbps("ghhome", 9102, 8<<20)
 	if slow > 40 || slow > free/4 {
 		t.Fatalf("a 16 Mb/s limit let %.1f Mb/s through (unlimited was %.0f)", slow, free)
@@ -118,13 +122,10 @@ func TestNetnsSpeedLimitAndPriorityMark(t *testing.T) {
 		t.Fatalf("the Guests network is not covered by the rule but ran at %.1f Mb/s", other)
 	}
 	// The connection carries the High mark in its top bits and nothing in the routing bits.
-	out, _ := l.sh("ghfw", "cat /proc/net/nf_conntrack 2>/dev/null || conntrack -L 2>/dev/null")
-	if out == "" {
-		t.Skip("cannot read the connection table here")
-	}
-	want := "mark=" + strconv.FormatUint(0xa1000000, 10)
-	if !strings.Contains(out, want) {
-		t.Fatalf("no connection carries %s:\n%s", want, out)
+	out, _ := l.sh("ghfw", "nft list table inet probe")
+	mk := regexp.MustCompile(`packets (\d+)`).FindStringSubmatch(out)
+	if mk == nil || mk[1] == "0" {
+		t.Fatalf("no packet belonged to a connection carrying the High mark:\n%s", out)
 	}
 }
 
