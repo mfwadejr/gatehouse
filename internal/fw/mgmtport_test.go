@@ -18,7 +18,7 @@ func TestManagementPortRulesAreAlwaysThereAndNeverRouted(t *testing.T) {
 	}
 	for _, want := range []string{
 		"set mgmt_if { type ifname; }",
-		`iifname @mgmt_if ip saddr 10.9.0.0/24 tcp dport 443 accept comment "protected: management port console"`,
+		`iifname @mgmt_if ip saddr 10.9.0.0/24 tcp dport 443 counter accept comment "protected: management port console"`,
 		`iifname @mgmt_if ip saddr 10.9.0.0/24 tcp dport 22 accept comment "protected: management port ssh"`,
 		`iifname @mgmt_if icmp type echo-request`,
 		`iifname @mgmt_if udp sport 67 udp dport 68 accept`,
@@ -54,8 +54,8 @@ func TestClosingTheLANConsoleGoesThroughAGate(t *testing.T) {
 	}
 	for _, want := range []string{
 		"set lan_console { type inet_service; }",
-		`tcp dport @lan_console accept comment "protected: management console"`,
-		`iifname "eth2" tcp dport @lan_console accept comment "protected: setup port"`,
+		`tcp dport @lan_console counter accept comment "protected: management console"`,
+		`iifname "eth2" tcp dport @lan_console counter accept comment "protected: setup port"`,
 		`protected: management port console`, // the management port itself is never gated
 	} {
 		if !strings.Contains(out, want) {

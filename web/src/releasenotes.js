@@ -1,6 +1,17 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.22',
+    title: 'Firewall rules as lines, with live counters',
+    items: [
+      'Firewall, Rules now opens as rule lines: one row for each rule with its number, name, From, To, Service, Action, Matches and When, the way most firewalls list them. Long lists show the first two entries and +N. Plain cards is still there, narrow windows open on it, and the view you choose is remembered.',
+      'Click a line to open it: the rule in a sentence, its counts, and the buttons. The built-in rules open for reading only, and so do the rules other pages make. Paused devices shows who is blocked right now, with a button to Profiles.',
+      'A rule with a few services (up to 8) counts each one on its own, so you can see which of them is being used.',
+      'The Live switch is on by default: counters update every second or two and a row flashes when it matches, so you can tell whether a rule is really being hit. With Live off the counters still refresh about every 20 seconds.',
+      'Export what is shown (CSV) saves the rows on screen, after your search and filters, one row for each service, with the counts and when each last matched. The built-in console rules now count their matches too.',
+    ],
+  },
+  {
     version: '0.9.4.21',
     title: 'One colour code, the names you gave your ports, and a better New service form',
     items: [

@@ -290,7 +290,7 @@ func (c *compiler) input() {
 	// The management port: a management address only. The console, remote login if it is on, and
 	// ping; nothing else, and nothing is ever routed through it.
 	for _, lim := range limits {
-		c.line(2, "iifname @%s%s tcp dport %s accept comment \"protected: management port console\"", MgmtIfSet, lim, portList(m.ConsolePorts))
+		c.line(2, "iifname @%s%s tcp dport %s counter accept comment \"protected: management port console\"", MgmtIfSet, lim, portList(m.ConsolePorts))
 		if m.SSHEnabled {
 			c.line(2, "iifname @%s%s tcp dport 22 ct state new add @ssh_rate4 { ip saddr limit rate over 8/minute burst 5 packets } drop comment \"protected: management port ssh limit\"", MgmtIfSet, lim)
 			c.line(2, "iifname @%s%s tcp dport 22 accept comment \"protected: management port ssh\"", MgmtIfSet, lim)
@@ -299,7 +299,7 @@ func (c *compiler) input() {
 	c.line(2, "iifname @%s icmp type echo-request limit rate 20/second accept comment \"protected: management port ping\"", MgmtIfSet)
 	c.line(2, "iifname @%s udp sport 67 udp dport 68 accept comment \"protected: management port address from dhcp\"", MgmtIfSet)
 	for _, lim := range limits {
-		c.line(2, "iifname %s%s tcp dport %s accept comment \"protected: management console\"", ifSet(mgmt), lim, consolePorts)
+		c.line(2, "iifname %s%s tcp dport %s counter accept comment \"protected: management console\"", ifSet(mgmt), lim, consolePorts)
 		if m.SNMPEnabled {
 			c.line(2, "iifname %s%s udp dport 161 accept comment \"protected: management snmp\"", ifSet(mgmt), lim)
 		}
@@ -316,7 +316,7 @@ func (c *compiler) input() {
 	// The last resort: the port the device was set up from keeps reaching the console, whatever
 	// the networks look like. Never on an internet-facing port or one already covered above.
 	if r := m.RescueIface; r != "" && !contains(m.WanIfaces(), r) && !contains(mgmt, r) {
-		c.line(2, "iifname %s tcp dport %s accept comment \"protected: setup port\"", ifSet([]string{r}), consolePorts)
+		c.line(2, "iifname %s tcp dport %s counter accept comment \"protected: setup port\"", ifSet([]string{r}), consolePorts)
 	}
 
 	// The cable to the partner unit: its address on that port only, for the link and the table copy.
@@ -630,6 +630,7 @@ func (c *compiler) explicit(indent int, r Rule, forward bool) {
 		}
 	}
 	tag := "rule:" + r.From + ":" + r.To + ":" + r.Name
+	perService := len(specs) > 1 && len(specs) <= MaxServiceCounters
 	for _, st := range srcT {
 		for _, dt := range dstT {
 			fam := st.fam
@@ -669,12 +670,26 @@ func (c *compiler) explicit(indent int, r Rule, forward bool) {
 					if c.logs(r.Action) || r.Log {
 						c.line(indent, "%s ct state new limit rate 100/second burst 200 packets log prefix %s", b.String(), q(logPrefix(r.Action, tag)))
 					}
-					c.line(indent, "%s counter %s comment %s", b.String(), r.Action, q(tag))
+					ctag := tag
+					if perService && sp.Proto != "" {
+						ctag = ServiceTag(tag, sp)
+					}
+					c.line(indent, "%s counter %s comment %s", b.String(), r.Action, q(ctag))
 				}
 			}
 		}
 	}
 }
+
+// MaxServiceCounters is the most services a rule may list and still have a match count for each.
+const MaxServiceCounters = 8
+
+// ServiceTag is the label the counter of one service of a rule carries. The rule's own total is
+// the sum of these, and Counters adds them up under the plain tag as well.
+func ServiceTag(tag string, sp PortSpec) string { return tag + SvcSep + sp.String() }
+
+// SvcSep separates a rule's tag from the service in a per-service counter label.
+const SvcSep = "#svc:"
 
 func setLit(v []string) string {
 	if len(v) == 1 {

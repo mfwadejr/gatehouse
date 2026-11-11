@@ -172,7 +172,7 @@ func (a *Applier) Counters() (map[string]Counter, error) {
 			}
 			continue
 		}
-		if it.Rule == nil || !strings.HasPrefix(it.Rule.Comment, "rule:") {
+		if it.Rule == nil || !(strings.HasPrefix(it.Rule.Comment, "rule:") || strings.HasPrefix(it.Rule.Comment, "protected:")) {
 			continue
 		}
 		var c Counter
@@ -185,6 +185,14 @@ func (a *Applier) Counters() (map[string]Counter, error) {
 		t.Packets += c.Packets
 		t.Bytes += c.Bytes
 		res[it.Rule.Comment] = t
+		// A service's own counter also counts toward its rule's total.
+		if i := strings.LastIndex(it.Rule.Comment, SvcSep); i > 0 {
+			base := it.Rule.Comment[:i]
+			tb := res[base]
+			tb.Packets += c.Packets
+			tb.Bytes += c.Bytes
+			res[base] = tb
+		}
 	}
 	return res, nil
 }

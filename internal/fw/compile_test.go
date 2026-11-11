@@ -33,7 +33,7 @@ func TestCompileShape(t *testing.T) {
 	}
 	for _, want := range []string{
 		"delete table inet nopewarden",
-		`iifname "eth1" tcp dport 443 accept comment "protected: management console"`,
+		`iifname "eth1" tcp dport 443 counter accept comment "protected: management console"`,
 		`iifname "eth1" oifname "eth0" counter accept comment "internet:Home"`,
 		`iifname "eth2" oifname "eth1" ip daddr { 192.168.1.50, 192.168.1.51 } tcp dport 631 counter accept`,
 		`iifname { "eth3", "eth3.20" } oifname "eth1" ip daddr 192.168.1.9 tcp dport 554`,
@@ -197,8 +197,8 @@ func TestSetupPortAndManagementLimit(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{
-		`iifname "eth1" ip saddr { 192.168.1.0/24, 10.8.0.0/24 } tcp dport 443 accept comment "protected: management console"`,
-		`iifname "eth2" tcp dport 443 accept comment "protected: setup port"`,
+		`iifname "eth1" ip saddr { 192.168.1.0/24, 10.8.0.0/24 } tcp dport 443 counter accept comment "protected: management console"`,
+		`iifname "eth2" tcp dport 443 counter accept comment "protected: setup port"`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in:\n%s", want, out)

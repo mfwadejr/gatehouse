@@ -26,6 +26,8 @@ type fwDyn struct {
 	pushQ      map[string]map[string]time.Time // set name -> address -> expiry, waiting to be sent
 	watch      []string                        // domains named by enabled rules
 	counts     map[string]fw.Counter
+	hitMu      sync.Mutex // one sample at a time, and not more often than asked for
+	hitAt      time.Time
 	kick       chan struct{}
 	geoBusy    atomic.Bool
 	geoTried   atomic.Int64
@@ -369,10 +371,20 @@ func fwTag(r fw.RuleRow) string { return "rule:" + r.From + ":" + r.To + ":" + r
 
 // sampleHits adds what the counters have counted since the last look to the totals, which
 // survive a firewall reload.
-func (a *App) sampleHits() {
+func (a *App) sampleHits() { a.sampleHitsIfOlder(0) }
+
+// sampleHitsIfOlder takes a new look at the counters unless one was taken within maxAge, so many
+// people watching the rules page cost one look a second between them.
+func (a *App) sampleHitsIfOlder(maxAge time.Duration) {
 	if a.FW == nil {
 		return
 	}
+	a.dyn.hitMu.Lock()
+	defer a.dyn.hitMu.Unlock()
+	if maxAge > 0 && time.Since(a.dyn.hitAt) < maxAge {
+		return
+	}
+	a.dyn.hitAt = time.Now()
 	cur, err := a.FW.Counters()
 	if err != nil {
 		return

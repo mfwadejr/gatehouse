@@ -31,8 +31,64 @@ type ruleView struct {
 	SrcChips  []chip   `json:"src_chips"`
 	DstChips  []chip   `json:"dst_chips"`
 	Warnings  []string `json:"warnings"`
-	Matrix    bool     `json:"matrix"`    // made by the matrix, not by hand
-	Countries bool     `json:"countries"` // made by the countries page; change it there
+	Matrix    bool     `json:"matrix"`             // made by the matrix, not by hand
+	Countries bool     `json:"countries"`          // made by the countries page; change it there
+	Services  []svcHit `json:"services,omitempty"` // a count for each service, when a rule lists a few
+}
+
+// svcHit is how often one service of a rule matched.
+type svcHit struct {
+	Label   string   `json:"label"` // the name it was given, or empty for a bare port
+	Ports   []string `json:"ports"`
+	Hits    int64    `json:"hits"`
+	LastHit int64    `json:"last_hit"`
+}
+
+// serviceHits splits a rule's services into the entries a person typed and finds each one's count.
+// A rule with one service, or more than fw.MaxServiceCounters, has no separate counts.
+func serviceHits(ru fw.RuleRow, lists map[string][]string, tag string, hits map[string]hitInfo) []svcHit {
+	var items []string
+	for _, part := range strings.Split(ru.Service, ",") {
+		part = strings.TrimSpace(part)
+		if name, ok := strings.CutPrefix(part, "list:"); ok {
+			items = append(items, lists[name]...)
+		} else if part != "" && part != "any" {
+			items = append(items, part)
+		}
+	}
+	seen := map[string]bool{}
+	var out []svcHit
+	total := 0
+	for _, it := range items {
+		sp, err := fw.ParseService(strings.ToLower(it))
+		if err != nil || len(sp) == 0 {
+			continue
+		}
+		h := svcHit{}
+		if _, bare := strings.CutPrefix(strings.ToLower(it), "tcp/"); !bare && !strings.HasPrefix(strings.ToLower(it), "udp/") {
+			h.Label = it
+		}
+		for _, one := range sp {
+			if seen[one.String()] {
+				continue
+			}
+			seen[one.String()] = true
+			total++
+			h.Ports = append(h.Ports, one.String())
+			x := hits[fw.ServiceTag(tag, one)]
+			h.Hits += x.Hits
+			if x.LastHit > h.LastHit {
+				h.LastHit = x.LastHit
+			}
+		}
+		if len(h.Ports) > 0 {
+			out = append(out, h)
+		}
+	}
+	if total < 2 || total > fw.MaxServiceCounters {
+		return nil
+	}
+	return out
 }
 
 type nameBook struct {
@@ -140,12 +196,14 @@ func (a *App) fwRulesView(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		return
 	}
 	hits := a.hitTable()
+	lists := portListsOf(a.Config)
 	nb := a.nameBook()
 	out := make([]ruleView, 0, len(rules))
 	for _, ru := range rules {
 		v := ruleView{RuleRow: ru, Tag: fwTag(ru), When: ru.Sched.Describe(), Matrix: fw.IsMatrixRule(ru.Name)}
 		h := hits[v.Tag]
 		v.Hits, v.Bytes, v.LastHit = h.Hits, h.Bytes, h.LastHit
+		v.Services = serviceHits(ru, lists, v.Tag, hits)
 		var w1, w2 []string
 		v.SrcChips, w1 = nb.chips(ru.Src, true)
 		v.DstChips, w2 = nb.chips(ru.Dst, false)

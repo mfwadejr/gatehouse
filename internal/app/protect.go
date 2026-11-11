@@ -49,10 +49,14 @@ func inRanges(ranges []string, ip string) bool {
 }
 
 type protectedRule struct {
-	Title  string `json:"title"`
-	Text   string `json:"text"`
-	Active bool   `json:"active"`
-	Note   string `json:"note,omitempty"`
+	Title   string `json:"title"`
+	Text    string `json:"text"`
+	Active  bool   `json:"active"`
+	Note    string `json:"note,omitempty"`
+	Tag     string `json:"tag,omitempty"` // the label its counter carries, when it has one
+	Hits    int64  `json:"hits"`
+	LastHit int64  `json:"last_hit"`
+	Bytes   int64  `json:"bytes"`
 }
 
 func joinNames(s []string) string {
@@ -92,7 +96,7 @@ func (a *App) protectedRules(m *fw.Model) []protectedRule {
 		text = fmt.Sprintf("Devices on %s can always open this console on %s (through %s).", joinNames(names), portsText(m.ConsolePorts), joinNames(a.portNameList(ifaces)))
 	}
 	out = append(out, protectedRule{Title: "Always reach this console", Text: text, Active: len(names) > 0,
-		Note: "This rule sits above every rule you can edit. It cannot be removed, reordered or switched off."})
+		Note: "This rule sits above every rule you can edit. It cannot be removed, reordered or switched off.", Tag: "protected: management console"})
 	if mc := a.mgmtCfg(); mc.Iface != "" {
 		on, note := true, "This rule sits above every rule you can edit. Nothing is routed through this port."
 		text := fmt.Sprintf("The console answers on %s, on %s, apart from every network.", portsText(m.ConsolePorts), a.portName(mc.Iface))
@@ -103,7 +107,7 @@ func (a *App) protectedRules(m *fw.Model) []protectedRule {
 				text += " It is closed on the LAN while this port is healthy."
 			}
 		}
-		out = append(out, protectedRule{Title: "The management port", Text: text, Active: on, Note: note})
+		out = append(out, protectedRule{Title: "The management port", Text: text, Active: on, Note: note, Tag: "protected: management port console"})
 	}
 	if len(m.MgmtAllow) > 0 {
 		out = append(out, protectedRule{Title: "Only these addresses may manage", Text: "Management is limited to " + strings.Join(m.MgmtAllow, ", ") + ". Everyone else on those networks is turned away.", Active: true,
@@ -117,7 +121,7 @@ func (a *App) protectedRules(m *fw.Model) []protectedRule {
 		case contains(ifaces, r):
 			on, note = false, "Not needed right now: this port already belongs to a management network. It takes over if that changes."
 		}
-		out = append(out, protectedRule{Title: "The port you set this up from", Text: fmt.Sprintf("The device was first set up from %s, so devices plugged into %s can always open the console on %s, whatever else changes.", a.portName(r), a.portName(r), portsText(m.ConsolePorts)), Active: on, Note: note})
+		out = append(out, protectedRule{Title: "The port you set this up from", Text: fmt.Sprintf("The device was first set up from %s, so devices plugged into %s can always open the console on %s, whatever else changes.", a.portName(r), a.portName(r), portsText(m.ConsolePorts)), Active: on, Note: note, Tag: "protected: setup port"})
 	}
 	if ssh {
 		out = append(out, protectedRule{Title: "Remote login (SSH)", Text: "Allowed from the networks you marked for remote login.", Active: true})
@@ -176,7 +180,7 @@ func (a *App) registerProtectRoutes() {
 			spec.CIDRs = []string{}
 		}
 		api.JSON(w, 200, map[string]any{
-			"rules": a.protectedRules(m), "allow": spec, "networks": nets,
+			"rules": a.withProtectedHits(a.protectedRules(m)), "allow": spec, "networks": nets,
 			"you": map[string]any{"ip": c.IP, "iface": ifaceOf(c.IP)},
 		})
 	})
@@ -291,4 +295,15 @@ func (a *App) registerProtectRoutes() {
 		}
 		api.JSON(w, 200, map[string]any{"ok": good, "checks": out})
 	})
+}
+
+// withProtectedHits adds the match counts to the built-in rules that have a counter.
+func (a *App) withProtectedHits(rs []protectedRule) []protectedRule {
+	hits := a.hitTable()
+	for i := range rs {
+		if h, ok := hits[rs[i].Tag]; ok && rs[i].Tag != "" {
+			rs[i].Hits, rs[i].Bytes, rs[i].LastHit = h.Hits, h.Bytes, h.LastHit
+		}
+	}
+	return rs
 }

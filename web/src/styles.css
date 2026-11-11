@@ -650,3 +650,37 @@ mark { background: color-mix(in srgb, var(--color-status-warning) 35%, transpare
 .svc-x:hover { color: var(--color-status-bad); }
 @media (max-width: 560px) { .svc-add { grid-template-columns: 1fr; } }
 .svc-extra-go { margin-top: var(--space-2); }
+
+/* Rules as lines */
+.rulebar { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; margin-bottom: var(--space-3); }
+.ltable { width: 100%; border-collapse: collapse; min-width: 52rem; }
+.ltable th { text-align: left; font-size: var(--font-size-sm); color: var(--color-text-muted); font-weight: var(--font-weight-semibold); padding: var(--space-2) var(--space-3); border-bottom: var(--border-width-thin) solid var(--color-border-default); white-space: nowrap; }
+.ltable td { padding: var(--space-2) var(--space-3); border-bottom: var(--border-width-thin) solid var(--color-border-default); vertical-align: top; }
+.ltable .n { color: var(--color-text-muted); width: 2.5rem; }
+.ltable .lname { font-weight: var(--font-weight-semibold); }
+.ltable .lwhen { white-space: nowrap; }
+.lsect td { background: var(--color-bg-inset); color: var(--color-text-muted); font-size: var(--font-size-sm); padding: var(--space-1) var(--space-3); }
+.lrow { cursor: pointer; }
+.lrow:hover td, .lrow:focus-visible td { background: var(--color-bg-inset); }
+.lrow.off td { opacity: .6; }
+.lrow.flash td { animation: lineflash 1.6s ease-out 1; }
+@keyframes lineflash { 0% { background: color-mix(in srgb, var(--color-status-good) 28%, transparent); } 100% { background: transparent; } }
+.lchips { display: inline-flex; flex-wrap: nowrap; gap: var(--space-1); }
+.lchip { border: var(--border-width-thin) solid var(--color-border-default); border-radius: var(--radius-sm); padding: 0 var(--space-2); font-size: var(--font-size-sm); white-space: nowrap; max-width: 14rem; overflow: hidden; text-overflow: ellipsis; }
+.lchip.quiet { border-color: transparent; padding: 0; max-width: 11rem; }
+.lchip.more { color: var(--color-text-link); }
+.lhit { color: var(--color-status-good); white-space: nowrap; }
+.lplus { color: var(--color-status-good); font-weight: var(--font-weight-semibold); }
+.ldetail td { background: var(--color-bg-inset); padding: 0; }
+.ldet { padding: var(--space-3) var(--space-4) var(--space-4) var(--space-6); display: grid; gap: var(--space-3); }
+.ldet .say { font-size: var(--font-size-base); }
+.ldet .note { border: var(--border-width-thin) solid var(--color-border-default); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); color: var(--color-text-secondary); }
+.llbl { color: var(--color-text-muted); font-size: var(--font-size-sm); margin-bottom: var(--space-1); }
+.lmeta { display: flex; flex-wrap: wrap; gap: var(--space-3); color: var(--color-text-muted); font-size: var(--font-size-sm); }
+.lbtns { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.lsv { display: grid; grid-template-columns: minmax(7rem, 1fr) minmax(14rem, 1.8fr) minmax(5rem, .6fr) minmax(6rem, .8fr); column-gap: var(--space-4); max-width: 44rem; }
+.lsv .mono { white-space: nowrap; }
+.lsv > div { padding: var(--space-1) 0; border-bottom: var(--border-width-thin) solid var(--color-border-default); }
+.lsv .sh { color: var(--color-text-muted); font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); }
+.lsv .r { text-align: right; }
+.lempty { padding: var(--space-3); }

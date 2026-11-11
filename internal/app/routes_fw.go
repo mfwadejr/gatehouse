@@ -87,6 +87,17 @@ func (a *App) registerFWRoutes() {
 		api.JSON(w, 200, imp)
 	})
 	s.Handle("GET /api/fw/rules", a.fwRulesView)
+	// Only the counters, fresh to within a second, for the Live switch on the rules page.
+	s.Handle("GET /api/fw/rules/counts", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		a.sampleHitsIfOlder(900 * time.Millisecond)
+		out := map[string]hitInfo{}
+		for k, h := range a.hitTable() {
+			if strings.HasPrefix(k, "rule:") || strings.HasPrefix(k, "protected:") {
+				out[k] = h
+			}
+		}
+		api.JSON(w, 200, map[string]any{"hits": out, "at": time.Now().Unix()})
+	})
 	s.HandleAdmin("PUT /api/fw/rules", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		var in fw.RuleRow
 		if !api.Decode(w, r, &in) {

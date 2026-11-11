@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { del, holdAnd, post, put, useData } from '../api.js';
 import { SAVED_LATER, SaveChoice } from '../changes.jsx';
 import { useWantedEdit } from '../hashtab.js';
 import { AddrPicker, Chip, NewDevice, ScheduleEditor, ServicePicker, tokens } from '../AddrPicker.jsx';
 import { PolicyControls, whenText } from '../policykit.jsx';
-import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Paged, Pill, Segmented, Select, ToggleRow, useAction, fmt, noticeBox, useUndoDelete } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Paged, Pill, Segmented, Select, Switch, ToggleRow, useAction, fmt, noticeBox, useUndoDelete } from '../ui.jsx';
+import { RuleLines, downloadCsv, rulesCsv, useLiveHits } from './RuleLines.jsx';
 
 const ACTIONS = [{ value: 'accept', label: 'Allow' }, { value: 'drop', label: 'Block silently' }, { value: 'reject', label: 'Block and tell the sender' }];
 // Only the fields the server stores; it refuses anything else.
@@ -192,11 +193,18 @@ function RuleSide({ chips, pickers }) {
   );
 }
 
-export function RulesList({ ov, rules, countryRules, pickers, reloadPickers, reload, filter, setFilter, startNew, goPorts }) {
+export function RulesList({ ov, rules, countryRules, pickers, reloadPickers, reload, filter, setFilter, startNew, goPorts, goTab }) {
   const [edit, setEdit] = useState(null);
   const [q, setQ] = useState('');
   const [act, setAct] = useState('');
   const [showSys, setShowSys] = useState(false);
+  const [live, setLive] = useState(true);
+  const [chosen, setChosen] = useState(() => { try { return localStorage.getItem('nw.rulesview') || ''; } catch { return ''; } });
+  const [wide, setWide] = useState(() => window.innerWidth >= 900);
+  useEffect(() => { const on = () => setWide(window.innerWidth >= 900); window.addEventListener('resize', on); return () => window.removeEventListener('resize', on); }, []);
+  const view = chosen || (wide ? 'lines' : 'cards');
+  const pickView = (v) => { setChosen(v); try { localStorage.setItem('nw.rulesview', v); } catch { /* the choice just is not remembered */ } };
+  const hits = useLiveHits(live);
   const [run] = useAction();
   const undoDelete = useUndoDelete();
   const { data: prot } = useData('/api/fw/protected');
@@ -209,6 +217,13 @@ export function RulesList({ ov, rules, countryRules, pickers, reloadPickers, rel
   const visible = (rules || []).map((r, i) => ({ r, i })).filter(({ r }) =>
     (!filter?.from || r.from === filter.from) && (!filter?.to || r.to === filter.to) && (!act || r.action === act) && (!needle || text(r).includes(needle)));
   const filtered = !!(filter?.from || filter?.to || act || needle);
+  const textOf = (...p) => p.join(' ').toLowerCase();
+  const anyFilter = !!(filter?.from || filter?.to || act);
+  const sysShown = anyFilter ? [] : (prot?.rules || []).filter((p) => !needle || textOf(p.title, p.text).includes(needle));
+  const pagesShown = anyFilter ? [] : (countryRules || []).filter((r) => !needle || text(r).includes(needle));
+  const opensShown = anyFilter ? [] : (opened?.forwards || []).filter((g) => !needle || textOf(g.group, g.text).includes(needle));
+  const pausedNames = (pickers?.groups || []).filter((g) => g.name === 'Paused').flatMap((g) => g.members.map((m) => pickers?.devices?.find((d) => d.mac === m)?.name || m));
+  const exportRows = () => downloadCsv(rulesCsv({ prot: { rules: sysShown }, pages: pagesShown, rules: visible, opened: { forwards: opensShown }, hits }));
   const move = (pos, d) => {
     const j = pos + d;
     if (j < 0 || j >= visible.length) return;
@@ -229,8 +244,20 @@ export function RulesList({ ov, rules, countryRules, pickers, reloadPickers, rel
         <Select value={act} onChange={setAct} aria-label="Action" options={[{ value: '', label: 'Allow or block' }, { value: 'accept', label: 'Allow' }, { value: 'drop', label: 'Block' }, { value: 'reject', label: 'Reject' }]} />
         {filtered && <Button small onClick={() => { setQ(''); setAct(''); setFilter({}); }}>Clear</Button>}
       </div>
-      <label className="inline small" style={{ marginBottom: 'var(--space-2)' }}><input type="checkbox" checked={showSys} onChange={(e) => setShowSys(e.target.checked)} /> Show system rules</label>
-      {showSys && (
+      <div className="rulebar">
+        <Segmented value={view} onChange={pickView} options={[{ value: 'lines', label: 'Rule lines' }, { value: 'cards', label: 'Plain cards' }]} aria-label="How to show the rules" />
+        <label className="inline small"><Switch checked={live} onChange={setLive} label="Live" />Live</label>
+        <span className="small muted">{live ? 'Counters update every second or two.' : 'Counters refresh about every 20 seconds.'}</span>
+        <Button small onClick={exportRows}>Export what is shown (CSV)</Button>
+      </div>
+      {view === 'cards' && <label className="inline small" style={{ marginBottom: 'var(--space-2)' }}><input type="checkbox" checked={showSys} onChange={(e) => setShowSys(e.target.checked)} /> Show system rules</label>}
+      {view === 'lines' && (
+        <RuleLines prot={{ rules: sysShown }} pages={pagesShown} rules={visible} opened={{ forwards: opensShown }} live={live} hits={hits}
+          onEdit={setEdit} onMove={move} canMove={!filtered} onPause={pauseFor} onToggle={toggle} pausedNames={pausedNames}
+          onRemove={(r) => undoDelete(`The rule "${r.name}"`, () => del(`/api/fw/rules/${r.id}`), () => put('/api/fw/rules', ruleBody({ ...r, id: undefined })), reload)}
+          goTab={goTab} goPorts={goPorts} />
+      )}
+      {view === 'cards' && showSys && (
         <div className="list sysrules">
           {(prot?.rules || []).map((r) => (
             <div className="item" key={r.title}><div><div className="name">🔒 {r.title}</div><div className="meta">{r.text}</div></div><Pill tone={r.active ? 'good' : ''}>{r.active ? 'Always on' : 'Standing by'}</Pill></div>
@@ -244,7 +271,7 @@ export function RulesList({ ov, rules, countryRules, pickers, reloadPickers, rel
           ))}
         </div>
       )}
-      <div className="list">
+      {view === 'cards' && <div className="list">
         <Paged items={visible}>{(shownRules) => shownRules.map(({ r }, pos) => (
           <div className={`item rule ${r.enabled ? '' : 'off'}`} key={r.id}>
             <div className="rulemain">
@@ -257,7 +284,7 @@ export function RulesList({ ov, rules, countryRules, pickers, reloadPickers, rel
               </div>
               {r.descr && <div className="meta">{r.descr}</div>}
               {(r.warnings || []).map((w, i) => <div className="meta warnline" key={i}>⚠ {w}</div>)}
-              <div className="meta hits">{r.hits > 0 ? `${fmt.n(r.hits)} matches · last ${fmt.ago(r.last_hit)}` : 'No matches yet'}</div>
+              <div className="meta hits">{hits.hit(r.tag, r).hits > 0 ? `${fmt.n(hits.hit(r.tag, r).hits)} matches · last ${fmt.ago(hits.hit(r.tag, r).last_hit)}` : 'No matches yet'}</div>
             </div>
             <div className="actions">
               <Button small aria-label="Move up" onClick={() => move(pos, -1)} disabled={pos === 0}>↑</Button>
@@ -268,7 +295,8 @@ export function RulesList({ ov, rules, countryRules, pickers, reloadPickers, rel
           </div>
         ))}</Paged>
         {!visible.length && <Empty>{filtered ? 'No rules match.' : 'No rules. Network types are all you need for most setups.'}</Empty>}
-      </div>
+      </div>}
+      {view === 'lines' && !visible.length && <Empty>{filtered ? 'No rules match.' : 'No rules. Network types are all you need for most setups.'}</Empty>}
       {edit && <RuleForm initial={{ ...edit, service: edit.service === 'any' ? '' : edit.service, src: edit.src === 'any' ? '' : edit.src, dst: edit.dst === 'any' ? '' : edit.dst }} zoneNames={names} pickers={pickers} reloadPickers={reloadPickers} onClose={() => setEdit(null)} onSaved={reload} />}
     </Card>
   );
