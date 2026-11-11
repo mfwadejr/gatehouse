@@ -35,6 +35,7 @@ func describePolicyChange(method, path string, body []byte) ([2]string, bool) {
 	kinds := []struct{ prefix, noun string }{
 		{"/api/fw/rules", "firewall rule"}, {"/api/routes", "route"}, {"/api/blocks", "block"},
 		{"/api/fw/appforwards", "port forward"}, {"/api/fw/forwards", "port forward"},
+		{"/api/speed/rule", "speed entry"},
 	}
 	noun := ""
 	for _, k := range kinds {

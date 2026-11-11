@@ -6,7 +6,7 @@ import { del, get, getWatched, post, put, setFailing, useData, useStream } from 
 import { RuleForm } from './FirewallRules.jsx';
 import { COUNTRIES, MAP_H, MAP_W } from '../worldmap.js';
 import { groupRows, rowTitle } from '../logrows.js';
-import { Button, Card, Empty, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, Switch, Tabs, ToggleRow, Trend, useAction, fmt , useDelayedDelete } from '../ui.jsx';
+import { Button, Card, Empty, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, DateTimeField, Switch, Tabs, ToggleRow, Trend, useAction, fmt , useDelayedDelete } from '../ui.jsx';
 
 const KINDS = [
   { value: '', label: 'Everything' },
@@ -242,8 +242,8 @@ export default function Logs({ me }) {
           </div>
           {hours === 'custom' && (
             <div className="inline small">
-              <label>From <input type="datetime-local" value={custom.from} onChange={(e) => setCustom({ ...custom, from: e.target.value })} /></label>
-              <label>To <input type="datetime-local" value={custom.to} onChange={(e) => setCustom({ ...custom, to: e.target.value })} /></label>
+              <label>From <DateTimeField value={custom.from} onChange={(v) => setCustom({ ...custom, from: v })} /></label>
+              <label>To <DateTimeField value={custom.to} onChange={(v) => setCustom({ ...custom, to: v })} /></label>
             </div>
           )}
           {tab === 'log' && <Segmented value={kind} onChange={setKind} options={KINDS} />}

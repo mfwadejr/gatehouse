@@ -78,6 +78,7 @@ func (a *App) sqmPlan() netd.SQMPlan {
 	}
 	a.sqm.mu.Unlock()
 	var plan netd.SQMPlan
+	prio := a.speedWantsPriority()
 	seen := map[string]bool{}
 	names := make([]string, 0, len(devs))
 	for n := range devs {
@@ -97,7 +98,7 @@ func (a *App) sqmPlan() netd.SQMPlan {
 		if down <= 0 || up <= 0 {
 			continue
 		}
-		plan.Links = append(plan.Links, netd.SQMLink{Iface: dev, DownKbit: int(down * 1000), UpKbit: int(up * 1000)})
+		plan.Links = append(plan.Links, netd.SQMLink{Iface: dev, DownKbit: int(down * 1000), UpKbit: int(up * 1000), Prio: prio})
 	}
 	a.sqm.mu.Lock()
 	for d := range a.sqm.devs {

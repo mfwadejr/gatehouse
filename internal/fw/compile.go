@@ -161,6 +161,15 @@ func (c *compiler) build() string {
 	for _, n := range []string{AcctUp, AcctDown} {
 		c.line(1, "set %s { type ipv4_addr; flags dynamic, timeout; timeout 1h; size 8192; counter; }", n)
 	}
+	c.speedSets()
+	// With more than one internet connection each device is also counted per connection.
+	if w := m.WanIfaces(); len(w) > 1 {
+		for _, d := range w {
+			for _, dir := range []string{"up", "dn"} {
+				c.line(1, "set %s { type ipv4_addr; flags dynamic, timeout; timeout 1h; size 8192; counter; }", acctWanSet(dir, d))
+			}
+		}
+	}
 	// Remote login is slowed down: one address may start only a few SSH connections a minute.
 	if m.SSHEnabled {
 		c.line(1, "set ssh_rate4 { type ipv4_addr; flags dynamic, timeout; timeout 5m; size 4096; }")
@@ -177,6 +186,7 @@ func (c *compiler) build() string {
 		c.line(1, "set %s { type inet_service; }", LanGateSet)
 	}
 	c.input()
+	c.speed()
 	c.forward()
 	c.line(1, "chain output {")
 	c.line(2, "type filter hook output priority filter; policy accept;")
@@ -383,6 +393,7 @@ func (c *compiler) forward() {
 	// The management port is never routed through, in either direction.
 	c.line(2, "iifname @%s counter drop comment \"protected: the management port is not routed\"", MgmtIfSet)
 	c.line(2, "oifname @%s counter drop comment \"protected: the management port is not routed\"", MgmtIfSet)
+	c.speedJumps()
 	// A guest who has not accepted the sign-in page gets nothing through, even on a connection that
 	// was open before the sign-in expired. Web pages fail at once so the phone shows the page.
 	if pn := m.PortalNets(); len(pn) > 0 {
@@ -394,6 +405,12 @@ func (c *compiler) forward() {
 	if toNet := append(append([]string(nil), wan...), m.TunnelIfaces()...); len(toNet) > 0 {
 		c.line(2, "oifname %s add @%s { ip saddr }", ifSet(toNet), AcctUp)
 		c.line(2, "iifname %s add @%s { ip daddr }", ifSet(toNet), AcctDown)
+	}
+	if len(wan) > 1 {
+		for _, d := range wan {
+			c.line(2, "oifname %s add @%s { ip saddr }", ifSet([]string{d}), acctWanSet("up", d))
+			c.line(2, "iifname %s add @%s { ip daddr }", ifSet([]string{d}), acctWanSet("dn", d))
+		}
 	}
 	if len(wan) > 0 {
 		c.line(2, "oifname %s add @%s { ip daddr }", ifSet(wan), AcctTo)
@@ -777,15 +794,15 @@ func (c *compiler) marks() {
 	c.line(1, "chain wanmark {")
 	c.line(2, "type filter hook prerouting priority mangle; policy accept;")
 	for i, d := range wan {
-		c.line(2, "iifname %s ct state new ct mark set 0x%x", q(d), MarkBase+i)
+		c.line(2, "iifname %s ct state new ct mark set ct mark & 0x%08x | 0x%x", q(d), ConnMarkDSCP, MarkBase+i)
 	}
 	// Only packets that did not arrive from the internet pick up the mark. Marking an incoming
 	// packet would route it by the mark's table before forwarding and send it straight back out.
-	c.line(2, "iifname != %s ct mark != 0 meta mark set ct mark", ifSet(wan))
+	c.line(2, "iifname != %s ct mark & 0x%06x != 0 meta mark set ct mark & 0x%06x", ifSet(wan), ConnMarkKeep, ConnMarkKeep)
 	c.line(1, "}")
 	c.line(1, "chain wanmark_out {")
 	c.line(2, "type route hook output priority mangle; policy accept;")
-	c.line(2, "ct mark != 0 meta mark set ct mark")
+	c.line(2, "ct mark & 0x%06x != 0 meta mark set ct mark & 0x%06x", ConnMarkKeep, ConnMarkKeep)
 	c.line(1, "}")
 }
 

@@ -20,7 +20,7 @@ for (const f of files) {
 }
 const settings = readFileSync('src/pages/Settings.jsx', 'utf8');
 tabs.settings = [...settings.match(/const TABS = \[([\s\S]*?)\];/)[1].matchAll(/value: '([a-z]+)'/g)].map((m) => m[1]);
-tabs.internet = ['connections', 'speed', 'troubleshoot', 'usage'];
+tabs.internet = ['connections', 'speed', 'control', 'troubleshoot', 'usage'];
 const src = readFileSync('src/search.jsx', 'utf8');
 const block = src.slice(src.indexOf('const ROWS = ['), src.indexOf('];', src.indexOf('const ROWS = [')));
 let bad = 0; const fail = (m) => { console.error('search: ' + m); bad++; };

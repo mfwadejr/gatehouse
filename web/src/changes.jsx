@@ -64,14 +64,19 @@ export function ChangeProvider({ me, children }) {
     const tick = () => setLeft(Math.max(0, pend.deadline - Math.floor(Date.now() / 1000)));
     tick();
     const t = setInterval(tick, 500);
-    return () => clearInterval(t);
-  }, [pend]);
+    // When the time is up the change has been kept or put back by now: ask again, a few times, so
+    // the page never keeps showing a change as on trial or still waiting.
+    const gap = Math.max(0, (pend.deadline - Math.floor(Date.now() / 1000) + 1) * 1000);
+    const again = [gap, gap + 2000, gap + 5000].map((ms) => setTimeout(reload, ms));
+    return () => { clearInterval(t); again.forEach(clearTimeout); };
+  }, [pend]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Wait until nothing is on trial any more (kept, or put back).
   const settle = async () => {
     for (let i = 0; i < 100; i += 1) {
       await sleep(1000);
       const s = await fresh();
+      reload(); // keep the screen in step with what NopeWarden says, so the countdown and list follow it
       if (!s.fw?.pending && !s.net?.pending) return s;
     }
     return stRef.current;

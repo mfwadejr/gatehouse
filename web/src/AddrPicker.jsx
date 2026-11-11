@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { patch, post, put } from './api.js';
-import { Button, Field, Input, Modal, Select, useAction } from './ui.jsx';
+import { Button, Field, Input, Modal, Select, TimeField, DateTimeField, useAction } from './ui.jsx';
 
 // Pieces used by the firewall rule form: choosing who or what a rule covers, which ports, and when.
 
@@ -291,8 +291,8 @@ export function ScheduleEditor({ value, onChange }) {
         { value: 'weekly', label: 'On certain days' }, { value: 'once', label: 'Just once' }]} />
       {(mode === 'daily' || mode === 'weekly') && (
         <div className="formgrid">
-          <Field label="From"><input className="in" type="time" value={s.from || ''} onChange={(e) => set({ from: e.target.value })} /></Field>
-          <Field label="Until" hint={s.from && s.to && s.to <= s.from ? 'Until the next morning' : ''}><input className="in" type="time" value={s.to || ''} onChange={(e) => set({ to: e.target.value })} /></Field>
+          <Field label="From"><TimeField value={s.from || ''} onChange={(v) => set({ from: v })} /></Field>
+          <Field label="Until" hint={s.from && s.to && s.to <= s.from ? 'Until the next morning' : ''}><TimeField value={s.to || ''} onChange={(v) => set({ to: v })} /></Field>
         </div>
       )}
       {mode === 'weekly' && (
@@ -305,8 +305,8 @@ export function ScheduleEditor({ value, onChange }) {
       )}
       {mode === 'once' && (
         <div className="formgrid">
-          <Field label="Starts"><input className="in" type="datetime-local" value={s.start || ''} onChange={(e) => set({ start: e.target.value })} /></Field>
-          <Field label="Ends"><input className="in" type="datetime-local" value={s.end || ''} onChange={(e) => set({ end: e.target.value })} /></Field>
+          <Field label="Starts"><DateTimeField value={s.start || ''} onChange={(v) => set({ start: v })} /></Field>
+          <Field label="Ends"><DateTimeField value={s.end || ''} onChange={(v) => set({ end: v })} /></Field>
         </div>
       )}
       {mode !== 'always' && <span className="hint">Uses the time zone set on this machine. The firewall switches the rule on and off by itself.</span>}

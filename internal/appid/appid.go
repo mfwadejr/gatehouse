@@ -142,3 +142,27 @@ func Names() []string {
 	}
 	return out
 }
+
+// Categories lists the groups the catalogue puts applications in, such as Video or Games.
+func Categories() []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, e := range catalogue {
+		if !seen[e.cat] {
+			seen[e.cat] = true
+			out = append(out, e.cat)
+		}
+	}
+	return out
+}
+
+// CategoryDomains lists the endings of every application in a category.
+func CategoryDomains(cat string) []string {
+	var out []string
+	for _, e := range catalogue {
+		if strings.EqualFold(e.cat, cat) {
+			out = append(out, strings.Fields(e.domains)...)
+		}
+	}
+	return out
+}

@@ -21,6 +21,7 @@ import (
 
 type fwDyn struct {
 	mu         sync.Mutex
+	spd        map[string][]string             // domain -> speed-control sets that hold its addresses
 	dom        map[string]map[string]time.Time // domain -> address -> when it is forgotten
 	pushQ      map[string]map[string]time.Time // set name -> address -> expiry, waiting to be sent
 	watch      []string                        // domains named by enabled rules
@@ -162,6 +163,9 @@ func (a *App) setContents(m *fw.Model, withGeo bool) map[string]fw.SetFill {
 		out[fw.PortalSet] = a.portalFill(leases)
 	}
 	out[fw.MgmtIfSet] = fw.SetFill{Replace: true, Elems: a.mgmtIfElems()}
+	for k, v := range a.speedFills(m, leases, reserved, now) {
+		out[k] = v
+	}
 	if m.CloseLAN {
 		gate := fw.SetFill{Replace: true}
 		if a.mgmtLanOpen() {
@@ -241,6 +245,18 @@ func (a *App) syncSets(full bool) {
 			a.dyn.watch = append(a.dyn.watch, ds.Ref.Val)
 		}
 	}
+	a.dyn.spd = map[string][]string{}
+	for _, sr := range m.Speed {
+		if !sr.WhatSet {
+			continue
+		}
+		if r, ok := a.speedRuleByID(sr.ID); ok {
+			for _, d := range speedDomains(r.Items) {
+				a.dyn.watch = append(a.dyn.watch, d)
+				a.dyn.spd[d] = append(a.dyn.spd[d], fw.SpeedWhatSet(sr.ID))
+			}
+		}
+	}
 	a.dyn.mu.Unlock()
 	for name, fill := range a.setContents(m, full) {
 		if err := a.FW.LoadSets(map[string]fw.SetFill{name: fill}); err != nil {
@@ -293,6 +309,14 @@ func (a *App) onDNSAnswer(qname string, answers []dns.RR) {
 				a.dyn.dom[d] = map[string]time.Time{}
 			}
 			a.dyn.dom[d][ip.String()] = now.Add(keep)
+			if fam == 4 {
+				for _, sn := range a.dyn.spd[d] {
+					if a.dyn.pushQ[sn] == nil {
+						a.dyn.pushQ[sn] = map[string]time.Time{}
+					}
+					a.dyn.pushQ[sn][ip.String()] = now.Add(keep)
+				}
+			}
 			name := fw.SetNameFor(fw.Ref{Kind: fw.RefDomain, Val: d}, fam)
 			if a.dyn.pushQ[name] == nil {
 				a.dyn.pushQ[name] = map[string]time.Time{}
@@ -357,7 +381,7 @@ func (a *App) sampleHits() {
 	a.sampleDevices(cur, time.Now())
 	a.sampleRemotes(cur, time.Now())
 	for tag, c := range cur {
-		if strings.HasPrefix(tag, fw.AcctPrefix) || strings.HasPrefix(tag, fw.RemotePrefix) {
+		if strings.HasPrefix(tag, fw.AcctPrefix) || strings.HasPrefix(tag, fw.RemotePrefix) || strings.HasPrefix(tag, fw.AcctWanPrefix) {
 			continue
 		}
 		prev := a.dyn.counts[tag]
@@ -431,6 +455,11 @@ func (a *App) retimeIfNeeded() {
 	scheduled := false
 	for _, r := range m.Rules {
 		if r.Enabled && strings.TrimSpace(r.Sched) != "" {
+			scheduled = true
+		}
+	}
+	for _, r := range m.Speed {
+		if strings.TrimSpace(r.Sched) != "" {
 			scheduled = true
 		}
 	}

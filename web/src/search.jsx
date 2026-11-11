@@ -12,6 +12,7 @@ const ROWS = [
   ["Why can't it reach that?", 'internet/troubleshoot', 'Find out what is blocking a device from a website', 'blocked cannot reach not working why tester troubleshoot', "Why can't it reach that?"],
   ['Speed test', 'internet/speed', 'Measure the speed of each connection', 'speed test download upload mbps', 'Speed test'],
   ['Keep delay low when the line is busy', 'internet/speed', 'Smart queues: hold the connection just under its speed', 'bufferbloat sqm cake fq_codel lag latency speed limit', 'Keep delay low'],
+  ['Speed control: limit speed or give priority', 'internet/control', 'Hold devices to a speed, or let some traffic go first', 'speed limit throttle bandwidth cap priority qos mbps guest device app', 'Speed control'],
   ['Provider report card', 'internet/usage', 'Outages and speed for a month to show your provider', 'isp outage uptime report complaint', 'Provider report card'],
   ['Data use and limit', 'internet/usage', 'How much data was used and an optional monthly limit', 'cap bandwidth usage metered billing', 'Data use'],
   ['Networks', 'networks', 'Ports, networks and VLANs', 'lan vlan port interface add network guest iot', 'Your networks'],

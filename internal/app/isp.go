@@ -269,56 +269,70 @@ type usageView struct {
 	Down int64      `json:"down"`
 	Pct  float64    `json:"pct"`
 	Top  []usageDev `json:"top"`
+	// Which connection and period this is: "" is all connections together.
+	Link  string      `json:"link"`
+	Range string      `json:"range"`
+	Links []usageLink `json:"links"`
+	Note  string      `json:"note"`
 }
 
+// usageNow is the billing period of the only connection, or of all together when there are
+// several: what the screen opens on.
 func (a *App) usageNow() usageView {
-	c := a.usageConfig()
-	from, to := usagePeriod(a.localNow(), c.Start)
-	v := usageView{usageConfig: c, From: from.Unix(), To: to.Unix(), Top: []usageDev{}}
-	a.Logs.QueryRow(`SELECT COALESCE(SUM(up),0),COALESCE(SUM(down),0) FROM traffic WHERE mac='' AND ts>=? AND ts<?`, from.Unix(), to.Unix()).Scan(&v.Up, &v.Down)
-	if c.On && c.CapGB > 0 {
-		v.Pct = 100 * float64(v.Up+v.Down) / (float64(c.CapGB) * 1e9)
+	link := ""
+	if l := a.usageLinks(); len(l) == 1 {
+		link = l[0]
 	}
-	rows, err := a.Logs.Query(`SELECT mac,SUM(up),SUM(down) FROM traffic WHERE mac<>'' AND ts>=? AND ts<? GROUP BY mac ORDER BY SUM(up)+SUM(down) DESC LIMIT 8`, from.Unix(), to.Unix())
-	if err == nil {
-		for rows.Next() {
-			var d usageDev
-			if rows.Scan(&d.MAC, &d.Up, &d.Down) == nil {
-				v.Top = append(v.Top, d)
-			}
-		}
-		rows.Close()
-	}
-	names := a.deviceNames()
-	for i := range v.Top {
-		v.Top[i].Name = orWord(names[v.Top[i].MAC], v.Top[i].MAC)
-	}
+	v, _ := a.usageFor(link, "billing", "", "")
 	return v
 }
 
-// usageTick sends each warning level once per billing period.
+// usageTick sends each warning level once per billing period, for each connection that has a limit.
 func (a *App) usageTick(now time.Time) {
-	c := a.usageConfig()
-	if !c.On || c.CapGB <= 0 || a.Logs == nil {
+	if a.Logs == nil {
 		return
 	}
-	v := a.usageNow()
-	told := a.setting("usage.told", "")
-	period := fmt.Sprint(v.From)
-	best := 0
-	for _, l := range c.Levels {
-		if v.Pct >= float64(l) && l > best {
-			best = l
+	links := a.usageLinks()
+	if len(links) == 0 {
+		links = []string{""}
+	}
+	for _, link := range links {
+		c := a.usageLinkConfig(link)
+		if !c.On || c.CapGB <= 0 {
+			continue
 		}
-	}
-	var prev int
-	if p, lv, ok := strings.Cut(told, ":"); ok && p == period {
-		fmt.Sscan(lv, &prev)
-	}
-	if best > prev {
-		a.Config.SetSetting("usage.told", period+":"+fmt.Sprint(best))
-		a.alert("usage", fmt.Sprintf("Data use is at %d%% of your limit", best),
-			fmt.Sprintf("%.1f of %d GB used this billing period.", float64(v.Up+v.Down)/1e9, c.CapGB))
+		v, err := a.usageFor(link, "billing", "", "")
+		if err != nil {
+			continue
+		}
+		if link == "" { // no connection is set up: the older whole-device total
+			from, to := usagePeriod(a.localNow(), c.Start)
+			v.From = from.Unix()
+			v.Up, v.Down, _ = a.usageSum("", from.Unix(), to.Unix())
+			v.Pct = 100 * float64(v.Up+v.Down) / (float64(c.CapGB) * 1e9)
+		}
+		key := "usage.told"
+		what := "Data use"
+		if link != "" {
+			key, what = "usage.told."+link, "Data use on "+link
+		}
+		told := a.setting(key, "")
+		period := fmt.Sprint(v.From)
+		best := 0
+		for _, l := range c.Levels {
+			if v.Pct >= float64(l) && l > best {
+				best = l
+			}
+		}
+		var prev int
+		if p, lv, ok := strings.Cut(told, ":"); ok && p == period {
+			fmt.Sscan(lv, &prev)
+		}
+		if best > prev {
+			a.Config.SetSetting(key, period+":"+fmt.Sprint(best))
+			a.alert("usage", fmt.Sprintf("%s is at %d%% of your limit", what, best),
+				fmt.Sprintf("%.1f of %d GB used this billing period.", float64(v.Up+v.Down)/1e9, c.CapGB))
+		}
 	}
 }
 
@@ -344,35 +358,82 @@ func (a *App) registerISPRoutes() {
 		fmt.Fprint(w, renderISP(rep, a.localNow().Location()))
 	})
 	s.HandleAdmin("GET /api/usage", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-		api.JSON(w, 200, a.usageNow())
+		q := r.URL.Query()
+		if !q.Has("link") && !q.Has("range") {
+			api.JSON(w, 200, a.usageNow())
+			return
+		}
+		v, err := a.usageFor(q.Get("link"), q.Get("range"), q.Get("from"), q.Get("to"))
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		api.JSON(w, 200, v)
+	})
+	s.HandleAdmin("PUT /api/usage/limit", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		link := r.URL.Query().Get("link")
+		known := false
+		for _, n := range a.usageLinks() {
+			known = known || n == link
+		}
+		if !known {
+			fail(w, fmt.Errorf("choose one internet connection. A limit belongs to a connection, because each plan has its own."))
+			return
+		}
+		in, err := a.usageCheck(w, r)
+		if err != nil {
+			return
+		}
+		var all map[string]usageConfig
+		json.Unmarshal([]byte(a.setting("usage.links", "")), &all)
+		if all == nil {
+			all = map[string]usageConfig{}
+		}
+		all[link] = in
+		b, _ := json.Marshal(all)
+		a.Config.SetSetting("usage.links", string(b))
+		a.Config.SetSetting("usage.told."+link, "")
+		v, _ := a.usageFor(link, "billing", "", "")
+		api.JSON(w, 200, v)
 	})
 	s.HandleAdmin("PUT /api/usage", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-		var in usageConfig
-		if !api.Decode(w, r, &in) {
+		in, err := a.usageCheck(w, r)
+		if err != nil {
 			return
 		}
-		if in.On && (in.CapGB < 1 || in.CapGB > 100000) {
-			fail(w, fmt.Errorf("enter the monthly limit in gigabytes, for example 1000"))
-			return
-		}
-		if in.Start < 1 || in.Start > 28 {
-			fail(w, fmt.Errorf("the billing period starts on a day from 1 to 28"))
-			return
-		}
-		var lv []int
-		for _, l := range in.Levels {
-			if l >= 10 && l <= 200 {
-				lv = append(lv, l)
-			}
-		}
-		if len(lv) == 0 {
-			lv = []int{80, 100}
-		}
-		sort.Ints(lv)
-		in.Levels = lv
 		b, _ := json.Marshal(in)
 		a.Config.SetSetting("usage.config", string(b))
 		a.Config.SetSetting("usage.told", "")
 		api.JSON(w, 200, a.usageNow())
 	})
+}
+
+// usageCheck reads and checks a limit from a request. On a problem it has already answered.
+func (a *App) usageCheck(w http.ResponseWriter, r *http.Request) (usageConfig, error) {
+	var in usageConfig
+	if !api.Decode(w, r, &in) {
+		return in, fmt.Errorf("bad body")
+	}
+	if in.On && (in.CapGB < 1 || in.CapGB > 100000) {
+		err := fmt.Errorf("enter the monthly limit in gigabytes, for example 1000")
+		fail(w, err)
+		return in, err
+	}
+	if in.Start < 1 || in.Start > 28 {
+		err := fmt.Errorf("the billing period starts on a day from 1 to 28")
+		fail(w, err)
+		return in, err
+	}
+	var lv []int
+	for _, l := range in.Levels {
+		if l >= 10 && l <= 200 {
+			lv = append(lv, l)
+		}
+	}
+	if len(lv) == 0 {
+		lv = []int{80, 100}
+	}
+	sort.Ints(lv)
+	in.Levels = lv
+	return in, nil
 }

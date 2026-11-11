@@ -92,6 +92,9 @@ func (s *Server) HandleAdmin(pattern string, h HandlerFunc) {
 	s.mux.HandleFunc(pattern, s.guard(h, true, true))
 }
 
+// HasTopic says whether a topic may be streamed.
+func (s *Server) HasTopic(name string) bool { return s.topics[name] }
+
 // Topic lets signed-in users stream a bus topic.
 func (s *Server) Topic(names ...string) {
 	for _, n := range names {

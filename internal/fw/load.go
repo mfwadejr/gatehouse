@@ -257,6 +257,7 @@ func Load(db Queryer) (*Model, error) {
 
 	m.Routes, _ = RouteSpecs(db)
 	m.MDNS = mdnsIfaces(m.Zones, MDNSFrom(db))
+	m.Speed = loadSpeedRules(db, m.Zones, setting(db, "speed.on", "1") == "1")
 
 	m.Now = time.Now()
 	m.Loc = time.UTC

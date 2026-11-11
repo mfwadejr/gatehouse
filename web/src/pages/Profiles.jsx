@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { del, post, put, useData } from '../api.js';
-import { Button, Card, Field, Input, Modal, Note, Page, Pill, Segmented, Select, ToggleRow, useAction , useDelayedDelete } from '../ui.jsx';
+import { Button, Card, Field, Input, Modal, Note, Page, Pill, Segmented, Select, TimeField, ToggleRow, useAction , useDelayedDelete } from '../ui.jsx';
 
 // Profiles: a name for a kind of person or device (Kids, Guests, Smart home, Work) with how much to
 // filter, safe search, hours when the internet is off, and a Pause button. Devices join a profile on
@@ -65,8 +65,8 @@ function Editor({ init, data, onClose, onSaved }) {
               {DAYS.map((d, i) => <Button key={d} small kind={p.hours.days.includes(i) ? 'primary' : ''} onClick={() => toggleDay(i)}>{d}</Button>)}
             </div>
             <div className="formgrid">
-              <Field label="Off from"><Input type="time" value={p.hours.from} onChange={(v) => setH('from', v)} /></Field>
-              <Field label="Back on at"><Input type="time" value={p.hours.to} onChange={(v) => setH('to', v)} /></Field>
+              <Field label="Off from"><TimeField value={p.hours.from} onChange={(v) => setH('from', v)} /></Field>
+              <Field label="Back on at"><TimeField value={p.hours.to} onChange={(v) => setH('to', v)} /></Field>
             </div>
             <span className="small muted">If the second time is earlier, the window runs past midnight and belongs to the day it starts on.</span>
           </div>

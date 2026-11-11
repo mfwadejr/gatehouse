@@ -195,7 +195,7 @@ func New(cfg Config) (*App, error) {
 	a.API.BeforeReq = a.dnsStageBefore
 	a.Lists.Hold = a.dnsHeld
 	a.API.Secure = cfg.TLSCert != ""
-	a.API.Topic("dns.stats", "dns.live", "dns.upstreams", "dns.lists", "dhcp.leases", "dhcp.utilisation", "fw.status", "net.status", "vpn.status", "logs.live", "upnp.maps", "dhcp.alerts", "speedtest", "events")
+	a.API.Topic("dns.stats", "dns.live", "dns.upstreams", "dns.lists", "dhcp.leases", "dhcp.utilisation", "fw.status", "net.status", "vpn.status", "logs.live", "upnp.maps", "dhcp.alerts", "speedtest", "events", "threat")
 	a.FW = cfg.FW
 	a.Net = cfg.Net
 	a.registerRoutes()

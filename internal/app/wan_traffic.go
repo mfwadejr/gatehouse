@@ -36,7 +36,10 @@ type wanTraffic struct {
 	seq    uint64 // samples taken so far; lets a caller ask for only what is new
 }
 
-func readCounter(dev, name string) (uint64, bool) {
+// readCounter reads one kernel interface counter. A variable so a test can supply the numbers.
+var readCounter = readCounterReal
+
+func readCounterReal(dev, name string) (uint64, bool) {
 	b, err := os.ReadFile(filepath.Join("/sys/class/net", dev, "statistics", name))
 	if err != nil {
 		return 0, false

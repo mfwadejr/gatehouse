@@ -160,15 +160,7 @@ export function NumberInput({ value, onChange, onBlur, className, ...rest }) {
   const shown = text !== null && (text === '' ? 0 : Number(text)) === (value ?? 0) ? text : (value ?? '');
   return <input type="number" value={shown} onChange={(e) => { setText(e.target.value); onChange(e.target.value === '' ? 0 : Number(e.target.value)); }} onBlur={(e) => { setText(null); onBlur?.(e); }} {...rest} className={inClass(className)} />;
 }
-export function Select({ value, onChange, options, className, ...rest }) {
-  return (
-    <select value={value ?? ''} onChange={(e) => onChange(e.target.value)} {...rest} className={inClass(className)}>
-      {options.map((o) => (o.group
-        ? <optgroup key={o.group} label={o.group}>{o.options.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}</optgroup>
-        : typeof o === 'string' ? <option key={o} value={o}>{o}</option> : <option key={o.value} value={o.value}>{o.label}</option>))}
-    </select>
-  );
-}
+export { Select, TimeField, DateField, DateTimeField, DateRange } from './pickers.jsx';
 
 export function Segmented({ value, onChange, options }) {
   return (

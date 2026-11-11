@@ -329,7 +329,7 @@ func TestNetnsRepliesLeaveByIngressLink(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(script, "ct mark set 0x101") {
+	if !strings.Contains(script, "ct mark set ct mark & 0xff000000 | 0x101") {
 		t.Fatalf("second link not marked:\n%s", script)
 	}
 	f := filepath.Join(t.TempDir(), "r.nft")

@@ -13,6 +13,7 @@ const KINDS = [
   { id: 'route', name: 'Route', page: 'routes' },
   { id: 'block', name: 'Block', page: 'protection/blocks' },
   { id: 'port', name: 'Open port', page: 'firewall/ports' },
+  { id: 'speed', name: 'Speed control', page: 'internet/control' },
 ];
 const kindName = (id) => KINDS.find((k) => k.id === id)?.name || id;
 const labels = (chips) => (chips || []).filter((c) => c.kind !== 'any').map((c) => c.label).join(', ');
@@ -30,12 +31,13 @@ export default function Policies() {
   const { data: routes, reload: rt } = useData('/api/routes', { topics: ['vpn.status', 'net.status'], every: 20000 });
   const { data: blocks, reload: rb } = useData('/api/blocks', { every: 20000 });
   const { data: ports, reload: rp } = useData('/api/fw/appforwards', { every: 20000 });
+  const { data: speed, reload: rsp } = useData('/api/speed', { every: 20000 });
   const [creating, setCreating] = useState(false);
   const [kind, setKind] = useState('');
   const [run, busy] = useAction();
   const undoDelete = useUndoDelete();
-  const again = () => { rr(); rt(); rb(); rp(); };
-  const loaded = rules && routes && blocks && ports;
+  const again = () => { rr(); rt(); rb(); rp(); rsp(); };
+  const loaded = rules && routes && blocks && ports && speed;
   const edit = (k, id) => { window.location.hash = `#/${KINDS.find((x) => x.id === k).page}?edit=${encodeURIComponent(id)}`; };
   const routeBody = (r) => ({ id: r.id, name: r.name, enabled: r.enabled, target_kind: r.target_kind, target: r.target, mode: r.mode, kill: r.kill, who: r.who, where: r.where, service: r.service, sched: r.sched, paused_until: r.paused_until });
 
@@ -61,6 +63,13 @@ export default function Policies() {
       toggle: () => run(() => post(`/api/blocks/${r.id}/enable`, { enabled: !r.enabled }), r.enabled ? 'Turned off.' : 'Turned on.').then(again),
       remove: () => undoDelete('The block', () => del(`/api/blocks/${r.id}`), () => put('/api/blocks', { name: r.name, items: r.items.map(({ kind, value }) => ({ kind, value })), targets: r.targets.map(({ scope, target }) => ({ scope, target })), allow: r.allow, method: r.method, schedule: r.schedule, enabled: r.enabled }), again),
     })),
+    ...(speed?.rules || []).map((r) => ({
+      k: 'speed', key: `speed${r.id}`, id: r.id, name: r.title, words: [r.does, r.when && r.when !== 'Always' ? r.when : ''].filter(Boolean).join(' · '), when: '', enabled: r.enabled, paused: r.paused_until, warn: r.note ? [r.note] : [],
+      tone: r.status === 'limiting' || r.status === 'prioritising' ? 'good' : r.status === 'waiting' ? 'warn' : '', state: { limiting: 'Limiting', prioritising: 'Giving priority', waiting: 'Waiting', paused: 'Paused', off: 'Off', 'outside hours': 'Not in its hours' }[r.status] || r.status,
+      pause: (m) => run(() => post(`/api/speed/rule/${r.id}/pause`, { minutes: m }), m === 0 ? 'Resumed.' : 'Paused.').then(again),
+      toggle: () => run(() => post(`/api/speed/rule/${r.id}/enable`, { enabled: !r.enabled }), r.enabled ? 'Turned off.' : 'Turned on.').then(again),
+      remove: () => undoDelete('The speed entry', () => del(`/api/speed/rule/${r.id}`), () => put('/api/speed/rule', { name: r.name, kind: r.kind, prio: r.prio, down_mbps: r.down_mbps, up_mbps: r.up_mbps, each: r.each, schedule: r.schedule, enabled: r.enabled, items: r.items.map(({ kind, value }) => ({ kind, value })), targets: r.targets.map(({ scope, target }) => ({ scope, target })) }), again),
+    })),
     ...(ports?.forwards || []).map((g) => ({
       k: 'port', key: `port${g.group}${g.id || ''}`, id: g.legacy ? g.id : g.group, name: g.text, words: g.countries?.length ? `Only from ${g.countries.join(', ')}.` : g.src?.length ? `Only from ${g.src.join(', ')}.` : 'Anyone on the internet can try to connect.',
       when: '', enabled: g.enabled, paused: g.paused_until, warn: g.blocked ? [g.blocked] : [], tone: g.enabled ? 'good' : '', state: g.enabled ? 'Open' : 'Off',
@@ -71,9 +80,9 @@ export default function Policies() {
   ];
   const shown = items.filter((x) => !kind || x.k === kind);
   return (
-    <Page title="Policies" sub="Everything that allows, blocks, routes or opens something for your devices, in one list and in plain words."
+    <Page title="Policies" sub="Everything that allows, blocks, routes, opens or speeds something for your devices, in one list and in plain words."
       actions={<Button kind="primary" small icon="plus" onClick={() => setCreating(true)}>Create policy</Button>}>
-      <Card title="Your policies" desc="Firewall rules, routes, blocks and open ports. Ordering and the finer settings stay on the Firewall, Routes and Protection pages.">
+      <Card title="Your policies" desc="Firewall rules, routes, blocks, open ports and speed control. Ordering and the finer settings stay on the Firewall, Routes and Protection pages.">
         <div className="filterbar">
           <Select value={kind} onChange={setKind} aria-label="Show" options={[{ value: '', label: 'All kinds' }, ...KINDS.map((k) => ({ value: k.id, label: `${k.name}s` }))]} />
           <span className="small muted">{loaded ? `${shown.length} ${shown.length === 1 ? 'policy' : 'policies'}` : 'Loading…'}</span>

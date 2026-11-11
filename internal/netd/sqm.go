@@ -18,6 +18,8 @@ type SQMLink struct {
 	Iface    string `json:"iface"`
 	DownKbit int    `json:"down_kbit"`
 	UpKbit   int    `json:"up_kbit"`
+	// Prio asks for the queue to tell traffic classes apart (Give priority entries exist).
+	Prio bool `json:"prio,omitempty"`
 }
 
 // SQMPlan is the whole set. Applying it replaces what was applied before.
@@ -42,10 +44,14 @@ func sqmClear(devs []string) [][]string {
 }
 
 // sqmShape returns the commands that shape one device with the discipline chosen.
-func sqmShape(dev string, kbit int, disc string, ingress bool) [][]string {
+func sqmShape(dev string, kbit int, disc string, ingress, prio bool) [][]string {
 	rate := fmt.Sprintf("%dkbit", kbit)
 	if disc == "cake" {
-		args := []string{"tc", "qdisc", "replace", "dev", dev, "root", "cake", "bandwidth", rate, "besteffort", "triple-isolate", "nat"}
+		classes := "besteffort"
+		if prio {
+			classes = "diffserv3"
+		}
+		args := []string{"tc", "qdisc", "replace", "dev", dev, "root", "cake", "bandwidth", rate, classes, "triple-isolate", "nat"}
 		if ingress {
 			args = append(args, "wash", "ingress")
 		}
@@ -58,12 +64,22 @@ func sqmShape(dev string, kbit int, disc string, ingress bool) [][]string {
 	}
 }
 
-// SQMCommands returns the commands for a plan with one discipline ("cake" or "fq_codel"), without
-// running anything, so it can be tested anywhere. Clearing comes first.
+// SQMCommands returns the commands for a plan with one queue type, without running anything, so
+// it can be tested anywhere. Clearing comes first. The types are "cake", "fq_codel", and for
+// links that want priority "cake+priority" (both directions) and "cake+priority-up" (upload only,
+// used when the kernel cannot restore the priority of download traffic).
 func SQMCommands(p SQMPlan, disc string) ([][]string, error) {
-	if disc != "cake" && disc != "fq_codel" {
+	base, up, down := disc, false, false
+	switch disc {
+	case "cake+priority":
+		base, up, down = "cake", true, true
+	case "cake+priority-up":
+		base, up = "cake", true
+	case "cake", "fq_codel":
+	default:
 		return nil, fmt.Errorf("unknown queue type %q", disc)
 	}
+	disc = base
 	seen := map[string]bool{}
 	var devs []string
 	add := func(d string) error {
@@ -95,15 +111,21 @@ func SQMCommands(p SQMPlan, disc string) ([][]string, error) {
 	cmds := sqmClear(devs)
 	for i, l := range links {
 		ifb := sqmIfb(i)
-		cmds = append(cmds, sqmShape(l.Iface, l.UpKbit, disc, false)...)
+		pu, pd := l.Prio && up, l.Prio && down
+		cmds = append(cmds, sqmShape(l.Iface, l.UpKbit, disc, false, pu)...)
 		cmds = append(cmds,
 			[]string{"ip", "link", "add", ifb, "type", "ifb"},
 			[]string{"ip", "link", "set", ifb, "up"})
-		cmds = append(cmds, sqmShape(ifb, l.DownKbit, disc, true)...)
-		cmds = append(cmds,
-			[]string{"tc", "qdisc", "replace", "dev", l.Iface, "handle", "ffff:", "ingress"},
-			[]string{"tc", "filter", "replace", "dev", l.Iface, "parent", "ffff:", "protocol", "all", "u32", "match", "u32", "0", "0",
+		cmds = append(cmds, sqmShape(ifb, l.DownKbit, disc, true, pd)...)
+		cmds = append(cmds, []string{"tc", "qdisc", "replace", "dev", l.Iface, "handle", "ffff:", "ingress"})
+		if pd {
+			// Put back the priority the firewall noted on the connection, then hand over to the queue.
+			cmds = append(cmds, []string{"tc", "filter", "replace", "dev", l.Iface, "parent", "ffff:", "protocol", "all", "matchall",
+				"action", "ctinfo", "dscp", "0xfc000000", "0x01000000", "pipe", "action", "mirred", "egress", "redirect", "dev", ifb})
+		} else {
+			cmds = append(cmds, []string{"tc", "filter", "replace", "dev", l.Iface, "parent", "ffff:", "protocol", "all", "u32", "match", "u32", "0", "0",
 				"action", "mirred", "egress", "redirect", "dev", ifb})
+		}
 	}
 	return cmds, nil
 }
@@ -134,7 +156,7 @@ func sqmClearAll(p SQMPlan) {
 	sqmRemoveIfbs()
 }
 
-// SQMApply puts the plan in place and reports which queue type it used ("cake" or "fq_codel").
+// SQMApply puts the plan in place and reports which queue type it used ("cake", "cake+priority", "cake+priority-up" or "fq_codel").
 // With no links it only removes earlier shaping. If anything fails, everything this feature added
 // is taken away again, so the connection is left exactly as it was.
 func (s *Service) SQMApply(p SQMPlan) (string, error) {
@@ -146,7 +168,14 @@ func (s *Service) SQMApply(p SQMPlan) (string, error) {
 		return "", nil
 	}
 	var lastMsg string
-	for _, disc := range []string{"cake", "fq_codel"} {
+	variants := []string{"cake", "fq_codel"}
+	for _, l := range p.Links {
+		if l.Prio {
+			variants = []string{"cake+priority", "cake+priority-up", "cake", "fq_codel"}
+			break
+		}
+	}
+	for _, disc := range variants {
 		sqmClearAll(p)
 		cmds, _ := SQMCommands(p, disc)
 		failed := false
@@ -166,8 +195,9 @@ func (s *Service) SQMApply(p SQMPlan) (string, error) {
 		if !failed {
 			return disc, nil
 		}
-		unknown := strings.Contains(lastMsg, "Unknown qdisc") || strings.Contains(lastMsg, "kind is unknown") || strings.Contains(lastMsg, "cake")
-		if disc == "cake" && unknown {
+		unknown := strings.Contains(lastMsg, "Unknown qdisc") || strings.Contains(lastMsg, "kind is unknown") || strings.Contains(lastMsg, "cake") ||
+			strings.Contains(lastMsg, "ctinfo") || strings.Contains(lastMsg, "Unknown action") || strings.Contains(lastMsg, "diffserv3")
+		if strings.HasPrefix(disc, "cake") && unknown {
 			continue
 		}
 		break

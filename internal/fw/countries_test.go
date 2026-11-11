@@ -86,7 +86,7 @@ func TestRouteMarksCompile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"chain routemark", "ip saddr 192.168.1.0/24 ip daddr 203.0.113.0/24 ct state new meta mark 0 meta mark set 0x1000", "set dm_", "set gc_nl_4", `comment "killswitch:Streaming"`, "ct mark >= 0x1000 meta mark set ct mark"} {
+	for _, want := range []string{"chain routemark", "ip saddr 192.168.1.0/24 ip daddr 203.0.113.0/24 ct state new meta mark 0 meta mark set 0x1000", "set dm_", "set gc_nl_4", `comment "killswitch:Streaming"`, "ct mark & 0xffffff >= 0x1000 meta mark set ct mark & 0xffffff"} {
 		if !strings.Contains(script, want) {
 			t.Errorf("missing %q in:\n%s", want, script)
 		}

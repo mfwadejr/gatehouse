@@ -112,6 +112,8 @@ type Tunnel struct {
 
 // Model is everything the compiler needs.
 type Model struct {
+	// Speed holds the priority and speed-limit entries, resolved for the firewall.
+	Speed    []SpeedRule
 	Zones    []Zone
 	Rules    []Rule
 	Forwards []Forward

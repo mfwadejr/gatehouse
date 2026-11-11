@@ -26,6 +26,8 @@ type devTraffic struct {
 	rate   map[string]devRate // by address
 	wan    [2]uint64          // internet connection bytes received and sent, last seen
 	wanOK  bool
+	link   map[string][2]uint64 // each connection's own counters (received, sent), last seen
+	lastW  map[string]uint64    // per connection and device counters, last seen
 }
 
 const (
@@ -158,6 +160,7 @@ func (a *App) sampleDevices(cur map[string]fw.Counter, now time.Time) {
 		}
 	}
 	t.wan, t.wanOK = [2]uint64{rx, tx}, any
+	a.sampleLinks(t, cur, deltas, arp, ts, now, first)
 }
 
 func maxF(a, b float64) float64 {
@@ -349,6 +352,8 @@ func (a *App) pruneTraffic(days int) {
 	// Per-device rows follow the retention the person chose. The whole-connection total is kept at
 	// least 100 days, because a billing period and the provider report need a month and more.
 	a.Logs.Exec(`DELETE FROM traffic WHERE mac<>'' AND ts<?`, time.Now().Add(-time.Duration(days)*24*time.Hour).Unix())
+	a.Logs.Exec(`DELETE FROM link_dev_traffic WHERE ts<?`, time.Now().Add(-time.Duration(days)*24*time.Hour).Unix())
+	a.Logs.Exec(`DELETE FROM link_traffic WHERE ts<?`, time.Now().Add(-time.Duration(maxInt(days, 100))*24*time.Hour).Unix())
 	total := days
 	if total < 100 {
 		total = 100
@@ -396,4 +401,11 @@ func (a *App) registerDevTrafficRoutes() {
 		}
 		api.JSON(w, 200, u.rows)
 	})
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }

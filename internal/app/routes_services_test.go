@@ -34,7 +34,7 @@ func TestRouteByPortThroughAConnectionGroup(t *testing.T) {
 	if rc != 200 {
 		t.Fatalf("route: %d %s", rc, raw)
 	}
-	for _, want := range []string{"tcp dport 563", "tcp dport 5000-5010", "udp dport 123", "203.0.113.5", "198.51.100.0/24", "meta mark set 0x1100", "ct mark >= 0x1000"} {
+	for _, want := range []string{"tcp dport 563", "tcp dport 5000-5010", "udp dport 123", "203.0.113.5", "198.51.100.0/24", "meta mark set 0x1100", "ct mark & 0xffffff >= 0x1000"} {
 		if !strings.Contains(ff.script, want) {
 			t.Errorf("firewall lacks %q\n%s", want, ff.script)
 		}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { get, post, put, useData } from './api.js';
-import { Button, Field, Input, Select, useAction, fmt } from './ui.jsx';
+import { Button, Field, Input, Select, TimeField, useAction, fmt } from './ui.jsx';
 
 // One control for "how often does this run": the same everywhere a recurring job is shown.
 // The text form is what the machine stores: every:N, daily:HH:MM, weekly:D:HH:MM or off.
@@ -46,7 +46,7 @@ export function ScheduleEditor({ id, label, extra, hideRun }) {
         <div className="inline" style={{ flexWrap: 'wrap', gap: '.5rem' }}>
           <Select value={cur} onChange={pick} options={kinds} aria-label={`How often: ${j.name}`} />
           {s.kind === 'weekly' && <Select value={String(s.day)} onChange={(v) => setDraft({ ...s, day: Number(v) })} options={DAYS.map((d, i) => ({ value: String(i), label: d }))} aria-label="Day" />}
-          {(s.kind === 'daily' || s.kind === 'weekly') && <input type="time" className="in" value={s.time} onChange={(e) => setDraft({ ...s, time: e.target.value })} aria-label="Time of day (the machine's own clock)" />}
+          {(s.kind === 'daily' || s.kind === 'weekly') && <TimeField value={s.time} onChange={(v) => setDraft({ ...s, time: v })} aria-label="Time of day (the machine's own clock)" />}
           {s.kind === 'custom' && <><Input value={String(s.hours)} onChange={(v) => setDraft({ ...s, hours: Number(v.replace(/\D/g, '')) || 0 })} inputMode="numeric" aria-label="Hours between runs" style={{ maxWidth: '5rem' }} /><span className="small muted">hours (1 to 720)</span></>}
           {dirty && <Button onClick={save} disabled={busy}>Save</Button>}
           {dirty && <Button kind="ghost" onClick={() => setDraft(null)}>Cancel</Button>}

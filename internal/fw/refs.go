@@ -154,6 +154,24 @@ const (
 // AcctKey is how a device's counter is named in what Counters reports.
 const AcctPrefix = "acct:"
 
+// Per internet connection, each device's traffic is counted in its own pair of sets, so a device
+// that uses two connections (a route, a failover) is counted on the one each packet really took.
+// AcctWanPrefix keys them as "acctw:<connection>:up:<address>".
+const AcctWanPrefix = "acctw:"
+
+// WanKey is the name a connection's device gets inside set names: letters and digits only.
+func WanKey(dev string) string {
+	b := []byte(dev)
+	for i, c := range b {
+		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9') {
+			b[i] = '_'
+		}
+	}
+	return string(b)
+}
+
+func acctWanSet(dir, dev string) string { return "aw_" + dir + "_" + WanKey(dev) }
+
 // MaxDynSets bounds how many sets one ruleset may declare.
 const MaxDynSets = 96
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { post, put, useData } from '../api.js';
-import { Button, Card, Field, Input, Note, Select, ToggleRow, useAction, useToast } from '../ui.jsx';
+import { Button, Card, Field, Input, Note, Select, TimeField, ToggleRow, useAction, useToast } from '../ui.jsx';
 
 // Alerts in plain words, by email or by ntfy (a free push-notification service you can also host
 // yourself). Each kind can be switched off, quiet hours hold messages until morning, and a test
@@ -72,8 +72,8 @@ export default function Alerts() {
         <ToggleRow title="Quiet hours" desc={f.quiet.enabled ? `Nothing is sent between ${f.quiet.from} and ${f.quiet.to}. What happened is sent as one message afterwards.${data.held ? ` ${data.held} waiting now.` : ''}` : 'Off. Alerts are sent at once, day or night.'} checked={f.quiet.enabled} onChange={(v) => set('quiet', { ...f.quiet, enabled: v })} />
         {f.quiet.enabled && (
           <div className="formgrid">
-            <Field label="From"><Input type="time" value={f.quiet.from} onChange={(v) => set('quiet', { ...f.quiet, from: v })} /></Field>
-            <Field label="Until"><Input type="time" value={f.quiet.to} onChange={(v) => set('quiet', { ...f.quiet, to: v })} /></Field>
+            <Field label="From"><TimeField value={f.quiet.from} onChange={(v) => set('quiet', { ...f.quiet, from: v })} /></Field>
+            <Field label="Until"><TimeField value={f.quiet.to} onChange={(v) => set('quiet', { ...f.quiet, to: v })} /></Field>
           </div>
         )}
         <div className="actions"><Button kind="primary" onClick={save} disabled={busy}>Save</Button></div>

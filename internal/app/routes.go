@@ -375,6 +375,7 @@ func (a *App) registerRoutes() {
 	a.registerTrafficRoutes()
 	a.registerOverviewRoutes()
 	a.registerSpeedRoutes()
+	a.registerSpeedCtlRoutes()
 	a.registerDevTrafficRoutes()
 	a.registerLogExtraRoutes()
 	a.registerStorageRoutes()

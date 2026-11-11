@@ -61,3 +61,36 @@ func TestSQMCommandsFallbackAndChecks(t *testing.T) {
 		t.Fatal("accepted an unknown queue type")
 	}
 }
+
+func TestSQMPriorityCommands(t *testing.T) {
+	p := SQMPlan{Links: []SQMLink{{Iface: "eth1", DownKbit: 100000, UpKbit: 20000, Prio: true}, {Iface: "eth2", DownKbit: 50000, UpKbit: 10000}}}
+	flat := func(c [][]string) string {
+		var out []string
+		for _, x := range c {
+			out = append(out, strings.Join(x, " "))
+		}
+		return strings.Join(out, "\n")
+	}
+	both, err := SQMCommands(p, "cake+priority")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := flat(both)
+	if !strings.Contains(f, "dev eth1 root cake bandwidth 20000kbit diffserv3") || !strings.Contains(f, "dev ghifb0 root cake bandwidth 100000kbit diffserv3 triple-isolate nat wash ingress") {
+		t.Fatalf("priority queues missing:\n%s", f)
+	}
+	if !strings.Contains(f, "matchall action ctinfo dscp 0xfc000000 0x01000000 pipe action mirred egress redirect dev ghifb0") {
+		t.Fatalf("download priority restore missing:\n%s", f)
+	}
+	if !strings.Contains(f, "dev eth2 root cake bandwidth 10000kbit besteffort") {
+		t.Fatalf("a link without priority must stay besteffort:\n%s", f)
+	}
+	up, _ := SQMCommands(p, "cake+priority-up")
+	if f = flat(up); strings.Contains(f, "ctinfo") || !strings.Contains(f, "dev eth1 root cake bandwidth 20000kbit diffserv3") {
+		t.Fatalf("upload-only variant wrong:\n%s", f)
+	}
+	plain, _ := SQMCommands(p, "cake")
+	if f = flat(plain); strings.Contains(f, "diffserv3") || strings.Contains(f, "ctinfo") {
+		t.Fatalf("plain cake must not use classes:\n%s", f)
+	}
+}

@@ -558,4 +558,23 @@ CREATE TABLE block_sets(
   created_at INTEGER NOT NULL DEFAULT 0
 );
 ALTER TABLE scope_rules ADD COLUMN set_id INTEGER NOT NULL DEFAULT 0;
+`, `
+-- Speed control (v0.9.4.20): Give priority and Limit speed entries. who is a list of networks,
+-- profiles and devices (like a block's targets); what is a list of apps, categories and websites
+-- (empty means all traffic).
+CREATE TABLE speed_rules(
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL DEFAULT '',
+  kind TEXT NOT NULL DEFAULT 'limit',
+  prio TEXT NOT NULL DEFAULT 'normal',
+  down_kbit INTEGER NOT NULL DEFAULT 0,
+  up_kbit INTEGER NOT NULL DEFAULT 0,
+  each INTEGER NOT NULL DEFAULT 0,
+  schedule TEXT NOT NULL DEFAULT '',
+  enabled INTEGER NOT NULL DEFAULT 1,
+  paused_until INTEGER NOT NULL DEFAULT 0,
+  items TEXT NOT NULL DEFAULT '[]',
+  targets TEXT NOT NULL DEFAULT '[]',
+  created_at INTEGER NOT NULL DEFAULT 0
+);
 `}

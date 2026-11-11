@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { hashQuery, setHashQuery, useWantedEdit } from '../hashtab.js';
 import { del, post, put, useData } from '../api.js';
-import { Button, Card, Empty, Field, Input, Modal, Note, Pill, Segmented, Select, ToggleRow, useAction, useUndoDelete, fmt, Limited } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, Pill, Segmented, Select, TimeField, ToggleRow, useAction, useUndoDelete, fmt, Limited } from '../ui.jsx';
 import { PolicyControls } from '../policykit.jsx';
 
 // A block is a named list of apps, categories and websites that applies to everyone or to a chosen
@@ -131,8 +131,8 @@ function BlockForm({ initial, data, allow, onClose, onSaved }) {
         {sc.mode !== 'always' && (
           <div className="stack">
             <div className="formgrid">
-              <Field label="From"><input type="time" className="in" value={sc.from} onChange={(e) => setSc({ ...sc, from: e.target.value })} /></Field>
-              <Field label="To"><input type="time" className="in" value={sc.to} onChange={(e) => setSc({ ...sc, to: e.target.value })} /></Field>
+              <Field label="From"><TimeField value={sc.from} onChange={(v) => setSc({ ...sc, from: v })} /></Field>
+              <Field label="To"><TimeField value={sc.to} onChange={(v) => setSc({ ...sc, to: v })} /></Field>
             </div>
             {sc.mode === 'weekly' && (
               <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>

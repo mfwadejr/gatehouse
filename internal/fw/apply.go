@@ -151,6 +151,17 @@ func (a *Applier) Counters() (map[string]Counter, error) {
 			}
 			continue
 		}
+		if it.Set != nil && strings.HasPrefix(it.Set.Name, "aw_") {
+			if dir, key, ok := strings.Cut(it.Set.Name[3:], "_"); ok && (dir == "up" || dir == "dn") {
+				if dir == "dn" {
+					dir = "down"
+				}
+				for ip, c := range acctElems(it.Set.Elem) {
+					res[AcctWanPrefix+key+":"+dir+":"+ip] = c
+				}
+			}
+			continue
+		}
 		if it.Set != nil && (it.Set.Name == AcctUp || it.Set.Name == AcctDown) {
 			dir := "up:"
 			if it.Set.Name == AcctDown {

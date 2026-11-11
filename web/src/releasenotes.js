@@ -1,6 +1,18 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.20',
+    title: 'Speed control, a redesigned Usage page and controls that match',
+    items: [
+      'Internet has a new Speed control tab. Limit speed holds a network, profile or device to a download and upload speed in Mb/s, shared or for each device. Give priority puts traffic first (High), last (Low) or back to Normal when the connection is full. Either can cover everything or only chosen apps, categories and websites, always or at chosen hours. One switch, Speed control is on, pauses all entries at once. The same entries appear on the Policies page, and Create policy can start them.',
+      'Priority works through the smart queue, so Keep delay low must be on for the connection. The queue now tells traffic classes apart when a priority entry exists, and says so in the console if this device can only do it for uploads, or not at all. A fault never slows anything.',
+      'Usage is redesigned. Data use shows what each internet connection used, or all of them, for this billing period, this or last month, 30 or 7 days, or dates you choose, with the busiest devices per connection. Data limit is set per connection, with its own billing day and warning levels. A device is counted against the connection its traffic really used.',
+      'Every date, time and drop-down in the console now looks and behaves the same: typed or picked times, a calendar for dates and ranges, and drop-downs you can use with the keyboard and type to find an item.',
+      'Fixed: after Apply, the Review page could keep showing the change as on trial, or still waiting, after the countdown reached zero, and the automatic keep could start late. The page now follows NopeWarden every second while a change is on trial and asks again when the time is up.',
+      'Fixed: the Overview page asked for a live feed that did not exist and showed an error in the browser log.',
+    ],
+  },
+  {
     version: '0.9.4.19',
     title: 'A management port of its own',
     items: [

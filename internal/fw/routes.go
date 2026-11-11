@@ -447,8 +447,8 @@ func (c *compiler) routeMarks() {
 					tc = " " + tc
 				}
 				for _, sv := range c.serviceTerms(r.Service) {
-					c.line(2, "iifname %s ip saddr %s%s%s%s%s ct state new meta mark 0 meta mark set 0x%x ct mark set 0x%x comment %s",
-						ifSet(locals), setLit(r.Srcs), e, sv, tc, hold, r.Mark, r.Mark, q("route:"+r.Name))
+					c.line(2, "iifname %s ip saddr %s%s%s%s%s ct state new meta mark 0 meta mark set 0x%x ct mark set ct mark & 0x%08x | 0x%x comment %s",
+						ifSet(locals), setLit(r.Srcs), e, sv, tc, hold, r.Mark, ConnMarkDSCP, r.Mark, q("route:"+r.Name))
 				}
 			}
 		}
@@ -458,7 +458,7 @@ func (c *compiler) routeMarks() {
 	}
 	if tunnel {
 		// Later packets of a connection keep the route their first packet got.
-		c.line(2, "iifname %s ct mark >= 0x%x meta mark set ct mark", ifSet(locals), RouteMarkBase)
+		c.line(2, "iifname %s ct mark & 0x%06x >= 0x%x meta mark set ct mark & 0x%06x", ifSet(locals), ConnMarkKeep, RouteMarkBase, ConnMarkKeep)
 	}
 	c.line(1, "}")
 }

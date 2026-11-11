@@ -142,4 +142,24 @@ DROP TABLE IF EXISTS dns_daily;
 -- the smart queue. Only tests on a quiet line with the queue lifted say what the line can really do.
 ALTER TABLE speedtests ADD COLUMN busy INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE speedtests ADD COLUMN shaped INTEGER NOT NULL DEFAULT 0;
+`, `
+-- Data use per internet connection (v0.9.4.20). link_traffic is the connection's own byte counters
+-- by minute; link_dev_traffic is what each device sent and received through that connection. The
+-- older traffic table keeps counting everything together, so earlier history stays whole.
+CREATE TABLE link_traffic(
+  ts INTEGER NOT NULL,
+  link TEXT NOT NULL,
+  up INTEGER NOT NULL DEFAULT 0,
+  down INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY(ts, link)
+);
+CREATE TABLE link_dev_traffic(
+  ts INTEGER NOT NULL,
+  link TEXT NOT NULL,
+  mac TEXT NOT NULL,
+  up INTEGER NOT NULL DEFAULT 0,
+  down INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY(ts, link, mac)
+);
+CREATE INDEX idx_link_dev ON link_dev_traffic(link, ts);
 `}

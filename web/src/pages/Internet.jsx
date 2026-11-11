@@ -3,6 +3,7 @@ import { del, holdAnd, put, useData } from '../api.js';
 import { SAVED_LATER, SaveChoice } from '../changes.jsx';
 import WanGroups, { Traffic } from './WanGroups.jsx';
 import SpeedTest from './SpeedTest.jsx';
+import SpeedControl from './SpeedControl.jsx';
 import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, Tabs, ToggleRow, useAction, useToast, fmt, usePortNames , useDelayedDelete } from '../ui.jsx';
 import { linkState, linkMeasure } from '../linkstate.js';
 import NatNotice from '../natnotice.jsx';
@@ -175,12 +176,12 @@ export default function Internet({ me }) {
   const tabs = [
     { value: 'connections', label: 'Connections' },
     ...(wans.some((w) => w.enabled) ? [{ value: 'speed', label: 'Speed' }] : []),
-    ...(admin ? [{ value: 'troubleshoot', label: 'Troubleshoot' }, { value: 'usage', label: 'Usage' }] : []),
+    ...(admin ? [{ value: 'control', label: 'Speed control' }, { value: 'troubleshoot', label: 'Troubleshoot' }, { value: 'usage', label: 'Usage' }] : []),
   ];
-  const [want, setWant] = useState(() => readTab([{ value: 'connections' }, { value: 'speed' }, { value: 'troubleshoot' }, { value: 'usage' }]));
+  const [want, setWant] = useState(() => readTab([{ value: 'connections' }, { value: 'speed' }, { value: 'control' }, { value: 'troubleshoot' }, { value: 'usage' }]));
   // Links can open a tab with #/internet/<tab>; a tab that is not available falls back to Connections.
   useEffect(() => {
-    const on = () => { if (window.location.hash.replace(/^#\/?/, '').split('?')[0].split('/')[0] === 'internet') setWant(readTab([{ value: 'connections' }, { value: 'speed' }, { value: 'troubleshoot' }, { value: 'usage' }])); };
+    const on = () => { if (window.location.hash.replace(/^#\/?/, '').split('?')[0].split('/')[0] === 'internet') setWant(readTab([{ value: 'connections' }, { value: 'speed' }, { value: 'control' }, { value: 'troubleshoot' }, { value: 'usage' }])); };
     window.addEventListener('hashchange', on);
     return () => window.removeEventListener('hashchange', on);
   }, []);
@@ -229,6 +230,7 @@ export default function Internet({ me }) {
 
       {(!showTabs || tab === 'connections') && <><WanGroups wans={wans} links={links} onChanged={all} /><Traffic wans={wans} links={links} /></>}
       {(!showTabs || tab === 'speed') && wans.some((w) => w.enabled) && <SpeedTest wans={wans} links={links} />}
+      {showTabs && tab === 'control' && <SpeedControl />}
       {showTabs && tab === 'troubleshoot' && <><NetTools /><Why /></>}
       {showTabs && tab === 'usage' && <><DataUse /><IspReport /></>}
 
