@@ -54,12 +54,12 @@ export default function Policies() {
       toggle: () => run(() => put('/api/routes', { ...routeBody(r), enabled: !r.enabled }), r.enabled ? 'Turned off.' : 'Turned on.').then(again),
       remove: () => undoDelete(`The route "${r.name}"`, () => del(`/api/routes/${r.id}`), () => put('/api/routes', { ...routeBody(r), id: undefined }), again),
     })),
-    ...(blocks?.rules || []).map((r) => ({
-      k: 'block', key: `block${r.id}`, id: r.id, name: r.text, words: r.when && r.when !== 'Always' ? r.when : '', when: '', enabled: r.enabled, paused: r.paused_until, warn: [],
+    ...(blocks?.blocks || []).map((r) => ({
+      k: 'block', key: `block${r.id}`, id: r.id, name: r.title, words: [r.what, r.where, r.when && r.when !== 'Always' ? r.when : ''].filter(Boolean).join(' · '), when: '', enabled: r.enabled, paused: r.paused_until, warn: [],
       tone: r.status === 'blocking' || r.status === 'allowing' ? 'good' : '', state: r.status,
       pause: (m) => run(() => post(`/api/blocks/${r.id}/pause`, { minutes: m }), m === 0 ? 'Resumed.' : 'Paused.').then(again),
       toggle: () => run(() => post(`/api/blocks/${r.id}/enable`, { enabled: !r.enabled }), r.enabled ? 'Turned off.' : 'Turned on.').then(again),
-      remove: () => undoDelete('The block', () => del(`/api/blocks/${r.id}`), () => put('/api/blocks', { kind: r.kind, value: r.value, scope: r.scope, target: r.target, allow: r.allow, method: r.method, schedule: r.schedule, enabled: r.enabled }), again),
+      remove: () => undoDelete('The block', () => del(`/api/blocks/${r.id}`), () => put('/api/blocks', { name: r.name, items: r.items.map(({ kind, value }) => ({ kind, value })), targets: r.targets.map(({ scope, target }) => ({ scope, target })), allow: r.allow, method: r.method, schedule: r.schedule, enabled: r.enabled }), again),
     })),
     ...(ports?.forwards || []).map((g) => ({
       k: 'port', key: `port${g.group}${g.id || ''}`, id: g.legacy ? g.id : g.group, name: g.text, words: g.countries?.length ? `Only from ${g.countries.join(', ')}.` : g.src?.length ? `Only from ${g.src.join(', ')}.` : 'Anyone on the internet can try to connect.',

@@ -14,6 +14,7 @@ export async function confirmRemoval(url, lead, { zoneRemoval = false } = {}) {
     if (imp.remove_zone && imp.zone) goes.push(`the firewall network "${imp.zone}"`);
     if (imp.rules > 0) goes.push(`${imp.rules} exception rule${imp.rules === 1 ? '' : 's'} that mention it`);
     if (goes.length) lines.push(`This also removes: ${goes.join(', ')}.`);
+    if (imp.blocks?.length) lines.push(`These blocks apply to it and will no longer include it: ${imp.blocks.join(', ')}.`);
     if (imp.kept) lines.push(imp.kept);
     if (zoneRemoval && !imp.management && imp.other_ports?.length) lines.push(`${imp.other_ports.join(', ')} keeps its address but is no longer part of any firewall network.`);
     if (zoneRemoval && imp.management) lines.push('This network can manage NopeWarden, so its address range stays and devices on it keep working.');

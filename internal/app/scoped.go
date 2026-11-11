@@ -1,7 +1,6 @@
 package app
 
 import (
-	"errors"
 	"net/http"
 	"sort"
 	"strconv"
@@ -321,84 +320,11 @@ type blockIn struct {
 	Enabled  bool   `json:"enabled"`
 }
 
+// saveScopeRule saves one thing in one place as a block of its own. The console saves whole blocks
+// (saveBlockSet); this is the single-block form, kept for the tests and for older callers.
 func (a *App) saveScopeRule(in blockIn) error {
-	in.Value = strings.TrimSpace(in.Value)
-	in.Target = strings.TrimSpace(in.Target)
-	switch in.Kind {
-	case "app":
-		found := false
-		for _, n := range appid.Names() {
-			if strings.EqualFold(n, in.Value) {
-				in.Value, found = n, true
-			}
-		}
-		if !found {
-			return errors.New("NopeWarden does not know that app yet")
-		}
-	case "topic":
-		if a.topicKey(in.Value) == "" {
-			return errors.New("choose one of the topics")
-		}
-	case "name":
-		d := dnssrv.NormalizeDomain(in.Value)
-		if d == "" {
-			return errors.New("that does not look like a website name")
-		}
-		in.Value = d
-	default:
-		return errors.New("choose an app, a topic or a name")
-	}
-	switch in.Scope {
-	case "everyone":
-		in.Target = ""
-	case "network", "profile", "device":
-		if in.Target == "" {
-			return errors.New("choose who this is for")
-		}
-		if in.Scope == "device" {
-			in.Target = strings.ToLower(in.Target)
-		}
-	default:
-		return errors.New("choose who this is for")
-	}
-	if in.Method == "" {
-		in.Method = "fast"
-	}
-	if in.Method != "fast" && in.Method != "thorough" && in.Method != "both" {
-		return errors.New("choose by name, thorough, or both")
-	}
-	sc, err := fw.ParseSchedule(in.Schedule)
-	if err == nil {
-		err = sc.Check(a.scopeLoc())
-	}
-	if err != nil {
-		return err
-	}
-	if in.Kind == "topic" && !in.Allow {
-		for _, c := range categoryCatalog {
-			if c.Key == in.Value {
-				if _, e := a.categoryListID(c); e != nil {
-					return e
-				}
-			}
-		}
-	}
-	en := 0
-	if in.Enabled {
-		en = 1
-	}
-	al := 0
-	if in.Allow {
-		al = 1
-	}
-	if in.ID == 0 {
-		_, err = a.Config.Exec(`INSERT INTO scope_rules(kind,value,scope,target,allow,method,schedule,enabled,created_at) VALUES(?,?,?,?,?,?,?,?,?)`,
-			in.Kind, in.Value, in.Scope, in.Target, al, in.Method, in.Schedule, en, time.Now().Unix())
-	} else {
-		_, err = a.Config.Exec(`UPDATE scope_rules SET kind=?,value=?,scope=?,target=?,allow=?,method=?,schedule=?,enabled=? WHERE id=?`,
-			in.Kind, in.Value, in.Scope, in.Target, al, in.Method, in.Schedule, en, in.ID)
-	}
-	a.dropScopeCache()
+	_, err := a.saveBlockSet(blockSet{ID: in.ID, Allow: in.Allow, Method: in.Method, Schedule: in.Schedule, Enabled: in.Enabled,
+		Items: []blockItem{{Kind: in.Kind, Value: in.Value}}, Targets: []blockTarget{{Scope: in.Scope, Target: in.Target}}})
 	return err
 }
 
@@ -430,7 +356,10 @@ func (a *App) registerScopeRoutes() {
 	s := a.API
 	a.DNS.Scoped = a.scopedBlock
 	a.DNS.OnScopedFault = func() { a.scopeFault("an unexpected error") }
+	a.migrateBlockSets()
 	s.Handle("GET /api/blocks", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		a.migrateBlockSets()
+		a.pruneBlockTargets()
 		type appOut struct {
 			Name     string `json:"name"`
 			Category string `json:"category"`
@@ -459,68 +388,12 @@ func (a *App) registerScopeRoutes() {
 			topics = append(topics, topicOut{Key: t.Key, Name: t.Name, Descr: t.Descr, Status: "built in"})
 		}
 		api.JSON(w, 200, map[string]any{
-			"rules": a.scopeViews(), "apps": apps, "topics": topics,
+			"blocks": a.blockViews(), "rules": a.scopeViews(), "apps": apps, "topics": topics,
 			"inspection": a.inspectionState(),
 			"fail_open":  "If anything goes wrong, nothing is blocked. A fault never cuts a device off.",
 		})
 	})
-	s.HandleAdmin("PUT /api/blocks", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-		var in blockIn
-		if !api.Decode(w, r, &in) {
-			return
-		}
-		if err := a.saveScopeRule(in); err != nil {
-			fail(w, err)
-			return
-		}
-		ok(w)
-	})
-	s.HandleAdmin("POST /api/blocks/{id}/pause", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-		id, good := pathID(r)
-		var in struct {
-			Minutes int `json:"minutes"`
-		}
-		if !good || !api.Decode(w, r, &in) {
-			return
-		}
-		until, err := pausePick(in.Minutes)
-		if err != nil {
-			fail(w, err)
-			return
-		}
-		if _, err := a.Config.Exec(`UPDATE scope_rules SET paused_until=? WHERE id=?`, until, id); err != nil {
-			fail(w, err)
-			return
-		}
-		a.dropScopeCache()
-		ok(w)
-	})
-	s.HandleAdmin("POST /api/blocks/{id}/enable", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-		id, good := pathID(r)
-		var in struct {
-			Enabled bool `json:"enabled"`
-		}
-		if !good || !api.Decode(w, r, &in) {
-			return
-		}
-		n := 0
-		if in.Enabled {
-			n = 1
-		}
-		a.Config.Exec(`UPDATE scope_rules SET enabled=?, paused_until=0 WHERE id=?`, n, id)
-		a.dropScopeCache()
-		ok(w)
-	})
-	s.HandleAdmin("DELETE /api/blocks/{id}", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-		id, good := pathID(r)
-		if !good {
-			fail(w, errBadID)
-			return
-		}
-		a.Config.Exec(`DELETE FROM scope_rules WHERE id=?`, id)
-		a.dropScopeCache()
-		ok(w)
-	})
+	a.registerBlockSetRoutes()
 	// Which lists blocking uses and how fresh they are, for Settings, Advanced.
 	s.Handle("GET /api/blocks/versions", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		names := appid.Names()

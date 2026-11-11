@@ -470,6 +470,7 @@ func (a *App) registerNetRoutes() {
 			a.publishLeases()
 		}
 		if imp.RemoveZone {
+			a.pruneBlockTargets()
 			a.markDirty()
 		}
 		a.publishNet()

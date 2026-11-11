@@ -201,6 +201,7 @@ func (a *App) registerRoutes() {
 			return
 		}
 		a.Devices.Rebuild()
+		a.pruneBlockTargets()
 		ok(w)
 	})
 	s.Handle("GET /api/dns/records", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {

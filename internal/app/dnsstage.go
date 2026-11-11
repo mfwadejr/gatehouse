@@ -81,6 +81,7 @@ func (a *App) forgetDevice(id int64) error {
 		return err
 	}
 	a.Config.Exec(`DELETE FROM device_group_members WHERE lower(mac)=?`, mac)
+	a.pruneBlockTargets()
 	a.fwSync()
 	return nil
 }

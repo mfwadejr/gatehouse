@@ -493,7 +493,7 @@ var restoreTables = []string{
 	"routes", "vpn_routes", "vpn_ovpn_users", "vpn_ovpn", "vpn_wg_peers", "vpn_wg",
 	"wan_group_routes", "wan_group_members", "wan_groups", "wan_links",
 	"dhcp_leases", "dhcp_reservations", "dhcp_scopes", "interfaces", "zones",
-	"dns_records", "custom_rules", "scope_rules", "threat_allowed", "threat_trusted", "dns_upstreams", "group_blocklists", "blocklists", "network_profiles", "groups",
+	"dns_records", "custom_rules", "scope_rules", "block_sets", "threat_allowed", "threat_trusted", "dns_upstreams", "group_blocklists", "blocklists", "network_profiles", "groups",
 	"device_group_members", "device_groups", "devices", "device_icons", "fw_revisions",
 }
 

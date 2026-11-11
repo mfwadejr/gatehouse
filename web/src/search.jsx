@@ -40,11 +40,11 @@ const ROWS = [
   ['Protection', 'protection/overview', 'Security check, block apps and categories, threat watching', 'ids ips suricata threat intrusion protect safe', 'Protection at a glance'],
   ['Security check', 'protection/overview', 'What to fix to make your network safer', 'security risk safe hardening audit', 'Security check'],
   ['Block apps and categories', 'protection/blocks', 'Stop an app or a kind of website for a device or hours', 'block youtube tiktok games social adult gambling parental', 'Block apps, categories and websites'],
-  ['Threat watching', 'protection/threats/alerts', 'Alerts about infected devices and break-in attempts', 'suricata ids ips intrusion detection malware alert install', 'Threat watching'],
-  ['Threat settings', 'protection/threats/settings', 'Light, Balanced, Strict or your own, and the limits', 'preset custom strict light balanced cpu memory limit restore defaults', 'How closely to watch'],
-  ['Groups of threat checks', 'protection/threats/rules', 'Turn whole kinds of checks on or off', 'rules groups scan malware policy suricata', 'Groups of checks'],
-  ['Allowed threat checks', 'protection/threats/advanced', 'Things you let through, and devices never checked', 'allow trusted ignore exclude', 'Allowed checks'],
-  ['Reset all threat settings', 'protection/threats/advanced', 'Put threat watching back to how it started', 'restore defaults reset', 'Reset all threat settings'],
+  ['Threat watching', 'threats/alerts', 'Alerts about infected devices and break-in attempts', 'suricata ids ips intrusion detection malware alert install', 'Threat watching'],
+  ['Threat settings', 'threats/settings', 'Light, Balanced, Strict or your own, and the limits', 'preset custom strict light balanced cpu memory limit restore defaults', 'How closely to watch'],
+  ['Groups of threat checks', 'threats/rules', 'Turn whole kinds of checks on or off', 'rules groups scan malware policy suricata', 'Groups of checks'],
+  ['Allowed threat checks', 'threats/advanced', 'Things you let through, and devices never checked', 'allow trusted ignore exclude', 'Allowed checks'],
+  ['Reset all threat settings', 'threats/advanced', 'Put threat watching back to how it started', 'restore defaults reset', 'Reset all threat settings'],
   ['Undo a change', 'settings/backup', 'Go back to how things were before a change', 'undo revert restore point rollback changes timeline', 'Changes'],
   ['Common setups', 'settings/general', 'Guest network, cameras, Plex from outside, UniFi', 'recipe guest cameras plex unifi how to get started finish setting up', 'Common setups'],
   ['Finish setting up', 'settings/general', 'The first-run list', 'get started checklist first run', 'Finish setting up'],
@@ -216,5 +216,5 @@ export function SearchBox({ onClose, go }) {
 }
 
 // "dns/lists" reads as "DNS" in the list.
-const NAMES = { internet: 'Internet', networks: 'Networks', dns: 'DNS', dhcp: 'DHCP', firewall: 'Firewall', protection: 'Protection', services: 'Services', vpn: 'VPN', routes: 'Routes', profiles: 'Profiles', devices: 'Devices', logs: 'Logs', diagnostics: 'Diagnostics', settings: 'Settings', overview: 'Overview' };
+const NAMES = { internet: 'Internet', networks: 'Networks', dns: 'DNS', dhcp: 'DHCP', firewall: 'Firewall', protection: 'Protection', threats: 'Threats', services: 'Services', vpn: 'VPN', routes: 'Routes', profiles: 'Profiles', devices: 'Devices', logs: 'Logs', diagnostics: 'Diagnostics', settings: 'Settings', overview: 'Overview' };
 const where = (p) => NAMES[p.split('/')[0]] || p;

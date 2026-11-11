@@ -541,4 +541,21 @@ ALTER TABLE routes ADD COLUMN mode TEXT NOT NULL DEFAULT 'failover';
 ALTER TABLE fw_rules ADD COLUMN paused_until INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE nat_forwards ADD COLUMN paused_until INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE nat_forwards ADD COLUMN sched TEXT NOT NULL DEFAULT '';
+`, `
+-- Named blocks (v0.9.4.17): one block holds many apps, categories and websites and applies to many
+-- networks, profiles and devices. items and targets are JSON lists. The rows in scope_rules are
+-- made from them (set_id says which block a row belongs to) and are what the DNS hook reads.
+CREATE TABLE block_sets(
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL DEFAULT '',
+  allow INTEGER NOT NULL DEFAULT 0,
+  method TEXT NOT NULL DEFAULT 'fast',
+  schedule TEXT NOT NULL DEFAULT '',
+  enabled INTEGER NOT NULL DEFAULT 1,
+  paused_until INTEGER NOT NULL DEFAULT 0,
+  items TEXT NOT NULL DEFAULT '[]',
+  targets TEXT NOT NULL DEFAULT '[]',
+  created_at INTEGER NOT NULL DEFAULT 0
+);
+ALTER TABLE scope_rules ADD COLUMN set_id INTEGER NOT NULL DEFAULT 0;
 `}

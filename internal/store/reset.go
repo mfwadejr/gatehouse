@@ -18,7 +18,7 @@ var networkTables = []string{
 	"routes", "vpn_routes", "vpn_ovpn_users", "vpn_ovpn", "vpn_wg_peers", "vpn_wg",
 	"wan_group_routes", "wan_group_members", "wan_groups", "wan_links",
 	"dhcp_leases", "dhcp_reservations", "dhcp_scopes", "interfaces", "zones",
-	"dns_records", "custom_rules", "scope_rules", "threat_allowed", "threat_trusted", "dns_upstreams", "group_blocklists", "blocklists", "groups",
+	"dns_records", "custom_rules", "scope_rules", "block_sets", "threat_allowed", "threat_trusted", "dns_upstreams", "group_blocklists", "blocklists", "groups",
 }
 
 // A factory reset also removes the accounts, the device list and the firewall history.

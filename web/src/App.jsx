@@ -23,6 +23,7 @@ const Policies = lazy(() => import('./pages/Policies.jsx'));
 const Review = lazy(() => import('./pages/Review.jsx'));
 const Firewall = lazy(() => import('./pages/Firewall.jsx'));
 const Protection = lazy(() => import('./pages/Protection.jsx'));
+const Threats = lazy(() => import('./pages/Threats.jsx'));
 const Diagnostics = lazy(() => import('./pages/Diagnostics.jsx'));
 const Services = lazy(() => import('./pages/Services.jsx'));
 const Devices = lazy(() => import('./pages/Devices.jsx'));
@@ -40,6 +41,7 @@ export const PAGES = [
   { id: 'policies', label: 'Policies', icon: 'policies', el: Policies, group: 'Network' },
   { id: 'firewall', label: 'Firewall', icon: 'firewall', el: Firewall, group: 'Security' },
   { id: 'protection', label: 'Protection', icon: 'protection', el: Protection, group: 'Security' },
+  { id: 'threats', label: 'Threats', icon: 'protection', el: Threats, group: 'Security' },
   { id: 'services', label: 'Services', icon: 'services', el: Services, group: 'Security' },
   { id: 'vpn', label: 'VPN', icon: 'vpn', el: VPN, group: 'Security' },
   { id: 'profiles', label: 'Profiles', icon: 'devices', el: Profiles, group: 'People and devices' },
@@ -50,11 +52,18 @@ export const PAGES = [
   { id: 'review', label: 'Review changes', icon: 'policies', el: Review, hidden: true },
 ];
 
+// The Threats page used to be a tab of Protection. Old links and bookmarks still land in the right place.
+const fixOldLink = () => {
+  const m = window.location.hash.match(/^#\/?protection\/threats(?:\/([a-z]+))?(\?.*)?$/);
+  if (m) window.history.replaceState(null, '', `#/threats${m[1] ? `/${m[1]}` : ''}${m[2] || ''}`);
+};
+
 function useRoute() {
+  fixOldLink();
   const read = () => (window.location.hash.replace(/^#\/?/, '').split('?')[0] || 'overview').split('/')[0];
   const [route, setRoute] = useState(read);
   useEffect(() => {
-    const on = () => setRoute(read());
+    const on = () => { fixOldLink(); setRoute(read()); };
     window.addEventListener('hashchange', on);
     return () => window.removeEventListener('hashchange', on);
   }, []);

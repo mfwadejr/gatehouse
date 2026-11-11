@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { del, post, put, get, useData } from '../api.js';
 import { ScheduleEditor } from '../ScheduleEditor.jsx';
 import { Chart, fmtBits } from '../charts.jsx';
-import { Button, Card, Empty, Field, Input, Modal, Note, NumberInput, Pill, Segmented, Steps, Switch, Tabs, Limited, Bar, useAction, fmt } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, NumberInput, Page, Pill, Segmented, Steps, Switch, Tabs, Limited, Bar, useAction, fmt } from '../ui.jsx';
 
 // Threat watching. An engine (Suricata) is installed only when the owner asks. It watches copies of
 // the traffic and NopeWarden says what it noticed in plain words. It never holds traffic up, so a
@@ -11,23 +11,29 @@ import { Button, Card, Empty, Field, Input, Modal, Note, NumberInput, Pill, Segm
 
 const mb = (n) => (n >= 1024 ? `${(n / 1024).toFixed(1)} GB` : `${n} MB`);
 
-function InstallPrompt({ data, reload }) {
+// The program itself: install it, watch it install or go, remove it. All of it lives on Settings.
+function ProgramCard({ data, reload }) {
   const [run, busy] = useAction();
   const [pre, setPre] = useState(null);
+  const [removing, setRemoving] = useState(false);
   const p = data.program || {};
   const working = p.state === 'installing' || p.state === 'removing';
   const look = async () => { const r = await run(() => post('/api/threat/install/preview')); if (r) setPre(r); };
   return (
-    <Card title="Threat watching" desc="Watches for infected devices, break-in attempts and probing, and tells you in plain words.">
+    <Card title={p.installed && !working ? 'The program' : 'Install threat watching'} desc={p.installed && !working ? 'Threat watching is an extra program. It can be removed at any time.' : 'An extra program, installed only if you ask. Nothing else in NopeWarden needs it.'}>
       <div className="stack">
-        {working ? <Note title={p.state === 'installing' ? 'Installing' : 'Removing'}>{p.steps?.length ? <><Steps steps={p.steps} label={p.state === 'installing' ? 'Install progress' : 'Removal progress'} /><span className="small muted">This takes a minute or two. You can leave this page.</span></> : (p.message || 'Working. This can take a few minutes. You can leave this page.')}</Note> : (
+        {working ? <Note title={p.state === 'installing' ? 'Installing' : 'Removing'}>{p.steps?.length ? <><Steps steps={p.steps} label={p.state === 'installing' ? 'Install progress' : 'Removal progress'} /><span className="small muted">This takes a minute or two. You can leave this page.</span></> : (p.message || 'Working. This can take a few minutes. You can leave this page.')}</Note> : p.installed ? (
           <>
-            <p className="small">This is not installed. It is an extra program, installed only if you ask. Nothing else in NopeWarden needs it.</p>
+            <p className="small">{p.running ? 'Running' : 'Not running'}{p.version ? `. Version ${p.version}` : ''}{p.memory_bytes ? `. Using ${mb(Math.round(p.memory_bytes / 1048576))} of memory` : ''}.</p>
+            <div className="actions"><Button kind="danger" disabled={busy} onClick={() => setRemoving(true)}>Remove threat watching</Button></div>
+          </>
+        ) : (
+          <>
+            <p className="small">This is not installed yet.</p>
             {p.state === 'failed' && <Note tone="warn" title="The last install did not finish">{p.steps?.length > 0 && <Steps steps={p.steps} label="What happened" />}{p.message}</Note>}
             <div className="actions"><Button kind="primary" disabled={busy} onClick={look}>Install threat watching</Button></div>
           </>
         )}
-        <p className="small muted">{data.blocking} {data.fail_open}</p>
       </div>
       {pre && (
         <Modal title="Install threat watching" onClose={() => setPre(null)} footer={<><Button onClick={() => setPre(null)}>Cancel</Button><Button kind="primary" disabled={busy} onClick={async () => { if (await run(() => post('/api/threat/install'), 'Installing. This can take a few minutes.')) { setPre(null); reload(); } }}>Install</Button></>}>
@@ -40,6 +46,35 @@ function InstallPrompt({ data, reload }) {
           </div>
         </Modal>
       )}
+      {removing && (
+        <Modal title="Remove threat watching" onClose={() => setRemoving(false)} footer={<><Button onClick={() => setRemoving(false)}>Cancel</Button><Button kind="danger" disabled={busy} onClick={async () => { if (await run(() => post('/api/threat/remove'), 'Removing. This can take a minute.')) { setRemoving(false); reload(); } }}>Remove</Button></>}>
+          <p className="small">The program is switched off and removed. Your traffic is not affected. Your alerts and tuning are kept.</p>
+        </Modal>
+      )}
+    </Card>
+  );
+}
+
+// The Off / Watch and tell switch with everything that explains it. It moves at once and says what the
+// program is doing while it catches up.
+function ModeCard({ data, reload }) {
+  const [run, busy] = useAction();
+  const [pending, setPending] = useState(null);
+  const p = data.program || {};
+  const watching = data.mode === 'watch';
+  return (
+    <Card title="Threat watching" desc="Watches for infected devices, break-in attempts and probing, and tells you in plain words.">
+      <div className="stack">
+        <Segmented value={pending || data.mode} onChange={(v) => { if (v === data.mode || busy) return; setPending(v); run(() => put('/api/threat/settings', { mode: v }), v === 'watch' ? 'Watching is on.' : 'Watching is off.').then(reload).finally(() => setPending(null)); }} options={[{ value: 'off', label: 'Off' }, { value: 'watch', label: 'Watch and tell' }, { value: 'protect', label: 'Protect (not yet)', disabled: true }]} disabled={busy || p.state === 'installing' || p.state === 'removing'} />
+        {pending && (
+          <div className="inline small" role="status" aria-live="polite"><span className="spinner" aria-hidden="true" /><span><b>Working on it.</b> {pending === 'watch' ? 'Starting the watching program and checking its rules' : 'Stopping the watching program'}. <span className="muted">This can take a few seconds.</span></span></div>
+        )}
+        {data.paused_reason && !watching && <Note tone="warn" title="NopeWarden switched watching off">{data.paused_reason} Your traffic was never held up.</Note>}
+        {watching && !p.running && <Note tone={p.failing ? 'bad' : 'warn'} title={p.failing ? 'The program keeps failing' : 'The program is not running'}>{p.why} Your traffic is not affected. See Advanced, Program log, or Diagnostics in the left menu.</Note>}
+        {p.state === 'updating' && <Note>Updating the rules. {p.message}</Note>}
+        {p.state === 'failed' && p.installed && <Note tone="warn">{p.message}</Note>}
+        <p className="small muted">{data.blocking} {data.fail_open} {data.limits}</p>
+      </div>
     </Card>
   );
 }
@@ -147,8 +182,10 @@ function Settings({ data, reload }) {
   const p = data.program || {};
   const base = (data.presets || []).find((x) => x.key === data.preset);
   const choose = (key) => run(() => put('/api/threat/settings', { preset: key }), 'Saved.').then(reload);
+  if (!p.installed || p.state === 'installing' || p.state === 'removing') return <ProgramCard data={data} reload={reload} />;
   return (
     <div className="stack">
+      <ModeCard data={data} reload={reload} />
       <Card title="How closely to watch" desc="A lighter setting looks for fewer things and uses less of the machine.">
         <div className="list" id="threat-presets">
           {(data.presets || []).map((x) => (
@@ -174,8 +211,8 @@ function Settings({ data, reload }) {
           <Field label="Memory limit (MB)" hint="256 to 16384."><NumberInput value={mem} onChange={setMem} /></Field>
         </div>
         <div className="actions"><Button disabled={busy} onClick={() => run(() => put('/api/threat/settings', { cpu_percent: Number(cpu), memory_mb: Number(mem) }), 'Saved.').then(reload)}>Save limits</Button></div>
-        {p.installed && <p className="small muted">Right now: {p.running ? 'running' : 'not running'}{p.memory_bytes ? `, using ${mb(Math.round(p.memory_bytes / 1048576))} of memory` : ''}.</p>}
       </Card>
+      <ProgramCard data={data} reload={reload} />
     </div>
   );
 }
@@ -272,7 +309,6 @@ function ProgramLog() {
 function Advanced({ data, reload }) {
   const [run, busy] = useAction();
   const [eve, setEve] = useState(data.eve_path === data.default_eve ? '' : data.eve_path);
-  const [removing, setRemoving] = useState(false);
   const [resetting, setResetting] = useState(false);
   const p = data.program || {};
   const importFile = async (f) => {
@@ -314,23 +350,17 @@ function Advanced({ data, reload }) {
         <div className="actions"><Button kind="danger" disabled={busy} onClick={() => setResetting(true)}>Reset all threat settings</Button></div>
       </Card>
       <ProgramLog />
-      <Card title="Program" desc="Where NopeWarden reads what the engine noticed.">
+      <Card title="Where it writes" desc="Where NopeWarden reads what the engine noticed. To remove the program, use Settings.">
         <p className="small">{data.engine?.text}</p>
         <p className="small muted">Watching: {(data.ports || []).length ? `port${data.ports.length === 1 ? '' : 's'} ${data.ports.join(', ')}` : 'no ports yet'}. {p.version ? `Version ${p.version}.` : ''}</p>
         <Field label="Log file" hint={`Leave empty to use ${data.default_eve}.`}><Input value={eve} onChange={setEve} className="in mono" /></Field>
         <div className="actions">
           <Button disabled={busy} onClick={() => run(() => put('/api/threat/settings', { eve_path: eve }), 'Saved.').then(reload)}>Save</Button>
-          {p.installed && <Button kind="danger" disabled={busy} onClick={() => setRemoving(true)}>Remove threat watching</Button>}
         </div>
       </Card>
       {resetting && (
         <Modal title="Reset all threat settings" onClose={() => setResetting(false)} footer={<><Button onClick={() => setResetting(false)}>Cancel</Button><Button kind="danger" disabled={busy} onClick={async () => { if (await run(() => post('/api/threat/reset'), 'Everything is back to the defaults.')) { setResetting(false); reload(); } }}>Reset everything</Button></>}>
           <p className="small">This puts back the Balanced setting, the standard limits and the standard groups of checks. It forgets every check you switched off, every check you allowed, and every device you told it never to check. Your alerts are kept, and your traffic is not affected.</p>
-        </Modal>
-      )}
-      {removing && (
-        <Modal title="Remove threat watching" onClose={() => setRemoving(false)} footer={<><Button onClick={() => setRemoving(false)}>Cancel</Button><Button kind="danger" disabled={busy} onClick={async () => { if (await run(() => post('/api/threat/remove'), 'Removing. This can take a minute.')) { setRemoving(false); reload(); } }}>Remove</Button></>}>
-          <p className="small">The program is switched off and removed. Your traffic is not affected. Your alerts and tuning are kept.</p>
         </Modal>
       )}
     </div>
@@ -358,6 +388,7 @@ function ThreatOverview({ data, goTab }) {
   const up = watching && ov.running && ov.since ? dur(now - ov.since) : '';
   const ser = (key) => h?.series?.[key] || [];
   const last = (key) => { const p = ser(key); return p.length ? p[p.length - 1][1] : null; };
+  const peakOf = (key) => Math.max(0, ...ser(key).map((p) => p[1]));
   const watched = last('threat.watched');
   const cpuTone = ov.cpu_now >= ov.cpu_limit * 0.9 ? 'bad' : ov.cpu_now >= ov.cpu_limit * 0.7 ? 'warn' : '';
   return (
@@ -372,10 +403,10 @@ function ThreatOverview({ data, goTab }) {
       <Card title="Over time" desc={range === '1h' ? 'Last hour' : range === '24h' ? 'Last 24 hours' : 'Last 7 days'}
         actions={<Segmented value={range} onChange={setRange} options={[{ value: '1h', label: '1 h' }, { value: '24h', label: '24 h' }, { value: '7d', label: '7 d' }]} />}>
         <div className="dns-cards">
-          <div className="stack gap1"><b className="small">Traffic on the watched ports</b>
-            <Chart series={[{ key: 'threat.watched', name: 'Traffic watched', color: 'var(--color-chart-series-1)', pts: ser('threat.watched') }]} from={h?.from || 0} to={h?.to || 1} kind="bits" height={110} compact label="Traffic on the watched ports" empty="Nothing saved yet. Points appear once watching has been on for a minute." /></div>
-          <div className="stack gap1"><b className="small">Processor used by the program (%)</b>
-            <Chart series={[{ key: 'threat.cpu', name: 'Processor', color: 'var(--color-chart-series-2)', pts: ser('threat.cpu') }]} from={h?.from || 0} to={h?.to || 1} unit="%" height={110} compact label="Processor used by the program" empty="Nothing saved yet. Points appear once watching has been on for a minute." /></div>
+          <div className="stack gap1"><div className="spread small"><b>Traffic on the watched ports</b><span className="muted">{peakOf('threat.watched') > 0 ? `peak ${fmtBits(peakOf('threat.watched'))}` : ''}</span></div>
+            <Chart series={[{ key: 'threat.watched', name: 'Traffic watched', color: 'var(--color-chart-series-1)', pts: ser('threat.watched') }]} from={h?.from || 0} to={h?.to || 1} kind="bits" height={150} label="Traffic on the watched ports" empty="Nothing saved yet. Points appear once watching has been on for a minute." /></div>
+          <div className="stack gap1"><div className="spread small"><b>Processor used by the program</b><span className="muted">{peakOf('threat.cpu') > 0 ? `peak ${fmt.d1(peakOf('threat.cpu'))} %` : ''}</span></div>
+            <Chart series={[{ key: 'threat.cpu', name: 'Processor', color: 'var(--color-chart-series-2)', pts: ser('threat.cpu') }]} from={h?.from || 0} to={h?.to || 1} unit="%" height={150} label="Processor used by the program" empty="Nothing saved yet. Points appear once watching has been on for a minute." /></div>
         </div>
       </Card>
       <div className="dns-cards">
@@ -413,38 +444,39 @@ function ThreatOverview({ data, goTab }) {
   );
 }
 
+// One line at the top of Overview that says where things stand and where to go next.
+function StatusLine({ data, goTab }) {
+  const p = data.program || {};
+  const watching = data.mode === 'watch';
+  const link = (label) => <button type="button" className="link" onClick={() => goTab('settings')}>{label}</button>;
+  if (p.state === 'installing' || p.state === 'removing') return <Note title={p.state === 'installing' ? 'Installing' : 'Removing'}>Working on it. The steps are under {link('Settings')}.</Note>;
+  if (!p.installed) return <Note>Threat watching is not installed. It is an extra program, installed only if you ask. Install it under {link('Settings')}.</Note>;
+  if (!watching) return data.paused_reason ? <Note tone="warn" title="NopeWarden switched watching off">{data.paused_reason} Your traffic was never held up. Switch it on again under {link('Settings')}.</Note> : <Note>Threat watching is off. Switch it on under {link('Settings')}.</Note>;
+  if (!p.running) return <Note tone={p.failing ? 'bad' : 'warn'} title={p.failing ? 'The program keeps failing' : 'The program is not running'}>{p.why} Your traffic is not affected.</Note>;
+  return <Note tone={data.engine?.state === 'missing' ? 'warn' : undefined}>{data.engine?.text}</Note>;
+}
+
 export default function Threats() {
-  const [tab, setTab] = useHashTab('protection', ['overview','alerts','settings','rules','advanced'], 'overview',2);
-  const [run, busy] = useAction();
+  const [tab, setTab] = useHashTab('threats', ['overview','alerts','settings','rules','advanced'], 'overview');
   const [fast, setFast] = useState(false);
   const { data, reload } = useData('/api/threat', { every: fast ? 1500 : 5000 });
-  const [pending, setPending] = useState(null); // the choice just made, shown at once while the program catches up
   const working = data?.program?.state === 'installing' || data?.program?.state === 'removing';
   useEffect(() => { setFast(!!working); }, [working]);
-  if (!data) return null;
-  const p = data.program || {};
-  if (!p.installed) return <InstallPrompt data={data} reload={reload} />;
-  const watching = data.mode === 'watch';
+  const p = data?.program || {};
+  const tabs = [{ value: 'overview', label: 'Overview' }, { value: 'alerts', label: 'Alerts' }, { value: 'settings', label: 'Settings' }, { value: 'rules', label: 'Rules' }, { value: 'advanced', label: 'Advanced' }];
   return (
-    <Card title="Threat watching" desc="Watches for infected devices, break-in attempts and probing, and tells you in plain words.">
-      <div className="stack">
-        <Segmented value={pending || data.mode} onChange={(v) => { if (v === data.mode || busy) return; setPending(v); run(() => put('/api/threat/settings', { mode: v }), v === 'watch' ? 'Watching is on.' : 'Watching is off.').then(reload).finally(() => setPending(null)); }} options={[{ value: 'off', label: 'Off' }, { value: 'watch', label: 'Watch and tell' }, { value: 'protect', label: 'Protect (not yet)', disabled: true }]} disabled={busy || p.state === 'installing' || p.state === 'removing'} />
-        {pending && (
-          <div className="inline small" role="status" aria-live="polite"><span className="spinner" aria-hidden="true" /><span><b>Working on it.</b> {pending === 'watch' ? 'Starting the watching program and checking its rules' : 'Stopping the watching program'}. <span className="muted">This can take a few seconds.</span></span></div>
-        )}
-        {data.paused_reason && !watching && <Note tone="warn" title="NopeWarden switched watching off">{data.paused_reason} Your traffic was never held up.</Note>}
-        {watching && !p.running && <Note tone={p.failing ? 'bad' : 'warn'} title={p.failing ? 'The program keeps failing' : 'The program is not running'}>{p.why} Your traffic is not affected. See Advanced, Program log, or Diagnostics in the left menu.</Note>}
-        {p.state === 'updating' && <Note>Updating the rules. {p.message}</Note>}
-        {p.state === 'failed' && <Note tone="warn">{p.message}</Note>}
-        <Note tone={data.engine?.state === 'missing' && watching ? 'warn' : undefined}>{data.engine?.text}</Note>
-        <p className="small muted">{data.blocking} {data.fail_open} {data.limits}</p>
-        <Tabs value={tab} onChange={setTab} tabs={[{ value: 'overview', label: 'Overview' }, { value: 'alerts', label: 'Alerts' }, { value: 'settings', label: 'Settings' }, { value: 'rules', label: 'Rules' }, { value: 'advanced', label: 'Advanced' }]} />
-        {tab === 'overview' && <ThreatOverview data={data} goTab={setTab} />}
-        {tab === 'alerts' && <Alerts data={data} reload={reload} />}
-        {tab === 'settings' && <Settings data={data} reload={reload} />}
-        {tab === 'rules' && <Rules data={data} reload={reload} goSettings={() => setTab('settings')} />}
-        {tab === 'advanced' && <Advanced data={data} reload={reload} />}
-      </div>
-    </Card>
+    <Page title="Threats" sub="Watches for infected devices, break-in attempts and probing, and tells you in plain words.">
+      <Tabs value={tab} onChange={setTab} tabs={tabs} />
+      {data && (
+        <div className="stack">
+          {tab === 'overview' && <><StatusLine data={data} goTab={setTab} />{p.installed && !working && <ThreatOverview data={data} goTab={setTab} />}</>}
+          {tab === 'settings' && <Settings data={data} reload={reload} />}
+          {tab !== 'overview' && tab !== 'settings' && !p.installed && <Note>Threat watching is not installed yet. Install it under <button type="button" className="link" onClick={() => setTab('settings')}>Settings</button>.</Note>}
+          {p.installed && tab === 'alerts' && <Alerts data={data} reload={reload} />}
+          {p.installed && tab === 'rules' && <Rules data={data} reload={reload} goSettings={() => setTab('settings')} />}
+          {p.installed && tab === 'advanced' && <Advanced data={data} reload={reload} />}
+        </div>
+      )}
+    </Page>
   );
 }

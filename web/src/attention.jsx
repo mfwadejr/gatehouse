@@ -61,7 +61,7 @@ export function AttentionProvider({ children }) {
     const warn = (sec?.items || []).filter((i) => i.level === 'warn').length;
     if (bad) add('bad', 'security', `Security check: ${bad} to fix now${warn ? `, ${warn} worth fixing` : ''}`, 'Open Protection to see what and how to fix it.', 'protection');
     else if (warn) add('warn', 'security', `Security check: ${warn} worth fixing`, 'Open Protection to see what and how to fix it.', 'protection');
-    if (ov?.threat_alerts_24h > 0) add('warn', 'threat', `Threat watching raised ${ov.threat_alerts_24h} alert${ov.threat_alerts_24h === 1 ? '' : 's'} in the last day`, `${ov.threat_devices_24h || 1} device${ov.threat_devices_24h === 1 ? '' : 's'} involved. Open Protection to look.`, 'protection');
+    if (ov?.threat_alerts_24h > 0) add('warn', 'threat', `Threat watching raised ${ov.threat_alerts_24h} alert${ov.threat_alerts_24h === 1 ? '' : 's'} in the last day`, `${ov.threat_devices_24h || 1} device${ov.threat_devices_24h === 1 ? '' : 's'} involved. Open Threats to look.`, 'threats/alerts');
     if (setup?.items?.length && setup.left > 0) add('info', 'setup', `Finish setting up: ${setup.items.length - setup.left} of ${setup.items.length} done`, 'You can do these in any order.', 'settings');
     const byPage = {};
     a.forEach((x) => { if (!byPage[x.to] || RANK[x.level] > RANK[byPage[x.to]]) byPage[x.to] = x.level; });
@@ -76,7 +76,7 @@ export function AttentionProvider({ children }) {
 export const levelText = { bad: 'Something is broken', warn: 'Needs you', info: 'A suggestion' };
 
 // The words for where an item's "Open" goes (the left menu's names).
-export const pageLabel = { internet: 'Internet', networks: 'Networks', firewall: 'Firewall', review: 'Review', dhcp: 'DHCP', vpn: 'VPN', dns: 'DNS', settings: 'Settings', protection: 'Protection' };
+export const pageLabel = { internet: 'Internet', networks: 'Networks', firewall: 'Firewall', review: 'Review', dhcp: 'DHCP', vpn: 'VPN', dns: 'DNS', settings: 'Settings', protection: 'Protection', threats: 'Threats' };
 
 // Short fingerprint of what an item says, so a dismissed suggestion comes back when its wording changes.
 const sigOf = (it) => { let h = 5381; const t = `${it.t}|${it.s}`; for (let i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0; return h.toString(36); };

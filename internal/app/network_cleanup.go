@@ -36,6 +36,7 @@ type removalImpact struct {
 	Scopes     []removalScope `json:"scopes"`
 	OtherPorts []string       `json:"other_ports,omitempty"`
 	Kept       string         `json:"kept,omitempty"` // why the firewall network stays, in plain words
+	Blocks     []string       `json:"blocks,omitempty"` // blocks that apply to this network and will lose it
 }
 
 func scopesWhere(q sqlq, where string, args ...any) []removalScope {
@@ -145,6 +146,9 @@ func (a *App) networkCleanupRoutes(s *api.Server) {
 			fail(w, err)
 			return
 		}
+		if imp.RemoveZone {
+			imp.Blocks = a.blocksUsing("network", imp.Zone)
+		}
 		api.JSON(w, 200, imp)
 	})
 	s.Handle("GET /api/fw/zones/{id}/removal", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
@@ -158,6 +162,7 @@ func (a *App) networkCleanupRoutes(s *api.Server) {
 			fail(w, err)
 			return
 		}
+		imp.Blocks = a.blocksUsing("network", imp.Zone)
 		api.JSON(w, 200, imp)
 	})
 }

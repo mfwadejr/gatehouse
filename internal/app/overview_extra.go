@@ -116,7 +116,7 @@ func (a *App) registerHomeAndHappened() {
 			k := fmt.Sprintf("%s|%v", g.Title, g.Quiet)
 			f := folds[k]
 			if f == nil {
-				it := happenedItem{TS: g.Last, Severity: "warning", Title: g.Title, To: "protection"}
+				it := happenedItem{TS: g.Last, Severity: "warning", Title: g.Title, To: "threats/alerts"}
 				if g.Quiet {
 					it.Severity, it.Tag = "info", "info"
 				}

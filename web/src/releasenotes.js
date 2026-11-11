@@ -1,6 +1,16 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.17',
+    title: 'Threats gets its own page, and blocks hold many things',
+    items: [
+      'Threats is now its own item in the menu, with the tabs Overview, Alerts, Settings, Rules and Advanced. The Overview opens with a one-line status and the numbers; the Off / Watch switch, the explanation and the install and remove buttons moved to Settings. The charts now have axes, a peak figure and a legend, like the DNS page. Old links to Protection, Threats still work.',
+      'A block can now have a name and hold many apps, categories and websites at once, and apply to everyone or to any mix of networks, profiles and devices, with one How, one When and one on/off switch. Without a name it is named for you, such as "Block Facebook and 3 more". Your existing blocks became blocks of one automatically.',
+      'Exceptions are their own list. The Blocks page has starting points (Social media, Streaming, Gaming, AI chat) and shows how many lookups each block refused in the last day.',
+      'Removing a network, profile or device now takes it out of the blocks that used it, and the question tells you which blocks are affected. Blocks are part of backups and restores.',
+    ],
+  },
+  {
     version: '0.9.4.16',
     title: 'Threat watching recovers after a failed start',
     items: [

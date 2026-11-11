@@ -82,6 +82,7 @@ func (a *App) registerFWRoutes() {
 			a.DHCP.Reload()
 			a.publishLeases()
 		}
+		a.pruneBlockTargets()
 		a.markDirty()
 		api.JSON(w, 200, imp)
 	})

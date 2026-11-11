@@ -4,12 +4,13 @@ import { del, post, put, useData } from '../api.js';
 import { Button, Card, Empty, Field, Input, Modal, Note, Pill, Segmented, Select, ToggleRow, useAction, useUndoDelete, fmt, Limited } from '../ui.jsx';
 import { PolicyControls } from '../policykit.jsx';
 
-// Block an app, a category or a website name for everyone, a network, a profile or one device, always
-// or on a schedule. Today the blocking works by name. Thorough checking is shown but not on yet.
+// A block is a named list of apps, categories and websites that applies to everyone or to a chosen
+// list of networks, profiles and devices, with one How, one When and one on/off switch. Exceptions
+// are blocks of their own that let things through. Today the blocking works by name.
 
-const blockBody = (r) => ({ kind: r.kind, value: r.value, scope: r.scope, target: r.target, allow: r.allow, method: r.method, schedule: r.schedule, enabled: r.enabled });
+const blockBody = (r) => ({ name: r.name, items: r.items.map(({ kind, value }) => ({ kind, value })), targets: r.targets.map(({ scope, target }) => ({ scope, target })), allow: r.allow, method: r.method, schedule: r.schedule, enabled: r.enabled });
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const STATUS = { blocking: ['Blocking', 'bad'], allowing: ['Allowed', 'good'], paused: ['Paused', 'warn'], off: ['Off', ''], 'outside hours': ['Not in its hours', ''], waiting: ['Waiting', 'warn'] };
+const STATUS = { blocking: ['Blocking', 'bad'], allowing: ['Allowed', 'good'], paused: ['Paused', 'warn'], off: ['Off', ''], 'outside hours': ['Not in its hours', ''], waiting: ['Waiting', 'warn'], nowhere: ['Applies nowhere', 'warn'] };
 
 function parseSchedule(s) { try { return s ? JSON.parse(s) : { mode: 'always' }; } catch { return { mode: 'always' }; } }
 
@@ -31,8 +32,31 @@ function TopicNames({ topic, onClose }) {
   );
 }
 
-function BlockForm({ initial, data, onClose, onSaved }) {
-  const [f, setF] = useState({ kind: 'app', value: '', scope: 'everyone', target: '', allow: false, method: 'fast', enabled: true, ...initial });
+
+// Starting points: each fills the form with a sensible list the person can change before saving.
+const STARTERS = [
+  { name: 'Social media', apps: ['Facebook', 'Instagram', 'TikTok', 'Snapchat', 'X', 'Twitter', 'Reddit', 'Pinterest'], topics: [] },
+  { name: 'Streaming', apps: [], topics: ['cat:Video', 'cat:Music'] },
+  { name: 'Gaming', apps: [], topics: ['cat:Games'] },
+  { name: 'AI chat', apps: [], topics: ['cat:AI'] },
+];
+
+const chip = (on, label, click, key) => <Button key={key || label} small kind={on ? 'primary' : undefined} onClick={click}>{label}</Button>;
+const toggle = (list, v) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
+
+function BlockForm({ initial, data, allow, onClose, onSaved }) {
+  const items0 = initial?.items || [];
+  const tg0 = initial?.targets || [];
+  const [name, setName] = useState(initial?.name || '');
+  const [apps, setApps] = useState(items0.filter((i) => i.kind === 'app').map((i) => i.value));
+  const [topics, setTopics] = useState(items0.filter((i) => i.kind === 'topic').map((i) => i.value));
+  const [sites, setSites] = useState(items0.filter((i) => i.kind === 'name').map((i) => i.value).join('\n'));
+  const [everyone, setEveryone] = useState(tg0.some((t) => t.scope === 'everyone') || (!tg0.length && !initial?.id));
+  const [nets, setNets] = useState(tg0.filter((t) => t.scope === 'network').map((t) => t.target));
+  const [profs, setProfs] = useState(tg0.filter((t) => t.scope === 'profile').map((t) => t.target));
+  const [devs, setDevs] = useState(tg0.filter((t) => t.scope === 'device').map((t) => t.target.toLowerCase()));
+  const [method, setMethod] = useState(initial?.method || 'fast');
+  const [enabled, setEnabled] = useState(initial ? initial.enabled !== false : true);
   const sc0 = parseSchedule(initial?.schedule);
   const [sc, setSc] = useState({ mode: sc0.mode || 'always', from: sc0.from || '21:00', to: sc0.to || '07:00', days: sc0.days || [1, 2, 3, 4, 5] });
   const [q, setQ] = useState('');
@@ -42,54 +66,62 @@ function BlockForm({ initial, data, onClose, onSaved }) {
   const { data: ch } = useData('/api/vpn/choices');
   const { data: ov } = useData('/api/fw/overview');
   const networks = (ov?.matrix_zones || []).map((z) => z.name);
-  const apps = (data?.apps || []).filter((a) => !q || a.name.toLowerCase().includes(q.toLowerCase()));
+  const shownApps = (data?.apps || []).filter((a) => !q || a.name.toLowerCase().includes(q.toLowerCase())).sort((x, y) => Number(apps.includes(y.name)) - Number(apps.includes(x.name)));
   const schedule = sc.mode === 'always' ? '' : JSON.stringify(sc.mode === 'daily' ? { mode: 'daily', from: sc.from, to: sc.to } : { mode: 'weekly', from: sc.from, to: sc.to, days: sc.days });
-  const targets = f.scope === 'network' ? networks.map((n) => ({ value: n, label: n }))
-    : f.scope === 'profile' ? (groups || []).map((g) => ({ value: String(g.id), label: g.name }))
-      : f.scope === 'device' ? (ch?.devices || []).map((d) => ({ value: d.mac.toLowerCase(), label: d.name })) : [];
-  const ready = f.value.trim() && (f.scope === 'everyone' || f.target);
-  const save = async () => { if (await run(() => put('/api/blocks', { ...f, schedule }), 'Saved.')) { onSaved(); onClose(); } };
+  const siteList = sites.split(/[\s,]+/).map((x) => x.trim()).filter(Boolean);
+  const items = [...apps.map((v) => ({ kind: 'app', value: v })), ...topics.map((v) => ({ kind: 'topic', value: v })), ...siteList.map((v) => ({ kind: 'name', value: v }))];
+  const targets = everyone ? [{ scope: 'everyone', target: '' }] : [...nets.map((t) => ({ scope: 'network', target: t })), ...profs.map((t) => ({ scope: 'profile', target: t })), ...devs.map((t) => ({ scope: 'device', target: t }))];
+  const ready = items.length > 0 && targets.length > 0;
+  const noun = allow ? 'exception' : 'block';
+  const save = async () => { if (await run(() => put('/api/blocks', { id: initial?.id || 0, name, items, targets, allow, method, schedule, enabled }), 'Saved.')) { onSaved(); onClose(); } };
   return (
-    <Modal title={initial?.id ? 'Edit' : (f.allow ? 'Allow an exception' : 'Block something')} onClose={onClose}
+    <Modal title={initial?.id ? `Edit this ${noun}` : (allow ? 'Add an exception' : 'Add a block')} onClose={onClose}
       footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" onClick={save} disabled={busy || !ready}>Save</Button></>}>
       <div className="stack">
-        <Field label="What">
-          <Segmented value={f.kind} onChange={(v) => setF({ ...f, kind: v, value: '' })} options={[{ value: 'app', label: 'An app' }, { value: 'topic', label: 'A category' }, { value: 'name', label: 'A website' }]} />
+        <Field label="Name" hint={`Optional. Left empty, NopeWarden names it from what it ${allow ? 'allows' : 'blocks'}.`}>
+          <Input value={name} onChange={setName} placeholder={allow ? 'For example: Homework sites' : 'For example: Bedtime'} aria-label="Name" />
         </Field>
-        {f.kind === 'app' && (
-          <Field label="Which app" hint={f.value ? `Chosen: ${f.value}` : 'Search, then tap one.'}>
-            <div className="stack">
-              <Input value={q} onChange={setQ} placeholder="Search apps" aria-label="Search apps" />
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', maxHeight: '10rem', overflow: 'auto' }}>
-                {apps.map((a) => <Button key={a.name} small kind={f.value === a.name ? 'primary' : undefined} onClick={() => setF({ ...f, value: a.name })}>{a.name}</Button>)}
-              </div>
+        <Field label={allow ? 'What to let through' : 'What to block'} hint={`${items.length} chosen. Mix apps, categories and websites in one ${noun}.`}>
+          <div className="stack">
+            <Input value={q} onChange={setQ} placeholder="Search apps" aria-label="Search apps" />
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', maxHeight: '10rem', overflow: 'auto' }}>
+              {shownApps.map((a) => chip(apps.includes(a.name), a.name, () => setApps(toggle(apps, a.name))))}
             </div>
-          </Field>
-        )}
-        {f.kind === 'topic' && (
-          <Field label="Which category" hint="Each category is a list NopeWarden downloads and keeps up to date.">
-            <div className="stack">
-              {(data?.topics || []).map((t) => (
-                <label key={t.key} className="small" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-                  <input type="radio" name="topic" checked={f.value === t.key} onChange={() => setF({ ...f, value: t.key })} /> <span><strong>{t.name}</strong> · {t.descr}</span>
-                  {!t.key.startsWith('cat:') && <button type="button" className="link small" onClick={(e) => { e.preventDefault(); setBrowse(t); }}>View names</button>}
-                </label>
-              ))}
-            </div>
-          </Field>
-        )}
-        {f.kind === 'name' && <Field label="Website name" hint="Such as games.example.com. Blocks it and anything under it."><Input value={f.value} onChange={(v) => setF({ ...f, value: v })} className="in mono" /></Field>}
-        <Field label="For whom">
-          <Segmented value={f.scope} onChange={(v) => setF({ ...f, scope: v, target: '' })} options={[{ value: 'everyone', label: 'Everyone' }, { value: 'network', label: 'A network' }, { value: 'profile', label: 'A profile' }, { value: 'device', label: 'One device' }]} />
+          </div>
         </Field>
-        {f.scope !== 'everyone' && <Select value={f.target} onChange={(v) => setF({ ...f, target: v })} options={[{ value: '', label: 'Choose…' }, ...targets]} />}
-        <ToggleRow title="This is an exception" desc="Lets this app, category or website through for the chosen device, network or profile, even if a block elsewhere says no." checked={f.allow} onChange={(v) => setF({ ...f, allow: v })} />
+        <Field label="Categories" hint="Each category is a list NopeWarden downloads and keeps up to date.">
+          <div className="stack">
+            {(data?.topics || []).map((t) => (
+              <label key={t.key} className="small" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+                <input type="checkbox" checked={topics.includes(t.key)} onChange={() => setTopics(toggle(topics, t.key))} /> <span><strong>{t.name}</strong> · {t.descr}</span>
+                {!t.key.startsWith('cat:') && <button type="button" className="link small" onClick={(e) => { e.preventDefault(); setBrowse(t); }}>View names</button>}
+              </label>
+            ))}
+          </div>
+        </Field>
+        <Field label="Websites" hint="One per line, such as games.example.com. Each one covers everything under it.">
+          <textarea className="in mono" rows={3} value={sites} onChange={(e) => setSites(e.target.value)} aria-label="Websites" />
+        </Field>
+        <Field label="Where it applies">
+          <div className="stack">
+            <ToggleRow title="Everyone" desc="Every device behind NopeWarden." checked={everyone} onChange={setEveryone} />
+            {!everyone && (
+              <>
+                {networks.length > 0 && <Field label="Networks"><div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>{networks.map((n) => chip(nets.includes(n), n, () => setNets(toggle(nets, n))))}</div></Field>}
+                {(groups || []).length > 0 && <Field label="Profiles"><div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>{(groups || []).map((g) => chip(profs.includes(String(g.id)), g.name, () => setProfs(toggle(profs, String(g.id))), `g${g.id}`))}</div></Field>}
+                {(ch?.devices || []).length > 0 && <Field label="Devices"><div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', maxHeight: '8rem', overflow: 'auto' }}>{(ch.devices || []).map((d) => chip(devs.includes(d.mac.toLowerCase()), d.name, () => setDevs(toggle(devs, d.mac.toLowerCase())), d.mac))}</div></Field>}
+                <p className="small muted">Choose as many networks, profiles and devices as you like.</p>
+              </>
+            )}
+          </div>
+        </Field>
         <Field label="How">
           <div className="stack">
-            <label className="small" style={{ display: 'flex', gap: 'var(--space-2)' }}><input type="radio" name="method" checked={f.method === 'fast'} onChange={() => setF({ ...f, method: 'fast' })} /> <span><strong>Option A: By name (fast)</strong>. NopeWarden refuses the app's website names. No slowdown. It can miss an app that uses its own private DNS, or a call already in progress.</span></label>
-            <label className="small" style={{ display: 'flex', gap: 'var(--space-2)' }}><input type="radio" name="method" checked={f.method === 'thorough'} onChange={() => setF({ ...f, method: 'thorough' })} /> <span><strong>Option B: Thorough</strong>. Looks at the traffic itself. Catches more but can be slower.</span></label>
-            <label className="small" style={{ display: 'flex', gap: 'var(--space-2)' }}><input type="radio" name="method" checked={f.method === 'both'} onChange={() => setF({ ...f, method: 'both' })} /> <span><strong>Both</strong>. By name now, and thorough as well once it is on.</span></label>
-            {f.method !== 'fast' && <Note tone="warn">{data?.inspection?.note}</Note>}
+            <label className="small" style={{ display: 'flex', gap: 'var(--space-2)' }}><input type="radio" name="method" checked={method === 'fast'} onChange={() => setMethod('fast')} /> <span><strong>Option A: By name (fast)</strong>. NopeWarden refuses the app's website names. No slowdown. It can miss an app that uses its own private DNS, or a call already in progress.</span></label>
+            <label className="small" style={{ display: 'flex', gap: 'var(--space-2)' }}><input type="radio" name="method" checked={method === 'thorough'} onChange={() => setMethod('thorough')} /> <span><strong>Option B: Thorough</strong>. Looks at the traffic itself. Catches more but can be slower.</span></label>
+            <label className="small" style={{ display: 'flex', gap: 'var(--space-2)' }}><input type="radio" name="method" checked={method === 'both'} onChange={() => setMethod('both')} /> <span><strong>Both</strong>. By name now, and thorough as well once it is on.</span></label>
+            {method !== 'fast' && <Note tone="warn">{data?.inspection?.note}</Note>}
+            {method !== 'fast' && (topics.length > 0 || siteList.length > 0) && <p className="small muted">Thorough checking applies to the apps in this {noun}. Categories and websites are always done by name.</p>}
             <p className="small muted">If either way fails, nothing is blocked. A fault never cuts a device off.</p>
           </div>
         </Field>
@@ -109,48 +141,69 @@ function BlockForm({ initial, data, onClose, onSaved }) {
             )}
           </div>
         )}
-        <ToggleRow title="Turned on" checked={f.enabled} onChange={(v) => setF({ ...f, enabled: v })} />
+        <ToggleRow title="Turned on" checked={enabled} onChange={setEnabled} />
       </div>
       {browse && <TopicNames topic={browse} onClose={() => setBrowse(null)} />}
     </Modal>
   );
 }
 
-export default function Blocks() {
-  const { data, reload } = useData('/api/blocks', { every: 15000 });
-  const [edit, setEdit] = useState(() => (hashQuery('new') ? {} : null));
-  useEffect(() => { if (hashQuery('new')) setHashQuery('new', ''); }, []);
+function BlockList({ title, desc, rows, empty, allow, data, reload, setEdit, extra }) {
   const [run, busy] = useAction();
   const undoDelete = useUndoDelete();
-  const rules = data?.rules || [];
-  useWantedEdit(data && rules, (r, w) => String(r.id) === w, setEdit);
   return (
-    <Card title="Block apps, categories and websites" desc="Choose what to block and for whom: everyone, a network, a profile or one device. Add hours if you like."
-      actions={<Button small icon="plus" onClick={() => setEdit({})}>Add a block</Button>}>
-      <Note>If anything goes wrong, nothing is blocked. A fault never cuts a device off.</Note>
+    <Card title={title} desc={desc} actions={<Button small icon="plus" onClick={() => setEdit({ allow })}>{allow ? 'Add an exception' : 'Add a block'}</Button>}>
+      {extra}
       <div className="list">
-        {<Limited items={rules} noun="blocks" render={(r) => {
+        <Limited items={rows} noun={allow ? 'exceptions' : 'blocks'} render={(r) => {
           const [word, tone] = STATUS[r.status] || [r.status, ''];
           return (
             <div className="item" key={r.id}>
               <div className="fill">
-                <div className="name">{r.text} <Pill tone={tone}>{word}</Pill></div>
-                <div className="meta">{r.when}{r.method === 'thorough' ? ' · thorough, waiting for it to be switched on' : r.method === 'both' ? ' · by name now, thorough once it is on' : ' · by name'}</div>
+                <div className="name">{r.title} <Pill tone={tone}>{word}</Pill></div>
+                <div className="meta">{[r.what, r.where, r.when, r.method === 'thorough' ? 'thorough, waiting for it to be switched on' : r.method === 'both' ? 'by name now, thorough once it is on' : 'by name', !allow && r.recent ? `${fmt.n(r.recent)} refused in the last day` : ''].filter(Boolean).join(' · ')}</div>
               </div>
               <div className="actions">
-                <PolicyControls name={r.name || 'this block'} enabled={r.enabled} pausedUntil={r.paused_until} busy={busy}
+                <PolicyControls name={r.title} enabled={r.enabled} pausedUntil={r.paused_until} busy={busy}
                   onPause={(m) => run(() => post(`/api/blocks/${r.id}/pause`, { minutes: m }), m === 0 ? 'Resumed.' : 'Paused.').then(reload)}
                   onToggle={() => run(() => post(`/api/blocks/${r.id}/enable`, { enabled: !r.enabled })).then(reload)}
                   onEdit={() => setEdit(r)}
-                  onRemove={() => undoDelete('The block', () => del(`/api/blocks/${r.id}`), () => put('/api/blocks', blockBody(r)), reload)} />
+                  onRemove={() => undoDelete(allow ? 'The exception' : 'The block', () => del(`/api/blocks/${r.id}`), () => put('/api/blocks', blockBody(r)), reload)} />
               </div>
             </div>
           );
-        }} />}
-        {data && !rules.length && <Empty>Nothing is blocked this way yet.</Empty>}
+        }} />
+        {data && !rows.length && <Empty>{empty}</Empty>}
       </div>
-      <p className="small muted">{data?.inspection?.note} {data?.fail_open}</p>
-      {edit && <BlockForm initial={edit} data={data} onClose={() => setEdit(null)} onSaved={reload} />}
     </Card>
+  );
+}
+
+export default function Blocks() {
+  const { data, reload } = useData('/api/blocks', { every: 15000 });
+  const [edit, setEdit] = useState(() => (hashQuery('new') ? { allow: false } : null));
+  useEffect(() => { if (hashQuery('new')) setHashQuery('new', ''); }, []);
+  const sets = data?.blocks || [];
+  useWantedEdit(data && sets, (r, w) => String(r.id) === w, setEdit);
+  const blocks = sets.filter((s) => !s.allow);
+  const exceptions = sets.filter((s) => s.allow);
+  const known = new Set((data?.apps || []).map((a) => a.name));
+  const start = (s) => setEdit({ allow: false, name: s.name, enabled: true, method: 'fast', items: [...s.apps.filter((n) => known.has(n)).map((value) => ({ kind: 'app', value })), ...s.topics.map((value) => ({ kind: 'topic', value }))], targets: [] });
+  return (
+    <div className="stack">
+      <BlockList title="Blocks" desc="Each block is a named list of apps, categories and websites, kept away from everyone or from the networks, profiles and devices you choose, always or on a schedule."
+        rows={blocks} empty="Nothing is blocked this way yet." allow={false} data={data} reload={reload} setEdit={setEdit}
+        extra={<>
+          <Note>If anything goes wrong, nothing is blocked. A fault never cuts a device off.</Note>
+          <div className="small" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', flexWrap: 'wrap', marginBottom: 'var(--space-3)' }}>
+            <span className="muted">Start from:</span>
+            {STARTERS.map((s) => <Button key={s.name} small onClick={() => start(s)}>{s.name}</Button>)}
+          </div>
+        </>} />
+      <BlockList title="Exceptions" desc="Things to let through for a device, profile or network even when a block says no."
+        rows={exceptions} empty="No exceptions." allow data={data} reload={reload} setEdit={setEdit} />
+      <p className="small muted">{data?.inspection?.note} {data?.fail_open}</p>
+      {edit && <BlockForm initial={edit} allow={!!edit.allow} data={data} onClose={() => setEdit(null)} onSaved={reload} />}
+    </div>
   );
 }

@@ -1,46 +1,33 @@
 # Protection
 
 ## What it is for
-One place for keeping the network safe: a check of what to fix, blocking apps and categories, and watching for threats. Block lists for ads, trackers and adult sites stay under DNS.
+One place for keeping the network safe: a check of what to fix, and blocking apps, categories and websites. Watching for threats has its own page, Threats. Block lists for ads, trackers and adult sites stay under DNS.
 
 ## What is on the page
 Tabs along the top:
 - **Overview**: **Protection at a glance** gives one sentence of verdict and a line each for the security check, your blocks and threat watching. Below it, the **Security check** lists what to fix, with a button that goes to the right page.
-- **Blocks**: **Block apps, categories and websites**. **Add a block** chooses what to block (an app, a category such as adult, gambling or games, or a website), for whom (everyone, a network, a profile or one device), and when (always or at set hours). A device can be given an exception, and **Pause…** stops a block for a set time or until you resume it. Blocks have the same controls as firewall rules and routes: pause, turn off, edit, remove.
-- **Threats**: **Threat watching**. Until you install it, the page offers **Install threat watching** and tells you the packages, the download size, the disk space and any worry about this machine's memory or processor before you agree. While it installs (or is removed), a ticked list shows the step it is on. Once installed: the switch **Off** or **Watch and tell** (it moves as soon as you click and says what it is doing), and the tabs **Overview**, **Alerts**, **Settings**, **Rules** and **Advanced**.
-  - **Overview** shows what the program is doing: **Status**, **Traffic watched** (on the watched ports), **Load on this machine** (processor and memory against their limits), **Rules** (how many are loaded, when they were updated and when the next update is due) and **Alerts** (last hour, day and week). Below are charts for the last hour, day or week, **What was seen** (alerts by kind), **Devices involved**, and **What it has been doing** (rule updates, switch-offs and changes).
-  - **Alerts** show what was noticed in plain words, named after the device (the name you gave it, or its network name). The same thing happening many times is one row with a count. Harmless engine chatter is kept in a folded section at the bottom. Each row has **Allow for this device**, **Allow for all** and **Never check this device**.
-  - **Settings** has **How closely to watch** (Light, Balanced, Strict or Custom) and **Limits** for the processor and memory. **Custom** appears once you change a group under Rules; **Restore defaults** goes back to the setting's own groups.
-  - **Rules** has **Update rules now**, **Roll back to the previous rules**, **Groups of checks** and **Single checks**. Each group has a plain description. Switch groups on or off, then press **Apply**; nothing changes until you do, and **Discard** drops your changes.
-  - **Advanced** has **Reset all threat settings**, **Program log** (the last lines the program wrote, the first place to look when it is not running), **Allowed checks**, **Devices never checked**, **Save or load your tuning**, and **Program**, where **Remove threat watching** is.
+- **Blocks**: the **Blocks** card lists one row per block: its name, what it holds, where it applies, when, how, and how many lookups it refused in the last day. **Add a block** takes an optional name and lets you choose many apps, categories and websites in one block, then where it applies (everyone, or any mix of networks, profiles and devices), how, and when (always or at set hours). **Start from** fills the form with Social media, Streaming, Gaming or AI chat, ready to change. **Pause…** stops a block for a set time or until you resume it. Blocks have the same controls as firewall rules and routes: pause, turn off, edit, remove.
+- **Exceptions** is a separate card. **Add an exception** lets things through for a device, profile or network even when a block says no.
+- Threat watching has its own page, **Threats**, in the left menu under Security.
 
 ## Common tasks
 1. See what needs fixing: **Overview**, read the **Security check**, press the button beside a risk.
-2. Block an app for a child's device: **Blocks**, **Add a block**, choose the app, choose the device, choose the hours, **Save**.
-3. Turn on threat watching: **Threats**, **Install threat watching**, read the sizes, **Install**. When it finishes, choose **Watch and tell**.
-4. Quiet a harmless alert: **Alerts**, **Allow for this device**.
-5. Lower its load on a small machine: **Threats**, **Settings**, choose **Light**, or lower the **Limits**.
-6. Make your own set: **Threats**, **Rules**, switch groups, **Apply**. To undo, **Settings**, **Restore defaults**.
-7. Go back after a bad rule update: **Threats**, **Rules**, **Roll back to the previous rules**.
+2. Block several apps for a child's devices: **Blocks**, **Add a block**, give it a name, choose the apps, choose the devices, choose the hours, **Save**.
+3. Let one device keep an app: **Exceptions**, **Add an exception**, choose the app and the device, **Save**.
 
 ## What happens if something goes wrong
-These features only add protection. If they fail, the protection goes and your internet carries on: your traffic is never held up.
-- A block that cannot be worked out lets the lookup through, and the Logs say so once an hour.
-- Threat watching reads copies of the traffic. If it stops, crashes or is removed, nothing changes for your devices. If it uses all of its processor share for ten minutes, NopeWarden switches it off by itself, says why on this page and in the Logs, and leaves it off until you switch it on again.
-- Blocking threats (**Protect**) is not available. It stays off until watching has proved itself on real traffic.
-- Most traffic is encrypted, so watching finds known bad servers and attack patterns, not everything.
-
-## Example
-A new camera starts talking to an address on a bad list. The **Threats** tab shows "A device may be infected and talking to a known bad server", with the camera's name. You unplug it, or choose **Never check this device** if you know it is fine.
+These features only add protection. If they fail, the protection goes and your internet carries on: your traffic is never held up. A block that cannot be worked out lets the lookup through, and the Logs say so once an hour.
 
 ## If something goes wrong
-If the page says **The program keeps failing**, the program starts and stops again and again; read the reason, then **Program log** under **Advanced** (or Diagnostics in the left menu). If **Install threat watching** fails, the page shows the reason; try again once the internet works and there is disk space. If the page says the program is not running, your traffic is not affected and NopeWarden keeps trying to start it. If it keeps stopping, choose **Light** under **Settings**. If a rule update breaks things, use **Roll back to the previous rules**.
+If a block does not seem to work, check that it is switched on and that the device uses NopeWarden for DNS. Blocking by name cannot catch an app that uses its own private DNS; choose both ways to cover more. Problems with threat watching are on the Threats page.
 
 ## Names inside a category, and your own names per profile
 - **View names** next to a category shows the names it blocks. Search, and allow a name that should not be blocked.
 - Each profile can have its own **custom blocked names**.
-- **Threat alerts** look up the name behind an address and try again if the first lookup finds nothing; **Look up again** retries now.
 - **Security check**: each fix button opens the exact window that changes the setting.
+
+## Removing things a block uses
+When you remove a network, a profile or a device, it also leaves the blocks that used it. The removal question names those blocks first. A block left with no place shows **Applies nowhere** until you choose one.
 
 ## Deleting a block
 Delete removes the block at once and shows an Undo button for a few seconds. Nothing asks "Are you sure?".
