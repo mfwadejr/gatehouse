@@ -380,7 +380,11 @@ func ifaceOf(clientIP string) string {
 // sessionSafe reports whether the administrator's own connection keeps management access.
 // checked is false when the client's interface cannot be determined or is the local loopback.
 func sessionSafe(m *fw.Model, clientIP string) (checked, safe bool, iface string) {
-	iface = ifaceOf(clientIP)
+	return sessionSafeVia(m, ifaceOf(clientIP), clientIP)
+}
+
+// sessionSafeVia is sessionSafe for a known interface.
+func sessionSafeVia(m *fw.Model, iface, clientIP string) (checked, safe bool, _ string) {
 	if m.BridgeOn() {
 		// In bridge mode the console is reached through the bridge; the bridge setup checks its own safety.
 		return false, true, iface
@@ -407,6 +411,21 @@ func sessionSafe(m *fw.Model, clientIP string) (checked, safe bool, iface string
 	return true, false, iface
 }
 
+// sessionSafe is the check above plus the management port: a connection through the port set aside
+// for managing this device keeps working, because that port is not part of any network, as long as
+// the limit on who may manage (if there is one) allows the address.
+func (a *App) sessionSafe(m *fw.Model, clientIP string) (checked, safe bool, iface string) {
+	return a.sessionSafeVia(m, ifaceOf(clientIP), clientIP)
+}
+
+func (a *App) sessionSafeVia(m *fw.Model, iface, clientIP string) (checked, safe bool, _ string) {
+	checked, safe, iface = sessionSafeVia(m, iface, clientIP)
+	if checked && !safe && iface != "" && iface == a.mgmtCfg().Iface {
+		safe = len(m.MgmtAllow) == 0 || inRanges(m.MgmtAllow, clientIP)
+	}
+	return
+}
+
 // fwPreview says what would change and whether it is safe, without touching anything.
 func (a *App) fwPreview(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 	m, script, err := a.currentRuleset()
@@ -422,7 +441,7 @@ func (a *App) fwPreview(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		}
 	}
 	// Simulation: the administrator's own connection must still be able to manage the device.
-	if checked, safe, ifc := sessionSafe(m, c.IP); checked {
+	if checked, safe, ifc := a.sessionSafe(m, c.IP); checked {
 		res["you_stay_connected"] = safe
 		if !safe {
 			res["ok"] = false
@@ -459,7 +478,7 @@ func (a *App) fwApply(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		return
 	}
 	// Refuse changes that would cut off this very session.
-	if checked, safe, _ := sessionSafe(m, c.IP); checked && !safe {
+	if checked, safe, _ := a.sessionSafe(m, c.IP); checked && !safe {
 		fail(w, errors.New("this change would disconnect you; it was not applied"))
 		return
 	}

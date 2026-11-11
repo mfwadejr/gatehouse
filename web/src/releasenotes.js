@@ -1,6 +1,13 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.23',
+    title: 'Applying changes through the management port',
+    items: [
+      'Fixed: when the console was opened through the management port, Review refused Verify and commit and said the connection would no longer be allowed to manage this device. The check now knows the management port keeps managing, unless the limit on who may manage leaves out your address.',
+    ],
+  },
+  {
     version: '0.9.4.22',
     title: 'Firewall rules as lines, with live counters',
     items: [

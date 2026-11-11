@@ -164,3 +164,21 @@ func TestMgmtPortCloseLANNeedsTheManagementAddress(t *testing.T) {
 		t.Fatalf("closing the LAN from the LAN must be refused: %d %s", rc, raw)
 	}
 }
+
+// A connection through the management port is not part of any network, yet it must not be
+// reported as "would no longer be allowed to manage" when the firewall is checked.
+func TestSessionThroughManagementPortStaysSafe(t *testing.T) {
+	a, _ := newSpeedApp(t)
+	a.Config.SetSetting(mgmtSetting, `{"iface":"enp2s0","mode":"dhcp"}`)
+	m := fw.DefaultModel([]string{"eth0"}, []string{"eth1"})
+	if _, safe, _ := a.sessionSafeVia(m, "enp2s0", "10.9.0.5"); !safe {
+		t.Fatal("the management port must stay able to manage")
+	}
+	if _, safe, _ := a.sessionSafeVia(m, "enp7s0", "10.7.0.5"); safe {
+		t.Fatal("an interface in no management network must still be refused")
+	}
+	m.MgmtAllow = []string{"192.168.1.0/24"}
+	if _, safe, _ := a.sessionSafeVia(m, "enp2s0", "10.9.0.5"); safe {
+		t.Fatal("an address outside the limit on who may manage must still be refused")
+	}
+}

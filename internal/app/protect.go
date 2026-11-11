@@ -266,7 +266,7 @@ func (a *App) registerProtectRoutes() {
 			}
 		}
 		add(mg > 0, "%d network(s) can manage this device.", mg)
-		if checked, safe, ifc := sessionSafe(m, c.IP); checked {
+		if checked, safe, ifc := a.sessionSafe(m, c.IP); checked {
 			add(safe, "You are connected through %s; it %s manage this device.", a.portName(ifc), map[bool]string{true: "can", false: "can NOT"}[safe])
 		} else {
 			add(true, "You are connected from this device itself, so the network cannot affect you.")
