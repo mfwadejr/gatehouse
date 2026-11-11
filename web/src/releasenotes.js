@@ -1,6 +1,17 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.24',
+    title: 'See why a change was undone',
+    items: [
+      'A change that is on trial is no longer a red dot in the menu. Red now means something is broken; a change waiting for its check shows blue, and changes saved but not live yet stay yellow.',
+      'Keep this change and Undo now can be pressed while a commit is still waiting. Before, both were greyed out during the trial, so a change could not be kept by hand.',
+      'When NopeWarden cannot keep a change by itself, a message now says why, instead of the countdown running out in silence.',
+      'The System log now records each firewall change applied, each confirmation received or refused, and each change that was not confirmed in time and was undone, with the address and port it came from. Search the log for firewall.',
+      'Fixed: Firewall, History showed an undone change as Waiting for ever. It now says Undone, and an alert is raised.',
+    ],
+  },
+  {
     version: '0.9.4.23',
     title: 'Applying changes through the management port',
     items: [

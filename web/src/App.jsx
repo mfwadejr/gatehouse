@@ -104,7 +104,7 @@ function Shell({ me, onSignOut, reloadMe }) {
               <Icon name={p.icon} />
               <span>{p.label}</span>
               {(p.id === 'firewall' || p.id === 'internet' || p.id === 'networks') && (dirty || pending)
-                ? <span className={`navdot ${pending ? 'bad' : 'warn'}`} title={pending ? 'A change is waiting for your confirmation' : 'Changes not applied yet'} />
+                ? <span className={`navdot ${pending ? '' : 'warn'}`} title={pending ? 'A change is waiting for your confirmation' : 'Changes not applied yet'} />
                 : attn.byPage[p.id] && <span className={`navdot ${attn.byPage[p.id]}`} role="img" aria-label={`${levelText[attn.byPage[p.id]]}: ${attn.items.filter((x) => x.to === p.id).map((x) => x.t).join('. ')}`} title={attn.items.filter((x) => x.to === p.id).map((x) => x.t).join('\n')} />}
             </a>
             </React.Fragment>

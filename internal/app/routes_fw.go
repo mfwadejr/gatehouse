@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"strconv"
@@ -509,6 +510,7 @@ func (a *App) fwApply(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 	a.apply.connID, a.apply.version = api.ConnID(r), ver
 	a.apply.mu.Unlock()
 	a.publishFW()
+	log.Printf("firewall: change %d applied for %s from %s (through %s); it is undone unless confirmed within %d seconds", ver, c.User.Username, c.IP, ifaceOf(c.IP), int(confirmWindow/time.Second))
 	// Close this connection so the confirmation has to prove a fresh one still works.
 	w.Header().Set("Connection", "close")
 	api.JSON(w, 200, map[string]any{"token": tok, "deadline": deadline.Unix(), "seconds": int(confirmWindow / time.Second)})
@@ -530,13 +532,16 @@ func (a *App) fwConfirm(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 	ver := a.apply.version
 	a.apply.mu.Unlock()
 	if same {
+		log.Printf("firewall: confirmation from %s refused: it came over the same connection that applied the change", c.IP)
 		api.Error(w, http.StatusConflict, "confirm from a new connection; the old one can outlive a broken change")
 		return
 	}
 	if err := a.FW.Confirm(in.Token); err != nil {
+		log.Printf("firewall: confirmation from %s refused: %v", c.IP, err)
 		fail(w, err)
 		return
 	}
+	log.Printf("firewall: change %d kept, confirmed by %s from %s (through %s)", ver, c.User.Username, c.IP, ifaceOf(c.IP))
 	a.Config.Exec(`UPDATE fw_revisions SET status='confirmed' WHERE version=?`, ver)
 	a.Config.Exec(`UPDATE fw_revisions SET status='superseded' WHERE status='confirmed' AND version<?`, ver)
 	a.fwSync()
@@ -561,5 +566,35 @@ func (a *App) clearFWFailure() {
 	if a.setting("fw.last_error", "") != "" {
 		a.Config.SetSetting("fw.last_error", "")
 		a.Config.SetSetting("fw.last_error_at", "0")
+	}
+}
+
+// settleRevisions marks a change that was never confirmed as undone. The safety timer puts the old
+// settings back by itself, without telling the console, so without this the history would show the
+// attempt as waiting for ever. It only looks at changes whose time is well over.
+func (a *App) settleRevisions() {
+	cutoff := time.Now().Add(-(confirmWindow + 5*time.Second)).Unix()
+	rows, err := a.Config.Query(`SELECT version,author FROM fw_revisions WHERE status='pending' AND created_at < ?`, cutoff)
+	if err != nil {
+		return
+	}
+	type old struct {
+		v      int64
+		author string
+	}
+	var olds []old
+	for rows.Next() {
+		var o old
+		rows.Scan(&o.v, &o.author)
+		olds = append(olds, o)
+	}
+	rows.Close()
+	for _, o := range olds {
+		a.Config.Exec(`UPDATE fw_revisions SET status='rolled_back' WHERE version=? AND status='pending'`, o.v)
+		log.Printf("firewall: change %d by %s was not confirmed in time and was undone; the previous settings are back", o.v, o.author)
+		a.event(o.author, "warn", "A firewall change was undone", "It was not kept within the time allowed, so the previous settings came back.")
+	}
+	if len(olds) > 0 {
+		a.publishFW()
 	}
 }

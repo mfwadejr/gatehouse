@@ -528,6 +528,7 @@ func (a *App) dynLoop(ctx context.Context) {
 				a.geoMaybeRefreshIfNeeded(ctx)
 			}
 			a.flushDomains()
+			a.settleRevisions()
 		case <-hits.C:
 			a.sampleHits()
 			if sig := a.pausedSig(); sig != a.dyn.lastPaused.Load() {

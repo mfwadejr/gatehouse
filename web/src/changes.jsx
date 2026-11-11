@@ -24,6 +24,7 @@ export function ChangeProvider({ me, children }) {
   const { data: staged, reload: reloadStaged } = useData('/api/staged', { topics: ['fw.status', 'net.status'], every: 15000 });
   const [auto, setAuto] = useState(readAuto);
   const [busy, setBusy] = useState(false);
+  const [acting, setActing] = useState(false); // Keep or Undo in progress; separate so they work while a commit is still waiting
   const [left, setLeft] = useState(null);
   const busyRef = useRef(false);
   const queued = useRef(false);
@@ -54,7 +55,10 @@ export function ChangeProvider({ me, children }) {
         await post(`/api/${kind}/confirm`, { token: pend.token });
         toast('Applied and kept. You can still reach NopeWarden, so the change is permanent.');
         reload();
-      } catch { /* cannot reach it: the countdown undoes the change, or it can be kept by hand */ }
+      } catch (e) {
+        // Cannot keep it by itself: the countdown undoes the change unless it is kept by hand. Say why.
+        toast(`The change could not be kept automatically: ${e?.message || 'NopeWarden did not answer'}. Press Keep this change to keep it, or it is undone when the time runs out.`, 'warn');
+      }
     })();
     return () => { dead = true; };
   }, [pend, pendKind, auto]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -142,21 +146,21 @@ export function ChangeProvider({ me, children }) {
   }, [pend]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const confirm = async () => {
-    setBusy(true);
+    setActing(true);
     try { await post(`/api/${pendKind}/confirm`, { token: pend.token }); toast('Confirmed. The change is now permanent.'); reload(); }
-    catch (e) { toast(e.message, 'bad'); } finally { setBusy(false); }
+    catch (e) { toast(e.message, 'bad'); } finally { setActing(false); }
   };
   const undo = async () => {
-    setBusy(true);
+    setActing(true);
     try { await post(`/api/${pendKind}/rollback`); toast('Undone. The previous settings are back. The change is waiting on the Review page if you want it again.'); reload(); }
-    catch (e) { toast(e.message, 'bad'); } finally { setBusy(false); }
+    catch (e) { toast(e.message, 'bad'); } finally { setActing(false); }
   };
 
   const value = { st, staged, dirtyKinds, pend, applyNow, commit, reload, busy, auto, setAutoPref };
   return (
     <Ctx.Provider value={value}>
       {children}
-      <ChangeBar pend={pend} left={left} auto={auto} setAutoPref={setAutoPref} busy={busy} confirm={confirm} undo={undo} />
+      <ChangeBar pend={pend} left={left} auto={auto} setAutoPref={setAutoPref} busy={acting} confirm={confirm} undo={undo} />
     </Ctx.Provider>
   );
 }
