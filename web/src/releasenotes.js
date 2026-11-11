@@ -1,6 +1,16 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.18',
+    title: 'Keep delay low follows what your line really delivers',
+    items: [
+      'Keep delay low used to hold a connection to 95 % of the speed the plan promises, which on a variable line (such as home internet) is above what it delivers, so it never did anything. It now shows three speeds per connection: Promised, Measured typical (a low figure, the 25th percentile, of the last 7 days of full tests on a quiet line) and the speed in use. Follow my measurements is the default once it is on; Use fixed numbers keeps the old way with speeds you type.',
+      'It moves toward the measured speed a little each day (at most 10 % up and 20 % down), and says Learning, holding to 85 % of your best test, until there are about 8 good tests over at least 2 days.',
+      'Measure the line automatically (off until you turn it on, and offered when you switch Keep delay low on) tests about every 4 hours, only after the line has been quiet for a minute. The queue is taken off for the length of each automatic test so it measures the line, not the queue. Failed tests, short tests, tests on a busy line, tests that went through the queue and tests during an outage are never counted.',
+      'Check the difference measures the delay under load without and with the queue, and says in words whether it helped.',
+    ],
+  },
+  {
     version: '0.9.4.17',
     title: 'Threats gets its own page, and blocks hold many things',
     items: [

@@ -137,4 +137,9 @@ ALTER TABLE threat_alerts ADD COLUMN dir TEXT NOT NULL DEFAULT '';
 `, `
 -- dns_daily was never filled in; it is removed.
 DROP TABLE IF EXISTS dns_daily;
+`, `
+-- Speed tests (v0.9.4.18): was the line busy when the test started, and did the test go through
+-- the smart queue. Only tests on a quiet line with the queue lifted say what the line can really do.
+ALTER TABLE speedtests ADD COLUMN busy INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE speedtests ADD COLUMN shaped INTEGER NOT NULL DEFAULT 0;
 `}

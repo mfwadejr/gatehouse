@@ -175,14 +175,19 @@ func (a *App) runSpeedOn(link, source string, full bool, server string) (speedRo
 	if server == "" {
 		server = cfg.Server
 	}
+	busy := !a.lineQuiet(link)
+	if source == "auto" { // a quiet-line test takes the queue off for its own length, so it sees the real line
+		defer a.sqmLift(dev)()
+	}
+	shaped := a.sqmShaped(dev)
 	res, err := a.Net.SpeedTest(speedtest.Params{Dev: dev, Server: server, Quick: quick})
 	row := speedRow{TS: time.Now().Unix(), Link: link, Source: source, Quick: quick, Server: res.Server,
 		DownBps: res.DownBps, UpBps: res.UpBps, DelayMS: res.DelayMS, JitterMS: res.JitterMS, LoadedMS: res.LoadedMS, Grade: res.Grade, Bytes: res.BytesUsed}
 	if err != nil {
 		row.Error = err.Error()
 	}
-	if r, e := a.Logs.Exec(`INSERT INTO speedtests(ts,link,source,quick,server,down_bps,up_bps,delay_ms,jitter_ms,loaded_ms,grade,bytes,error) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		row.TS, row.Link, row.Source, b2i(row.Quick), row.Server, row.DownBps, row.UpBps, row.DelayMS, row.JitterMS, row.LoadedMS, row.Grade, row.Bytes, row.Error); e == nil {
+	if r, e := a.Logs.Exec(`INSERT INTO speedtests(ts,link,source,quick,server,down_bps,up_bps,delay_ms,jitter_ms,loaded_ms,grade,bytes,error,busy,shaped) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		row.TS, row.Link, row.Source, b2i(row.Quick), row.Server, row.DownBps, row.UpBps, row.DelayMS, row.JitterMS, row.LoadedMS, row.Grade, row.Bytes, row.Error, b2i(busy), b2i(shaped)); e == nil {
 		row.ID, _ = r.LastInsertId()
 	}
 	a.speed.mu.Lock()

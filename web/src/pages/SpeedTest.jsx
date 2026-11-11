@@ -23,35 +23,82 @@ function Result({ r, plan }) {
       <div><b>{fmtBits(r.down_bps)}</b> down · <b>{fmtBits(r.up_bps)}</b> up · delay <b>{Math.round(r.delay_ms)} ms</b>{r.jitter_ms >= 1 ? ` (varies ${Math.round(r.jitter_ms)} ms)` : ''}
         {r.grade && <> · busy-line grade <Pill tone={GRADE[r.grade]}><span className="sp-grade">{r.grade}</span></Pill></>}</div>
       {pct > 0 && <div className="muted">{fmtBits(r.down_bps).replace(/ .*/, '')} of {plan.down_mbps} Mbps promised ({pct} %)</div>}
-      <div className="muted">{fmt.dt(r.ts)} · {r.quick ? 'short test' : 'full test'} · {r.source === 'scheduled' ? 'scheduled' : 'run by hand'} · {r.server}</div>
+      <div className="muted">{fmt.dt(r.ts)} · {r.quick ? 'short test' : 'full test'} · {srcWord(r).toLowerCase()} · {r.server}</div>
       {r.grade && <div className="muted">{GRADE_TEXT[r.grade]}</div>}
     </div>
   );
 }
 
 
-// Keep delay low when the line is busy: hold each connection just under its real speed.
+// Keep delay low when the line is busy: hold each connection just under the speed it really delivers.
+const srcWord = (r) => ({ scheduled: 'Scheduled', auto: 'Automatic', 'check-before': 'Before and after check', 'check-after': 'Before and after check' }[r.source] || 'By hand');
+const mb = (n) => (n >= 100 ? Math.round(n) : Math.round(n * 10) / 10);
+
+function SmoothLink({ l, auto, busy, run, reload }) {
+  const [fixed, setFixed] = useState({ down: l.fixed_down_mbps || Math.floor(l.down_mbps * 0.95) || '', up: l.fixed_up_mbps || Math.floor(l.up_mbps * 0.95) || '' });
+  const send = (body, msg) => run(async () => { await put('/api/sqm', body); reload(); }, msg);
+  const toggle = async (on) => {
+    const done = await run(async () => { await put('/api/sqm', { links: { ...l.all, [l.name]: on } }); reload(); }, on ? 'Keep delay low is on.' : 'Keep delay low is off.');
+    if (done && on && !auto && !l.metered && await confirmBox('Keep delay low works best when NopeWarden measures the line now and then. Turn on automatic tests? About every 4 hours, only when the line has been quiet for a minute, taking about 20 seconds each.', { title: 'Measure the line automatically?', yes: 'Turn on automatic tests', no: 'Not now', danger: false })) {
+      await send({ auto: true }, 'Automatic tests are on.');
+    }
+  };
+  const state = !l.on ? ['Off', ''] : l.mode === 'fixed' ? ['Fixed numbers', 'good'] : l.learning ? ['Learning', 'warn'] : ['Following your measurements', 'good'];
+  const check = l.check;
+  return (
+    <div className="item" key={l.name} style={{ flexWrap: 'wrap' }}>
+      <div className="fill">
+        <div className="name">{l.name} <Pill tone={state[1]}>{state[0]}</Pill></div>
+        <div className="meta">
+          Promised: {l.down_mbps ? `${mb(l.down_mbps)} down, ${mb(l.up_mbps)} up Mbps` : 'not entered'}
+          {' · '}Measured typical: {l.tests ? `${mb(l.measured_down_mbps)} down, ${mb(l.measured_up_mbps)} up Mbps${l.trend ? ` (${l.trend})` : ''}` : 'no good tests yet'}
+          {' · '}{l.on ? 'In use' : 'Would use'}: {l.hold_down_mbps ? `${mb(l.hold_down_mbps)} down, ${mb(l.hold_up_mbps)} up Mbps` : 'nothing yet'}
+        </div>
+        {l.on && l.mode !== 'fixed' && l.learning && <div className="meta">{l.tests ? `Still learning: it holds to 85 % of your best test until there are about 8 good tests over at least 2 days (${l.tests} so far).` : 'No good tests yet, so it holds to 95 % of the promised speed until there are some. Run a test, or turn on automatic tests.'}</div>}
+        {l.on && l.mode !== 'fixed' && !l.learning && l.changed > 0 && <div className="meta">Last changed {fmt.ago(l.changed)}. It moves a little each day, never more than 10 % up or 20 % down.</div>}
+        {!l.ready && !l.on && <div className="meta">Fill in the speeds your plan promises (in the Speed test box above), or run a speed test, to use this.</div>}
+      </div>
+      <Switch checked={l.on} label={`Keep delay low on ${l.name}`} disabled={busy || (!l.ready && !l.on)} onChange={toggle} />
+      {l.on && (
+        <div className="stack" style={{ flexBasis: '100%' }}>
+          <Segmented value={l.mode} onChange={(v) => send({ mode: { [l.name]: v } }, v === 'fixed' ? 'Using fixed numbers.' : 'Following your measurements.')} options={[{ value: 'follow', label: 'Follow my measurements' }, { value: 'fixed', label: 'Use fixed numbers' }]} />
+          {l.mode === 'fixed' && (
+            <div className="formgrid">
+              <Field label="Download (Mbps)"><NumberInput value={fixed.down} onChange={(v) => setFixed({ ...fixed, down: v })} /></Field>
+              <Field label="Upload (Mbps)"><NumberInput value={fixed.up} onChange={(v) => setFixed({ ...fixed, up: v })} /></Field>
+              <Button small onClick={() => send({ fixed: { [l.name]: { down_mbps: Number(fixed.down), up_mbps: Number(fixed.up) } } }, 'Saved.')} disabled={busy || !(Number(fixed.down) > 0 && Number(fixed.up) > 0)}>Save these numbers</Button>
+            </div>
+          )}
+          <div className="inline">
+            <Button small disabled={busy || l.checking} onClick={() => run(async () => { await post('/api/sqm/check', { link: l.name }); reload(); }, 'Checking. This takes about a minute.')}>{l.checking ? 'Checking…' : 'Check the difference'}</Button>
+            {l.checking && <span className="small muted">{l.checkStep}</span>}
+          </div>
+          {check && !l.checking && (check.error ? <p className="small errtext">{fmt.ago(check.at)}: {check.error}</p> : <p className="small">{check.words} <span className="muted">({fmt.ago(check.at)})</span></p>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SmoothLine({ reload: reloadSpeed }) {
-  const { data, reload } = useData('/api/sqm');
+  const { data, reload } = useData('/api/sqm', { every: 4000, topics: ['speedtest'] });
   const [run, busy] = useAction();
   if (!data?.links?.length) return null;
-  const toggle = (name, on) => run(async () => { await put('/api/sqm', { links: Object.fromEntries(data.links.map((l) => [l.name, l.name === name ? on : l.on])) }); reload(); reloadSpeed && reloadSpeed(); }, on ? 'Speed limit is on.' : 'Speed limit is off.');
+  const all = Object.fromEntries(data.links.map((l) => [l.name, l.on]));
+  const again = () => { reload(); reloadSpeed && reloadSpeed(); };
   return (
-    <Card title="Keep delay low when the line is busy" desc={`Holds each connection to ${data.share} % of the speed your plan promises, in both directions, so calls and games stay smooth during big downloads. Off by default.`}>
+    <Card title="Keep delay low when the line is busy" desc="Holds each connection just under the speed it really delivers, so calls and games stay smooth during big downloads. Off by default.">
       <div className="list">
-        {data.links.map((l) => (
-          <div className="item" key={l.name}>
-            <div>
-              <div className="name">{l.name}</div>
-              <div className="meta">{l.ready ? `Will hold to ${Math.floor(l.hold_down_mbps)} Mbps down and ${Math.floor(l.hold_up_mbps)} Mbps up.` : 'Fill in the speeds your plan promises (in the Speed test box above) to use this.'}</div>
-            </div>
-            <Switch checked={l.on} label={`Keep delay low on ${l.name}`} disabled={busy || (!l.ready && !l.on)} onChange={(v) => toggle(l.name, v)} />
-          </div>
-        ))}
+        <div className="item">
+          <div className="fill"><div className="name">Measure the line automatically</div>
+            <div className="meta">About every 4 hours, only when the line has been quiet for a minute, taking about 20 seconds each. These tests are how NopeWarden learns what the line really delivers. Connections with a data limit are left out.</div></div>
+          <Switch checked={!!data.auto} label="Automatic tests" disabled={busy} onChange={(v) => run(async () => { await put('/api/sqm', { auto: v }); again(); }, v ? 'Automatic tests are on.' : 'Automatic tests are off.')} />
+        </div>
+        {data.links.map((l) => <SmoothLink key={l.name} l={{ ...l, all, checking: data.check?.running && data.check.link === l.name, checkStep: data.check?.step }} auto={data.auto} busy={busy} run={run} reload={again} />)}
       </div>
       {data.error && <Note tone="warn" title="Could not set it up">{data.error}</Note>}
       {data.queue && <span className="small muted">Using the {data.queue === 'cake' ? 'CAKE' : 'fq_codel'} queue type.</span>}
-      <Note>Run a speed test afterwards. The busy-line grade should improve. If your speeds drop more than you expected, turn this off, or check the plan speeds above.</Note>
+      <Note>Promised is what your plan says, measured typical is a low figure (the 25th percentile) of the last 7 days of full tests on a quiet line, and the speed in use is what the queue is held to. Tests you run by hand while this is on go through the queue, so they show how smooth the line is, not how fast it can go.</Note>
     </Card>
   );
 }
@@ -82,7 +129,7 @@ function History({ links }) {
                   <tr key={r.id}>
                     <td>{fmt.dt(r.ts)}</td><td>{r.link}</td>
                     {r.error ? <td colSpan={4} style={{ color: 'var(--color-status-serious)' }}>{r.error}</td> : <><td>{fmtBits(r.down_bps)}</td><td>{fmtBits(r.up_bps)}</td><td>{Math.round(r.delay_ms)} ms</td><td>{r.grade && <Pill tone={GRADE[r.grade]}>{r.grade}</Pill>}</td></>}
-                    <td className="small muted">{r.server}</td><td className="small muted">{r.source === 'scheduled' ? 'Scheduled' : 'By hand'}{r.quick ? ' · short' : ''}</td>
+                    <td className="small muted">{r.server}</td><td className="small muted">{srcWord(r)}{r.quick ? ' · short' : ''}</td>
                   </tr>
                 ))}
               </tbody>

@@ -430,6 +430,7 @@ func (a *App) Run(ctx context.Context) error {
 	run(func() { a.flowLoop(ctx) })
 	run(func() { a.snmpLoop(ctx) })
 	run(func() { a.sqmLoop(ctx) })
+	run(func() { a.sqmTestLoop(ctx) })
 	run(func() { a.portalLoop(ctx) })
 	run(func() { a.haWarmLoop(ctx) })
 	run(func() { a.overrideLoop(ctx) })
