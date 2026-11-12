@@ -202,19 +202,20 @@ func (a *App) searchFWf(f fwFilter) []LogItem {
 		fetch = 5000 // country is worked out per row, so look at more rows and keep the matches
 	}
 	args = append(args, fetch)
-	rows, err := a.Logs.Query(`SELECT id,ts,action,from_zone,from_addr,to_zone,to_addr,proto,dport,sport,src_name,dst_name,reason,rule,out_if FROM fw_events WHERE `+where+` ORDER BY ts DESC,id DESC LIMIT ?`, args...)
+	rows, err := a.Logs.Query(`SELECT id,ts,action,from_zone,from_addr,to_zone,to_addr,proto,dport,sport,src_name,dst_name,reason,rule,out_if,outcome,bytes_out,bytes_in,dur FROM fw_events WHERE `+where+` ORDER BY ts DESC,id DESC LIMIT ?`, args...)
 	if err != nil {
 		return nil
 	}
 	defer rows.Close()
 	wans := a.wanZoneNames()
 	on := a.appsOn()
+	hits := a.hitTable() // how many connections each rule has matched so far
 	var out []LogItem
 	for rows.Next() {
-		var id, ts int64
-		var action, fz, fa, tz, ta, proto, sn, dn, reason, rule, outIf string
+		var id, ts, bo, bi, du int64
+		var action, fz, fa, tz, ta, proto, sn, dn, reason, rule, outIf, outcome string
 		var dport, sport int
-		if rows.Scan(&id, &ts, &action, &fz, &fa, &tz, &ta, &proto, &dport, &sport, &sn, &dn, &reason, &rule, &outIf) != nil {
+		if rows.Scan(&id, &ts, &action, &fz, &fa, &tz, &ta, &proto, &dport, &sport, &sn, &dn, &reason, &rule, &outIf, &outcome, &bo, &bi, &du) != nil {
 			continue
 		}
 		cc := a.country(ta)
@@ -228,6 +229,20 @@ func (a *App) searchFWf(f fwFilter) []LogItem {
 			Src: fa, Dst: ta, DstName: dn, Port: dport, Proto: proto, Service: serviceName(proto, dport), Country: cc, FromZone: fz, ToZone: tz,
 			Direction: a.directionOf(fz, tz, wans), Rule: rule}
 		it.Via, it.ViaKind = a.viaOf(outIf)
+		it.Outcome = outcome
+		if bo >= 0 && bi >= 0 {
+			it.BytesOut, it.BytesIn = &bo, &bi
+		}
+		if du >= 0 && outcome != "" && outcome != outBlocked {
+			it.DurS = &du
+		}
+		if rule != "" {
+			it.RuleName = ruleLabel(rule)
+			if h, ok := hits[rule]; ok {
+				n := h.Hits
+				it.RuleHits = &n
+			}
+		}
 		if it.Who == "" {
 			it.Who = fa
 		}
@@ -442,6 +457,39 @@ func (a *App) countryCounts(f fwFilter, where string, args []any) []topItem {
 }
 
 // csvSafe stops a spreadsheet from running a log value as a formula.
+// The columns of the log's spreadsheet. The first ones are the same for every kind of row; the
+// rest are the detail that shows when a row is opened, empty where it does not apply.
+var logCSVHeader = []string{"time", "type", "result", "device", "device address", "from network", "to network", "destination", "destination address", "country", "protocol", "port", "service", "reason",
+	"DNS name asked", "DNS record type", "DNS response code", "DNS answer time (ms)", "DNS answered by",
+	"connection outcome", "bytes out", "bytes in", "duration (seconds)", "matching rule", "rule tag", "rule matches so far (total at download time)"}
+
+func logCSVRow(it LogItem) []string {
+	kind := map[string]string{"dns": "DNS lookup", "firewall": "Connection", "event": "System event"}[it.Kind]
+	num := func(p *int64) string {
+		if p == nil {
+			return ""
+		}
+		return strconv.FormatInt(*p, 10)
+	}
+	row := []string{time.Unix(it.TS, 0).Format("2006-01-02 15:04:05"), kind, it.Verdict, csvSafe(it.Who), it.Addr, csvSafe(it.FromZone), csvSafe(it.ToZone),
+		csvSafe(it.DstName), it.Dst, it.Country, it.Proto, "", it.Service, csvSafe(it.Why)}
+	if it.Port > 0 {
+		row[11] = strconv.Itoa(it.Port)
+	}
+	if it.Kind == "dns" {
+		row[7], row[8] = "", ""
+		row = append(row, csvSafe(it.What), strings.TrimSuffix(it.Detail, " lookup"), it.RCode, strconv.FormatFloat(float64(it.AnswerUS)/1000, 'f', 1, 64), csvSafe(it.Server))
+	} else {
+		row = append(row, "", "", "", "", "")
+	}
+	if it.Kind == "firewall" {
+		row = append(row, it.Outcome, num(it.BytesOut), num(it.BytesIn), num(it.DurS), csvSafe(it.RuleName), csvSafe(it.Rule), num(it.RuleHits))
+	} else {
+		row = append(row, "", "", "", "", "", "", "")
+	}
+	return row
+}
+
 func csvSafe(s string) string {
 	if s != "" && strings.ContainsRune("=+-@\t\r", rune(s[0])) {
 		return "'" + s
@@ -498,17 +546,16 @@ func (a *App) registerLogExtraRoutes() {
 	s.Handle("GET /api/logs/summary", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		api.JSON(w, 200, a.logSummary(logParams(r)))
 	})
+	// The rows on screen as a spreadsheet: whatever the search and filters match, lookups and
+	// connections together, one column for each detail and a blank where it does not apply.
 	s.Handle("GET /api/logs/export", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-		f := logParams(r)
-		f.Limit = 50000
-		items := a.searchFWf(f)
+		items, _ := a.logItems(r, 50000)
 		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-		w.Header().Set("Content-Disposition", `attachment; filename="nopewarden-connections-`+time.Now().Format("2006-01-02")+`.csv"`)
+		w.Header().Set("Content-Disposition", `attachment; filename="nopewarden-log-`+time.Now().Format("2006-01-02")+`.csv"`)
 		cw := csv.NewWriter(w)
-		cw.Write([]string{"time", "result", "device", "device address", "from network", "to network", "destination", "destination address", "country", "protocol", "port", "service", "reason"})
+		cw.Write(logCSVHeader)
 		for _, it := range items {
-			cw.Write([]string{time.Unix(it.TS, 0).Format("2006-01-02 15:04:05"), it.Verdict, csvSafe(it.Who), it.Src, csvSafe(it.FromZone), csvSafe(it.ToZone),
-				csvSafe(it.DstName), it.Dst, it.Country, it.Proto, strconv.Itoa(it.Port), it.Service, csvSafe(it.Why)})
+			cw.Write(logCSVRow(it))
 		}
 		cw.Flush()
 	})

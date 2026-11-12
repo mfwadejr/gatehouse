@@ -570,6 +570,7 @@ func (a *App) registerNetRoutes() {
 			fail(w, err)
 			return
 		}
+		a.prog.finish("undone")
 		a.publishNet()
 		ok(w)
 	})
@@ -668,24 +669,33 @@ func (a *App) netApply(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 			return
 		}
 	}
+	a.prog.begin("net")
 	p, err := a.buildPlan(a.Config)
 	if err == nil {
 		err = a.validatePlan(p)
 	}
 	if err != nil {
+		a.prog.fail(stepSafe, err.Error())
 		fail(w, err)
 		return
 	}
+	a.prog.set(stepSafe, "done", "")
+	a.prog.set(stepBack, "active", "")
 	a.restorePoint()
+	a.prog.set(stepBack, "done", "")
+	a.prog.activate(stepLoad, stepLists, stepTimer)
 	tok, deadline, err := a.Net.NetApply(*p, confirmWindow)
 	if err != nil {
 		if errors.Is(err, netcfg.ErrPending) {
+			a.prog.fail(stepSafe, "Another change is still being tried out.")
 			api.Error(w, http.StatusConflict, err.Error())
 			return
 		}
+		a.prog.fail(failedStepFor(err), err.Error())
 		fail(w, err)
 		return
 	}
+	a.prog.armed(deadline)
 	a.netApplyState.mu.Lock()
 	a.netApplyState.connID, a.netApplyState.print, a.netApplyState.base = api.ConnID(r), fingerprint(p), baseFingerprint(p)
 	a.netApplyState.mu.Unlock()
@@ -719,6 +729,7 @@ func (a *App) netConfirm(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 	}
 	a.Config.SetSetting("net.applied", print)
 	a.Config.SetSetting("net.applied_base", base)
+	a.prog.finish("kept")
 	a.publishNet()
 	ok(w)
 }

@@ -48,6 +48,19 @@ type LogItem struct {
 	Category  string `json:"category,omitempty"`
 	Via       string `json:"via,omitempty"`      // the connection it left through
 	ViaKind   string `json:"via_kind,omitempty"` // tunnel or wan
+
+	// Detail shown when a row is opened. DNS: the response code, how long the answer took and who gave it.
+	RCode    string `json:"rcode,omitempty"`
+	AnswerUS int64  `json:"answer_us,omitempty"`
+	Server   string `json:"server,omitempty"`
+	// Connections: how it ended, bytes each way and how long it lasted (nil when not known), and the
+	// rule that decided it with how many connections that rule has matched so far.
+	Outcome  string `json:"outcome,omitempty"`
+	BytesOut *int64 `json:"bytes_out,omitempty"`
+	BytesIn  *int64 `json:"bytes_in,omitempty"`
+	DurS     *int64 `json:"dur_s,omitempty"`
+	RuleName string `json:"rule_name,omitempty"`
+	RuleHits *int64 `json:"rule_hits,omitempty"`
 }
 
 // fwReason turns the comment of the rule that decided a connection into a sentence.
@@ -130,6 +143,11 @@ func (a *App) deviceName(ip string) string {
 	return a.Devices.Client(ip).Name
 }
 
+type followedConn struct {
+	e  netd.FWEvent
+	id int64
+}
+
 // storeFW records events in the log database and tells the console.
 func (a *App) storeFW(evs []netd.FWEvent) {
 	if len(evs) == 0 {
@@ -139,6 +157,7 @@ func (a *App) storeFW(evs []netd.FWEvent) {
 	if err != nil {
 		return
 	}
+	var followed []followedConn
 	for _, e := range evs {
 		from, to := a.zoneOf(e.In), a.zoneOf(e.Out)
 		if e.Out == "" {
@@ -148,12 +167,24 @@ func (a *App) storeFW(evs []netd.FWEvent) {
 		if dn == "" {
 			dn = a.names.get(e.Dst) // the name a device asked for before connecting
 		}
-		tx.Exec(`INSERT INTO fw_events(ts,action,from_zone,from_addr,to_zone,to_addr,proto,dport,rule,sport,src_name,dst_name,reason,out_if) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-			e.TS, e.Verdict, from, e.Src, to, e.Dst, e.Proto, e.DPort, e.Tag, e.SPort, sn, dn, fwReason(e.Verdict, e.Tag, from, to), e.Out)
+		outcome := ""
+		if e.Verdict == "drop" {
+			outcome = outBlocked
+		}
+		res, err := tx.Exec(`INSERT INTO fw_events(ts,action,from_zone,from_addr,to_zone,to_addr,proto,dport,rule,sport,src_name,dst_name,reason,out_if,outcome) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			e.TS, e.Verdict, from, e.Src, to, e.Dst, e.Proto, e.DPort, e.Tag, e.SPort, sn, dn, fwReason(e.Verdict, e.Tag, from, to), e.Out, outcome)
+		if err == nil && e.Verdict == "allow" {
+			if id, err := res.LastInsertId(); err == nil {
+				followed = append(followed, followedConn{e, id})
+			}
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		tx.Rollback()
 		return
+	}
+	for _, f := range followed {
+		a.conns.add(f.e, f.id) // only once the rows are saved, so there is a row to bring up to date
 	}
 	a.Bus.Publish("logs.live", map[string]int{"fw": len(evs)})
 	a.syslogFW(evs)
@@ -207,7 +238,8 @@ func like(s string) string {
 }
 
 func dnsItem(r dnssrv.Row) LogItem {
-	it := LogItem{Key: "d" + strconv.FormatInt(r.ID, 10), TS: r.TS, Kind: "dns", Who: r.ClientName, Addr: r.Client, What: r.QName, Detail: r.QType + " lookup", Verdict: "allowed"}
+	it := LogItem{Key: "d" + strconv.FormatInt(r.ID, 10), TS: r.TS, Kind: "dns", Who: r.ClientName, Addr: r.Client, What: r.QName, Detail: r.QType + " lookup", Verdict: "allowed",
+		RCode: r.RCode, AnswerUS: r.LatencyUS, Server: dnsAnsweredBy(r)}
 	if it.Who == "" {
 		it.Who = r.Client
 	}
@@ -285,12 +317,19 @@ func (a *App) searchEvents(text string, since, before int64, limit int) []LogIte
 
 // logSearch merges the sources. It asks each for one page and keeps the newest of all.
 func (a *App) logSearch(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-	q := r.URL.Query()
-	text, kind, verdict := strings.TrimSpace(q.Get("q")), q.Get("kind"), q.Get("verdict")
-	limit, _ := strconv.Atoi(q.Get("limit"))
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	if limit <= 0 || limit > 300 {
 		limit = 100
 	}
+	items, more := a.logItems(r, limit)
+	api.JSON(w, 200, map[string]any{"items": items, "more": more,
+		"record_allowed": a.Config.Setting("fw.log_allowed", "1") == "1", "record_blocked": a.Config.Setting("fw.log_drops", "1") == "1"})
+}
+
+// logItems finds the log rows the request's filters match, newest first, at most limit of them.
+func (a *App) logItems(r *http.Request, limit int) ([]LogItem, bool) {
+	q := r.URL.Query()
+	text, kind, verdict := strings.TrimSpace(q.Get("q")), q.Get("kind"), q.Get("verdict")
 	var since int64
 	if h, err := strconv.Atoi(q.Get("hours")); err == nil && h > 0 {
 		since = time.Now().Add(-time.Duration(h) * time.Hour).Unix()
@@ -357,6 +396,5 @@ func (a *App) logSearch(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 	if items == nil {
 		items = []LogItem{}
 	}
-	api.JSON(w, 200, map[string]any{"items": items, "more": more,
-		"record_allowed": a.Config.Setting("fw.log_allowed", "1") == "1", "record_blocked": a.Config.Setting("fw.log_drops", "1") == "1"})
+	return items, more
 }

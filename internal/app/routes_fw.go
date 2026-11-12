@@ -29,6 +29,7 @@ type applyState struct {
 
 func (a *App) registerFWRoutes() {
 	s := a.API
+	a.registerApplyProgress()
 	s.Handle("GET /api/fw/overview", a.fwOverview)
 	// A small answer for a Save: what the firewall and the network would run now, and whether
 	// either is waiting to be applied. The console asks before and after a Save to tell the
@@ -91,9 +92,10 @@ func (a *App) registerFWRoutes() {
 	// Only the counters, fresh to within a second, for the Live switch on the rules page.
 	s.Handle("GET /api/fw/rules/counts", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		a.sampleHitsIfOlder(900 * time.Millisecond)
+		all := r.URL.Query().Get("all") == "1" // the log asks for every rule, built in and automatic ones too
 		out := map[string]hitInfo{}
 		for k, h := range a.hitTable() {
-			if strings.HasPrefix(k, "rule:") || strings.HasPrefix(k, "protected:") {
+			if all || strings.HasPrefix(k, "rule:") || strings.HasPrefix(k, "protected:") {
 				out[k] = h
 			}
 		}
@@ -252,6 +254,7 @@ func (a *App) registerFWRoutes() {
 			return
 		}
 		a.Config.Exec(`UPDATE fw_revisions SET status='rolled_back' WHERE status='pending'`)
+		a.prog.finish("undone")
 		a.fwSync()
 		a.publishFW()
 		ok(w)
@@ -473,32 +476,46 @@ func (a *App) fwApply(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 			return
 		}
 	}
+	a.prog.begin("fw")
 	m, script, err := a.currentRuleset()
 	if err != nil {
+		a.prog.fail(stepSafe, err.Error())
 		fail(w, err)
 		return
 	}
 	// Refuse changes that would cut off this very session.
 	if checked, safe, _ := a.sessionSafe(m, c.IP); checked && !safe {
-		fail(w, errors.New("this change would disconnect you; it was not applied"))
+		e := errors.New("this change would disconnect you; it was not applied")
+		a.prog.fail(stepSafe, "This change would cut off your own connection, so it was not applied.")
+		fail(w, e)
 		return
 	}
 	if a.geoMissing(m) {
-		fail(w, errors.New("the country lists are still being downloaded; try again in a minute"))
+		e := errors.New("the country lists are still being downloaded; try again in a minute")
+		a.prog.set(stepSafe, "done", "")
+		a.prog.fail(stepLists, "The country lists are still being downloaded. Try again in a minute.")
+		fail(w, e)
 		a.geoMaybeRefreshIfNeeded(context.Background())
 		return
 	}
+	a.prog.set(stepSafe, "done", "")
+	a.prog.set(stepBack, "active", "")
 	a.restorePoint()
+	a.prog.set(stepBack, "done", "")
+	a.prog.activate(stepLoad, stepLists, stepTimer)
 	tok, deadline, err := a.FW.Apply(a.fullScript(m, script), confirmWindow, c.User.Username)
 	if err != nil {
 		if errors.Is(err, fw.ErrPending) {
+			a.prog.fail(stepSafe, "Another change is still being tried out.")
 			api.Error(w, http.StatusConflict, err.Error())
 			return
 		}
+		a.prog.fail(failedStepFor(err), err.Error())
 		a.noteFWFailure(err, c.User.Username)
 		fail(w, err)
 		return
 	}
+	a.prog.armed(deadline)
 	a.clearFWFailure()
 	summary := strings.Join(fw.Describe(m), " ")
 	if len(summary) > 500 {
@@ -542,6 +559,7 @@ func (a *App) fwConfirm(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		return
 	}
 	log.Printf("firewall: change %d kept, confirmed by %s from %s (through %s)", ver, c.User.Username, c.IP, ifaceOf(c.IP))
+	a.prog.finish("kept")
 	a.Config.Exec(`UPDATE fw_revisions SET status='confirmed' WHERE version=?`, ver)
 	a.Config.Exec(`UPDATE fw_revisions SET status='superseded' WHERE status='confirmed' AND version<?`, ver)
 	a.fwSync()
@@ -591,6 +609,7 @@ func (a *App) settleRevisions() {
 	rows.Close()
 	for _, o := range olds {
 		a.Config.Exec(`UPDATE fw_revisions SET status='rolled_back' WHERE version=? AND status='pending'`, o.v)
+		a.prog.finish("undone")
 		log.Printf("firewall: change %d by %s was not confirmed in time and was undone; the previous settings are back", o.v, o.author)
 		a.event(o.author, "warn", "A firewall change was undone", "It was not kept within the time allowed, so the previous settings came back.")
 	}

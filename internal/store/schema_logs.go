@@ -162,4 +162,11 @@ CREATE TABLE link_dev_traffic(
   PRIMARY KEY(ts, link, mac)
 );
 CREATE INDEX idx_link_dev ON link_dev_traffic(link, ts);
+`, `
+-- What became of a connection (v0.9.4.26): how it ended, the bytes each way and how long it lasted,
+-- read from the kernel's connection list after the connection was logged. -1 means not known.
+ALTER TABLE fw_events ADD COLUMN outcome TEXT NOT NULL DEFAULT '';
+ALTER TABLE fw_events ADD COLUMN bytes_out INTEGER NOT NULL DEFAULT -1;
+ALTER TABLE fw_events ADD COLUMN bytes_in INTEGER NOT NULL DEFAULT -1;
+ALTER TABLE fw_events ADD COLUMN dur INTEGER NOT NULL DEFAULT -1;
 `}

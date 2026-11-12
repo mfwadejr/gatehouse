@@ -92,6 +92,8 @@ type App struct {
 	FW         fw.Controller // nil when no privileged helper is available
 	Net        NetController
 	apply      applyState
+	prog       applyProgress
+	conns      connTrack
 	vpn        vpnState
 	fwn        fwNames
 	scope      scopeCache
@@ -429,6 +431,7 @@ func (a *App) Run(ctx context.Context) error {
 	run(func() { a.threatLoop(ctx) })
 	run(func() { a.threatWatchLoop(ctx) })
 	run(func() { a.flowLoop(ctx) })
+	run(func() { a.connStatsLoop(ctx) })
 	run(func() { a.snmpLoop(ctx) })
 	run(func() { a.sqmLoop(ctx) })
 	run(func() { a.sqmTestLoop(ctx) })

@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { get, post, useData } from './api.js';
-import { Button, useToast } from './ui.jsx';
+import { Button, Card, useToast } from './ui.jsx';
 
 // The one place that applies changes. Saving a change to the firewall, the network or a policy
 // applies it straight away (after a quiet moment, so several quick saves go live together) unless
@@ -17,6 +17,54 @@ const AREAS = [['net', 'network settings'], ['dns', 'DNS settings'], ['fw', 'the
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const review = () => { window.location.hash = '#/review'; };
 
+// The steps of putting a change live. The box reports its own; this browser adds the one only it can
+// do (checking that it can still reach NopeWarden). A finished list stays until it is closed.
+const dismissKey = 'nopewarden.applyClosed';
+const readClosed = () => { try { return Number(sessionStorage.getItem(dismissKey)) || 0; } catch { return 0; } };
+
+function mergeRun(run, reach, auto) {
+  if (!run) return null;
+  const steps = run.steps.map((x) => ({ ...x }));
+  const ri = steps.findIndex((x) => x.key === 'reach');
+  const ki = steps.length - 1;
+  if (!run.outcome) {
+    if (steps[ri].state === 'active') {
+      if (reach?.state === 'failed') { steps[ri].state = 'failed'; steps[ri].reason = reach.reason; }
+      else if (reach?.state === 'done') { steps[ri].state = 'done'; steps[ki].state = 'active'; }
+      else if (!auto) steps[ri].detail = 'Waiting for you. Press Keep this change once everything still works.';
+    }
+  } else if (run.outcome === 'undone' && reach?.reason) steps[ri].reason = reach.reason;
+  return { ...run, steps };
+}
+
+// What the list says in a sentence: title and a line of explanation.
+export function applyHeadline(run) {
+  const out = run?.outcome || '';
+  const bad = (run?.steps || []).find((x) => x.state === 'failed');
+  if (out === 'kept') return { title: 'Applied successfully', text: 'The change is live and has been kept. Close this when you have read it.' };
+  if (out === 'failed') return { title: 'The change did not apply', text: `It stopped at “${bad?.label || 'applying'}”${bad?.reason ? `: ${bad.reason}` : '.'} The previous settings are still in use.` };
+  if (out === 'undone') return { title: 'The change was undone', text: 'It was not kept in time, so the previous settings are back. It is waiting on the Review page if you want to try it again.' };
+  return { title: 'Applying your change', text: 'Each step is ticked off as it is done.' };
+}
+
+export function ApplyList({ run }) {
+  if (!run) return null;
+  const mark = { done: '✓', pending: '○', failed: '✕' };
+  return (
+    <ol className="usteps applylist" aria-label="Progress of the change">
+      {run.steps.map((x) => (
+        <li key={x.key} className={x.state}>
+          <span aria-hidden="true">{x.state === 'active' ? <span className="spinner" /> : mark[x.state]}</span>
+          <div>
+            {x.label}
+            <small>{x.state === 'failed' && x.reason ? x.reason : x.detail}</small>
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export function ChangeProvider({ me, children }) {
   const toast = useToast();
   const admin = me?.user?.role === 'admin';
@@ -26,6 +74,11 @@ export function ChangeProvider({ me, children }) {
   const [busy, setBusy] = useState(false);
   const [acting, setActing] = useState(false); // Keep or Undo in progress; separate so they work while a commit is still waiting
   const [left, setLeft] = useState(null);
+  const [run, setRun] = useState(null); // the steps of the change going live, from the box
+  const [reach, setReach] = useState(null); // this browser's own check: { token, state, reason }
+  const [closed, setClosed] = useState(readClosed);
+  const seen = useRef(new Set()); // runs this browser watched going; an old finished one is not shown again
+  const baseRun = useRef(0); // while committing, ignore the run that was there before
   const busyRef = useRef(false);
   const queued = useRef(false);
   const timer = useRef(null);
@@ -37,31 +90,58 @@ export function ChangeProvider({ me, children }) {
 
   const pend = st?.fw?.pending || st?.net?.pending;
   const pendKind = st?.net?.pending ? 'net' : st?.fw?.pending ? 'fw' : '';
+  const pullRun = useCallback(async () => {
+    try {
+      const j = await get('/api/apply/progress');
+      let r = j.run || null;
+      if (r && busyRef.current && r.id <= baseRun.current) r = null;
+      if (r && (!r.outcome || busyRef.current)) seen.current.add(r.id);
+      setRun(r);
+      return r;
+    } catch { return null; }
+  }, []);
   const dirtyKinds = AREAS.filter(([k]) => st?.[k]?.dirty).map(([k]) => k);
   const fresh = async () => { const s = await get('/api/applystate'); stRef.current = s; return s; };
 
   // Keep a change by itself once this browser has proved it can still reach NopeWarden.
+  // It depends on the change's token, not on the object the page holds: that object is replaced every
+  // time the page asks again, and doing so used to stop this check half way, so the change was never
+  // kept and came back undone.
+  const pendToken = pend?.token || '';
   useEffect(() => {
-    if (!pend || !auto || tried.current === pend.token) return undefined;
-    tried.current = pend.token;
+    if (!pendToken || !auto || tried.current === pendToken) return undefined;
+    tried.current = pendToken;
     const kind = pendKind;
+    const token = pendToken;
     let dead = false;
     (async () => {
       try {
+        setReach({ token, state: 'active' });
         await sleep(4000); if (dead) return;
         await get('/api/auth/me');
         await sleep(2000); if (dead) return;
         await get('/api/auth/me'); if (dead) return;
-        await post(`/api/${kind}/confirm`, { token: pend.token });
+        setReach({ token, state: 'done' });
+        await post(`/api/${kind}/confirm`, { token });
         toast('Applied and kept. You can still reach NopeWarden, so the change is permanent.');
         reload();
       } catch (e) {
         // Cannot keep it by itself: the countdown undoes the change unless it is kept by hand. Say why.
+        setReach({ token, state: 'failed', reason: `${e?.message || 'NopeWarden did not answer'}.` });
         toast(`The change could not be kept automatically: ${e?.message || 'NopeWarden did not answer'}. Press Keep this change to keep it, or it is undone when the time runs out.`, 'warn');
       }
     })();
     return () => { dead = true; };
-  }, [pend, pendKind, auto]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pendToken, pendKind, auto]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Follow the steps while a change is going live, is on trial, or has not been closed yet.
+  const going = busy || !!pend || (!!run && !run.outcome);
+  useEffect(() => {
+    pullRun();
+    if (!going) return undefined;
+    const t = setInterval(pullRun, 600);
+    return () => clearInterval(t);
+  }, [going, pend?.token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!pend) { setLeft(null); return undefined; }
@@ -90,7 +170,9 @@ export function ChangeProvider({ me, children }) {
   const commit = useCallback(async (code = '') => {
     if (busyRef.current) return '';
     busyRef.current = true; setBusy(true);
+    setReach(null);
     try {
+      baseRun.current = (await pullRun().catch(() => null))?.id || baseRun.current;
       let s = await fresh();
       for (const [k, label] of AREAS) {
         if (!s[k]?.dirty) continue;
@@ -101,7 +183,7 @@ export function ChangeProvider({ me, children }) {
       }
       return '';
     } catch (e) { return e.message; }
-    finally { busyRef.current = false; setBusy(false); reload(); }
+    finally { busyRef.current = false; setBusy(false); reload(); pullRun(); }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The quick path: look for anything that deserves a second look, otherwise apply.
@@ -156,30 +238,64 @@ export function ChangeProvider({ me, children }) {
     catch (e) { toast(e.message, 'bad'); } finally { setActing(false); }
   };
 
-  const value = { st, staged, dirtyKinds, pend, applyNow, commit, reload, busy, auto, setAutoPref };
+  const shown = run && run.id !== closed && (!run.outcome || seen.current.has(run.id)) ? mergeRun(run, reach && (!pend || reach.token === pend.token) ? reach : null, auto) : null;
+  const closeRun = () => { if (run) { setClosed(run.id); try { sessionStorage.setItem(dismissKey, String(run.id)); } catch { /* ignore */ } } };
+  const value = { st, staged, dirtyKinds, pend, applyNow, commit, reload, busy, auto, setAutoPref, run: shown, closeRun };
   return (
     <Ctx.Provider value={value}>
       {children}
-      <ChangeBar pend={pend} left={left} auto={auto} setAutoPref={setAutoPref} busy={acting} confirm={confirm} undo={undo} />
+      <ChangeBar pend={pend} run={shown} left={left} auto={auto} setAutoPref={setAutoPref} busy={acting} confirm={confirm} undo={undo} close={closeRun} />
     </Ctx.Provider>
   );
 }
 
-// The bar at the bottom of the window: the countdown while a change is on trial.
-function ChangeBar({ pend, left, auto, setAutoPref, busy, confirm, undo }) {
-  if (!pend) return null;
+// The bar at the bottom of the window: the steps and the countdown while a change goes live, and the
+// result afterwards until it is closed.
+function ChangeBar({ pend, run, left, auto, setAutoPref, busy, confirm, undo, close }) {
+  const out = run?.outcome || '';
+  if (!pend && !run) return null;
+  const counting = !!pend && !out;
+  const head = applyHeadline(run);
+  const cls = counting ? 'countdown' : out === 'kept' ? 'ok' : out ? 'bad' : 'countdown';
   return (
-    <div className="confirmbar countdown floating" role="alert">
+    <div className={`confirmbar ${cls} floating`} role={out === 'kept' ? 'status' : 'alert'}>
       <div>
-        <div className="count">{left ?? ''}s</div>
-        <div className="sec">{auto ? 'Checking that you can still reach NopeWarden. If you can, the change is kept on its own.' : 'Does everything still work? Confirm to keep this change.'} If you cannot, the previous settings come back on their own.</div>
-        <button type="button" className="link small" onClick={() => setAutoPref(!auto)}>{auto ? 'Ask me to confirm every time' : 'Keep changes automatically when I can still reach NopeWarden'}</button>
+        {counting ? (
+          <>
+            <div className="count">{left ?? ''}s</div>
+            <div className="sec">{auto ? 'Checking that you can still reach NopeWarden. If you can, the change is kept on its own.' : 'Does everything still work? Confirm to keep this change.'} If you cannot, the previous settings come back on their own.</div>
+            <button type="button" className="link small" onClick={() => setAutoPref(!auto)}>{auto ? 'Ask me to confirm every time' : 'Keep changes automatically when I can still reach NopeWarden'}</button>
+          </>
+        ) : (
+          <>
+            <div className="count text">{head.title}</div>
+            <div className="sec">{head.text}</div>
+          </>
+        )}
       </div>
-      <div className="actions">
-        <Button onClick={undo} disabled={busy}>Undo now</Button>
-        <Button kind="primary" onClick={confirm} disabled={busy}>Keep this change</Button>
-      </div>
+      {counting && (
+        <div className="actions">
+          <Button onClick={undo} disabled={busy}>Undo now</Button>
+          <Button kind="primary" onClick={confirm} disabled={busy}>Keep this change</Button>
+        </div>
+      )}
+      {!counting && out && <div className="actions"><Button onClick={close}>Close</Button></div>}
+      {run && <ApplyList run={run} />}
     </div>
+  );
+}
+
+// The same steps on the Review page.
+export function ApplyPanel() {
+  const ch = useChanges();
+  const run = ch?.run;
+  if (!run) return null;
+  const head = applyHeadline(run);
+  return (
+    <Card title={head.title} desc={head.text}>
+      <ApplyList run={run} />
+      {run.outcome && <div className="actions"><Button onClick={ch.closeRun}>Close</Button></div>}
+    </Card>
   );
 }
 

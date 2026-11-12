@@ -16,6 +16,8 @@ type Conn struct {
 	RSPort, RDPort   uint16
 	OPackets, OBytes uint64
 	RPackets, RBytes uint64
+	State            string // the kernel's word for where a TCP connection is (ESTABLISHED, TIME_WAIT, CLOSE...), empty for others
+	Unreplied        bool   // nothing has come back yet
 }
 
 type key struct {
@@ -44,6 +46,12 @@ func ParseConntrack(text string) []Conn {
 		for _, tok := range f[4:] {
 			k, v, ok := strings.Cut(tok, "=")
 			if !ok {
+				switch {
+				case tok == "[UNREPLIED]":
+					c.Unreplied = true
+				case isTCPState(tok):
+					c.State = tok
+				}
 				continue
 			}
 			switch k {
@@ -107,6 +115,14 @@ func ParseConntrack(text string) []Conn {
 		out = append(out, c)
 	}
 	return out
+}
+
+func isTCPState(s string) bool {
+	switch s {
+	case "SYN_SENT", "SYN_RECV", "ESTABLISHED", "FIN_WAIT", "CLOSE_WAIT", "LAST_ACK", "TIME_WAIT", "CLOSE", "SYN_SENT2":
+		return true
+	}
+	return false
 }
 
 type seen struct {

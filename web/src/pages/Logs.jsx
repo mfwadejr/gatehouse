@@ -31,6 +31,14 @@ const bytes = (n) => {
   while (v >= 1000 && i < u.length - 1) { v /= 1000; i++; }
   return `${v >= 100 || i === 0 ? Math.round(v) : v.toFixed(1)} ${u[i]}`;
 };
+// The detail of a row that is opened. A DNS answer: the response code in words, how long it took, who
+// answered. A connection: how it ended, bytes each way, how long it lasted, and the rule that decided it.
+const RCODES = { NOERROR: 'answered', NXDOMAIN: 'that name does not exist', SERVFAIL: 'the server failed to answer', REFUSED: 'the server refused', FORMERR: 'the question was malformed', NOTIMP: 'not supported' };
+const rcodeText = (c) => (c ? `${c}${RCODES[c] ? ` (${RCODES[c]})` : ''}` : 'not recorded');
+const answerTime = (us) => (!us ? 'under a millisecond' : us < 1000 ? 'under a millisecond' : us < 100000 ? `${(us / 1000).toFixed(us < 10000 ? 1 : 0)} ms` : `${(us / 1e6).toFixed(2)} seconds`);
+const lastedText = (s) => (s == null ? 'not known' : s < 10 ? 'under 10 seconds' : s < 120 ? `${s} seconds` : s < 7200 ? `${Math.round(s / 60)} minutes` : `${(s / 3600).toFixed(1)} hours`);
+const OUTCOME_TONE = { Completed: 'good', 'Still open': 'good', Blocked: 'bad', Reset: 'warn', 'Timed out': 'warn' };
+
 const bits = (n) => {
   if (!n || n < 1000) return n ? '<1 kb/s' : '0';
   const u = ['kb/s', 'Mb/s', 'Gb/s'];
@@ -220,6 +228,18 @@ export default function Logs({ me }) {
   });
 
   const groups = useMemo(() => groupRows(rows), [rows]);
+  // While a connection row is open its rule's match count follows the firewall, as long as Live is on.
+  const ruleOpen = groups.some((g) => open[g.key] && g.first.kind === 'firewall' && g.first.rule);
+  const [ruleHits, setRuleHits] = useState({});
+  useEffect(() => {
+    if (!ruleOpen) return undefined;
+    let dead = false;
+    const pull = async () => { try { const j = await get('/api/fw/rules/counts?all=1'); if (!dead) setRuleHits(j.hits || {}); } catch { /* keep the last count */ } };
+    pull();
+    if (!live) return () => { dead = true; };
+    const iv = setInterval(pull, 2000);
+    return () => { dead = true; clearInterval(iv); };
+  }, [ruleOpen, live]);
   const none = !loading && !rows.length;
   const chips = Object.entries(flt).filter(([, v]) => v !== '' && v != null);
   return (
@@ -309,6 +329,22 @@ export default function Logs({ me }) {
                               {r.why && <div><b>Why:</b> {r.why}{conn && r.rule && <> <button className="link" onClick={() => pick('rule', r.rule)}>Same rule</button></>}</div>}
                               {conn && <div className="small">{r.dst_name && <>Host <span className="mono">{r.dst_name}</span> · </>}Address <span className="mono">{r.dst}</span>{r.port ? <> · port <button className="link" title="Show only this port" onClick={() => pick('port', r.port)}>{r.port}</button></> : null}{r.country && <> · <button className="link" onClick={() => pick('country', r.country)}>{regionName(r.country)}</button></>}</div>}
                               {conn && <div className="small">{r.from_zone && <button className="link" onClick={() => pick('network', r.from_zone)}>{r.from_zone}</button>} → {r.to_zone && <button className="link" onClick={() => pick('network', r.to_zone)}>{r.to_zone}</button>}{r.service && <> · <button className="link" onClick={() => pick('service', r.service)}>{r.service}</button></>}{r.app && <> · <button className="link" title="Show only this app" onClick={() => pick('app', r.app)}>{r.app}</button></>}</div>}
+                              {r.kind === 'dns' && (
+                                <div className="small logfacts">
+                                  <span>Response <b>{rcodeText(r.rcode)}</b></span>
+                                  <span>Answer time <b>{answerTime(r.answer_us)}</b></span>
+                                  <span>Answered by <b>{r.server || 'not recorded'}</b></span>
+                                </div>
+                              )}
+                              {conn && (
+                                <div className="small logfacts">
+                                  <span>Outcome <b>{r.outcome ? <Pill tone={OUTCOME_TONE[r.outcome] || ''}>{r.outcome}</Pill> : 'not known yet'}</b></span>
+                                  {r.verdict !== 'blocked' && <span>Sent <b>{r.bytes_out != null ? bytes(r.bytes_out) : 'not known'}</b></span>}
+                                  {r.verdict !== 'blocked' && <span>Received <b>{r.bytes_in != null ? bytes(r.bytes_in) : 'not known'}</b></span>}
+                                  {r.verdict !== 'blocked' && <span>Lasted <b>{lastedText(r.dur_s)}</b></span>}
+                                  {r.rule_name && <span>Rule <b>{r.rule_name}</b>{(ruleHits[r.rule]?.hits ?? r.rule_hits) != null && <> · matched <b>{fmt.n(ruleHits[r.rule]?.hits ?? r.rule_hits)}</b> so far{live ? ' (live)' : ''}</>}</span>}
+                                </div>
+                              )}
                               {r.who && r.addr && <div className="small"><button className="link" onClick={() => pick('device', r.addr)}>Show only {r.who}</button></div>}
                               {n > 1 && <div className="small muted">{n} times: {g.items.slice(0, 20).map((x) => fmt.time(x.ts)).join(', ')}{n > 20 ? ', …' : ''}</div>}
                               {conn && r.dst && <div><Button small onClick={() => mkRule(r, r.verdict === 'blocked' ? 'accept' : 'drop')}>{r.verdict === 'blocked' ? 'Allow this' : 'Block this'}</Button></div>}

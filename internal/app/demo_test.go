@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	dnssrv "nopewarden/internal/dns"
+	"nopewarden/internal/netd"
 	"nopewarden/internal/wanmon"
 	"nopewarden/web"
 )
@@ -103,6 +105,22 @@ func seedDemo(t *testing.T, c *client, scene string) {
 		}
 		return
 	}
+	if os.Getenv("NW_LOGS") != "" { // a few lookups and connections, with the detail a real box would have filled in
+		seedDemoLogs(c)
+	}
 	must("PUT", "/api/fw/rules", map[string]any{"name": "Cameras stay home", "from": "Home", "to": "Internet", "dst": "203.0.113.9", "action": "drop", "enabled": true})
 	apply()
+}
+
+// seedDemoLogs puts a few log rows in so the opened-row detail can be looked at.
+func seedDemoLogs(c *client) {
+	now := time.Now().Unix()
+	c.app.storeFW([]netd.FWEvent{
+		{TS: now - 40, Verdict: "allow", Tag: "rule:Home:Internet:Web", In: "eth1", Out: "eth0", Src: "192.168.1.110", Dst: "142.250.80.46", Proto: "tcp", SPort: 51000, DPort: 443},
+		{TS: now - 30, Verdict: "drop", Tag: "default:fwd", In: "eth1", Out: "eth0", Src: "192.168.1.115", Dst: "203.0.113.9", Proto: "tcp", SPort: 51001, DPort: 25},
+	})
+	c.app.Logs.Exec(`UPDATE fw_events SET outcome='Completed',bytes_out=2600,bytes_in=1480000,dur=25 WHERE dport=443`)
+	c.app.QLog.Add(dnssrv.LogEntry{TS: now - 20, Client: "192.168.1.110", ClientName: "Living room TV", QName: "api.example.com", QType: "A", Result: "forwarded", RCode: "NOERROR", Upstream: "1.1.1.1", LatencyUS: 14200})
+	c.app.QLog.Add(dnssrv.LogEntry{TS: now - 10, Client: "192.168.1.112", ClientName: "Marvin's laptop", QName: "nothing-here.example.net", QType: "AAAA", Result: "forwarded", RCode: "NXDOMAIN", Upstream: "1.1.1.1", LatencyUS: 31800})
+	time.Sleep(1500 * time.Millisecond)
 }

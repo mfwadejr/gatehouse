@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { post } from '../api.js';
-import { useChanges } from '../changes.jsx';
+import { ApplyPanel, useChanges } from '../changes.jsx';
 import { Button, Card, Empty, Field, Input, Note, Page, Problems, confirmBox, fmt, useStepUp, useToast } from '../ui.jsx';
 
 // Everything that is saved but not in use yet, in plain words, with what NopeWarden found when it
@@ -52,6 +52,7 @@ export default function Review() {
   };
   return (
     <Page title="Review changes" sub="Saved for later and not in use yet. Check them here, then put them all live in one step.">
+      <ApplyPanel />
       {ch.pend && <Note tone="warn" title="A change is being tried out">Wait for it to be kept or undone first. It takes up to a minute.</Note>}
       {!dirty.length && !ch.pend && (
         <Card title="Nothing is waiting"><Empty>Everything you have saved is in use. Changes made with Save for later show up here.</Empty></Card>

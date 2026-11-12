@@ -15,7 +15,9 @@ The picture is an example from a new, empty box; yours will show your own device
 - The search box and filters: **Allowed and blocked**, a time range (1 h, 24 h, 7 d, 30 d, or custom) and **Everything**, **Connections**, **Names (DNS)** or **Events**. Live updates can be turned off.
 - Every row is at most two lines: the app or website on top, the port and service below. **Out through** shows which connection or VPN it left by. Identical neighbouring entries become one row with a count.
 - Click a row (or press Enter) for the rest: why, the rule, the host and address, the country, the networks, the times, and **Block this** or **Allow this**.
-- **Columns & rows** chooses columns and how many rows load at a time. **Download as spreadsheet (CSV)** exports what you see.
+- **Columns & rows** chooses columns and how many rows load at a time. **Download as spreadsheet (CSV)** exports what you see: the same search, filters and kind, lookups and connections together, one row for each entry (a run of repeats on screen is one row each in the file). The first columns are the same for every row; the rest are the details below, left empty where they do not apply, plus the rule's technical tag. The rule's match count is the total at the moment you download.
+- Open a row to see more. A DNS lookup shows **Response** (the code, with what it means), **Answer time** and **Answered by** (an upstream DNS server, or NopeWarden itself for a name from memory, one of your own names or a blocked name). A connection shows **Outcome** (Completed, Reset, Timed out, Still open or Blocked), **Sent** and **Received** (bytes each way), **Lasted** and the **Rule** that decided it with how many connections that rule has matched so far, counting live while Live is on. A blocked connection shows the outcome and the rule only.
+- Outcome, bytes and time are read from the router's list of live connections every few seconds, so a very short connection shows "under 10 seconds", they cover IPv4 only, and connections logged before 0.9.4.26 show "not known yet".
 - **Recording & storage** chooses what is recorded and how long it is kept.
 
 ## Common tasks

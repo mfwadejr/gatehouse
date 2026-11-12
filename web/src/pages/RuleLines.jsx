@@ -123,11 +123,14 @@ export function RuleLines({ prot, pages, rules, opened, live, hits, onEdit, onMo
           {pages.map((r, i) => {
             const paused = r.name.startsWith('Paused');
             const members = pausedNames || [];
+            const standingBy = paused && members.length === 0;
             return (
               <Row key={`p${i}`} k={`p${i}`} num="–" name={`${r.name}: ${r.from} → ${r.to === 'self' ? 'NopeWarden' : r.to}`} from={sideItems(r.src_chips, r.from).map((x) => (x === 'Paused' ? 'Paused devices' : x))} to={sideItems(r.dst_chips, r.to === 'self' ? 'NopeWarden' : r.to)} svc={['everything']}
-                action={<Pill tone={r.action === 'accept' ? 'good' : 'bad'}>{actionWord(r.action)}</Pill>} info={hits.hit(r.tag, r)} tag={r.tag} when="Always">
+                off={standingBy}
+                action={standingBy ? <Pill>Standing by, nobody paused</Pill> : <Pill tone={r.action === 'accept' ? 'good' : 'bad'}>{actionWord(r.action)}</Pill>} info={hits.hit(r.tag, r)} tag={r.tag} when="Always">
                 <div className="say">{paused ? `Devices that are paused, or inside their profile's off-hours, cannot reach ${/^(wan|internet)$/i.test(r.to) ? 'the internet' : r.to} from ${r.from}.` : (r.descr || ruleSentence(r))}</div>
-                {paused && (
+                {standingBy && <div className="note">Nobody is paused right now, so this rule is not blocking anything. It switches on by itself when you pause a device or profile, which you do on the Profiles page, and a profile's off-hours switch it on too.</div>}
+                {paused && !standingBy && (
                   <div>
                     <div className="llbl">Blocked right now ({members.length})</div>
                     <div>{members.length ? <Chips items={members} max={8} /> : <span className="muted">No device is paused at the moment.</span>}</div>

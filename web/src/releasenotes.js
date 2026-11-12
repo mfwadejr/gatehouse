@@ -1,6 +1,26 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.26',
+    title: 'More detail when you open a log row',
+    items: [
+      'Logs: open a DNS lookup to see the response code (with what it means), how long the answer took and who answered, an upstream DNS server or NopeWarden itself.',
+      'Open a connection to see how it ended (Completed, Reset, Timed out, Still open or Blocked), the bytes sent and received, how long it lasted, and the rule that decided it with how many connections that rule has matched so far. The count follows the firewall live while Live is on.',
+      'Download as spreadsheet (CSV) now exports exactly what the log shows, lookups and connections together, with a column for each of these details, empty where they do not apply. The rule match count is the total when you download.',
+      'The outcome, bytes and time are read from the router every few seconds, only for IPv4, and only for connections logged from now on; older rows say not known yet.',
+    ],
+  },
+  {
+    version: '0.9.4.25',
+    title: 'Watch a change go live',
+    items: [
+      'When a change goes live you now see the steps, ticked off as they finish: checking it is safe, saving a way back, loading the new rules, filling in the device and country lists, starting the 60-second safety timer, checking you can still reach NopeWarden, and keeping the change or undoing it. Each step says in a line what is happening. Network changes show their own steps.',
+      'The list is on the card at the bottom of the window, where the countdown is, and on the Review page. Keep this change, Undo now and the countdown stay on the card.',
+      'When it worked the list says Applied successfully and stays until you close it. When a step fails it turns red, says why and stays until you close it, and the previous settings are still in use.',
+      'Firewall, Rules: the Paused line is greyed out and says Standing by, nobody paused when no device is paused, with a note that pausing is done on the Profiles page. While someone is paused it shows as active with their names.',
+    ],
+  },
+  {
     version: '0.9.4.24',
     title: 'See why a change was undone',
     items: [
