@@ -243,7 +243,7 @@ export default function Logs({ me }) {
   const none = !loading && !rows.length;
   const chips = Object.entries(flt).filter(([, v]) => v !== '' && v != null);
   return (
-    <Page title="Logs" sub="What your network did: connections allowed and blocked, names looked up, devices joining or leaving, and threat alerts. Looking for how NopeWarden itself is running? Open Diagnostics."
+    <Page title="Logs" sub="What your network did: connections, names looked up, devices joining or leaving, and threat alerts. For how NopeWarden itself is running, open Diagnostics."
       actions={<><label className="inline small"><Switch checked={live} onChange={setLive} label="Live updates" />Live</label><Button small onClick={() => setRec(true)}>Recording &amp; storage</Button></>}>
       {(!meta.record_allowed || !meta.record_blocked) && (
         <Note tone="warn" title="Some connections are not being recorded">
@@ -252,7 +252,7 @@ export default function Logs({ me }) {
         </Note>
       )}
       <Tabs value={tab} onChange={setTab} tabs={[{ value: 'log', label: 'Log' }, { value: 'summary', label: 'Summary & map' }, { value: 'activity', label: 'Activity' }, ...(admin ? [{ value: 'admin', label: 'Admin activity' }] : [])]} />
-      {tab === 'admin' ? <AdminActivity /> : (
+      {tab === 'admin' ? <AdminActivity /> : tab === 'activity' ? null : (
       <Card>
         <div className="stack">
           <div className="inline">
@@ -421,12 +421,14 @@ function Activity() {
   const pts = d?.points || [];
   const span = d ? d.to - d.from : 3600;
   const peak = (k) => Math.max(0, ...pts.map((p) => p[k]));
+  // Small speeds are drawn in kb/s so the scale does not read "0.1 Mb/s" twice.
+  const [per, speedUnit] = Math.max(peak('down'), peak('up')) < 1e6 ? [1e3, ' kb/s'] : [1e6, ' Mb/s'];
   return (
     <div className="stack">
       <Segmented value={range} onChange={setRange} options={[{ value: '30m', label: '30 min' }, { value: '1h', label: '1 h' }, { value: '1d', label: '24 h' }, { value: '1w', label: '7 d' }, { value: '1m', label: '30 d' }]} />
       <div className="grid2">
-        <Card title="Download speed" desc={`Highest ${bits(peak('down'))}`}><Trend values={pts.map((p) => p.down / 1e6)} unit=" Mb/s" seconds={span} series="Internet download" empty="No traffic recorded yet" /></Card>
-        <Card title="Upload speed" desc={`Highest ${bits(peak('up'))}`}><Trend values={pts.map((p) => p.up / 1e6)} unit=" Mb/s" seconds={span} series="Internet upload" empty="No traffic recorded yet" /></Card>
+        <Card title="Download speed" desc={`Highest ${bits(peak('down'))}`}><Trend values={pts.map((p) => p.down / per)} unit={speedUnit} seconds={span} series="Internet download" empty="No traffic recorded yet" /></Card>
+        <Card title="Upload speed" desc={`Highest ${bits(peak('up'))}`}><Trend values={pts.map((p) => p.up / per)} unit={speedUnit} seconds={span} series="Internet upload" empty="No traffic recorded yet" /></Card>
       </div>
       <Card title="Data used by each device" desc="Counted at the internet connection, including VPN tunnels.">
         {!usage.length ? <Empty>Nothing recorded in this time yet.</Empty> : (

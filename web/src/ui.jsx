@@ -15,6 +15,7 @@ export const ICONS = {
   logs: 'M5 4h14v16H5zM9 9h6M9 13h6M9 17h3',
   diagnostics: 'M4 5h16v11H4zM8 20h8M12 16v4M8 9l2 2-2 2M12 13h4',
   settings: 'M4 7h10M18 7h2M4 17h2M10 17h10M14 5v4M6 15v4',
+  updates: 'M12 4v11M7 11l5 5 5-5M5 20h14',
   check: 'M5 12l5 5 9-10',
   up: 'M12 19V5M5 12l7-7 7 7',
   down: 'M12 5v14M5 12l7 7 7-7',
@@ -62,7 +63,7 @@ export function Card({ title, desc, actions, children, className = '', enter = f
   );
 }
 
-const HELP_PAGES = ['overview', 'internet', 'networks', 'dns', 'dhcp', 'firewall', 'services', 'vpn', 'routes', 'policies', 'review', 'profiles', 'devices', 'logs', 'protection', 'threats', 'diagnostics', 'settings'];
+const HELP_PAGES = ['overview', 'internet', 'networks', 'dns', 'dhcp', 'firewall', 'services', 'vpn', 'routes', 'policies', 'review', 'profiles', 'devices', 'logs', 'protection', 'threats', 'diagnostics', 'updates', 'settings'];
 function helpPage() {
   const id = (window.location.hash.replace(/^#\/?/, '').split('?')[0] || 'overview').split('/')[0];
   return HELP_PAGES.includes(id) ? `${id}.html` : '';
@@ -201,7 +202,7 @@ export function Pill({ tone = '', children }) {
 export function Note({ tone = '', title, children }) {
   return (
     <div className={`note ${tone}`} role={tone === 'bad' ? 'alert' : undefined}>
-      {tone && <Icon name={tone === 'good' ? 'check' : 'warn'} size={18} />}
+      {tone && <Icon name={tone === 'good' ? 'check' : tone === 'info' ? 'updates' : 'warn'} size={18} />}
       <div>
         {title && <strong>{title}</strong>}
         {children}
@@ -240,10 +241,13 @@ export function Spark({ values = [], width = 88, height = 30, area = true, tone 
 
 // A labelled chart: a scale on the left, time along the bottom, and a legend saying what the
 // line is, so an empty or flat chart still reads as "nothing happened" rather than "broken".
+// A span of seconds in the words people use ("30 min", "2 h").
+const agoShort = (sec) => (sec < 90 ? `${Math.max(1, Math.round(sec))} s` : sec < 5400 ? `${Math.round(sec / 60)} min` : sec < 86400 * 2 ? `${Math.round(sec / 3600)} h` : `${Math.round(sec / 86400)} days`);
+
 export function Trend({ values = [], unit = '', series = '', seconds = 60, height = 90, empty = 'Nothing in this period' }) {
   const peak = Math.max(0, ...values);
   const top = peak === 0 ? 1 : peak < 10 ? Math.ceil(peak * 10) / 10 : Math.ceil(peak);
-  const label = (n) => `${n % 1 ? n.toFixed(1) : n}${unit}`;
+  const label = (n) => `${n % 1 ? n.toFixed(n < 1 ? 2 : 1) : n}${unit}`;
   return (
     <figure className="trend-chart">
       <div className="tc-body">
@@ -254,7 +258,7 @@ export function Trend({ values = [], unit = '', series = '', seconds = 60, heigh
           {peak === 0 && <span className="tc-empty">{empty}</span>}
         </div>
       </div>
-      <div className="tc-x small muted" aria-hidden="true"><span>{seconds} s ago</span><span>{seconds / 2} s</span><span>now</span></div>
+      <div className="tc-x small muted" aria-hidden="true"><span>{agoShort(seconds)} ago</span><span>{agoShort(seconds / 2)}</span><span>now</span></div>
       {series && <figcaption className="tc-legend small muted"><span className="swatch" />{series}</figcaption>}
     </figure>
   );

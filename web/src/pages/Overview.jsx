@@ -571,16 +571,24 @@ function MachineCard({ sys, upd }) {
 // The box has two lists (what needs you, and suggestions), can be collapsed, and the person's choices
 // (collapsed, dismissed suggestions, "remind me later") are kept under their account. Broken things can
 // never be dismissed or snoozed, and the dots in the left menu never hide.
-function AttentionArea({ items, stamp }) {
-  const c = useAttentionChoices(items);
+// Updates have their own banner at the top of the page, so their rows are left out of the lists here;
+// a restart or a failed update still counts in the status line, so the line is never "all good" while a banner says otherwise.
+const UPDATE_IDS = ['updates', 'reboot', 'update-failed'];
+const notUpdate = (x) => !UPDATE_IDS.includes(x.id);
+
+function AttentionArea({ c, stamp }) {
   const [showDismissed, setShowDismissed] = useState(false);
   const [asking, setAsking] = useState(null);
-  const { needs, snoozed, suggestions, dismissed } = c;
+  const needs = c.needs.filter(notUpdate);
+  const snoozed = c.snoozed.filter(notUpdate);
+  const suggestions = c.suggestions.filter(notUpdate);
+  const dismissed = c.dismissed.filter(notUpdate);
   const rows = needs.length + snoozed.length + suggestions.length + dismissed.length;
-  const tone = !needs.length ? 'good' : needs.some((x) => x.level === 'bad') ? 'bad' : 'warn';
-  const first = needs[0];
+  const all = c.needs;
+  const tone = !all.length ? 'good' : all.some((x) => x.level === 'bad') ? 'bad' : 'warn';
+  const first = all[0];
   const n = (k, one, many) => `${k} ${k === 1 ? one : many}`;
-  const text = needs.length ? `${needs.length === 1 ? '1 thing needs' : `${needs.length} things need`} your attention` : snoozed.length ? 'Nothing needs you right now' : 'Everything is working';
+  const text = all.length ? `${all.length === 1 ? '1 thing needs' : `${all.length} things need`} your attention` : snoozed.length ? 'Nothing needs you right now' : 'Everything is working';
   const row = (a, actions) => (
     <div className="spread" key={a.id} style={{ alignItems: 'flex-start' }}>
       <div className="inline" style={{ alignItems: 'flex-start', flexWrap: 'nowrap' }}><i className={`navdot ${a.level}`} style={{ marginLeft: 0, marginTop: '.4rem', animation: 'none' }} /><div><div className="name">{a.t}</div><div className="small muted">{a.s}</div></div></div>
@@ -593,16 +601,16 @@ function AttentionArea({ items, stamp }) {
     <>
       <div className="ov-statusline">
         <span className={`ov-state ${tone}`}><i className="dot" />{text}</span>
-        {needs.length === 1 && <button type="button" className="link" onClick={() => go(first.to)}>Open {pageLabel[first.to] || 'it'} →</button>}
-        {needs.length > 1 && <button type="button" className="link" onClick={() => go(first.to)}>{first.t} →</button>}
-        {needs.length > 1 && !c.open && <button type="button" className="link" onClick={() => c.setOpen(true)}>and {needs.length - 1} more</button>}
-        {!needs.length && !c.open && suggestions.length > 0 && <button type="button" className="link" onClick={() => c.setOpen(true)}>{n(suggestions.length, 'suggestion', 'suggestions')}</button>}
+        {all.length === 1 && <button type="button" className="link" onClick={() => go(first.to)}>Open {pageLabel[first.to] || 'it'} →</button>}
+        {all.length > 1 && <button type="button" className="link" onClick={() => go(first.to)}>{first.t} →</button>}
+        {all.length > 1 && !c.open && needs.length > 1 && <button type="button" className="link" onClick={() => c.setOpen(true)}>and {all.length - 1} more</button>}
+        {!all.length && !c.open && suggestions.length > 0 && <button type="button" className="link" onClick={() => c.setOpen(true)}>{n(suggestions.length, 'suggestion', 'suggestions')}</button>}
         {!c.open && snoozed.length > 0 && <button type="button" className="link muted" onClick={() => c.setOpen(true)}>{snoozed.length} snoozed</button>}
         <UpdatedAgo stamp={stamp} />
         {rows > 0 && <button type="button" className="chevbtn" onClick={() => c.setOpen(!c.open)} aria-expanded={c.open} aria-label={c.open ? 'Hide the list' : 'Show the list'} title={c.open ? 'Hide the list' : 'Show the list'} style={{ transform: c.open ? 'none' : 'rotate(-90deg)' }}><Icon d="M6 9l6 6 6-6" size={16} /></button>}
       </div>
       {rows > 0 && c.open && (
-        <Card className={`ov-attn ${needs.length ? '' : 'calm'}`}>
+        <Card className={`ov-attn ${all.length ? '' : 'calm'}`}>
           <div className="stack gap2">
             {needs.length > 0 && <div className="attnlabel">Needs your attention</div>}
             {needs.map((a) => row(a, <>
@@ -621,6 +629,52 @@ function AttentionArea({ items, stamp }) {
         </Card>
       )}
     </>
+  );
+}
+
+// The update notice at the top of the page. Blue: an update is ready (it can be put off until tomorrow, or
+// dismissed for that version). Yellow: a restart is needed. Red: the last update did not work. The yellow and
+// red ones cannot be put away; they go when the restart happens or the next update works.
+function tomorrowMorning() {
+  const t = new Date();
+  t.setDate(t.getDate() + 1);
+  t.setHours(8, 0, 0, 0);
+  return t.getTime() - Date.now();
+}
+
+function UpdateBanner({ c }) {
+  const it = c.suggestions.find((x) => x.id === 'updates');
+  const warn = c.needs.find((x) => x.id === 'reboot');
+  const bad = c.needs.find((x) => x.id === 'update-failed');
+  const [more, setMore] = useState(false);
+  if (!it && !warn && !bad) return null;
+  return (
+    <div className="stack">
+      {bad && (
+        <Note tone="bad" title={bad.t}>
+          {bad.s}
+          <div className="actions"><Button kind="primary" small onClick={() => go('updates')}>Open Updates</Button></div>
+        </Note>
+      )}
+      {warn && (
+        <Note tone="warn" title={warn.t}>
+          {warn.s} Pick a moment that suits you; the network is down for about a minute.
+          <div className="actions"><Button kind="primary" small onClick={() => go('updates')}>Open Updates</Button></div>
+        </Note>
+      )}
+      {it && (
+        <Note tone="info" title={it.t}>
+          {it.s}
+          {more && it.notes && <div className="small" style={{ whiteSpace: 'pre-wrap', marginTop: 'var(--space-2)' }}>{it.notes}</div>}
+          <div className="actions">
+            <Button kind="primary" small onClick={() => go('updates')}>Update now</Button>
+            <Button small onClick={() => (it.notes ? setMore(!more) : go('updates/whatsnew'))}>{more ? 'Hide details' : "What's new"}</Button>
+            <Button small onClick={() => c.snooze(it, tomorrowMorning())}>Remind me later</Button>
+            <Button small onClick={() => c.dismiss(it)}>Dismiss</Button>
+          </div>
+        </Note>
+      )}
+    </div>
   );
 }
 
@@ -643,13 +697,15 @@ export default function Overview() {
   const links = net?.links || {};
   const wanList = wans?.wans || [];
   const { items: attention } = useAttention();
+  const choices = useAttentionChoices(attention);
   const stamp = Math.max(thrAt || 0, netAt || 0, dnsAt || 0) || null;
 
   return (
     <Page title="Overview"
       sub={`${devs?.online ?? 0} device${devs?.online === 1 ? '' : 's'} online`}
       actions={<LiveDot stamp={stamp} />}>
-      <AttentionArea items={attention} stamp={stamp} />
+      <UpdateBanner c={choices} />
+      <AttentionArea c={choices} stamp={stamp} />
       <WhatsNewCard current={upd?.current} />
       <Hero wanList={wanList} links={links} thr={thr} />
       <section className="ov-g4" aria-label="Status">

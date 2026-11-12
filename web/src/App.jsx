@@ -29,6 +29,7 @@ const Services = lazy(() => import('./pages/Services.jsx'));
 const Devices = lazy(() => import('./pages/Devices.jsx'));
 const Profiles = lazy(() => import('./pages/Profiles.jsx'));
 const Logs = lazy(() => import('./pages/Logs.jsx'));
+const Updates = lazy(() => import('./pages/Updates.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
 
 export const PAGES = [
@@ -48,6 +49,7 @@ export const PAGES = [
   { id: 'devices', label: 'Devices & access', icon: 'devices', el: Devices, group: 'People and devices' },
   { id: 'logs', label: 'Logs', icon: 'logs', el: Logs, group: 'System' },
   { id: 'diagnostics', label: 'Diagnostics', icon: 'diagnostics', el: Diagnostics, group: 'System' },
+  { id: 'updates', label: 'Updates', icon: 'updates', el: Updates, group: 'System' },
   { id: 'settings', label: 'Settings', icon: 'settings', el: Settings, group: 'System' },
   { id: 'review', label: 'Review changes', icon: 'policies', el: Review, hidden: true },
 ];
@@ -118,7 +120,9 @@ function Shell({ me, onSignOut, reloadMe }) {
           </div>
           <button type="button" className="themebtn" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} aria-label={theme === 'light' ? 'Switch to the dark look' : 'Switch to the light look'} title={theme === 'light' ? 'Switch to the dark look' : 'Switch to the light look'}><Icon name={theme === 'light' ? 'moon' : 'sun'} size={16} /></button>
           <button type="button" className="signoutbtn" onClick={onSignOut} aria-label="Sign out" title="Sign out"><Icon name="logout" size={16} /></button>
-          {upd?.current && <button type="button" className="link small verline" onClick={() => setNotes(true)}>Version {upd.current} · What's new</button>}
+          {upd?.current && (attn.items.some((x) => x.id === 'updates')
+            ? <a className="link small verline" href="#/updates" title="An update is ready">Version {upd.current} · Update available</a>
+            : <button type="button" className="link small verline" onClick={() => setNotes(true)}>Version {upd.current} · What's new</button>)}
         </div>
       </aside>
       <main className="main" id="main">

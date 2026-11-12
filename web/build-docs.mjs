@@ -10,7 +10,7 @@ export const ORDER = [
   ['getting-started', 'Getting started'], ['recovery', 'If you are locked out'],
   ['overview', 'Overview'], ['internet', 'Internet'], ['networks', 'Networks'], ['dns', 'DNS'], ['dhcp', 'DHCP'],
   ['firewall', 'Firewall'], ['protection', 'Protection'], ['threats', 'Threats'], ['services', 'Services'], ['vpn', 'VPN'], ['routes', 'Routes'], ['policies', 'Policies'], ['review', 'Review changes'], ['profiles', 'Profiles'],
-  ['devices', 'Devices & access'], ['logs', 'Logs'], ['diagnostics', 'Diagnostics'], ['settings', 'Settings'], ['reference', 'Reference'], ['ease-of-use', 'How easy is it?'],
+  ['devices', 'Devices & access'], ['logs', 'Logs'], ['diagnostics', 'Diagnostics'], ['updates', 'Updates'], ['settings', 'Settings'], ['reference', 'Reference'], ['ease-of-use', 'How easy is it?'],
 ];
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const inline = (s) => esc(s)

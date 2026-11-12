@@ -157,6 +157,7 @@ textarea.in { height: auto; padding: var(--space-2-5) var(--component-input-padd
 .note.warn { border-color: var(--color-status-warning); }
 .note.bad { border-color: var(--color-status-bad-border); color: var(--color-status-bad); }
 .note.good { border-color: var(--color-status-good); }
+.note.info { border-color: var(--color-accent-selected-border); background: var(--color-accent-selected-bg); }
 .note ul { margin: var(--space-1) 0 0; padding-left: var(--space-4-5); }
 
 .overlay { position: fixed; inset: 0; z-index: var(--z-modal); display: flex; align-items: flex-start; justify-content: center; padding: var(--space-8) var(--space-4); overflow-y: auto; }

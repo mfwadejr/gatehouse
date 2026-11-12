@@ -119,7 +119,7 @@ export default function UPnPCard() {
         <summary>Advanced: how long ports stay open, and recent requests</summary>
         <div className="stack">
           <Field label="Longest a port stays open" hint="Devices renew what they still need.">
-            <Select value={String(st.max_lease_hours)} onChange={(v) => save({ max_lease_hours: Number(v) })} options={[{ value: '1', label: '1 hour' }, { value: '6', label: '6 hours' }, { value: '24', label: '1 day' }, { value: '168', label: '7 days' }]} />
+            <Select aria-label="Longest an opened port may stay open" value={String(st.max_lease_hours)} onChange={(v) => save({ max_lease_hours: Number(v) })} options={[{ value: '1', label: '1 hour' }, { value: '6', label: '6 hours' }, { value: '24', label: '1 day' }, { value: '168', label: '7 days' }]} />
           </Field>
           <div className="scroll"><table className="table">
             <thead><tr><th>Time</th><th>Request from a device</th></tr></thead>

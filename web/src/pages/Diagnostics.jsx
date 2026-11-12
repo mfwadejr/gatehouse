@@ -165,7 +165,7 @@ function SystemLog() {
         </div>
         {res && <p className="small muted">{fmt.n(res.matched)} of {fmt.n(res.scanned)} lines searched match{words.length ? '' : ' your choices'}. Showing the newest {fmt.n(rows.length)}.</p>}
         {!res ? <span className="muted">Loading…</span> : !rows.length ? (
-          <Empty>{words.length ? 'Nothing matches. What your network did is in Logs; who changed what is in Logs, Admin activity.' : 'Nothing to show. That is good news when only warnings and errors are on.'}</Empty>
+          <Empty>{words.length ? 'Nothing matches. What your network did is in Logs; who changed what is in Logs, Admin activity.' : everything ? 'Nothing to show for these choices.' : 'No warnings or errors in this time. That is good news.'}{!everything && !words.length && <> <button type="button" className="link" onClick={() => setEverything(true)}>Show everything</button></>}</Empty>
         ) : (
           <pre className="logpre mono small" tabIndex={0}>{rows.map((x, i) => <div key={i}><Hit text={x.l} words={words} />{x.known && <span className="muted">{'  ← '}{x.known}</span>}</div>)}</pre>
         )}
@@ -179,7 +179,10 @@ export default function Diagnostics() {
   return (
     <Page title="Diagnostics" sub="How NopeWarden itself is running: its services, its system log, and tools to test the connection. Looking for what your network did? Open Logs.">
       <Tabs value={tab} onChange={setTab} tabs={[{ value: 'services', label: 'Health & services' }, { value: 'log', label: 'System log' }, { value: 'tools', label: 'Network tools' }, { value: 'terminal', label: 'Terminal' }]} />
-      {tab === 'services' && <><Verdict /><Services /><Connections /></>}
+      {tab === 'services' && <><Verdict /><Services /><Connections />
+        <Card title="My network" desc="A printable summary for a handover or your records: networks, addresses, devices, open ports and how to get back in. It never contains passwords or keys.">
+          <a className="btn" href="/api/summary/print" target="_blank" rel="noreferrer">Open the printable page</a>
+        </Card></>}
       {tab === 'log' && <SystemLog />}
       {tab === 'tools' && <NetTools />}
       {tab === 'terminal' && <Terminal />}

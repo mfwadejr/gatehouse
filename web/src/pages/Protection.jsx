@@ -1,9 +1,11 @@
 import { useHashTab } from '../hashtab.js';
 import React, { useState } from 'react';
 import { useData } from '../api.js';
-import { Card, Note, Page, Pill, Tabs } from '../ui.jsx';
+import { Card, Guard, Note, Page, Pill, Tabs } from '../ui.jsx';
 import Security from './Security.jsx';
 import Blocks from './Blocks.jsx';
+import TrafficLabels from './TrafficLabels.jsx';
+import BlockVersions from './BlockVersions.jsx';
 
 // One place for everything that protects the network from the inside and the outside.
 // Fail open: the app and category blocks, and the threat watching, never stop the network when they
@@ -36,12 +38,13 @@ function Summary({ go }) {
 }
 
 export default function Protection() {
-  const [tab, setTab] = useHashTab('protection', ['overview','blocks'], 'overview');
+  const [tab, setTab] = useHashTab('protection', ['overview','blocks','lists'], 'overview');
   return (
     <Page title="Protection" sub="Check how safe the network is, and block apps, categories and websites.">
-      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'overview', label: 'Overview' }, { value: 'blocks', label: 'Blocks' }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'overview', label: 'Overview' }, { value: 'blocks', label: 'Blocks' }, { value: 'lists', label: 'Lists and labels' }]} />
       {tab === 'overview' && <Summary go={setTab} />}
       {tab === 'blocks' && <Blocks />}
+      {tab === 'lists' && <><Guard what="Blocking lists"><BlockVersions /></Guard><Guard what="Traffic labels"><TrafficLabels /></Guard></>}
     </Page>
   );
 }

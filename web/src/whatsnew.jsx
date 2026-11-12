@@ -8,7 +8,7 @@ const remember = (v) => { try { localStorage.setItem(KEY, v); } catch { /* fine 
 
 export const latestRelease = () => RELEASES[0];
 
-function Notes({ list }) {
+export function Notes({ list }) {
   return (
     <div className="stack">
       {list.map((r) => (

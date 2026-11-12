@@ -8,11 +8,11 @@ Your account, and how this box is run. It is split into five tabs.
 The picture is an example from a new, empty box; yours will show your own devices and numbers.
 
 ## What is on the page
-- **General**: **Finish setting up** (only while something is left) and **Common setups**, **Device mode** (Router or Bridge, with a three-step change), **Updates** (**Check now**, **How often to check**, **Off**, **Notify** or **Automatic**), **Power** (restart or shut down), **Console address**, **Your place on the map** (**Find a place** by zip or postal code, city or address, or type your latitude and longitude, click the map or pick a country; only the words you search for are sent, to OpenStreetMap, and the saved place stays on this machine and is placed within about a degree) and **Appearance**.
+- **General**: **Finish setting up** (only while something is left) and **Common setups**, **Device mode** (Router or Bridge, with a three-step change), **Power** (restart or shut down), **Console address**, **Your place on the map** (**Find a place** by zip or postal code, city or address, or type your latitude and longitude, click the map or pick a country; only the words you search for are sent, to OpenStreetMap, and the saved place stays on this machine and is placed within about a degree) and **Appearance**.
 - **Account & sign-in**: **Two-factor sign-in**, **Password**, **Where you are signed in** (the round arrow button at the bottom of the left menu signs you out of this browser at once) and **Remote login** (SSH, off unless you turn it on; if the machine has no SSH identity yet, NopeWarden makes one when you turn it on).
 - **Alerts & logs**: **Alerts** (ntfy or email, with quiet hours), **Send logs elsewhere**, **Send traffic records (NetFlow / IPFIX)**, SNMP and **Storage** (what is kept on this machine's disk, about how much room each kind takes, and when it is removed).
-- **Backup & recovery**: **Backups**, **Changes** (a copy before every change, to go back to), **My network** (a printable summary with a map) and **Reset to default**.
-- **Advanced**: **High availability** (two boxes as a pair), **Bridge mode** (all the detailed settings), **Traffic labels**, **Guest sign-in page** and **Lists used for blocking** (the version of the app names and category lists NopeWarden blocks by).
+- **Backup & recovery**: **Backups**, **Changes** (a copy before every change, to go back to) and **Reset to default**.
+- **Advanced**: **High availability** (two boxes as a pair), **Bridge mode** (all the detailed settings) and **Guest sign-in page**. Updates have their own page, Updates; **Traffic labels** and **Lists used for blocking** are on Protection, under Lists and labels.
 
 Administrators see all five tabs. Other accounts see only their own sign-in settings and Appearance. The page reopens on the tab you used last.
 
@@ -31,10 +31,10 @@ Administrators see all five tabs. Other accounts see only their own sign-in sett
 3. Make a backup: **Backup & recovery**, **Back up now**.
 
 ## Example
-Use **Notify** for updates: NopeWarden tells you when one is ready and you press **Update now** when it suits you.
+Turn on two-factor sign-in under **Account & sign-in**, then make a backup under **Backup & recovery**.
 
 ## If something goes wrong
 A mode change that is not kept goes back on its own, and the card says so. See Getting back in for lock-outs.
 
 ## One schedule for every recurring job
-Update checks, blocklist refreshes, country lists and threat rules all use the same schedule editor: **Every N hours**, **Daily at** a time, **Weekly on** a day and time, or **Off**. The sentence beside it says in plain English when the next run is. A job that fails retries after 5 minutes, 15, 30, and then every hour until it works.
+Update checks (set on the Updates page), blocklist refreshes, country lists and threat rules all use the same schedule editor: **Every N hours**, **Daily at** a time, **Weekly on** a day and time, or **Off**. The sentence beside it says in plain English when the next run is. A job that fails retries after 5 minutes, 15, 30, and then every hour until it works.

@@ -14,6 +14,8 @@ Tabs along the top:
 
 The **Log** card under Services has **Show the log of** (one service, or **Warnings from everything**), **How many lines**, **Only lines containing** and **Refresh**.
 
+- **My network** (bottom of the **Health & services** tab): a printable summary for a handover or your records, with a map. It never contains passwords or keys.
+
 ## Common tasks
 1. Find out why a service is not working: **Health & services**, read the reason, press **Show log**.
 2. Restart a service that is stuck: **Restart**.

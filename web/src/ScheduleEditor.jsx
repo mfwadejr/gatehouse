@@ -64,11 +64,11 @@ export function ScheduleEditor({ id, label, extra, hideRun }) {
 }
 
 // Every recurring job in one place, for Settings.
-export function ScheduleTable() {
+export function ScheduleTable({ except = [] }) {
   const { data } = useData('/api/schedules', { every: 30000 });
   return (
     <div className="stack">
-      {(data || []).map((j) => <ScheduleEditor key={j.id} id={j.id} label={j.name} />)}
+      {(data || []).filter((j) => !except.includes(j.id)).map((j) => <ScheduleEditor key={j.id} id={j.id} label={j.name} />)}
     </div>
   );
 }

@@ -93,7 +93,7 @@ export default function BridgeMode() {
 
   return (
     <Card title="Bridge mode" desc="Use NopeWarden as a filter between another router and your network, without routing or changing addresses. Your current networks stay saved and come back when you switch it off."
-      actions={live ? <Pill tone="good">On</Pill> : <Pill>Off</Pill>}>
+      actions={live ? <Pill tone="good">On</Pill> : f.enabled ? <Pill tone="warn">Saved, not applied</Pill> : <Pill>Off</Pill>}>
       <div className="stack">
         {data.undone && <Note tone="warn" title="The last change was not kept">It was undone on its own, and your previous settings are back. Your setup is still saved below so you can try again.</Note>}
         <Problems list={data.problems} />
@@ -122,7 +122,7 @@ export default function BridgeMode() {
             <details className="more"><summary>Extra safety and exceptions</summary>
               <div className="stack">
                 <div className="formgrid">
-                  <Field label="Management-only port (optional)" hint="A spare port that is never part of the bridge. Plug a laptop in here to always reach the console."><Select value={f.oob} onChange={set('oob')} options={portOpts('None')} /></Field>
+                  <Field label="Management-only port (optional)" hint="A spare port that is never part of the bridge. Plug a laptop in here to always reach the console."><Select aria-label="Management-only port" value={f.oob} onChange={set('oob')} options={portOpts('None')} /></Field>
                   {f.oob && <Field label="Its address"><Input value={f.oob_addr} onChange={set('oob_addr')} placeholder="192.168.99.1/24" className="in mono" /></Field>}
                 </div>
                 <Field label="Networks on the other router's side that may manage NopeWarden" hint="Leave empty so only your own devices can. For example an office or VPN range: 10.8.0.0/24"><Input value={subnets} onChange={setSubnets} className="in mono" /></Field>

@@ -52,7 +52,7 @@ export default function Alerts() {
             <div style={{ alignSelf: 'end' }}><Button onClick={() => test('email')} disabled={busy}>Send a test</Button></div>
           </div>
         )}
-        {!anyChannel && <Note>Switch on at least one way to be told, or no alerts are sent.</Note>}
+        {!anyChannel && Object.values(f.on || {}).some(Boolean) && <Note tone="warn">Switch on at least one way to be told above, or no alerts are sent.</Note>}
         <strong>Tell me when</strong>
         {data.kinds.map((k) => (
           <ToggleRow key={k.id} title={k.label} desc={k.desc} checked={!!f.on[k.id]} onChange={(v) => set('on', { ...f.on, [k.id]: v })} />

@@ -1,6 +1,18 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.27',
+    title: 'Updates get their own page',
+    items: [
+      'Updates are now a page of their own in the System group, with four tabs: Updates, Schedule, What\'s new and Advanced. The schedule for update checks is in one place, and the release page is under Advanced.',
+      'A notice at the top of the Overview says when an update is ready, whichever way updating is set. Update now opens the Updates page, Remind me later hides it until tomorrow morning, and Dismiss hides it for that version only.',
+      'The Updates entry in the menu shows a blue dot when an update is ready, yellow when a restart is needed and red when the last update did not work; the Overview shows a yellow or red notice for those two. The line at the bottom of the menu says Update available.',
+      'Blocking lists and Traffic labels are now on Protection, under Lists and labels. My network (the printable summary) is under Diagnostics.',
+      'Logs, Activity has one time picker, the speed charts say 30 min or 2 h instead of raw seconds, and slow speeds are drawn in kb/s.',
+      'Bridge mode says Saved, not applied when it is set up but not yet live. A blocking list that could not be downloaded says so instead of showing an error. Signed-in browsers are named (Chrome on Linux) instead of raw text. The system log says why it is empty and offers Show everything. The data limit alert points to Internet, Usage.',
+    ],
+  },
+  {
     version: '0.9.4.26',
     title: 'More detail when you open a log row',
     items: [

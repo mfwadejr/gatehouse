@@ -7,6 +7,7 @@ One place for keeping the network safe: a check of what to fix, and blocking app
 Tabs along the top:
 - **Overview**: **Protection at a glance** gives one sentence of verdict and a line each for the security check, your blocks and threat watching. Below it, the **Security check** lists what to fix, with a button that goes to the right page.
 - **Blocks**: the **Blocks** card lists one row per block: its name, what it holds, where it applies, when, how, and how many lookups it refused in the last day. **Add a block** takes an optional name and lets you choose many apps, categories and websites in one block, then where it applies (everyone, or any mix of networks, profiles and devices), how, and when (always or at set hours). **Start from** fills the form with Social media, Streaming, Gaming or AI chat, ready to change. **Pause…** stops a block for a set time or until you resume it. Blocks have the same controls as firewall rules and routes: pause, turn off, edit, remove.
+- **Lists and labels**: **Lists used for blocking** shows which version of the app names and category lists blocking uses, and how fresh each download is; a list that could not be downloaded says so and the last good copy keeps working. **Traffic labels** names the app behind each connection by looking at the first packets (off by default).
 - **Exceptions** is a separate card. **Add an exception** lets things through for a device, profile or network even when a block says no.
 - Threat watching has its own page, **Threats**, in the left menu under Security.
 

@@ -54,8 +54,16 @@ export function AttentionProvider({ children }) {
       const names = dns.upstreams.map((u) => u.name).filter(Boolean).join(', ');
       add('bad', 'dns-down', 'No DNS server is answering', `${names ? `${names} did not answer. ` : ''}Devices cannot look up names until one answers. Open DNS and press Test.`, 'dns');
     }
-    if (upd?.needs_reboot) add('warn', 'reboot', 'A restart is needed', 'The system was updated and needs a restart to finish.', 'settings');
-    else if (upd?.available && upd.mode !== 'off' && upd.state === 'idle') add('info', 'updates', 'Updates are ready to install', [upd.nopewarden_new && upd.latest ? `NopeWarden ${upd.latest.version}` : '', upd.system_count > 0 ? `${upd.system_count} system update${upd.system_count === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and '), 'settings');
+    // Updates have their own page. An update that is ready is shown whatever the update mode is.
+    const failedAt = upd?.result && !upd.result.ok ? upd.result.at || 0 : 0;
+    if (upd?.state === 'idle' && !upd.working && failedAt && Date.now() / 1000 - failedAt < 3 * 86400) add('bad', 'update-failed', upd.result.rolled_back ? 'The last update did not work and was undone' : 'The last update did not work', `${upd.result.error || 'Open Updates to see what happened.'}`, 'updates');
+    if (upd?.needs_reboot) add('warn', 'reboot', 'A restart is needed', 'The system was updated and needs a restart to finish.', 'updates');
+    else if (upd?.available && upd.state === 'idle' && !upd.working) {
+      const nw = upd.nopewarden_new && upd.latest ? upd.latest.version : '';
+      const sys = upd.system_count > 0 ? `${upd.system_count} system update${upd.system_count === 1 ? '' : 's'}` : '';
+      const it = { level: 'info', id: 'updates', t: nw ? `NopeWarden ${nw} is available` : 'System updates are ready to install', s: [nw ? `You are on ${upd.current}.` : '', sys && nw ? `Also ${sys}.` : sys].filter(Boolean).join(' '), to: 'updates', sig: nw ? `v${nw}` : 'system', notes: nw ? upd.latest.notes || '' : '' };
+      a.push(it);
+    }
     // The security check and threat alerts both live on Protection.
     const bad = (sec?.items || []).filter((i) => i.level === 'bad').length;
     const warn = (sec?.items || []).filter((i) => i.level === 'warn').length;
@@ -76,10 +84,10 @@ export function AttentionProvider({ children }) {
 export const levelText = { bad: 'Something is broken', warn: 'Needs you', info: 'A suggestion' };
 
 // The words for where an item's "Open" goes (the left menu's names).
-export const pageLabel = { internet: 'Internet', networks: 'Networks', firewall: 'Firewall', review: 'Review', dhcp: 'DHCP', vpn: 'VPN', dns: 'DNS', settings: 'Settings', protection: 'Protection', threats: 'Threats' };
+export const pageLabel = { internet: 'Internet', networks: 'Networks', firewall: 'Firewall', review: 'Review', dhcp: 'DHCP', vpn: 'VPN', dns: 'DNS', settings: 'Settings', updates: 'Updates', protection: 'Protection', threats: 'Threats' };
 
 // Short fingerprint of what an item says, so a dismissed suggestion comes back when its wording changes.
-const sigOf = (it) => { let h = 5381; const t = `${it.t}|${it.s}`; for (let i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0; return h.toString(36); };
+const sigOf = (it) => { let h = 5381; const t = it.sig || `${it.t}|${it.s}`; for (let i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0; return h.toString(36); };
 
 export const SNOOZES = { day: 24 * 3600 * 1000, week: 7 * 24 * 3600 * 1000 };
 
@@ -107,7 +115,7 @@ export function useAttentionChoices(items) {
   const view = useMemo(() => {
     const status = (it) => {
       const h = state.hide[it.id];
-      if (it.level === 'info') return h?.k === 'd' && h.sig === sigOf(it) ? 'dismissed' : 'shown';
+      if (it.level === 'info') return h?.k === 's' && h.until > now ? 'snoozed' : h?.k === 'd' && h.sig === sigOf(it) ? 'dismissed' : 'shown';
       if (it.level === 'warn') return h?.k === 's' && h.until > now ? 'snoozed' : 'shown';
       return 'shown';
     };

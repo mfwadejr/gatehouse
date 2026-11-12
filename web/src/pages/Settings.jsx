@@ -15,11 +15,9 @@ import GuestPortal from './GuestPortal.jsx';
 import BridgeMode from './BridgeMode.jsx';
 import DeviceMode from './DeviceMode.jsx';
 import HighAvailability from './HighAvailability.jsx';
-import TrafficLabels from './TrafficLabels.jsx';
-import BlockVersions from './BlockVersions.jsx';
 import RemoteLogin from './RemoteLogin.jsx';
 import Alerts from './Alerts.jsx';
-import { ScheduleEditor, ScheduleTable } from '../ScheduleEditor.jsx';
+import { PowerModal, useReconnect } from './PowerModal.jsx';
 
 function Password() {
   const [f, setF] = useState({ current: '', next: '', again: '' });
@@ -37,6 +35,18 @@ function Password() {
   );
 }
 
+// A browser string such as "Mozilla/5.0 (X11; Linux x86_64) ... Chrome/120" in words people use.
+function browserName(ua) {
+  const u = ua || '';
+  if (!u) return 'Unknown device';
+  const app = /Edg\//.test(u) ? 'Edge' : /OPR\/|Opera/.test(u) ? 'Opera' : /Firefox\//.test(u) ? 'Firefox' : /HeadlessChrome/.test(u) ? 'A test browser' : /Chrome\//.test(u) ? 'Chrome' : /Safari\//.test(u) ? 'Safari' : null;
+  const os = /iPhone|iPad/.test(u) ? 'iPhone or iPad' : /Android/.test(u) ? 'Android' : /Mac OS X|Macintosh/.test(u) ? 'a Mac' : /Windows/.test(u) ? 'Windows' : /Linux|X11/.test(u) ? 'Linux' : '';
+  if (app) return os ? `${app} on ${os}` : app;
+  if (/^Go-http-client/.test(u)) return 'A script (Go client)';
+  if (/curl/i.test(u)) return 'A script (curl)';
+  return u.slice(0, 40);
+}
+
 function Sessions() {
   const { data, reload } = useData('/api/auth/sessions');
   const [run] = useAction();
@@ -45,7 +55,7 @@ function Sessions() {
       <div className="list">
         {(data || []).map((s) => (
           <div className="item" key={s.id}>
-            <div><div className="name">{s.ip} {s.current && <Pill tone="good">This browser</Pill>}</div><div className="meta">{(s.ua || '').slice(0, 80)} · active {fmt.ago(s.last_seen)}</div></div>
+            <div><div className="name">{s.ip} {s.current && <Pill tone="good">This browser</Pill>}</div><div className="meta">{browserName(s.ua)} · active {fmt.ago(s.last_seen)}</div></div>
             {!s.current && <Button small kind="danger" onClick={() => run(() => del(`/api/auth/sessions/${s.id}`)).then(reload)}>Sign out</Button>}
           </div>
         ))}
@@ -149,52 +159,6 @@ function ConsolePort() {
   );
 }
 
-const POWER = {
-  reboot: { title: 'Restart this machine', verb: 'Restart', warn: 'The network is down for about a minute while it restarts. This page reconnects by itself.', waiting: 'Restarting…' },
-  poweroff: { title: 'Shut down this machine', verb: 'Shut down', warn: 'The network goes down and stays down until someone switches the machine back on.', waiting: 'Shutting down…' },
-  'restart-nopewarden': { title: 'Restart NopeWarden only', verb: 'Restart NopeWarden', warn: 'The console, DNS and DHCP are down for a few seconds. The machine itself keeps running.', waiting: 'Restarting NopeWarden…' },
-};
-
-// Waits until the machine stops answering and then answers again, then reloads the page.
-function useReconnect() {
-  const [waiting, setWaiting] = useState(false);
-  useEffect(() => {
-    if (!waiting) return undefined;
-    let down = false;
-    const started = Date.now();
-    const t = setInterval(async () => {
-      try {
-        const r = await fetch('/api/health', { cache: 'no-store' });
-        if (r.ok && (down || Date.now() - started > 45000)) { clearInterval(t); window.location.reload(); }
-      } catch { down = true; }
-    }, 3000);
-    return () => clearInterval(t);
-  }, [waiting]);
-  return [waiting, setWaiting];
-}
-
-function PowerModal({ action, me, onClose }) {
-  const meta = POWER[action];
-  const [code, setCode] = useState('');
-  const [run, busy] = useAction();
-  const [waiting, setWaiting] = useReconnect();
-  const needCode = useStepUp().everyday;
-  const go = async () => { if (await run(() => post('/api/system/power', { action, code }))) setWaiting(true); };
-  if (waiting) {
-    return (
-      <Modal title={meta.waiting} onClose={() => {}} footer={null}>
-        <p>{action === 'poweroff' ? 'The machine is shutting down. You can close this page.' : 'Waiting for the machine to come back. This page reloads by itself when it does.'}</p>
-      </Modal>
-    );
-  }
-  return (
-    <Modal title={meta.title} onClose={onClose}
-      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy || (needCode && code.length < 6)} onClick={go}>{meta.verb}</Button></>}>
-      <p>{meta.warn}</p>
-      {needCode && <Field label="Code from your authenticator app"><Input value={code} onChange={setCode} inputMode="numeric" autoComplete="one-time-code" autoFocus /></Field>}
-    </Modal>
-  );
-}
 
 function PowerCard({ me }) {
   const [action, setAction] = useState(null);
@@ -264,150 +228,6 @@ function ResetCard({ me }) {
   );
 }
 
-const hourLabel = (h) => `${h === 0 ? 12 : h > 12 ? h - 12 : h}:00 ${h < 12 ? 'AM' : 'PM'}`;
-
-function UpdateSteps({ steps, rollingBack }) {
-  const mark = { done: '✓', active: '●', pending: '○' };
-  return (
-    <ol className="usteps" aria-label="Update progress">
-      {steps.map((st) => (
-        <li key={st.id} className={st.state}><span aria-hidden="true">{mark[st.state]}</span> {st.label}{st.state === 'active' && rollingBack ? ' (undoing)' : ''}</li>
-      ))}
-    </ol>
-  );
-}
-
-function Updates({ me }) {
-  const { data, reload } = useData('/api/system/update', { every: 15000 });
-  const [run, busy] = useAction();
-  const [chk, chkGo] = useCheck();
-  const [asking, setAsking] = useState(false);
-  const [code, setCode] = useState('');
-  const [job, setJob] = useState(null); // { since } while an update is going on
-  const [live, setLive] = useState(null); // fresher status while something is happening
-  const [lost, setLost] = useState(false);
-  const [repo, setRepo] = useState(null);
-  const [customEvery, setCustomEvery] = useState(false);
-  const [everyText, setEveryText] = useState(null);
-  const [outcome, setOutcome] = useState(null);
-  const [restart, setRestart] = useState(false);
-  const d = live || data;
-
-  // An update that is already going on (the page was opened or reloaded in the middle of it).
-  useEffect(() => {
-    if (!job && data && (data.working || data.state !== 'idle')) setJob({ since: 0 });
-  }, [data, job]);
-
-  // While installing the console restarts, so errors are expected; keep asking until it answers.
-  useEffect(() => {
-    if (!job && !data?.checking) return undefined;
-    let lastOk = Date.now();
-    const t = setInterval(async () => {
-      try {
-        const x = await get('/api/system/update');
-        lastOk = Date.now();
-        setLost(false);
-        setLive(x);
-        if (job) {
-          const r = x.result;
-          if (!x.working && x.state === 'idle' && (x.run_error || (r && r.at >= job.since))) {
-            setOutcome({ result: r && r.at >= job.since ? r : null, error: x.run_error });
-            setJob(null);
-            setLive(null);
-            reload();
-            // The list of waiting updates is from the check before the run, so look again now;
-            // otherwise it keeps showing updates that were just installed.
-            post('/api/system/update/check', {}).then(() => reload()).catch(() => {});
-          }
-        } else if (!x.checking) {
-          setLive(null);
-          reload();
-        }
-      } catch {
-        if (Date.now() - lastOk > 180000) setLost(true);
-      }
-    }, 3000);
-    return () => clearInterval(t);
-  }, [job, data?.checking, reload]);
-
-  const everyday = useStepUp().everyday; // a hook: it must run on every render, before any early return
-  if (!d) return null;
-  const go = async () => {
-    const r = await run(() => post('/api/system/update/install', { code }));
-    if (r) { setAsking(false); setCode(''); setOutcome(null); setJob({ since: Math.floor(Date.now() / 1000) - 5 }); }
-  };
-  const start = () => { if (everyday) setAsking(true); else go(); };
-  const save = (patch) => run(() => put('/api/system/update/settings', patch)).then(reload);
-  const l = d.latest;
-  const steps = d.steps || [];
-  const working = !!job;
-  // After the console restarts the page reloads and forgets what it started, so fall back to the
-  // result the machine kept: the last run's outcome stays visible for a day.
-  const kept = d.result && d.result.ok && Date.now() / 1000 - (d.result.at || 0) < 86400 ? d.result : null;
-  const res = outcome?.result || kept;
-  return (
-    <Card title="Updates" desc="NopeWarden and the system underneath it update together, from one button. Nothing is installed until you press Update now, unless you choose Automatic below. Your settings are kept."
-      actions={<Button small disabled={busy || working || d.checking || !d.key_set} onClick={() => chkGo(async () => { await post('/api/system/update/check', {}); await reload(); }, 'Looking for a new version…', 'Checked just now.')}>Check now</Button>}>
-      <div className="stack">
-        <div className="inline"><span>You are running version <b>{d.current}</b>.</span>{d.checked_at > 0 && <span className="small muted">Checked {fmt.ago(d.checked_at)}</span>}</div>
-        <CheckLine st={chk} />
-        {!d.key_set && <Note tone="warn" title="Updates are not set up in this build">This copy of NopeWarden has no update signing key, so it cannot install updates. Build a new installer once with a key (docs/UPDATES.md); after that, updates need no installer.</Note>}
-        {d.key_set && d.error && <Note tone="warn" title="Could not look for NopeWarden updates">{d.error}</Note>}
-        {d.key_set && d.system_error && <Note tone="warn" title="Could not look at the system updates">{d.system_error}</Note>}
-        {d.pair?.phase === 'failed' && d.pair.error && <Note tone="warn" title="The update of both units stopped">{d.pair.error}</Note>}
-        {d.checking && !working && <p className="muted">Looking at what the system has waiting…</p>}
-        {working && (
-          <Note tone="good" title="Updating">
-            {steps.length > 0 && <UpdateSteps steps={steps} rollingBack={d.rolling_back} />}
-            <p className="small" style={{ margin: '.5rem 0 0' }}>{d.rolling_back ? 'Something went wrong, so the previous version is being put back.' : 'This takes a few minutes. The console restarts near the end and this page reconnects by itself. If anything goes wrong the old NopeWarden is put back automatically.'}</p>
-            {lost && <p className="small" style={{ margin: '.5rem 0 0' }}><b>This page cannot reach the machine.</b> Look at the machine's own screen: it shows what is happening.</p>}
-          </Note>
-        )}
-        {!working && (outcome || kept) && ((outcome || {}).error
-          ? <Note tone="bad" title="The update could not start">{outcome.error}</Note>
-          : res?.ok
-            ? <Note tone="good" title={res.from === res.to ? 'System updates installed' : `Updated to ${res.to}`}>
-                {res.from === res.to ? 'NopeWarden was already the newest version.' : 'Everything is running the new version.'}
-                {res.system && res.system.packages > 0 && ` ${res.system.packages} system packages were updated.`}
-                {res.system?.skipped && ` The system updates were skipped: ${res.system.skipped}`}
-              </Note>
-            : <Note tone="bad" title={res?.rolled_back ? 'The update did not work and was undone' : 'The update did not work'}>{res?.error}</Note>)}
-        {!working && !outcome && d.result && !d.result.ok && <Note tone="warn" title={d.result.rolled_back ? 'The last update was undone' : 'The last update did not work'}>{d.result.error}</Note>}
-        {!working && d.available && (
-          <Note tone="good" title="Updates are ready">
-            <ul className="ulist">
-              {d.nopewarden_new && l && <li><b>NopeWarden {l.version}</b>{l.notes && <div style={{ whiteSpace: 'pre-wrap' }} className="small">{l.notes}</div>}</li>}
-              {d.system_count > 0 && <li><b>{d.system_count} system update{d.system_count === 1 ? '' : 's'}</b>{d.system_names?.length > 0 && <span className="small muted"> ({d.system_names.slice(0, 6).join(', ')}{d.system_count > 6 ? ', …' : ''})</span>}</li>}
-            </ul>
-            <Button kind="primary" disabled={busy || d.state !== 'idle'} onClick={start}>Update now</Button>
-          </Note>
-        )}
-        {!working && d.key_set && !d.available && !d.error && !d.system_error && !d.checking && d.checked_at > 0 && <p className="muted">Everything is up to date.</p>}
-        {d.needs_reboot && !working && <Note tone="warn" title="A restart is needed">The system was updated and needs a restart to finish. The network is down for about a minute while it restarts; pick a moment that suits you.<div style={{ marginTop: '.5rem' }}><Button onClick={() => setRestart(true)}>Restart now</Button></div></Note>}
-        <Field label="Updating" hint="Off: only when you press Check now. Notify: NopeWarden looks as often as you choose below and tells you when something is ready. Automatic: it installs by itself in the hour you choose below.">
-          <Segmented value={d.mode} onChange={(v) => save({ mode: v })} options={[{ value: 'off', label: 'Off' }, { value: 'notify', label: 'Notify' }, { value: 'auto', label: 'Automatic' }]} />
-        </Field>
-        {d.mode !== 'off' && <ScheduleEditor id="updates" label="How often to check" />}
-        {d.mode === 'auto' && (
-          <Field label="Start automatic updates at" hint="NopeWarden restarts for about a minute while it updates, so pick a quiet hour (the machine's own clock).">
-            <Select value={String(d.window)} onChange={(v) => save({ window: Number(v) })} options={Array.from({ length: 24 }, (_, h) => ({ value: String(h), label: hourLabel(h) }))} style={{ maxWidth: '10rem' }} />
-          </Field>
-        )}
-        <Field label="Where releases come from" hint="The GitHub page that publishes NopeWarden releases, as owner/name. Only releases signed with this build's key are ever installed.">
-          <Form className="inline" onSubmit={() => run(() => put('/api/system/update/settings', { repo }), 'Saved.').then(() => { setRepo(null); reload(); })}><Input value={repo ?? d.repo} onChange={setRepo} style={{ maxWidth: '18rem' }} />
-            <Button type="submit" disabled={busy || repo === null || repo === d.repo}>Save</Button></Form>
-        </Field>
-      </div>
-      {restart && <PowerModal action="reboot" me={me} onClose={() => setRestart(false)} />}
-      {asking && (
-        <Modal title="Install the updates" onClose={() => setAsking(false)}
-          footer={<><Button onClick={() => setAsking(false)}>Cancel</Button><Button kind="primary" disabled={busy || code.length < 6} onClick={go}>Install</Button></>}>
-          <Field label="Code from your authenticator app"><Input value={code} onChange={setCode} inputMode="numeric" autoComplete="one-time-code" autoFocus /></Field>
-        </Modal>
-      )}
-    </Card>
-  );
-}
 
 const TABS = [
   { value: 'general', label: 'General' },
@@ -446,7 +266,6 @@ export default function Settings({ me, reloadMe }) {
         <>
           <Guard what="Get started"><GetStarted /></Guard>
           <Guard what="Device mode"><DeviceMode /></Guard>
-          <Guard what="Updates"><Updates me={me} /><Card title="Update schedule" desc="When each recurring job looks for something new. The same controls appear on the page each job belongs to."><ScheduleTable /></Card></Guard>
           <Guard what="PowerCard"><PowerCard me={me} /></Guard>
           <Guard what="ConsolePort"><ConsolePort /></Guard>
           <Guard what="Map location"><MapLocation /></Guard>
@@ -473,9 +292,6 @@ export default function Settings({ me, reloadMe }) {
         <>
           <Guard what="Backups"><Backups me={me} /></Guard>
           <Guard what="Changes"><Changes me={me} /></Guard>
-          <Card title="My network" desc="A printable summary for a handover or your records: networks, addresses, devices, open ports and how to get back in. It never contains passwords or keys.">
-            <a className="btn" href="/api/summary/print" target="_blank" rel="noreferrer">Open the printable page</a>
-          </Card>
           <Guard what="ResetCard"><ResetCard me={me} /></Guard>
         </>
       )}
@@ -483,8 +299,6 @@ export default function Settings({ me, reloadMe }) {
         <>
           <div id="set-ha"><Guard what="High availability"><HighAvailability me={me} /></Guard></div>
           <Guard what="Bridge mode"><BridgeMode /></Guard>
-          <Guard what="Traffic labels"><TrafficLabels /></Guard>
-          <Guard what="Blocking lists"><BlockVersions /></Guard>
           <Guard what="Guest sign-in page"><GuestPortal /></Guard>
         </>
       )}
