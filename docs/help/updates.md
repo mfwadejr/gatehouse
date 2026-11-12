@@ -6,7 +6,7 @@ Keeping NopeWarden, and the system underneath it, up to date. Updates have their
 ## What is on the page
 - **Updates**: the version you are running, when NopeWarden last looked, and what is ready: a new NopeWarden version, system updates, or both. **Check now** looks straight away. **Update now** installs everything that is ready. While it installs, the page shows a ticked list of steps; the console restarts near the end and the page reconnects by itself. If a restart is needed afterwards, **Restart now** appears here.
 - **Schedule**: **Updating** is **Off** (only when you press **Check now**), **Notify** (NopeWarden looks as often as you choose and tells you) or **Automatic** (it installs by itself at the hour you choose in **Start automatic updates at**). **How often to check** sets how often it looks. **Other recurring jobs** lists the same schedule for block lists, country lists and the other jobs.
-- **What's new**: what changed in each version, newest first.
+- **What's new**: what changed in each version. The newest release is open; every older one is a single line you click to open, and older releases are grouped by line (0.9.4.x, 0.9.3.x and so on). **Expand all** and **Collapse all** open or close everything, and the **Search the release notes** box shows only the releases that mention every word you type. The notes go back to the first builds.
 - **Advanced**: **Release page**, the place releases are fetched from. Only releases signed with this build's key are ever installed.
 
 ## Where you are told about an update

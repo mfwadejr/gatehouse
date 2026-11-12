@@ -507,6 +507,13 @@ details.more > summary { cursor: pointer; color: var(--color-text-secondary); ma
 .srch-none { padding: var(--space-4); }
 .side .srchbtn { display: flex; align-items: center; gap: var(--space-2); width: 100%; background: none; border: var(--border-width-thin) solid var(--color-border-default); border-radius: var(--radius-md); color: var(--color-text-secondary); font: inherit; padding: var(--space-2) var(--space-3); cursor: pointer; }
 .side .srchbtn kbd { margin-left: auto; font: inherit; font-size: .75rem; opacity: .7; }
+/* What's new: one line a release, the newest open. */
+.rel { border-top: var(--border-width-thin) solid var(--color-border-default); }
+.relhead { display: flex; align-items: center; gap: var(--space-2); width: 100%; padding: var(--space-2) 0; background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.relhead:focus-visible { outline: var(--border-width-thick) solid var(--color-accent-default); outline-offset: var(--space-0-5); }
+.relchev { display: inline-flex; flex: none; }
+.relbody { max-width: 70ch; margin: 0 0 var(--space-3) var(--space-5); }
+.relkids { margin-left: var(--space-4); }
 ul.notes { margin: 0 0 var(--space-3); padding-left: 1.2rem; display: flex; flex-direction: column; gap: var(--space-1); }
 @media (max-width: 800px) { .side .srchbtn kbd { display: none; } }
 

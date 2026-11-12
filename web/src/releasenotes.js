@@ -1,6 +1,15 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.28',
+    title: 'A shorter What\'s new, and block lists that say they update themselves',
+    items: [
+      'What\'s new shows the newest release open and every older one as a single line you can open. Older releases are grouped (0.9.4.x, 0.9.3.x and so on), there are Expand all and Collapse all buttons, and a search box that shows only the releases mentioning your words.',
+      'The notes now go all the way back: the releases that had no entry are filled in, back to the first builds. Where an old build changed little, its entry says so.',
+      'Protection, Lists and labels says the block lists update themselves, when they next will, and has a Change when link and a Run now button. A list nothing uses yet says Not in use yet and is downloaded the first time a block needs it.',
+    ],
+  },
+  {
     version: '0.9.4.27',
     title: 'Updates get their own page',
     items: [
@@ -355,6 +364,14 @@ export const RELEASES = [
     ],
   },
   {
+    version: '0.8.49',
+    title: 'Build fix for 0.8.48 (build fix)',
+    items: [
+      "The terminal now starts reliably when the machine's working folder is not available to it.",
+      'The port-name lookup uses the same list of ports as the rest of the console.',
+    ],
+  },
+  {
     version: '0.8.48',
     title: 'Diagnostics page, terminal, Suricata reasons, SSH fix',
     items: [
@@ -371,6 +388,43 @@ export const RELEASES = [
       'Choose how often NopeWarden looks for updates: 6 hours, 12 hours (the usual), a day, a week, or your own number of hours.',
       'More topics to block (scams, piracy, crypto mining, drugs, games, video, music, messaging, shopping, AI). Settings, Advanced shows which version of the lists is in use. Blocking also has a thorough choice, which is saved but does not act yet.',
       'If a block or threat watching ever goes wrong, your internet is not affected. This is now stated beside the setting, in the Logs when it happens, and in the Protection and Reference chapters.',
+    ],
+  },
+  {
+    version: '0.8.47',
+    title: 'Threat watching says why it is not running',
+    items: [
+      'When threat watching is on but its program is not running, the page now says why: out of memory, still starting, or the last error.',
+      'The memory limit now starts at 2 GB, because 1 GB was too small for the full rule set.',
+    ],
+  },
+  {
+    version: '0.8.46',
+    title: 'Install window shows a real size',
+    items: [
+      'The install window showed 0 MB. The size is now worked out from the package list, and no size is shown when it cannot be worked out.',
+      'Rule groups are shown in columns.',
+    ],
+  },
+  {
+    version: '0.8.45',
+    title: 'Threat watching as an optional install, and more',
+    items: [
+      'Threat watching is an optional install. An Install button shows the packages, their sizes and any warnings for your machine. It runs watch-only, with processor and memory limits, and it never blocks anything.',
+      'Presets Light, Balanced and Strict; rule updates that can be rolled back; rule search and groups; export and import; a watchdog that switches it off after ten minutes at its limit and says why.',
+      'A new Protection page holds the security check and blocking by app and topic.',
+      'Settings, Advanced shows which block list versions are in use, and the pages say that blocking fails open: if anything goes wrong, nothing is blocked because of it.',
+      'Port forwards on a port the firewall itself uses now warn instead of refusing.',
+      'Add a network offers five kinds (Trusted, Private, Guest, Isolated, Custom), and a VLAN can be made on any port.',
+      'Update checks: choose how often to look (every 6 hours, every 12, daily, weekly or your own number of hours).',
+      'Number boxes can be emptied to type a new value, and Help with this page is blue.',
+    ],
+  },
+  {
+    version: '0.8.44',
+    title: 'First build of the 0.8.45 package (build fix)',
+    items: [
+      'Same content as 0.8.45. Its build failed on a test, so 0.8.45 replaced it.',
     ],
   },
   {
@@ -680,6 +734,251 @@ export const RELEASES = [
       'More VPN provider files (such as ExpressVPN) import without changes, and if one cannot, every reason is listed at once.',
       'Your own names are checked when you save them, so a pasted web address cannot break a name.',
       'Messages appear top right and go away when clicked.',
+    ],
+  },
+  {
+    version: '0.8.11',
+    title: 'A Wi-Fi watchdog that restarted a working card',
+    items: [
+      'Fixed the watchdog restarting a working Wi-Fi card about once a minute.',
+      'New switch on the Wi-Fi page: Restart the card automatically if it stops working (on by default).',
+    ],
+  },
+  {
+    version: '0.8.10',
+    title: 'Wi-Fi "Check this card" table tidied',
+    items: [
+      'Columns are aligned and the headings read \'What the card says it can do\' and \'Listening test\'.',
+    ],
+  },
+  {
+    version: '0.8.9',
+    title: 'Speed test schedule saves again',
+    items: [
+      'Saving the speed test schedule said \'invalid request body\'. Fixed.',
+    ],
+  },
+  {
+    version: '0.8.8',
+    title: 'Build fix for 0.8.7 (build fix)',
+    items: [
+      'The new SSH firewall test needed administrator rights to run. Nothing changed on screen.',
+    ],
+  },
+  {
+    version: '0.8.7',
+    title: 'Remote login (SSH) and a steadier Wi-Fi card',
+    items: [
+      'Remote login (SSH) in Settings: off by default, one switch. Sign in with an administrator name and the console password. It is reachable only from networks allowed to manage the device, never from the internet side, with a limit on wrong passwords, no root login, and every sign-in and failure in the log.',
+      'Wi-Fi stall: the status is honest (Broadcasting only when the access point answers), the card is restarted automatically when it stops, a Keep the card awake switch turns power saving off, and a Wi-Fi report button gathers the details for troubleshooting.',
+    ],
+  },
+  {
+    version: '0.8.6',
+    title: 'Switch a Wi-Fi card off and on',
+    items: [
+      'Each Wi-Fi card has a Switch off and Switch on button. Its settings and password are kept.',
+    ],
+  },
+  {
+    version: '0.8.5',
+    title: 'Backups, forced DNS and many smaller things',
+    items: [
+      'Backups: on a schedule, keep the newest few, every backup checked when it is made. Check shows what is inside against what you have now, restore makes a safety backup first, download with a password, and upload a backup from elsewhere.',
+      "Force DNS by network: devices must use NopeWarden's DNS, with exceptions for chosen devices or groups.",
+      'Logs, Recording and storage shows the last clean-up and has Clean up now.',
+      'Speed test: a list of test servers, a speed readout every second, and data used per country on the map.',
+      "Change a network's port or VLAN after it is made, an extra ARP check before an address is handed out, pause for OpenVPN devices, and changes to a device group now reach the VPN.",
+      'A new DNS Overview layout, and dotted gaps in the small charts where nothing was recorded.',
+    ],
+  },
+  {
+    version: '0.8.4',
+    title: 'Services and a better address picker',
+    items: [
+      'A Services page: named services (a protocol and ports) you can use in firewall rules.',
+      'Firewall rules got a better picker for who, where and what.',
+    ],
+  },
+  {
+    version: '0.8.3',
+    title: 'DNS server checks',
+    items: [
+      'NopeWarden now checks that each DNS server answers, and shows the result.',
+    ],
+  },
+  {
+    version: '0.8.2',
+    title: 'Chart fixes',
+    items: [
+      'Spacing and drawing fixes in the Overview charts.',
+    ],
+  },
+  {
+    version: '0.8.1',
+    title: 'Overview and country fixes',
+    items: [
+      'Fixes to the Overview map and charts, and to country-based rules and the country lists.',
+    ],
+  },
+  {
+    version: '0.8.0',
+    title: 'The Overview dashboard, speed test and device map',
+    items: [
+      'The Overview was rebuilt: what needs you first, an internet hero with a line per connection and history from 10 minutes to 30 days, tiles for devices, DNS, DHCP and security, a world map of where connections go, busiest devices, machine health and recent events.',
+      'History is kept in three tiers: every 30 seconds for 2 hours, every 5 minutes for 25 hours and hourly for 31 days.',
+      'Internet: a speed test with history. Devices: a List and a Map view.',
+      'Recovery works over a serial console on machines without a screen.',
+    ],
+  },
+  {
+    version: '0.7.5',
+    title: 'A small fix to how firewall changes are applied',
+    items: [
+      'A small fix to how firewall changes are applied.',
+    ],
+  },
+  {
+    version: '0.7.4',
+    title: 'Boot menu look',
+    items: [
+      'Changes to the look of the boot menu.',
+    ],
+  },
+  {
+    version: '0.7.3',
+    title: 'Boot menu look',
+    items: [
+      'Changes to the look of the boot menu.',
+    ],
+  },
+  {
+    version: '0.7.2',
+    title: 'First-start setup fix',
+    items: [
+      "A fix in the first-start setup and the installer's management network step.",
+    ],
+  },
+  {
+    version: '0.7.1',
+    title: 'Boot menu look',
+    items: [
+      'Changes to the look of the boot menu.',
+    ],
+  },
+  {
+    version: '0.7.0',
+    title: 'Installer and boot screens reworked',
+    items: [
+      'The installer works out a plan for the ports and the management network, and the boot screen theme changed. The setup wizard follows the same plan.',
+    ],
+  },
+  {
+    version: '0.6.3',
+    title: 'Installer screen tweaks',
+    items: [
+      'Small changes to the installer screens.',
+    ],
+  },
+  {
+    version: '0.6.2',
+    title: 'Installer screen tweaks',
+    items: [
+      'Small changes to the installer screens.',
+    ],
+  },
+  {
+    version: '0.6.1',
+    title: 'Wi-Fi in the setup wizard',
+    items: [
+      'The wizard can use a Wi-Fi network as the internet, and can set the LAN up as a bridge so Wi-Fi can join it later. (Wi-Fi was removed from NopeWarden in 0.8.53.)',
+    ],
+  },
+  {
+    version: '0.6.0',
+    title: 'Setup wizard and checklist',
+    items: [
+      'The first-run wizard has the internet port as its own step: pick the port the modem plugs into and how the provider connects you.',
+      'Your network step: the port, the address, and a DHCP switch.',
+      'A Finish setting up checklist on the Overview, in any order, that goes away when done.',
+      'Add a network asks what it is for (My own devices, Guests, Cameras and smart-home) and sets the switches for you.',
+    ],
+  },
+  {
+    version: '0.5.9',
+    title: 'Add a network fix',
+    items: [
+      'A fix in Add a network.',
+    ],
+  },
+  {
+    version: '0.5.8',
+    title: 'Recovery over a serial console',
+    items: [
+      'The setup and recovery screens work over a serial console on headless machines.',
+    ],
+  },
+  {
+    version: '0.5.7',
+    title: 'Installer screen fixes',
+    items: [
+      'Fixes to the installer screens.',
+    ],
+  },
+  {
+    version: '0.5.6',
+    title: 'Installer and boot screen fixes',
+    items: [
+      'Fixes to the installer and boot screens.',
+    ],
+  },
+  {
+    version: '0.5.5',
+    title: 'Installer screen fixes',
+    items: [
+      'Fixes to the installer screens.',
+    ],
+  },
+  {
+    version: '0.5.4',
+    title: 'Build and image changes only (build fix)',
+    items: [
+      'Changes to how the install image is built. Nothing you would see in the console.',
+    ],
+  },
+  {
+    version: '0.5.3',
+    title: 'Build and image changes only (build fix)',
+    items: [
+      'Changes to how the install image is built. Nothing you would see in the console.',
+    ],
+  },
+  {
+    version: '0.5.2',
+    title: 'A Networks page',
+    items: [
+      'Networks has its own page, and the DHCP, Firewall and Internet pages were tidied to match.',
+    ],
+  },
+  {
+    version: '0.5.1',
+    title: 'Devices page tweaks',
+    items: [
+      'Small changes to the Devices page.',
+    ],
+  },
+  {
+    version: '0.1 to 0.5.0',
+    title: 'The first builds',
+    items: [
+      'A console for networks, DHCP, DNS, firewall rules, VPN and logs, with a text installer, a recovery screen (Alt+F2), a watchdog that restarts the console if it stops, and lock-out protection with a way back.',
+      'One update button for NopeWarden and the system together, signed and checked, with a restart-needed notice.',
+      'Change the console port, restart or shut down from the console, and reset to default.',
+      'Add a network as one form, with an address check and a check for another DHCP server.',
+      'VPN: import a provider file, servers for your own devices, site-to-site over WireGuard.',
+      'A Devices page with filters, vendor names, icons and per-device speed and data used.',
+      'Logs with click-to-filter, a time range, CSV download, a summary and a world map.',
+      'App names for about 70 well-known apps, and the first groundwork for a pair of boxes (high availability).',
     ],
   },
 ];

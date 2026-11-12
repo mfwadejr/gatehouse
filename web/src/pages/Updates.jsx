@@ -3,7 +3,7 @@ import { get, post, put, useData } from '../api.js';
 import { Guard, Button, Card, Field, Form, Input, Modal, Note, Page, Segmented, Select, Tabs, useAction, useCheck, CheckLine, fmt, useStepUp } from '../ui.jsx';
 import { useHashTab } from '../hashtab.js';
 import { ScheduleEditor, ScheduleTable } from '../ScheduleEditor.jsx';
-import { Notes } from '../whatsnew.jsx';
+import { ReleaseList } from '../whatsnew.jsx';
 import { RELEASES } from '../releasenotes.js';
 import { PowerModal } from './PowerModal.jsx';
 
@@ -167,7 +167,7 @@ function ScheduleTab({ data, reload }) {
 function ReleasesTab() {
   return (
     <Card title="What's new" desc="What changed in each version of NopeWarden, newest first.">
-      <Notes list={RELEASES} />
+      <ReleaseList list={RELEASES} />
     </Card>
   );
 }
