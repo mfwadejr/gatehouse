@@ -14,6 +14,7 @@ import Forwards from './Forwards.jsx';
 import Discovery from './Discovery.jsx';
 import NatNotice from '../natnotice.jsx';
 import { GroupsAndLists, Matrix, PairModal, RuleForm, RulesList } from './FirewallRules.jsx';
+import Services from './Services.jsx';
 import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Problems, Select, Tabs, ToggleRow, useAction, useToast, fmt, confirmBox, Limited, usePortNames } from '../ui.jsx';
 
 function ZoneForm({ initial, presets, ifaces, taken, onClose, onSaved }) {
@@ -251,7 +252,7 @@ export default function Firewall({ me }) {
   // One live connection for both lists, since a browser only keeps a few open per site.
   useStream(['fw.status', 'dhcp.leases'], (topic) => { if (topic === 'fw.status') reloadRules(); else reloadPickers(); });
   const { data: pr } = useData('/api/fw/presets');
-  const [tab, setTab] = useHashTab('firewall', ['networks','rules','groups','ports','countries','discovery','protection','history'], 'networks');
+  const [tab, setTab] = useHashTab('firewall', ['networks','rules','groups','services','ports','countries','discovery','protection','history'], 'networks');
   const [filter, setFilter] = useState({});
   const [pair, setPair] = useState(null);
   const [newRule, setNewRule] = useState(() => (hashQuery('new') && window.location.hash.includes('/rules') ? {} : null));
@@ -263,10 +264,11 @@ export default function Firewall({ me }) {
   return (
     <Page title="Firewall" sub="Decide what each network may reach. A saved change goes live in a moment, or waits on the Review page if you choose Save for later.">
       <Protected reload={reload} />
-      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'networks', label: 'Networks' }, { value: 'rules', label: `Rules${(rules || []).filter((r) => !r.countries).length ? ` (${(rules || []).filter((r) => !r.countries).length})` : ''}` }, { value: 'groups', label: 'Groups & lists' }, { value: 'ports', label: 'Open ports' }, { value: 'countries', label: 'Countries' }, { value: 'discovery', label: 'Discovery' }, { value: 'protection', label: 'Protection' }, { value: 'history', label: 'History' }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'networks', label: 'Networks' }, { value: 'rules', label: `Rules${(rules || []).filter((r) => !r.countries).length ? ` (${(rules || []).filter((r) => !r.countries).length})` : ''}` }, { value: 'groups', label: 'Device groups' }, { value: 'services', label: 'Services' }, { value: 'ports', label: 'Open ports' }, { value: 'countries', label: 'Countries' }, { value: 'discovery', label: 'Discovery' }, { value: 'protection', label: 'Protection' }, { value: 'history', label: 'History' }]} />
       {tab === 'networks' && <><Matrix ov={ov} rules={(rules || []).filter((r) => !r.countries)} onPick={(from, to, p) => setPair({ from, to, p })} /><Networks ov={ov} presets={presets} reload={reload} /></>}
       {tab === 'rules' && <><RulesList ov={ov} rules={(rules || []).filter((r) => !r.countries)} countryRules={countryRules} pickers={pickers} reloadPickers={reloadPickers} reload={all} filter={filter} setFilter={setFilter} startNew={(init) => setNewRule(init)} goPorts={() => setTab('ports')} goTab={setTab} /><AlwaysOn /></>}
       {tab === 'groups' && <GroupsAndLists pickers={pickers} reloadPickers={reloadPickers} reload={all} />}
+      {tab === 'services' && <Services part goPorts={() => setTab('ports')} />}
       {tab === 'ports' && <><NatNotice compact /><Forwards reload={reload} /><UPnPCard /></>}
       {tab === 'protection' && <><Note tone="info">The management port, the spare port kept for managing this device, is now under <a href="#/settings/general">Settings, General</a>.</Note><Protection ov={ov} reload={reload} pickers={pickers} /></>}
       {tab === 'countries' && <Countries reload={all} />}

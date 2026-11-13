@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { hashQuery } from '../hashtab.js';
+import { hashQuery, useHashTab } from '../hashtab.js';
 import { del, get, patch, post, put, useData } from '../api.js';
 import DeviceIcon, { ICON_LABELS } from '../DeviceIcon.jsx';
 import { NewDevice } from '../AddrPicker.jsx';
@@ -7,9 +7,9 @@ import DeviceMap from './DeviceMap.jsx';
 import VirtualOverride from './VirtualOverride.jsx';
 import Approval from './Approval.jsx';
 import { OpenPortModal } from './Forwards.jsx';
-import { pauseChoices, whenText } from './Profiles.jsx';
+import Profiles, { pauseChoices, whenText } from './Profiles.jsx';
 import { WhyBody } from './Why.jsx';
-import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, Select, Spark, ToggleRow, useAction, useToast, fmt, usePortNames } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, Select, Spark, Tabs, ToggleRow, useAction, useToast, fmt, usePortNames } from '../ui.jsx';
 
 const POLICIES = [
   { value: 'filtered', label: 'Allowed, ads and trackers filtered' },
@@ -85,7 +85,7 @@ function IconPicker({ d, onChanged }) {
   );
 }
 
-function Details({ d, groups, onClose, onSaved }) {
+function Details({ d, groups, onClose, onSaved, onManage }) {
   const pn = usePortNames();
   const toast = useToast();
   const [run, busy] = useAction();
@@ -111,7 +111,7 @@ function Details({ d, groups, onClose, onSaved }) {
         <>
           <Field label="Name"><Input value={f.name} onChange={(v) => setF({ ...f, name: v })} placeholder={d.hostname || 'Give it a friendly name'} /></Field>
           <Field label="Icon"><IconPicker d={d} onChanged={onSaved} /></Field>
-          <Field label="Profile" hint="Decides which blocklists apply. Manage profiles on the Profiles page."><Select value={String(f.group_id)} onChange={(v) => setF({ ...f, group_id: Number(v) })} options={[{ value: '0', label: 'Default' }, ...groups.map((g) => ({ value: String(g.id), label: g.name }))]} /></Field>
+          <Field label="Profile" hint={<>Decides which blocklists apply. <button type="button" className="link" onClick={onManage}>Manage profiles</button></>}><Select value={String(f.group_id)} onChange={(v) => setF({ ...f, group_id: Number(v) })} options={[{ value: '0', label: 'Default' }, ...groups.map((g) => ({ value: String(g.id), label: g.name }))]} /></Field>
           <Field label="DNS filtering"><Select value={f.policy} onChange={(v) => setF({ ...f, policy: v })} options={POLICIES} /></Field>
           <Field label="Pause the internet" hint={whenText(det?.paused_until) || 'Cuts this device off from the internet for a while. It comes back by itself.'}>
             <div className="inline" style={{ gap: 'var(--space-1-5)', flexWrap: 'wrap' }}>
@@ -188,6 +188,7 @@ export default function Devices({ me }) {
   const [page, setPage] = useState(0);
   const [pick, setPick] = useState(false);
   const [view, setView] = useState('list');
+  const [tab, setTab] = useHashTab('devices', ['devices', 'profiles'], 'devices');
 
   const chosen = cols || prefs?.cols;
   const hasVia = (data?.devices || []).some((d) => d.via);
@@ -215,10 +216,12 @@ export default function Devices({ me }) {
 
   return (
     <Page title="Devices & access" sub="Every device that has joined your network. Rename it, give it an icon, filter it, or pause its internet."
-      actions={<><Segmented value={view} onChange={setView} options={[{ value: 'list', label: 'List' }, { value: 'map', label: 'Map' }]} /><Button icon="plus" onClick={() => setAdding(true)}>Add a device</Button></>}>
-      <Approval />
-      {view === 'map' && <DeviceMap devices={all} onOpen={setOpen} />}
-      <div style={view === 'map' ? { display: 'none' } : undefined}>
+      actions={tab === 'devices' ? <><Segmented value={view} onChange={setView} options={[{ value: 'list', label: 'List' }, { value: 'map', label: 'Map' }]} /><Button icon="plus" onClick={() => setAdding(true)}>Add a device</Button></> : undefined}>
+      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'devices', label: 'Devices' }, { value: 'profiles', label: 'Profiles' }]} />
+      {tab === 'profiles' && <Profiles part onShowDevices={(name) => { setF((x) => ({ ...x, profile: name })); setTab('devices'); }} />}
+      {tab === 'devices' && <Approval />}
+      {tab === 'devices' && view === 'map' && <DeviceMap devices={all} onOpen={setOpen} />}
+      <div style={tab !== 'devices' || view === 'map' ? { display: 'none' } : undefined}>
         <Card actions={
           <div className="inline">
             <div style={{ width: '15rem' }}><Input value={q} onChange={setQ} placeholder="Search name, maker, address" aria-label="Search devices" /></div>
@@ -266,7 +269,7 @@ export default function Devices({ me }) {
           )}
         </Card>
       </div>
-      {open1 && <Details d={open1} groups={groups || []} onClose={() => setOpen(null)} onSaved={reload} />}
+      {open1 && <Details d={open1} groups={groups || []} onClose={() => setOpen(null)} onSaved={reload} onManage={() => { setOpen(null); setTab('profiles'); }} />}
       {opening && <OpenPortModal preset={{ mac: opening.mac, ip: opening.ip, device_name: opening.name || opening.hostname || opening.mac }} apps={fwf?.apps || []} connections={fwf?.connections || []} existing={fwf?.forwards || []} onClose={() => setOpening(null)} onSaved={reloadFwf} reloadApps={reloadFwf} />}
       {adding && <NewDevice onClose={() => setAdding(false)} onCreated={reload} seen={all.filter((d) => d.mac && !d.name)} />}
       {pick && (

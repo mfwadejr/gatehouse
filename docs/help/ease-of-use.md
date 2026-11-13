@@ -9,7 +9,7 @@ It shows you what to expect before you start, and it is the list the next round 
 **Everyday jobs and their steps**
 
 - Cut a device off the internet: **Devices**, then **Pause** on its row. 2 steps. To choose how long, open the row first. 3 steps.
-- Pause everyone in a profile: **Profiles**, then a **Pause** choice. 2 steps.
+- Pause everyone in a profile: **Devices & access**, the **Profiles** tab, then a **Pause** choice. 2 steps.
 - Find out why the internet is down: open **Overview**. The top of the page says **Internet is down** and gives the reason. 1 step.
 - Rename a device: **Devices**, click the device, type the name, **Save**. 4 steps, or 3 if you press Enter instead of clicking **Save**.
 - Add a second internet connection: **Internet**, **Add connection**, choose the port, **Save**. 4 steps.

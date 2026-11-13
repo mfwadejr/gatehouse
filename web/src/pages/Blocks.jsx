@@ -195,7 +195,7 @@ export default function Blocks() {
         <div className="list">
           <div className="item"><div><div className="name">An app, a category or a website, for some devices or at set hours</div><div className="meta">Here, on this page. For example social media for the kids, at night.</div></div></div>
           <div className="item"><div><div className="name">Ads, trackers and malware for everyone</div><div className="meta">DNS, Blocking tab. These are the big downloaded lists.</div></div><a className="link" href="#/dns/lists">Open</a></div>
-          <div className="item"><div><div className="name">Which devices get which lists</div><div className="meta">Profiles. Each profile has a filtering level and can pick its own lists.</div></div><a className="link" href="#/profiles">Open</a></div>
+          <div className="item"><div><div className="name">Which devices get which lists</div><div className="meta">Devices & access, Profiles. Each profile has a filtering level and can pick its own lists.</div></div><a className="link" href="#/devices/profiles">Open</a></div>
           <div className="item"><div><div className="name">A country, a port or one address</div><div className="meta">Firewall. Rules and Countries.</div></div><a className="link" href="#/firewall/rules">Open</a></div>
         </div>
       </Card>

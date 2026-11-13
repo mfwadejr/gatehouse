@@ -23,17 +23,18 @@ type chip struct {
 
 type ruleView struct {
 	fw.RuleRow
-	Tag       string   `json:"tag"`
-	Hits      int64    `json:"hits"`
-	Bytes     int64    `json:"bytes"`
-	LastHit   int64    `json:"last_hit"`
-	When      string   `json:"when"`
-	SrcChips  []chip   `json:"src_chips"`
-	DstChips  []chip   `json:"dst_chips"`
-	Warnings  []string `json:"warnings"`
-	Matrix    bool     `json:"matrix"`             // made by the matrix, not by hand
-	Countries bool     `json:"countries"`          // made by the countries page; change it there
-	Services  []svcHit `json:"services,omitempty"` // a count for each service, when a rule lists a few
+	Tag       string      `json:"tag"`
+	Hits      int64       `json:"hits"`
+	Bytes     int64       `json:"bytes"`
+	LastHit   int64       `json:"last_hit"`
+	When      string      `json:"when"`
+	SrcChips  []chip      `json:"src_chips"`
+	DstChips  []chip      `json:"dst_chips"`
+	Warnings  []string    `json:"warnings"`
+	Overlap   *fw.Overlap `json:"overlap,omitempty"`  // an earlier rule already covers this one
+	Matrix    bool        `json:"matrix"`             // made by the matrix, not by hand
+	Countries bool        `json:"countries"`          // made by the countries page; change it there
+	Services  []svcHit    `json:"services,omitempty"` // a count for each service, when a rule lists a few
 }
 
 // svcHit is how often one service of a rule matched.
@@ -199,6 +200,7 @@ func (a *App) fwRulesView(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 	lists := portListsOf(a.Config)
 	nb := a.nameBook()
 	out := make([]ruleView, 0, len(rules))
+	overlaps := fw.FindOverlaps(rules)
 	for _, ru := range rules {
 		v := ruleView{RuleRow: ru, Tag: fwTag(ru), When: ru.Sched.Describe(), Matrix: fw.IsMatrixRule(ru.Name)}
 		h := hits[v.Tag]
@@ -208,6 +210,11 @@ func (a *App) fwRulesView(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		v.SrcChips, w1 = nb.chips(ru.Src, true)
 		v.DstChips, w2 = nb.chips(ru.Dst, false)
 		v.Warnings = append(w1, w2...)
+		if o, ok := overlaps[ru.ID]; ok {
+			o := o
+			v.Overlap = &o
+			v.Warnings = append(v.Warnings, o.Text)
+		}
 		out = append(out, v)
 	}
 	// The rules the countries page makes are not stored as rules; show them so nothing is hidden.

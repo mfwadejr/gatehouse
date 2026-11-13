@@ -137,7 +137,7 @@ export function RuleLines({ prot, pages, rules, opened, live, hits, onEdit, onMo
                   </div>
                 )}
                 <div className="note">This rule is made by another page, so it opens here for reading only.</div>
-                <div className="lbtns">{paused ? <Button small onClick={() => { window.location.hash = '#/profiles'; }}>Open Profiles</Button> : <Button small onClick={() => goTab('countries')}>Open Countries</Button>}</div>
+                <div className="lbtns">{paused ? <Button small onClick={() => { window.location.hash = '#/devices/profiles'; }}>Open Profiles</Button> : <Button small onClick={() => goTab('countries')}>Open Countries</Button>}</div>
               </Row>
             );
           })}
@@ -152,7 +152,7 @@ export function RuleLines({ prot, pages, rules, opened, live, hits, onEdit, onMo
             const k = `r${r.id}`;
             const info = hits.hit(r.tag, r);
             return (
-              <Row key={k} k={k} num={pos + 1} off={!r.enabled} name={<>{r.matrix ? `Matrix: ${r.from} to ${r.to}` : r.name} {!r.enabled && <Pill>Off</Pill>}</>}
+              <Row key={k} k={k} num={pos + 1} off={!r.enabled} name={<>{r.matrix ? `Matrix: ${r.from} to ${r.to}` : r.name} {!r.enabled && <Pill>Off</Pill>} {r.overlap && <span title={r.overlap.text}><Pill tone="warn">{{ duplicate: 'Duplicate', redundant: 'Not needed', shadowed: 'Never applies' }[r.overlap.kind] || 'Overlaps'}</Pill></span>}</>}
                 from={sideItems(r.src_chips, r.from)} to={sideItems(r.dst_chips, r.to === 'self' ? 'NopeWarden' : r.to)} svc={svcText(r.service)}
                 action={<Pill tone={r.action === 'accept' ? 'good' : 'bad'}>{actionWord(r.action)}</Pill>} info={info} tag={r.tag}
                 when={whenText(r.paused_until) || r.when}>

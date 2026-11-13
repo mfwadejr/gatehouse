@@ -147,3 +147,7 @@ Record the machine, the version (Settings, About) and the date at the top of eac
 | 140 | Package cache repair (0.9.4.34) | After an update with a corrupted package cache, Updates does not show the warning; Check now works. | | |
 | 141 | Profile device link (0.9.4.34) | On Profiles, choose a device count; Devices opens with only that profile's devices and a Profile filter set. Clear filters shows all. | | |
 | 142 | Advanced links (0.9.4.34) | Updates (Updates, Schedule) and Threats (all tabs but Advanced) end with a link that opens their Advanced tab. | | |
+| 143 | Services tab (0.9.4.35) | The sidebar has no Services item. Firewall has a Services tab with your services (each says Used by N rules) and the built-in list. An old #/services link opens it. In a rule, the What for box offers Make a new service. | | |
+| 144 | Profiles tab (0.9.4.35) | The sidebar has no Profiles item. Devices & access has Devices and Profiles tabs. An old #/profiles link opens the Profiles tab. A profile's device count shows only those devices. The device editor has Manage profiles. | | |
+| 145 | Device groups and Policies (0.9.4.35) | The Firewall tab is called Device groups. Policies sits under Security, below Firewall, and still works. | | |
+| 146 | Overlapping rules (0.9.4.35) | Make two identical allow rules, then a broader allow before a narrower one, then an allow before a block for the same traffic. Each later rule shows a warning line saying which earlier rule covers it, and Rules shows a count. Remove or reorder and the warning goes. | | |

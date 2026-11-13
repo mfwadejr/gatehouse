@@ -104,6 +104,7 @@ export default function Policies({ part }) {
           {loaded && !shown.length && <Empty>{kind ? 'None of this kind yet.' : 'No policies yet. Create one to allow, block, route or open something.'}</Empty>}
         </div>
       </Card>
+      {!part && <p className="small muted">Policies pick ports by name. Make and manage those names under <a href="#/firewall/services">Firewall, Services</a>.</p>}
       {creating && <CreatePolicy onClose={() => setCreating(false)} />}
     </PageOrPart>
   );

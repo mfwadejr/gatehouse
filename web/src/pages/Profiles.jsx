@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { del, post, put, useData } from '../api.js';
 import { PauseMenu } from '../policykit.jsx';
-import { Button, Card, Field, Input, Modal, Note, Page, Pill, Segmented, Select, TimeField, ToggleRow, useAction , useDelayedDelete } from '../ui.jsx';
+import { Button, Card, Field, Input, Modal, Note, PageOrPart, Pill, Segmented, Select, TimeField, ToggleRow, useAction , useDelayedDelete } from '../ui.jsx';
 
 // Profiles: a name for a kind of person or device (Kids, Guests, Smart home, Work) with how much to
 // filter, safe search, hours when the internet is off, and a Pause button. Devices join a profile on
@@ -115,25 +115,25 @@ function PerNetwork({ profiles }) {
   );
 }
 
-export default function Profiles() {
+export default function Profiles({ part, onShowDevices }) {
   const delayedDelete = useDelayedDelete();
   const { data, reload } = useData('/api/profiles', { every: 15000 });
   const [edit, setEdit] = useState(null);
   const [run] = useAction();
-  if (!data) return <Page title="Profiles"><Card title="Profiles"><span className="muted">Loading…</span></Card></Page>;
+  if (!data) return <PageOrPart part={part} title="Profiles"><Card title="Profiles"><span className="muted">Loading…</span></Card></PageOrPart>;
   const blank = { id: 0, name: '', description: '', preset: '', level: 'basic', categories: [], lists: [], safe_search: false, hours: { on: false, days: [0, 1, 2, 3, 4, 5, 6], from: '21:00', to: '07:00' } };
   const fromPreset = (s) => ({ ...blank, name: s.name, preset: s.key, level: s.level, categories: s.categories || [], safe_search: s.safe_search, hours: s.hours.on ? s.hours : blank.hours });
   const have = new Set(data.profiles.map((x) => x.preset));
   const pause = (id, minutes, text) => run(async () => { await post(`/api/profiles/${id}/pause`, { minutes }); reload(); }, text);
   const remove = (x) => delayedDelete(`The profile ${x.name}`, () => del(`/api/profiles/${x.id}`), reload, 'Its devices go back to the Default profile.');
   return (
-    <Page title="Profiles" sub="Group people and devices by what they should be able to do, then give each group a filtering level, safe search and off-hours.">
+    <PageOrPart part={part} title="Profiles" sub="Group people and devices by what they should be able to do, then give each group a filtering level, safe search and off-hours.">
       <div className="stack">
         {data.profiles.map((x) => (
           <Card key={x.id} title={x.name} desc={x.description || levelText[x.level]}
             actions={<><PauseMenu until={x.paused_until} name={x.name} onPause={(m) => pause(x.id, m, m === 0 ? `${x.name} resumed.` : `${x.name} paused.`)} /><Button small onClick={() => setEdit({ ...x, hours: { ...x.hours } })}>Edit</Button>{x.name !== 'Default' && x.name !== 'Trusted' && <Button small onClick={() => remove(x)}>Delete</Button>}</>}>
             <div className="row" style={{ gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-              <a href={`#/devices?profile=${encodeURIComponent(x.name)}`} title="Show these devices" style={{ textDecoration: 'none' }}><Pill>{x.devices} device{x.devices === 1 ? '' : 's'}</Pill></a>
+              <a href={`#/devices?profile=${encodeURIComponent(x.name)}`} title="Show these devices" style={{ textDecoration: 'none' }} onClick={onShowDevices ? (e) => { e.preventDefault(); onShowDevices(x.name); } : undefined}><Pill>{x.devices} device{x.devices === 1 ? '' : 's'}</Pill></a>
               <Pill tone={x.level === 'off' ? '' : 'good'}>{x.level === 'custom' ? `Custom filtering, ${x.categories.length} categor${x.categories.length === 1 ? 'y' : 'ies'}` : `${LEVELS.find((l) => l.value === x.level)?.label} filtering`}{x.lists?.length ? ` + ${x.lists.length} list${x.lists.length === 1 ? '' : 's'}` : ''}</Pill>
               {x.safe_search && <Pill tone="good">Safe search</Pill>}
               {x.hours.on && <Pill>Off {x.hours.from}–{x.hours.to}</Pill>}
@@ -148,10 +148,10 @@ export default function Profiles() {
             <Button kind="primary" onClick={() => setEdit(blank)}>Blank profile</Button>
           </div>
         </Card>
-        <Note title="Good to know">Put a device in a profile on the Devices page. Category lists download the first time you use them, so a new category can take a minute to start working. Filtering works through NopeWarden's DNS, so a device that uses its own DNS or an encrypted-DNS setting can skip it; Forced DNS and the DoH option under Firewall close that gap.</Note>
+        <Note title="Good to know">Put a device in a profile on the Devices tab. To use a collection of devices in firewall rules instead, see <a href="#/firewall/groups">Firewall, Device groups</a>. Category lists download the first time you use them, so a new category can take a minute to start working. Filtering works through NopeWarden's DNS, so a device that uses its own DNS or an encrypted-DNS setting can skip it; Forced DNS and the DoH option under Firewall close that gap.</Note>
       </div>
       {edit && <Editor init={edit} data={data} onClose={() => setEdit(null)} onSaved={reload} />}
-    </Page>
+    </PageOrPart>
   );
 }
 

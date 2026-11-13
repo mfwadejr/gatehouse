@@ -241,7 +241,7 @@ export function ServicePicker({ value, onChange, pickers, reload }) {
             {mine.map(row)}
             {known.map(row)}
             {!isPort && !mine.length && !known.length && <div className="muted small pad">{needle ? 'No service with that name or port. Type a port like tcp/8080 to use it or save it as a service.' : 'Nothing left to add.'}</div>}
-            {!needle && <button type="button" role="option" onMouseDown={(e) => e.preventDefault()} onClick={() => setSaving('')}>+ New service…</button>}
+            {!isPort && <button type="button" role="option" onMouseDown={(e) => e.preventDefault()} onClick={() => setSaving('')}>+ Make a new service…</button>}
           </div>
         )}
       </div>

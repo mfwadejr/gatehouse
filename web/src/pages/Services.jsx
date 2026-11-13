@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { del, holdAnd, put, useData } from '../api.js';
 import { SAVED_LATER, SaveChoice } from '../changes.jsx';
-import { Button, Card, Empty, Field, Input, Modal, Page, Paged, Select, useAction, useUndoDelete } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, PageOrPart, Paged, Select, useAction, useUndoDelete } from '../ui.jsx';
 
 // Services: the one place to see what NopeWarden knows by name and to make your own. A service is a
 // name for one or more ports. Rules pick services by searching for the name or a port.
@@ -109,7 +109,16 @@ function ServiceForm({ initial, builtin, onClose, onSaved }) {
   );
 }
 
-export default function Services() {
+// "Used by 2 rules and 1 open port", from the list the server sends (open ports start with "Open port: ").
+function usedText(list) {
+  const ports = list.filter((u) => u.startsWith('Open port: ')).length, rules = list.length - ports;
+  const bits = [];
+  if (rules) bits.push(`${rules} ${rules === 1 ? 'rule' : 'rules'}`);
+  if (ports) bits.push(`${ports} open ${ports === 1 ? 'port' : 'ports'}`);
+  return `Used by ${bits.join(' and ')}`;
+}
+
+export default function Services({ part, goPorts }) {
   const { data, reload } = useData('/api/fw/services');
   const [q, setQ] = useState('');
   const [edit, setEdit] = useState(null);
@@ -120,7 +129,7 @@ export default function Services() {
   const mine = useMemo(() => (data?.custom || []).filter(hit), [data, needle]);
   const known = useMemo(() => (data?.builtin || []).filter(hit), [data, needle]);
   return (
-    <Page title="Services" sub="Names for ports. Make your own, then pick them by name when you make a firewall rule."
+    <PageOrPart part={part} title="Services" sub="Names for ports. Make your own, then pick them by name when you make a firewall rule."
       actions={<Button kind="primary" icon="plus" onClick={() => setEdit({})}>New service</Button>}>
       <Card title="Search" desc="Find a service by name to see which ports it uses.">
         <Input value={q} onChange={setQ} placeholder="Search by name or port number" aria-label="Search services" />
@@ -132,7 +141,7 @@ export default function Services() {
               <div>
                 <div className="name">{s.name}</div>
                 <div className="meta mono">{s.ports.join(', ')}</div>
-                <div className="meta">{s.used_by.length ? <>Used by {s.used_by.join(', ')}</> : 'Not used yet'}</div>
+                <div className="meta">{s.used_by.length ? <>{usedText(s.used_by)}: {s.used_by.map((u) => u.replace(/^Open port: /, '')).join(', ')}</> : 'Not used yet'}</div>
               </div>
               <div className="actions">
                 <Button small icon="edit" onClick={() => setEdit(s)}>Edit</Button>
@@ -144,7 +153,8 @@ export default function Services() {
         </div>
       </Card>
       {(data?.open_ports || []).length > 0 && (
-        <Card title="Open ports" desc="Apps you have opened to the internet. Change them on the Firewall page, Open ports tab.">
+        <Card title="Open ports" desc={part ? 'Apps you have opened to the internet. Change them on the Open ports tab.' : 'Apps you have opened to the internet. Change them on the Firewall page, Open ports tab.'}
+          actions={part && goPorts ? <Button small onClick={goPorts}>Open ports</Button> : undefined}>
           <div className="list">
             {data.open_ports.map((g) => <div className="item" key={g.group}><div><div className="name">{g.group}</div><div className="meta">{g.text}</div></div></div>)}
           </div>
@@ -161,6 +171,6 @@ export default function Services() {
         </div>
       </Card>
       {edit && <ServiceForm initial={edit} builtin={data?.builtin} onClose={() => setEdit(null)} onSaved={reload} />}
-    </Page>
+    </PageOrPart>
   );
 }

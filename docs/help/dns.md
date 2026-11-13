@@ -10,7 +10,7 @@ The picture is an example from a new, empty box; yours will show your own device
 ## What is on the page
 Tabs along the top:
 - **Overview**: **Lookups over time**, **How queries were answered**, **Busiest devices**, **Most blocked** and **Most asked**.
-- **Blocking**: **Blocklists** you can switch on (which devices get which lists is set per profile, on the Profiles page), **Always allow or block** exceptions that beat every list, and **Why is this blocked?** to find which list blocks a name.
+- **Blocking**: **Blocklists** you can switch on (which devices get which lists is set per profile, on the Profiles tab of Devices & access), **Always allow or block** exceptions that beat every list, and **Why is this blocked?** to find which list blocks a name.
 - **Servers**: **Upstream DNS servers** (where NopeWarden asks when it does not know), **Which server is asked first**, **Add a DNS server**, and the encrypted DNS switch.
 - **Your own names**: **Give this firewall a name**, and names that point somewhere on your network, like nas.lan to 192.168.1.10.
 - **Settings**: **What to do with blocked names**, **Home domain**, **Queries per second per device**, **Remember answers (entries)**, **Keep the query history for (days)**, **Hide device addresses in the history** and **Tell browsers to use this DNS**.

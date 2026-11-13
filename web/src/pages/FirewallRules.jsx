@@ -234,6 +234,7 @@ export function RulesList({ ov, rules, countryRules, pickers, reloadPickers, rel
   };
   const pauseFor = (r, m) => run(() => post(`/api/fw/rules/${r.id}/pause`, { minutes: m }), m === 0 ? 'Saved. Apply it to resume the rule.' : 'Saved. Apply it to start the pause.').then(reload);
   const toggle = (r) => run(() => put('/api/fw/rules', ruleBody({ ...r, sched: r.sched || null, enabled: !r.enabled })), 'Saved. Apply it to start using it.').then(reload);
+  const overlapping = rules.filter((r) => r.overlap).length;
   return (
     <Card title="Rules" desc="Special cases on top of your network types, such as keeping the kids' devices offline at night."
       actions={<Button small icon="plus" disabled={names.length < 1} onClick={() => startNew({})}>Add rule</Button>}>
@@ -244,6 +245,7 @@ export function RulesList({ ov, rules, countryRules, pickers, reloadPickers, rel
         <Select value={act} onChange={setAct} aria-label="Action" options={[{ value: '', label: 'Allow or block' }, { value: 'accept', label: 'Allow' }, { value: 'drop', label: 'Block' }, { value: 'reject', label: 'Reject' }]} />
         {filtered && <Button small onClick={() => { setQ(''); setAct(''); setFilter({}); }}>Clear</Button>}
       </div>
+      {overlapping > 0 && <Note tone="warn" title={`${overlapping} ${overlapping === 1 ? 'rule is' : 'rules are'} covered by an earlier rule`}>Each is marked Duplicate, Not needed or Never applies; open it to see which rule comes first and what that means. Nothing is changed for you: remove the extra rule, or move it above the one that covers it.</Note>}
       <div className="rulebar">
         <Segmented value={view} onChange={pickView} options={[{ value: 'lines', label: 'Rule lines' }, { value: 'cards', label: 'Plain cards' }]} aria-label="How to show the rules" />
         <label className="inline small"><Switch checked={live} onChange={setLive} label="Live" />Live</label>

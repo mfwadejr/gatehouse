@@ -24,9 +24,7 @@ const Firewall = lazy(() => import('./pages/Firewall.jsx'));
 const Protection = lazy(() => import('./pages/Protection.jsx'));
 const Threats = lazy(() => import('./pages/Threats.jsx'));
 const Diagnostics = lazy(() => import('./pages/Diagnostics.jsx'));
-const Services = lazy(() => import('./pages/Services.jsx'));
 const Devices = lazy(() => import('./pages/Devices.jsx'));
-const Profiles = lazy(() => import('./pages/Profiles.jsx'));
 const Logs = lazy(() => import('./pages/Logs.jsx'));
 const Updates = lazy(() => import('./pages/Updates.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
@@ -37,13 +35,11 @@ export const PAGES = [
   { id: 'networks', label: 'Networks', icon: 'networks', el: Networks, group: 'Network' },
   { id: 'dns', label: 'DNS', icon: 'dns', el: DNS, group: 'Network' },
   { id: 'dhcp', label: 'DHCP', icon: 'dhcp', el: DHCP, group: 'Network' },
-  { id: 'policies', label: 'Policies', icon: 'policies', el: Policies, group: 'Network' },
   { id: 'firewall', label: 'Firewall', icon: 'firewall', el: Firewall, group: 'Security' },
+  { id: 'policies', label: 'Policies', icon: 'policies', el: Policies, group: 'Security' },
   { id: 'protection', label: 'Protection', icon: 'protection', el: Protection, group: 'Security' },
   { id: 'threats', label: 'Threats', icon: 'protection', el: Threats, group: 'Security' },
-  { id: 'services', label: 'Services', icon: 'services', el: Services, group: 'Security' },
   { id: 'vpn', label: 'VPN', icon: 'vpn', el: VPN, group: 'Security' },
-  { id: 'profiles', label: 'Profiles', icon: 'devices', el: Profiles, group: 'People and devices' },
   { id: 'devices', label: 'Devices & access', icon: 'devices', el: Devices, group: 'People and devices' },
   { id: 'logs', label: 'Logs', icon: 'logs', el: Logs, group: 'System' },
   { id: 'diagnostics', label: 'Diagnostics', icon: 'diagnostics', el: Diagnostics, group: 'System' },
@@ -57,8 +53,12 @@ const fixOldLink = () => {
   // Routes became a tab of Policies.
   const r = window.location.hash.match(/^#\/?routes(\?.*)?$/);
   if (r) window.history.replaceState(null, '', `#/policies/routes${r[1] || ''}`);
-  // Filtering profiles are edited on the Profiles page; the DNS tab is gone.
-  if (/^#\/?dns\/groups(\?.*)?$/.test(window.location.hash)) window.history.replaceState(null, '', '#/profiles');
+  // Services became a tab of Firewall, and Profiles a tab of Devices & access.
+  const sv = window.location.hash.match(/^#\/?services(\?.*)?$/);
+  if (sv) window.history.replaceState(null, '', `#/firewall/services${sv[1] || ''}`);
+  const pf = window.location.hash.match(/^#\/?(?:profiles|dns\/groups)(\?.*)?$/);
+  if (pf) window.history.replaceState(null, '', `#/devices/profiles${pf[1] || ''}`);
+  // Old links to the Device groups tab, when it was called Groups & lists, still work: the tab keeps its address.
   const m = window.location.hash.match(/^#\/?protection\/threats(?:\/([a-z]+))?(\?.*)?$/);
   if (m) window.history.replaceState(null, '', `#/threats${m[1] ? `/${m[1]}` : ''}${m[2] || ''}`);
 };

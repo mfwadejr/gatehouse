@@ -1,6 +1,16 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.35',
+    title: 'Services and Profiles move to where you use them, and rules that cover each other are flagged',
+    items: [
+      'Services is now a tab of Firewall, next to Rules and Open ports, because services are names for ports that rules use. Each service says how many rules and open ports use it, and the rule editor has Make a new service. Old links still open it.',
+      'Profiles is now a tab of Devices & access, next to the devices they apply to. The device editor has Manage profiles, and the Profiles tab points to Firewall, Device groups for collections of devices to use in rules. Old links still open it.',
+      'The Firewall tab Groups & lists is now called Device groups, which is all it holds. Policies moved to the Security group, next to Firewall.',
+      'A rule that an earlier rule already covers now gets a warning line: it is the same, it adds nothing, or an earlier rule decides the opposite so it never applies. Nothing is changed for you.',
+    ],
+  },
+  {
     version: '0.9.4.34',
     title: 'Console is a real service, a calmer Overview, Logs and Diagnostics, and a self-repairing update check',
     items: [
