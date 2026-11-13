@@ -1,6 +1,15 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.29',
+    title: 'Search finds every setting',
+    items: [
+      'Search now reaches every card that holds a setting, not just pages: Management port, Hold new devices until you approve them, Monthly data limit, Speed test history and servers, Connection groups, DNS settings, Resolve directly, Filtering profiles, Add a profile, Your own services, VPN test addresses, threat limits, single threat checks and the threat program log, among others. Each opens its page and lights up the card.',
+      'Things that moved in earlier releases still turn up under their old names: searching for blocking lists, traffic labels or how often to check finds where they live now.',
+      'Behind the scenes, the build now fails if a new card with a setting on it cannot be found by search, so new pages cannot leave it behind.',
+    ],
+  },
+  {
     version: '0.9.4.28',
     title: 'A shorter What\'s new, and block lists that say they update themselves',
     items: [

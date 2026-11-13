@@ -48,6 +48,24 @@ for (const f of files) {
     else if (tab && !(tabs[page] || []).includes(tab)) fail(`${f}: a link opens ${page}/${tab}, but ${page} has no such tab`);
   }
 }
+
+// Coverage: every card that holds a control or a setting must be reachable from search. A card
+// that only shows numbers or a chart can be listed in DISPLAY_ONLY (src/search-display.json) with a reason.
+const display = JSON.parse(readFileSync('src/search-display.json', 'utf8'));
+const literals = [...block.matchAll(/'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)"/g)].map((m) => (m[1] ?? m[2]).replace(/\\'/g, "'").toLowerCase());
+const reach = literals.filter((l) => l.length > 3);
+let cards = 0;
+for (const f of files.filter((x) => x.includes('/pages/'))) {
+  const t = readFileSync(f, 'utf8');
+  for (const m of t.matchAll(/<Card\s+title=(?:"([^"]+)"|'([^']+)')/g)) {
+    const title = (m[1] || m[2]).replace(/&amp;/g, '&').replace(/&apos;|&#39;/g, "'");
+    const k = title.toLowerCase();
+    cards++;
+    if (reach.some((r) => r && (k.startsWith(r) || r.startsWith(k)))) continue;
+    if (Object.prototype.hasOwnProperty.call(display, title)) continue;
+    fail(`the card "${title}" (${f.replace('src/pages/', '')}) cannot be found from search. Add a search row for it, or list it in src/search-display.json with the reason it only shows numbers.`);
+  }
+}
 if (n < 60) fail(`only ${n} search rows could be read; the check cannot tell whether the list is right`);
 if (bad) { console.error(`search check: ${bad} problem(s)`); process.exit(1); }
-console.log(`search check ok (${n} results, ${links} links)`);
+console.log(`search check ok (${n} results, ${links} links, ${cards} cards reachable)`);

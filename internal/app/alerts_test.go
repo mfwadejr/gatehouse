@@ -99,7 +99,7 @@ func TestAlertsSendOnlyWhatIsOnAndHideSecrets(t *testing.T) {
 		"ntfy":  map[string]any{"enabled": true, "server": srv.URL, "topic": "gate"},
 		"email": map[string]any{"security": "starttls", "port": 587},
 		"on":    map[string]bool{"new_device": true},
-		"quiet": map[string]any{"enabled": true, "from": "00:00", "to": "23:59"},
+		"quiet": map[string]any{"enabled": true, "from": time.Now().Add(-time.Hour).Format("15:04"), "to": time.Now().Add(time.Hour).Format("15:04")},
 	})
 	a.alert("new_device", "held one", "")
 	select {
