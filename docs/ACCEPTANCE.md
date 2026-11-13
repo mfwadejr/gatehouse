@@ -137,3 +137,5 @@ Record the machine, the version (Settings, About) and the date at the top of eac
 | 130 | Pause on Profiles (0.9.4.32) | Each profile has one Pause… drop-down; choosing a length pauses it and the button becomes Resume now. The device count opens Devices. | | |
 | 131 | Protection overview (0.9.4.32) | Security check is first, then Also protecting you. Blocks starts with Where do I block things? and its links open the right pages. | | |
 | 132 | Threats install page (0.9.4.32) | With threat watching not installed, Threats, Overview explains it and has Install threat watching; other tabs point there. Rules holds Allowed checks and Devices never checked; Advanced does not. | | |
+| 133 | Wildcard in a website (0.9.4.33) | Protection, Blocks, Add a block, Websites: type *.youtube.com and Save. It saves as youtube.com and blocks music.youtube.com too. A name like a*b.com is still refused with a reason. | | |
+| 134 | Plain update notice (0.9.4.33) | When an update is ready, Updates and the Overview notice show its notes as plain lines: no ** marks, no Full Changelog link. | | |

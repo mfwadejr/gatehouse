@@ -99,7 +99,7 @@ function BlockForm({ initial, data, allow, onClose, onSaved }) {
             ))}
           </div>
         </Field>
-        <Field label="Websites" hint="One per line, such as games.example.com. Each one covers everything under it.">
+        <Field label="Websites" hint="One per line, such as games.example.com. Each one covers everything under it, so youtube.com also covers music.youtube.com. A leading *. is accepted and changes nothing.">
           <textarea className="in mono" rows={3} value={sites} onChange={(e) => setSites(e.target.value)} aria-label="Websites" />
         </Field>
         <Field label="Where it applies">

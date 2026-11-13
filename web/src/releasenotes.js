@@ -1,6 +1,14 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.33',
+    title: 'Wildcards in website names, and a cleaner update notice',
+    items: [
+      'Websites in a block, a speed rule or the DNS exceptions can now be typed with a leading *. (for example *.youtube.com). It means the same as youtube.com, because a website always covers everything under it. Before, a name with a star was refused.',
+      'The notice that an update is ready no longer shows stray ** marks or a bare link. The release text is shown as plain lines.',
+    ],
+  },
+  {
     version: '0.9.4.32',
     title: 'Profiles in one place, a cleaner Protection page, and Threats installs from its Overview',
     items: [

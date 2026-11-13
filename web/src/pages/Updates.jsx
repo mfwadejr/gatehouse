@@ -3,7 +3,7 @@ import { get, post, put, useData } from '../api.js';
 import { Guard, Button, Card, Field, Form, Input, Modal, Note, Page, Segmented, Select, Tabs, useAction, useCheck, CheckLine, fmt, useStepUp } from '../ui.jsx';
 import { useHashTab } from '../hashtab.js';
 import { ScheduleEditor, ScheduleTable } from '../ScheduleEditor.jsx';
-import { ReleaseList } from '../whatsnew.jsx';
+import { ReleaseList, plainNotes } from '../whatsnew.jsx';
 import { RELEASES } from '../releasenotes.js';
 import { PowerModal } from './PowerModal.jsx';
 
@@ -115,7 +115,7 @@ function StatusTab({ me, data, reload, goTab }) {
         {!working && d.available && (
           <Note tone="good" title="Updates are ready">
             <ul className="ulist">
-              {d.nopewarden_new && l && <li><b>NopeWarden {l.version}</b>{l.notes && <div style={{ whiteSpace: 'pre-wrap' }} className="small">{l.notes}</div>}</li>}
+              {d.nopewarden_new && l && <li><b>NopeWarden {l.version}</b>{plainNotes(l.notes) && <div style={{ whiteSpace: 'pre-wrap' }} className="small">{plainNotes(l.notes)}</div>}</li>}
               {d.system_count > 0 && <li><b>{d.system_count} system update{d.system_count === 1 ? '' : 's'}</b>{d.system_names?.length > 0 && <span className="small muted"> ({d.system_names.slice(0, 6).join(', ')}{d.system_count > 6 ? ', …' : ''})</span>}</li>}
             </ul>
             <Button kind="primary" disabled={busy || d.state !== 'idle'} onClick={start}>Update now</Button>

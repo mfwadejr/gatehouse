@@ -119,3 +119,23 @@ export function WhatsNewCard({ current }) {
     </Card>
   );
 }
+
+// plainNotes turns the release text GitHub publishes (markdown, "Full Changelog" links, "by @name in
+// URL" tails) into plain lines, so the console never shows stray ** or a bare link.
+export function plainNotes(text) {
+  const out = [];
+  for (let line of String(text || '').split(/\r?\n/)) {
+    if (/full changelog/i.test(line)) continue;
+    line = line.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+      .replace(/\s+by @\S+ in https?:\/\/\S+/g, '')
+      .replace(/https?:\/\/\S+/g, '')
+      .replace(/^#{1,6}\s*/, '')
+      .replace(/^\s*[*-]\s+/, '\u2022 ')
+      .replace(/(\*\*|__|`)/g, '')
+      .trimEnd();
+    if (!line.trim() && (!out.length || !out[out.length - 1])) continue;
+    out.push(line);
+  }
+  while (out.length && !out[out.length - 1].trim()) out.pop();
+  return out.join('\n');
+}

@@ -146,7 +146,7 @@ func (a *App) checkBlockItem(kind, value string, allow bool) (string, error) {
 		}
 		return value, nil
 	case "name":
-		d := dnssrv.NormalizeDomain(value)
+		d := dnssrv.NormalizeSite(value)
 		if d == "" {
 			return "", errors.New(value + " does not look like a website name")
 		}

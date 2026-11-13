@@ -102,3 +102,17 @@ func TestCustomRulesAllowWins(t *testing.T) {
 		t.Fatal("unexpected match")
 	}
 }
+
+func TestNormalizeSiteAcceptsAWildcardPrefix(t *testing.T) {
+	for in, want := range map[string]string{"youtube.com": "youtube.com", "*.YouTube.com": "youtube.com", " *.*.a.example.com. ": "a.example.com", "*.com": "com"} {
+		if want == "com" {
+			want = ""
+		}
+		if got := NormalizeSite(in); got != want {
+			t.Errorf("%q: got %q want %q", in, got, want)
+		}
+	}
+	if NormalizeSite("a*b.com") != "" {
+		t.Error("a wildcard in the middle must stay refused")
+	}
+}

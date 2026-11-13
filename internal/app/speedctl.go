@@ -124,7 +124,7 @@ func (a *App) validSpeedRule(r *speedRule) error {
 				return errors.New("choose one of the app categories, such as Video or Games")
 			}
 		case "name":
-			d := dnssrv.NormalizeDomain(it.Value)
+			d := dnssrv.NormalizeSite(it.Value)
 			if d == "" {
 				return errors.New(it.Value + " is not a website name")
 			}

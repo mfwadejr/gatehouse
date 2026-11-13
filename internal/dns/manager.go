@@ -538,7 +538,7 @@ type Explanation struct {
 
 // Explain checks a domain for a group and reports which lists contain it.
 func (m *Manager) Explain(domain string, group int64) Explanation {
-	d := NormalizeDomain(domain)
+	d := NormalizeSite(domain)
 	if d == "" {
 		d = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(domain), "."))
 	}
@@ -607,7 +607,7 @@ type CustomRule struct {
 
 // AddCustom stores an allow or block rule.
 func (m *Manager) AddCustom(domain, action, note string) error {
-	d := NormalizeDomain(domain)
+	d := NormalizeSite(domain)
 	if d == "" {
 		return fmt.Errorf("that does not look like a domain name")
 	}

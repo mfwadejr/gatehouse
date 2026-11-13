@@ -84,6 +84,16 @@ func NormalizeDomain(s string) string {
 	return s
 }
 
+// NormalizeSite is NormalizeDomain for names a person types: a leading "*." is accepted and dropped,
+// because a site always covers everything under it.
+func NormalizeSite(s string) string {
+	s = strings.TrimSpace(s)
+	for strings.HasPrefix(s, "*.") {
+		s = s[2:]
+	}
+	return NormalizeDomain(s)
+}
+
 var hostsIgnore = map[string]bool{
 	"localhost": true, "localhost.localdomain": true, "local": true, "broadcasthost": true,
 	"ip6-localhost": true, "ip6-loopback": true, "ip6-localnet": true, "ip6-mcastprefix": true,

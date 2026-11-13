@@ -30,5 +30,8 @@ If a block does not seem to work, check that it is switched on and that the devi
 ## Removing things a block uses
 When you remove a network, a profile or a device, it also leaves the blocks that used it. The removal question names those blocks first. A block left with no place shows **Applies nowhere** until you choose one.
 
+## Typing websites
+A website covers everything under it, so youtube.com also covers music.youtube.com. A leading *. is accepted and changes nothing: *.youtube.com means the same.
+
 ## Deleting a block
 Delete removes the block at once and shows an Undo button for a few seconds. Nothing asks "Are you sure?".

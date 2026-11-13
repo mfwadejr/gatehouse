@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { put, useData } from './api.js';
 import { linkState } from './linkstate.js';
+import { plainNotes } from './whatsnew.jsx';
 
 // What needs the person, worked out once for the whole console. The Overview's status line and
 // card read it, and the left menu shows a quiet dot on the page that holds the action. A dot is
@@ -62,7 +63,7 @@ export function AttentionProvider({ children }) {
     else if (upd?.available && upd.state === 'idle' && !upd.working) {
       const nw = upd.nopewarden_new && upd.latest ? upd.latest.version : '';
       const sys = upd.system_count > 0 ? `${upd.system_count} system update${upd.system_count === 1 ? '' : 's'}` : '';
-      const it = { level: 'info', id: 'updates', t: nw ? `NopeWarden ${nw} is available` : 'System updates are ready to install', s: [nw ? `You are on ${upd.current}.` : '', sys && nw ? `Also ${sys}.` : sys].filter(Boolean).join(' '), to: 'updates', sig: nw ? `v${nw}` : 'system', notes: nw ? upd.latest.notes || '' : '' };
+      const it = { level: 'info', id: 'updates', t: nw ? `NopeWarden ${nw} is available` : 'System updates are ready to install', s: [nw ? `You are on ${upd.current}.` : '', sys && nw ? `Also ${sys}.` : sys].filter(Boolean).join(' '), to: 'updates', sig: nw ? `v${nw}` : 'system', notes: nw ? plainNotes(upd.latest.notes) : '' };
       a.push(it);
     }
     // The security check and threat alerts both live on Protection.
