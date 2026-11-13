@@ -33,7 +33,7 @@ func TestStorageReportAndPruneLong(t *testing.T) {
 	}
 	rep := a.storageReport()
 	tabs, _ := rep["tables"].([]storRow)
-	if len(tabs) != 10 {
+	if len(tabs) != 11 {
 		t.Fatalf("tables reported: %d", len(tabs))
 	}
 	for _, r := range tabs {

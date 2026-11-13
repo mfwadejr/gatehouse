@@ -49,6 +49,7 @@ type bkManifest struct {
 	Version string            `json:"version"`
 	Schema  int               `json:"schema"`
 	Kind    string            `json:"kind"`
+	Logs    bool              `json:"logs,omitempty"`
 	Sums    map[string]string `json:"sums"`
 }
 
@@ -92,6 +93,9 @@ type BackupConfig struct {
 	Schedule string `json:"schedule"` // off, daily or weekly
 	Hour     int    `json:"hour"`
 	Keep     int    `json:"keep"`
+	// History adds the logs (traffic, DNS lookups, events) to backups made by hand or on a schedule. Off by default,
+	// because they can be large and a restore does not need them.
+	History bool `json:"include_history"`
 }
 
 func (a *App) backupConfig() BackupConfig {
@@ -120,15 +124,20 @@ func (a *App) keyPath() string { return filepath.Join(a.Cfg.DataDir, "secret.key
 
 // saveBackup makes a complete backup and returns its path. prefix says why: manual, auto,
 // before-reset, before-restore.
-func (a *App) saveBackup(prefix string) (string, error) {
+func (a *App) saveBackup(prefix string) (string, error) { return a.saveBackupBy(prefix, "system") }
+
+// saveBackupBy is saveBackup with the name of who asked for it, for the backup history.
+func (a *App) saveBackupBy(prefix, actor string) (string, error) {
 	dir := a.backupDir()
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", err
 	}
 	name := filepath.Join(dir, fmt.Sprintf("%s-%s%s", prefix, time.Now().Format("20060102-150405"), bkExt))
 	if err := a.writeBackupFile(name, prefix, true); err != nil {
+		a.backupLog(actor, "failed", prefix, name, err.Error())
 		return "", err
 	}
+	a.backupLog(actor, "created", prefix, name, "")
 	a.pruneBackups(prefix)
 	return name, nil
 }
@@ -154,7 +163,17 @@ func (a *App) writeBackupFile(name, prefix string, verify bool) error {
 		return err
 	}
 	sum := func(b []byte) string { h := sha256.Sum256(b); return hex.EncodeToString(h[:]) }
-	man := bkManifest{Format: 1, Created: time.Now().Unix(), Version: a.Cfg.Version, Schema: store.ConfigSchemaVersion(), Kind: prefix,
+	var logsb []byte
+	if (prefix == "manual" || prefix == "auto") && a.backupConfig().History && a.Logs != nil {
+		lf := filepath.Join(tmp, "logs.db")
+		if _, err := a.Logs.Exec(`VACUUM INTO ?`, lf); err != nil {
+			return fmt.Errorf("could not save a copy of the logs: %w", err)
+		}
+		if logsb, err = os.ReadFile(lf); err != nil {
+			return err
+		}
+	}
+	man := bkManifest{Format: 1, Logs: logsb != nil, Created: time.Now().Unix(), Version: a.Cfg.Version, Schema: store.ConfigSchemaVersion(), Kind: prefix,
 		Sums: map[string]string{"config.db": sum(dbb), "secret.key": sum(key)}}
 	mb, _ := json.Marshal(man)
 	var buf bytes.Buffer
@@ -163,7 +182,10 @@ func (a *App) writeBackupFile(name, prefix string, verify bool) error {
 	for _, f := range []struct {
 		n string
 		b []byte
-	}{{"manifest.json", mb}, {"config.db", dbb}, {"secret.key", key}} {
+	}{{"manifest.json", mb}, {"config.db", dbb}, {"secret.key", key}, {"logs.db", logsb}} {
+		if f.b == nil {
+			continue
+		}
 		if err := tw.WriteHeader(&tar.Header{Name: f.n, Mode: 0o600, Size: int64(len(f.b)), ModTime: time.Now()}); err != nil {
 			return err
 		}
@@ -525,7 +547,7 @@ func (a *App) restoreBackup(path, password, actor string) (*restoreResult, error
 	defer o.close()
 	cur, _ := os.ReadFile(a.keyPath())
 	differentKey := o.key != nil && !bytes.Equal(o.key, cur)
-	safety, err := a.saveBackup("before-restore")
+	safety, err := a.saveBackupBy("before-restore", actor)
 	if err != nil {
 		return nil, err
 	}
@@ -724,6 +746,12 @@ func kindLabel(name string) string {
 	}
 }
 
+// backupKindOf is the kind of a backup file, from its name.
+func backupKindOf(p string) string {
+	k := strings.SplitN(filepath.Base(p), "-2", 2)[0]
+	return k
+}
+
 func (a *App) backupPath(name string) (string, error) {
 	if !reBackupName.MatchString(name) {
 		return "", errors.New("that backup was not found")
@@ -764,6 +792,9 @@ func (a *App) registerBackupRoutes() {
 	s.Handle("GET /api/backups", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		api.JSON(w, 200, map[string]any{"backups": a.listBackups(), "config": a.backupConfig(), "now": contents(a.Config)})
 	})
+	s.HandleAdmin("GET /api/backups/history", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		api.JSON(w, 200, map[string]any{"events": a.backupHistory()})
+	})
 	s.HandleAdmin("PUT /api/backups/config", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		var in BackupConfig
 		if !api.Decode(w, r, &in) {
@@ -787,7 +818,7 @@ func (a *App) registerBackupRoutes() {
 		ok(w)
 	})
 	s.HandleAdmin("POST /api/backups", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-		p, err := a.saveBackup("manual")
+		p, err := a.saveBackupBy("manual", c.User.Username)
 		if err != nil {
 			fail(w, err)
 			return
@@ -839,6 +870,7 @@ func (a *App) registerBackupRoutes() {
 		}
 		os.Remove(p)
 		os.Remove(p + ".json")
+		a.backupLog(c.User.Username, "deleted", backupKindOf(p), p, "")
 		ok(w)
 	})
 	// The file as it is. A backup that is not protected by a password holds the secrets of this
@@ -867,6 +899,7 @@ func (a *App) registerBackupRoutes() {
 				return
 			}
 		}
+		a.backupLog(c.User.Username, "downloaded", backupKindOf(p), p, "as it is")
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Header().Set("Content-Disposition", `attachment; filename="`+filepath.Base(p)+`"`)
 		w.Header().Set("Cache-Control", "no-store")
@@ -903,6 +936,7 @@ func (a *App) registerBackupRoutes() {
 			fail(w, err)
 			return
 		}
+		a.backupLog(c.User.Username, "downloaded", backupKindOf(p), p, "protected by a password")
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Header().Set("Content-Disposition", `attachment; filename="`+strings.TrimSuffix(filepath.Base(p), bkExt)+`-protected`+bkExt+`"`)
 		w.Header().Set("Cache-Control", "no-store")
@@ -932,6 +966,7 @@ func (a *App) registerBackupRoutes() {
 		rep, _ := a.verifyBackup(p, "")
 		a.writeMeta(p, bkMeta{Report: rep})
 		a.pruneBackups("upload")
+		a.backupLog(c.User.Username, "uploaded", "upload", p, "")
 		api.JSON(w, 200, map[string]any{"name": filepath.Base(p), "report": rep})
 	})
 	s.HandleAdmin("POST /api/backups/{name}/restore", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
@@ -963,9 +998,11 @@ func (a *App) registerBackupRoutes() {
 		}
 		res, err := a.restoreBackup(p, in.Password, c.User.Username)
 		if err != nil {
+			a.backupLog(c.User.Username, "restore-failed", backupKindOf(p), p, err.Error())
 			fail(w, err)
 			return
 		}
+		a.backupLog(c.User.Username, "restored", backupKindOf(p), p, "")
 		api.JSON(w, 200, res)
 	})
 }

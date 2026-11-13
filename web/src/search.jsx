@@ -95,7 +95,7 @@ const ROWS = [
   ['Your place on the map', 'settings/general', 'Set where the lines on the Overview map start', 'map location home pin country zip postal code city address find lookup', 'Your place on the map'],
   ['Dark or light', 'settings/general', 'Choose the look of the console', 'appearance theme dark light', 'Appearance'],
   ['Backups', 'settings/backup', 'Save and restore your settings', 'backup restore export import', 'Backups'],
-  ['Reset to default', 'settings/backup', 'Erase the settings and start again', 'factory reset wipe', 'Reset to default'],
+  ['Danger zone', 'settings/backup', 'Restore default settings, reset the network, or erase everything', 'reset default restore factory wipe erase start over', 'Danger zone'],
   ['Restart or shut down', 'settings/general', 'Power controls', 'reboot power off shutdown', 'Power'],
   ['Diagnostics', 'diagnostics/services', 'How each service is doing, its log, and a terminal', 'logs services status restart support bundle troubleshoot failing', 'Services'],
   ['Network tools', 'diagnostics/tools', 'Ping, trace a route, look up a name', 'ping traceroute lookup dig tools', 'Tools'],

@@ -538,7 +538,12 @@ func (a *App) enforceLogCap() {
 		}
 	}
 	trim([]string{"fw_events", "dns_queries"}, 20)
-	trim([]string{"events", "traffic", "country_traffic", "threat_alerts"}, 10)
+	trim([]string{"traffic", "country_traffic", "threat_alerts"}, 10)
+	// General activity can be trimmed by the size limit; admin activity is the record of what people did and is not.
+	adm, aargs := a.adminCond()
+	for i := 0; i < 10 && over(); i++ {
+		a.Logs.Exec(`DELETE FROM events WHERE id IN (SELECT id FROM events WHERE NOT `+adm+` ORDER BY id LIMIT MAX(1000,(SELECT COUNT(*)/10 FROM events)))`, aargs...)
+	}
 }
 
 func (a *App) registerLogExtraRoutes() {

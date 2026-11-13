@@ -4,6 +4,10 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
+
+	"nopewarden/internal/api"
+	"nopewarden/internal/auth"
 )
 
 func TestNetworkResetClearsNetworksAndKeepsTheAccount(t *testing.T) {
@@ -93,4 +97,78 @@ func TestBackupDownload(t *testing.T) {
 		t.Fatalf("expected the backup to be kept, found %d", len(left))
 	}
 	_ = os.Remove
+}
+
+func TestRestoreDefaultsOnlyTouchesPreferences(t *testing.T) {
+	c, _, _ := updBox(t, "http://127.0.0.1:1/none", true)
+	c.app.Config.SetSetting("backup.config", `{"schedule":"weekly"}`)
+	c.app.Config.SetSetting("logs.retention_days", "90")
+	c.app.Config.SetSetting("prefs.1.devices", `{"rows":50}`)
+	c.app.Config.SetSetting("sched.update", "daily 03:00")
+	c.app.Config.SetSetting("sched.update.last", "123")
+	c.app.Config.SetSetting("console.port", "8443")
+	c.app.Config.SetSetting("syslog.config", `{"host":"10.0.0.9"}`)
+	var zones int
+	c.app.Config.QueryRow(`SELECT count(*) FROM zones`).Scan(&zones)
+	if rc, _, _ := c.call("POST", "/api/system/reset", map[string]any{"level": "defaults"}); rc != 403 {
+		t.Fatal("restoring defaults must ask for the password")
+	}
+	if rc, _, raw := c.call("POST", "/api/system/reset", map[string]any{"level": "defaults", "password": "correct horse battery"}); rc != 200 {
+		t.Fatalf("restore defaults: %d %s", rc, raw)
+	}
+	for _, k := range []string{"backup.config", "logs.retention_days", "prefs.1.devices", "sched.update"} {
+		if c.app.Config.Setting(k, "gone") != "gone" {
+			t.Errorf("%s should be back to its default", k)
+		}
+	}
+	for k, want := range map[string]string{"sched.update.last": "123", "console.port": "8443", "syslog.config": `{"host":"10.0.0.9"}`} {
+		if got := c.app.Config.Setting(k, "gone"); got != want {
+			t.Errorf("%s should stay, got %q", k, got)
+		}
+	}
+	var after int
+	c.app.Config.QueryRow(`SELECT count(*) FROM zones`).Scan(&after)
+	if after != zones || after == 0 {
+		t.Fatalf("networks must not change: %d then %d", zones, after)
+	}
+	// Still signed in, and no network reset was started.
+	if rc, _, _ := c.call("GET", "/api/system/update", nil); rc != 200 {
+		t.Fatalf("signed out: %d", rc)
+	}
+}
+
+func TestDangerZoneAsksForThePasswordAndTheCode(t *testing.T) {
+	c, _, _ := updBox(t, "http://127.0.0.1:1/none", true)
+	u := &auth.User{ID: 1, Username: "admin", TOTPEnabled: true}
+	if rows := c.app.Config.QueryRow(`SELECT id, username FROM users LIMIT 1`); rows != nil {
+		rows.Scan(&u.ID, &u.Username)
+	}
+	secret, _, err := c.app.Auth.BeginEnrol(u.ID, "NopeWarden")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.app.Auth.ConfirmEnrol(u.ID, auth.TOTPCodeAt(secret, time.Now())); err != nil {
+		t.Fatal(err)
+	}
+	ctx := &api.Ctx{User: u, IP: "127.0.0.1"}
+	if err := c.app.dangerous(ctx, "123456", ""); err != errNeedPass {
+		t.Fatalf("a code alone is not enough, got %v", err)
+	}
+	if err := c.app.dangerous(ctx, "123456", "wrong"); err == nil || err == errNeedCode {
+		t.Fatalf("a wrong password is refused as a wrong password, got %v", err)
+	}
+	if err := c.app.dangerous(ctx, "", "correct horse battery"); err != errNeedCode {
+		t.Fatalf("the right password without a code must ask for the code, got %v", err)
+	}
+	if err := c.app.dangerous(ctx, "000000", "correct horse battery"); err != errNeedCode {
+		t.Fatalf("a wrong code must be refused, got %v", err)
+	}
+	good := auth.TOTPCodeAt(secret, time.Now().Add(30*time.Second))
+	if err := c.app.dangerous(ctx, good, "correct horse battery"); err != nil {
+		t.Fatalf("password and the right code must pass, got %v", err)
+	}
+	u.TOTPEnabled = false
+	if err := c.app.dangerous(ctx, "", "correct horse battery"); err != nil {
+		t.Fatalf("without two-factor the password is enough, got %v", err)
+	}
 }

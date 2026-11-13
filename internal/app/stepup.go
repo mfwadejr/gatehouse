@@ -35,6 +35,21 @@ func (a *App) serious(c *api.Ctx, code, password string) error {
 	return nil
 }
 
+// dangerous is for the Danger zone: the password every time, and the authenticator code as well when
+// two-factor sign-in is on. A code alone proves the phone; the password with it proves the person.
+func (a *App) dangerous(c *api.Ctx, code, password string) error {
+	if password == "" {
+		return errNeedPass
+	}
+	if err := a.Auth.CheckPassword(c.User.Username, password, c.IP); err != nil {
+		return errors.New("that password is not right")
+	}
+	if c.User.TOTPEnabled && (code == "" || a.Auth.VerifyStepUp(c.User.ID, code) != nil) {
+		return errNeedCode
+	}
+	return nil
+}
+
 func (a *App) registerStepUpRoutes() {
 	// What the screens should ask for: a code on routine changes only when the person switched that
 	// on and uses two-factor sign-in; on serious ones a code (two-factor on) or the password.
@@ -42,6 +57,7 @@ func (a *App) registerStepUpRoutes() {
 		api.JSON(w, 200, map[string]any{
 			"everyday": a.Config.Setting("fw.stepup", "0") == "1" && c.User.TOTPEnabled,
 			"serious":  map[bool]string{true: "code", false: "password"}[c.User.TOTPEnabled],
+			"danger":   map[bool]string{true: "both", false: "password"}[c.User.TOTPEnabled],
 		})
 	})
 }

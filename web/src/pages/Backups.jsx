@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { del, post, put, saveFile, sendFile, useData } from '../api.js';
-import { Button, Card, Empty, Field, Input, Modal, Note, Pill, Select, useAction, fmt, useStepUp, stepReady, StepUp, Limited , useDelayedDelete } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, Pill, Select, ToggleRow, useAction, fmt, useStepUp, stepReady, StepUp, Limited , useDelayedDelete } from '../ui.jsx';
 
 // Backups of the settings: made on a schedule, checked when they are made, and checkable again by
 // trying a restore without changing anything. Nothing here touches the network until a restore is
@@ -119,6 +119,44 @@ function ProtectedDownload({ b, onClose }) {
   );
 }
 
+const HIST = {
+  created: ['Backup made', 'good'], failed: ['Backup failed', 'bad'], restored: ['Restored', 'warn'], 'restore-failed': ['Restore failed', 'bad'],
+  uploaded: ['Added from a file', ''], downloaded: ['Downloaded', ''], deleted: ['Deleted', ''],
+};
+
+// Every backup, restore, upload, download and delete, failed ones too, and who did it. Loaded when opened.
+function BackupHistory() {
+  const [open, setOpen] = useState(false);
+  return (
+    <details className="more" onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary>Backup history</summary>
+      {open && <HistoryList />}
+    </details>
+  );
+}
+
+function HistoryList() {
+  const { data } = useData('/api/backups/history', { every: 30000 });
+  if (!data) return null;
+  const ev = data.events || [];
+  if (!ev.length) return <Empty>Nothing has been recorded yet.</Empty>;
+  return (
+    <div className="list">
+      <Limited items={ev} noun="entries" render={(e, i) => {
+        const [label, tone] = HIST[e.action] || [e.action, ''];
+        return (
+          <div className="item" key={`${e.at}-${i}`}>
+            <div>
+              <div className="name">{label} <Pill tone={tone}>{e.kind}</Pill></div>
+              <div className="small muted">{fmt.dt(e.at)} · by {e.actor}{e.detail ? ` · ${e.detail}` : ''}</div>
+            </div>
+          </div>
+        );
+      }} />
+    </div>
+  );
+}
+
 export default function Backups({ me }) {
   const delayedDelete = useDelayedDelete();
   const { data, reload } = useData('/api/backups', { every: 30000 });
@@ -141,11 +179,12 @@ export default function Backups({ me }) {
     <Card title="Backups" desc="Copies of your settings, made on a schedule and checked as they are made. A backup is only worth having if it restores, so you can also check one without changing anything."
       actions={<Button small kind="primary" disabled={busy} onClick={async () => { if (await run(() => post('/api/backups', {}), 'Backup made.')) reload(); }}>Back up now</Button>}>
       <div className="stack">
-        <div className="inline" style={{ alignItems: 'flex-end' }}>
+        <div className="inline" style={{ alignItems: 'flex-start' }}>
           <Field label="Make a backup"><Select value={c.schedule} onChange={(v) => save({ schedule: v })} options={[{ value: 'daily', label: 'Every day' }, { value: 'weekly', label: 'Every week' }, { value: 'off', label: 'Only when I ask' }]} /></Field>
           {c.schedule !== 'off' && <Field label="At"><Select value={String(c.hour)} onChange={(v) => save({ hour: Number(v) })} options={HOURS} /></Field>}
-          <Field label="Keep this many backups" hint="Backup copies, not days. Older ones are deleted."><Select value={String(c.keep)} onChange={(v) => save({ keep: Number(v) })} options={[3, 5, 7, 10, 14, 30, 60].map((n) => ({ value: String(n), label: String(n) }))} /></Field>
+          <Field label="Keep this many backups" hint="Backup copies, not days. Older ones are deleted."><div style={{ width: '9rem' }}><Select value={String(c.keep)} onChange={(v) => save({ keep: Number(v) })} options={[3, 5, 7, 10, 14, 30, 60].map((n) => ({ value: String(n), label: String(n) }))} /></div></Field>
         </div>
+        <ToggleRow title="Include history (logs)" desc="Adds the traffic, DNS and event logs to backups made by hand or on a schedule. Off by default: they can be large, and a restore does not need them." checked={!!c.include_history} onChange={(v) => save({ include_history: v })} />
         {!lastGood && <Note tone="warn" title="No good backup yet">Press Back up now to make one.</Note>}
         {lastGood && stale && <Note tone="" title="Try a restore check">No backup has been checked in 90 days. Press Check on one to be sure it will work when you need it.</Note>}
         {!list.length ? <Empty>No backups yet.</Empty> : (
@@ -167,6 +206,7 @@ export default function Backups({ me }) {
             )} />}
           </div>
         )}
+        <BackupHistory />
         <div className="inline" style={{ alignItems: 'flex-end' }}>
           <Field label="Use a backup from somewhere else" hint="Choose a backup file. It is added to the list, checked, and not restored until you say so.">
             <input ref={file} type="file" accept=".ghbk,.db" />

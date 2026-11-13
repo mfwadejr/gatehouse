@@ -228,7 +228,9 @@ func (a *App) pruneFWLog(days int) {
 	cut := time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix()
 	a.Logs.Exec(`DELETE FROM fw_events WHERE ts<?`, cut)
 	a.Logs.Exec(`DELETE FROM fw_events WHERE id < (SELECT COALESCE(MAX(id),0)-500000 FROM fw_events)`)
-	a.Logs.Exec(`DELETE FROM events WHERE ts<?`, cut)
+	// Admin activity follows its own, longer period and is removed by pruneLong.
+	adm, aargs := a.adminCond()
+	a.Logs.Exec(`DELETE FROM events WHERE ts<? AND NOT `+adm, append([]any{cut}, aargs...)...)
 }
 
 // Search ------------------------------------------------------------------------------------

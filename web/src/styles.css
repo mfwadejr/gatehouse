@@ -384,8 +384,7 @@ details.more > summary { cursor: pointer; color: var(--color-text-secondary); ma
 .ov-wan .num { text-align: right; font-variant-numeric: tabular-nums; color: var(--color-text-secondary); }
 .ov-g4 { display: grid; gap: var(--space-4); grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .ov-g3 { display: grid; gap: var(--space-4); grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.ov-gm { display: grid; gap: var(--space-4); grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
-.ov-gm .ov-map svg { max-height: 13rem; }
+.ov-gm { display: grid; gap: var(--space-4); grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr); }
 @media (max-width: 70rem) { .ov-g4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ov-g3, .ov-gm { grid-template-columns: 1fr; } }
 @media (max-width: 36rem) { .ov-g4 { grid-template-columns: 1fr; } }
 .ov-tile .val { font-size: 2rem; }
@@ -705,3 +704,15 @@ mark { background: color-mix(in srgb, var(--color-status-warning) 35%, transpare
 
 .logfacts { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); }
 .logfacts b { font-weight: var(--font-weight-semibold); }
+
+/* Danger zone: three cards of rising severity, built only from the status colours. */
+.dz { border: var(--border-width-thin) solid var(--color-status-bad-border); border-radius: var(--radius-lg); padding: var(--space-4); display: grid; gap: var(--space-3); background: var(--color-bg-inset); }
+.dz > h2 { margin: 0; color: var(--color-status-bad); font-size: var(--font-size-lg); }
+.dz > .desc { margin: 0; color: var(--color-text-secondary); }
+.dz-card { border: var(--border-width-thin) solid var(--dz-c); border-left-width: var(--space-1); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); background: var(--color-bg-surface); display: flex; gap: var(--space-4); align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.dz-card h3 { margin: 0 0 var(--space-1); color: var(--dz-c); font-size: var(--font-size-base); }
+.dz-card p { margin: 0; color: var(--color-text-secondary); font-size: var(--font-size-sm); }
+.dz-card > div:first-child { flex: 1 1 22rem; min-width: 0; }
+.dz-1 { --dz-c: var(--color-status-warning); }
+.dz-2 { --dz-c: color-mix(in srgb, var(--color-status-warning) 50%, var(--color-status-bad)); }
+.dz-3 { --dz-c: var(--color-status-bad); }

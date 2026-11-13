@@ -1,8 +1,11 @@
 package app
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -15,8 +18,9 @@ import (
 // that grows has a rule here, so nothing is kept forever by accident.
 
 const (
-	defaultLongDays = 365 // alerts and outages
-	defaultRevKeep  = 200 // firewall change copies kept for going back
+	defaultLongDays  = 365 // alerts and outages
+	defaultRevKeep   = 200 // firewall change copies kept for going back
+	defaultAdminDays = 365 // admin activity: the record of what people did
 )
 
 type storTable struct {
@@ -26,23 +30,52 @@ type storTable struct {
 	db     string
 	table  string
 	ts     string // time column; empty when the table has none
+	where  string // limits the table to one kind of row; empty for all of it
+	clear  bool   // may be cleared by hand
+}
+
+// adminCond picks out the admin activity rows of the events table: sign-ins and what administrators
+// did. Everything else in that table is general activity.
+func (a *App) adminCond() (string, []any) {
+	cond := `(area='admin'`
+	args := []any{}
+	if rows, err := a.Config.Query(`SELECT username FROM users`); err == nil {
+		var names []any
+		for rows.Next() {
+			var n string
+			rows.Scan(&n)
+			names = append(names, n)
+		}
+		rows.Close()
+		if len(names) > 0 {
+			cond += ` OR actor IN (` + strings.TrimSuffix(strings.Repeat("?,", len(names)), ",") + `)`
+			args = append(args, names...)
+		}
+	}
+	return cond + `)`, args
 }
 
 func (a *App) storTables() []storTable {
 	days := a.logDays()
 	long := a.longDays()
+	adm, _ := a.adminCond()
 	return []storTable{
-		{"connections", "Connections", fmt.Sprintf("%d days, and trimmed first when the size limit is reached", days), "logs", "fw_events", "ts"},
-		{"lookups", "DNS lookups", fmt.Sprintf("%d days, and trimmed first when the size limit is reached", days), "logs", "dns_queries", "ts"},
-		{"events", "What happened (activity)", fmt.Sprintf("%d days", days), "logs", "events", "ts"},
-		{"traffic", "Data used by each device", fmt.Sprintf("%d days", days), "logs", "traffic", "ts"},
-		{"countries", "Data by country", fmt.Sprintf("%d days", days), "logs", "country_traffic", "ts"},
-		{"history", "Overview charts", "Kept in three steps: fine for 2 hours, medium for 25 hours, coarse for 31 days", "logs", "metrics", "ts"},
-		{"speed", "Speed tests", "365 days", "logs", "speedtests", "ts"},
-		{"threats", "Threat alerts", fmt.Sprintf("%d days", long), "logs", "threat_alerts", "ts"},
-		{"outages", "Internet outages", fmt.Sprintf("%d days", long), "logs", "outages", "start"},
-		{"revisions", "Firewall change copies", fmt.Sprintf("The newest %d, plus the one in use and any waiting to be kept", a.revKeep()), "config", "fw_revisions", "created_at"},
+		{"connections", "Connections", fmt.Sprintf("%d days, and trimmed first when the size limit is reached", days), "logs", "fw_events", "ts", "", true},
+		{"lookups", "DNS lookups", fmt.Sprintf("%d days, and trimmed first when the size limit is reached", days), "logs", "dns_queries", "ts", "", true},
+		{"events", "What happened (activity)", fmt.Sprintf("%d days", days), "logs", "events", "ts", "NOT " + adm, true},
+		{"admin", "Admin activity", fmt.Sprintf("%d days. Never cleared by hand: it is the record of what people did", a.adminDays()), "logs", "events", "ts", adm, false},
+		{"traffic", "Data used by each device", fmt.Sprintf("%d days", days), "logs", "traffic", "ts", "", true},
+		{"countries", "Data by country", fmt.Sprintf("%d days", days), "logs", "country_traffic", "ts", "", true},
+		{"history", "Overview charts", "Kept in three steps: fine for 2 hours, medium for 25 hours, coarse for 31 days", "logs", "metrics", "ts", "", true},
+		{"speed", "Speed tests", "365 days", "logs", "speedtests", "ts", "", true},
+		{"threats", "Threat alerts", fmt.Sprintf("%d days", long), "logs", "threat_alerts", "ts", "", true},
+		{"outages", "Internet outages", fmt.Sprintf("%d days", long), "logs", "outages", "start", "", true},
+		{"revisions", "Firewall change copies", fmt.Sprintf("The newest %d, plus the one in use and any waiting to be kept", a.revKeep()), "config", "fw_revisions", "created_at", "", false},
 	}
+}
+
+func (a *App) adminDays() int {
+	return clampInt(int(a.settingFloat("logs.admin_days", defaultAdminDays)), 30, 3650)
 }
 
 func (a *App) logDays() int { return int(a.settingFloat("logs.retention_days", 30)) }
@@ -68,6 +101,8 @@ func (a *App) pruneLong() {
 	cut := time.Now().Add(-time.Duration(a.longDays()) * 24 * time.Hour).Unix()
 	a.Logs.Exec(`DELETE FROM threat_alerts WHERE ts<?`, cut)
 	a.Logs.Exec(`DELETE FROM outages WHERE start<? AND end>0`, cut)
+	adm, aargs := a.adminCond()
+	a.Logs.Exec(`DELETE FROM events WHERE ts<? AND `+adm, append([]any{time.Now().Add(-time.Duration(a.adminDays()) * 24 * time.Hour).Unix()}, aargs...)...)
 	keep := a.revKeep()
 	// Keep the newest few, the copy in use, and anything waiting for a decision.
 	a.Config.Exec(`DELETE FROM fw_revisions WHERE status NOT IN ('pending','confirmed') AND version NOT IN (SELECT version FROM fw_revisions ORDER BY version DESC LIMIT ?)`, keep)
@@ -110,6 +145,21 @@ type storRow struct {
 	Oldest int64 `json:"oldest"`
 }
 
+// tableWhere is the WHERE clause that limits a table to the kind of row a line stands for.
+func (a *App) tableWhere(t storTable) (string, []any) {
+	if t.where == "" {
+		return "", nil
+	}
+	if strings.Contains(t.where, "area='admin'") {
+		c, args := a.adminCond()
+		if strings.HasPrefix(t.where, "NOT ") {
+			return " WHERE NOT " + c, args
+		}
+		return " WHERE " + c, args
+	}
+	return " WHERE " + t.where, nil
+}
+
 func (a *App) storageReport() map[string]any {
 	var out []storRow
 	for _, t := range a.storTables() {
@@ -118,9 +168,10 @@ func (a *App) storageReport() map[string]any {
 			db = a.Config
 		}
 		r := storRow{storTable: t}
-		db.QueryRow(`SELECT COUNT(*) FROM ` + t.table).Scan(&r.Rows)
+		w, wargs := a.tableWhere(t)
+		db.QueryRow(`SELECT COUNT(*) FROM `+t.table+w, wargs...).Scan(&r.Rows)
 		if t.ts != "" && r.Rows > 0 {
-			db.QueryRow(`SELECT COALESCE(MIN(` + t.ts + `),0) FROM ` + t.table).Scan(&r.Oldest)
+			db.QueryRow(`SELECT COALESCE(MIN(`+t.ts+`),0) FROM `+t.table+w, wargs...).Scan(&r.Oldest)
 		}
 		r.Bytes = a.sizeEstimate(t, r.Rows)
 		out = append(out, r)
@@ -137,12 +188,13 @@ func (a *App) storageReport() map[string]any {
 	return map[string]any{
 		"tables": out, "logs_bytes": usage["used_bytes"], "config_bytes": cfgPages * cfgSize,
 		"disk_free": free, "disk_total": total,
-		"days": a.logDays(), "long_days": a.longDays(), "max_mb": int(a.settingFloat("logs.max_mb", 200)), "revisions_keep": a.revKeep(),
+		"days": a.logDays(), "long_days": a.longDays(), "admin_days": a.adminDays(), "max_mb": int(a.settingFloat("logs.max_mb", 200)), "revisions_keep": a.revKeep(),
 		"last_prune": usage["last_prune"],
 	}
 }
 
 func (a *App) registerStorageRoutes() {
+	a.registerClearRoutes()
 	a.API.Handle("GET /api/logs/storage", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		api.JSON(w, 200, a.storageReport())
 	})
@@ -156,7 +208,9 @@ func (a *App) registerStorageRoutes() {
 	})
 	a.API.HandleAdmin("PUT /api/logs/storage", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		var in struct {
+			Days          int `json:"days"`
 			LongDays      int `json:"long_days"`
+			AdminDays     int `json:"admin_days"`
 			RevisionsKeep int `json:"revisions_keep"`
 		}
 		if !api.Decode(w, r, &in) {
@@ -166,9 +220,24 @@ func (a *App) registerStorageRoutes() {
 			fail(w, fmt.Errorf("keep alerts and outages between 7 and 3650 days"))
 			return
 		}
+		if in.Days != 0 && (in.Days < 1 || in.Days > 365) {
+			fail(w, fmt.Errorf("keep traffic and events between 1 and 365 days"))
+			return
+		}
+		if in.AdminDays != 0 && (in.AdminDays < 30 || in.AdminDays > 3650) {
+			fail(w, fmt.Errorf("keep admin activity between 30 and 3650 days"))
+			return
+		}
 		if in.RevisionsKeep < 20 || in.RevisionsKeep > 5000 {
 			fail(w, fmt.Errorf("keep between 20 and 5000 firewall change copies"))
 			return
+		}
+		if in.Days != 0 {
+			a.Config.SetSetting("logs.retention_days", strconv.Itoa(in.Days))
+			a.Config.SetSetting("dns.log_retention_days", strconv.Itoa(in.Days))
+		}
+		if in.AdminDays != 0 {
+			a.Config.SetSetting("logs.admin_days", strconv.Itoa(in.AdminDays))
 		}
 		a.Config.SetSetting("logs.long_days", strconv.Itoa(in.LongDays))
 		a.Config.SetSetting("fw.revisions_keep", strconv.Itoa(in.RevisionsKeep))
@@ -245,4 +314,102 @@ func (a *App) adminActivity(q string, hours, limit int, before int64) ([]adminRo
 		rows.Close()
 	}
 	return out, total
+}
+
+// ---- what a clean-up would remove, and clearing by hand ----
+
+// cleanupPreview counts what the rules would remove if they ran right now, kind by kind.
+func (a *App) cleanupPreview() map[string]int64 {
+	day := 24 * time.Hour
+	cut := func(d int) int64 { return time.Now().Add(-time.Duration(d) * day).Unix() }
+	n := func(q string, args ...any) int64 {
+		var v int64
+		a.Logs.QueryRow(q, args...).Scan(&v)
+		return v
+	}
+	adm, aargs := a.adminCond()
+	days := a.logDays()
+	out := map[string]int64{
+		"connections": n(`SELECT COUNT(*) FROM fw_events WHERE ts<?`, cut(days)),
+		"lookups":     n(`SELECT COUNT(*) FROM dns_queries WHERE ts<?`, cut(days)),
+		"events":      n(`SELECT COUNT(*) FROM events WHERE ts<? AND NOT `+adm, append([]any{cut(days)}, aargs...)...),
+		"admin":       n(`SELECT COUNT(*) FROM events WHERE ts<? AND `+adm, append([]any{cut(a.adminDays())}, aargs...)...),
+		"traffic":     n(`SELECT COUNT(*) FROM traffic WHERE mac<>'' AND ts<?`, cut(days)),
+		"countries":   n(`SELECT COUNT(*) FROM country_traffic WHERE ts<?`, cut(days)),
+		"threats":     n(`SELECT COUNT(*) FROM threat_alerts WHERE ts<?`, cut(a.longDays())),
+		"outages":     n(`SELECT COUNT(*) FROM outages WHERE start<? AND end>0`, cut(a.longDays())),
+	}
+	return out
+}
+
+// clearKinds says which kinds may be cleared by hand and the table behind each. Admin activity and the
+// firewall change copies are not here on purpose.
+var clearKinds = map[string]string{
+	"connections": "fw_events", "lookups": "dns_queries", "events": "events", "traffic": "traffic",
+	"countries": "country_traffic", "history": "metrics", "speed": "speedtests", "threats": "threat_alerts", "outages": "outages",
+}
+
+func (a *App) registerClearRoutes() {
+	a.API.HandleAdmin("GET /api/logs/cleanup-preview", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		api.JSON(w, 200, map[string]any{"would_remove": a.cleanupPreview(), "last_prune": int64(a.settingFloat("logs.last_prune", 0)), "last_removed": int64(a.settingFloat("logs.last_removed", 0))})
+	})
+	a.API.HandleAdmin("POST /api/logs/clear", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		var in struct {
+			Kinds    []string `json:"kinds"`
+			Code     string   `json:"code"`
+			Password string   `json:"password"`
+		}
+		if !api.Decode(w, r, &in) {
+			return
+		}
+		if len(in.Kinds) == 0 {
+			fail(w, errors.New("tick what you want to clear"))
+			return
+		}
+		for _, k := range in.Kinds {
+			if _, ok := clearKinds[k]; !ok {
+				fail(w, errors.New("admin activity and firewall change copies cannot be cleared this way"))
+				return
+			}
+		}
+		if err := a.dangerous(c, in.Code, in.Password); err != nil {
+			api.Error(w, http.StatusForbidden, err.Error())
+			return
+		}
+		removed := map[string]int64{}
+		var parts []string
+		for _, k := range in.Kinds {
+			if _, dup := removed[k]; dup {
+				continue
+			}
+			var res sql.Result
+			var err error
+			switch k {
+			case "connections":
+				res, err = a.Logs.Exec(`DELETE FROM fw_events`)
+			case "lookups":
+				var cnt int64
+				a.Logs.QueryRow(`SELECT COUNT(*) FROM dns_queries`).Scan(&cnt)
+				a.QLog.Clear()
+				removed[k] = cnt
+				parts = append(parts, fmt.Sprintf("%s: %d", k, cnt))
+				continue
+			case "events":
+				adm, aargs := a.adminCond()
+				res, err = a.Logs.Exec(`DELETE FROM events WHERE NOT `+adm, aargs...)
+			default:
+				res, err = a.Logs.Exec(`DELETE FROM ` + clearKinds[k])
+			}
+			if err != nil {
+				fail(w, err)
+				return
+			}
+			n, _ := res.RowsAffected()
+			removed[k] = n
+			parts = append(parts, fmt.Sprintf("%s: %d", k, n))
+		}
+		sort.Strings(parts)
+		a.auditEvent(c.User.Username, "warning", "Logs were cleared by hand", strings.Join(parts, ", "))
+		api.JSON(w, 200, map[string]any{"removed": removed})
+	})
 }

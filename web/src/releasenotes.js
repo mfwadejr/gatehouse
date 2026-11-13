@@ -1,6 +1,16 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.36',
+    title: 'A Danger zone for resets, backup history, and clearer log keeping',
+    items: [
+      'Settings, Backup & recovery now ends with a Danger zone: three cards of rising severity. Restore default settings (yellow) puts only your preferences back; Reset network settings (orange) starts networks, firewall, DHCP, DNS and VPNs clean; Factory reset (red) erases everything. Each says what stays, saves a copy of your settings first, and asks for your password every time, plus your authenticator code if you use two-factor sign-in.',
+      'Backups now has a folded Backup history: every backup, restore, upload, download and delete, failed ones too, and who did it. It is kept beside the backups, so a restore or reset cannot erase it. A new Include history (logs) switch, off by default, adds the logs to backups made by hand or on a schedule. The Keep this many backups box lines up properly.',
+      'Storage now has three periods: traffic and events, alerts and outages, and admin activity (365 days unless you change it). It says what a clean-up would remove right now and what the last one removed. Clear by hand lets you tick the kinds to empty, or Select all, and asks for your password (and code). Admin activity and firewall change copies are not offered there, and the clear itself is recorded in admin activity.',
+      'The size limit and the hourly clean-up no longer remove admin activity early. The old Delete all log entries button moved into Storage as Clear by hand.',
+    ],
+  },
+  {
     version: '0.9.4.35',
     title: 'Services and Profiles move to where you use them, and rules that cover each other are flagged',
     items: [

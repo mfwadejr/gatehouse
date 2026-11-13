@@ -25,7 +25,7 @@ func (a *App) backupDir() string { return filepath.Join(a.Cfg.DataDir, "backups"
 func (a *App) registerResetRoutes() {
 	// A fresh copy of the settings as a download, so it can be kept before a reset.
 	a.API.HandleAdmin("GET /api/system/backup", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-		name, err := a.saveBackup("manual")
+		name, err := a.saveBackupBy("manual", c.User.Username)
 		if err != nil {
 			fail(w, err)
 			return
@@ -46,7 +46,7 @@ func (a *App) registerResetRoutes() {
 		if !api.Decode(w, r, &in) {
 			return
 		}
-		if in.Level != store.ResetNetwork && in.Level != store.ResetFactory {
+		if in.Level != store.ResetNetwork && in.Level != store.ResetFactory && in.Level != store.ResetDefaults {
 			fail(w, errors.New("choose which reset you want"))
 			return
 		}
@@ -54,7 +54,7 @@ func (a *App) registerResetRoutes() {
 			fail(w, errors.New("type the word reset to confirm a factory reset"))
 			return
 		}
-		if err := a.serious(c, in.Code, in.Password); err != nil {
+		if err := a.dangerous(c, in.Code, in.Password); err != nil {
 			api.Error(w, http.StatusForbidden, err.Error())
 			return
 		}
@@ -62,9 +62,19 @@ func (a *App) registerResetRoutes() {
 			api.Error(w, http.StatusConflict, "an update is running ("+st+"); wait for it to finish")
 			return
 		}
-		backup, err := a.saveBackup("before-reset")
+		backup, err := a.saveBackupBy("before-reset", c.User.Username)
 		if err != nil {
 			fail(w, err)
+			return
+		}
+		if in.Level == store.ResetDefaults {
+			n, err := store.ResetPreferences(a.Config)
+			if err != nil {
+				fail(w, err)
+				return
+			}
+			a.event(c.User.Username, "warning", "Settings were restored to their defaults", "Preferences only: backups, alerts, log keeping, updates and console display. Networks, accounts and data were not touched. A copy of the settings from before is kept in the backups folder.")
+			api.JSON(w, 200, map[string]any{"status": "reset", "level": in.Level, "backup": backup, "removed": n})
 			return
 		}
 		if err := a.resetNow(in.Level, c.User.Username); err != nil {

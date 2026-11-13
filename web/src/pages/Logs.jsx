@@ -2,11 +2,11 @@ import { hashQuery, setHashQuery, useHashTab } from '../hashtab.js';
 import { Hit } from './AdminActivity.jsx';
 import AdminActivity from './AdminActivity.jsx';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { del, get, getWatched, post, put, setFailing, useData, useStream } from '../api.js';
+import { get, getWatched, post, put, setFailing, useData, useStream } from '../api.js';
 import { RuleForm } from './FirewallRules.jsx';
 import { COUNTRIES, MAP_H, MAP_W } from '../worldmap.js';
 import { groupRows, rowTitle } from '../logrows.js';
-import { Button, Card, Empty, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, DateTimeField, Switch, Tabs, ToggleRow, Trend, useAction, fmt , useDelayedDelete } from '../ui.jsx';
+import { Button, Card, Empty, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, DateTimeField, Switch, Tabs, ToggleRow, Trend, useAction, fmt } from '../ui.jsx';
 
 const KINDS = [
   { value: '', label: 'Everything' },
@@ -49,7 +49,6 @@ const bits = (n) => {
 const dtLocal = (ts) => { const d = new Date(ts * 1000 - new Date().getTimezoneOffset() * 60000); return d.toISOString().slice(0, 16); };
 
 function Recording({ onClose, state, onSaved }) {
-  const delayedDelete = useDelayedDelete();
   const [run, busy] = useAction();
   const [f, setF] = useState({ record_allowed: state.record_allowed, record_blocked: state.record_blocked });
   const { data: u, reload } = useData('/api/logs/usage');
@@ -77,7 +76,7 @@ function Recording({ onClose, state, onSaved }) {
           </div>
         )}
         <p className="small muted">Only the first packet of each connection is recorded, and a flood is capped, so a busy network cannot fill the disk. Names asked for through DNS are always recorded.</p>
-        <Button kind="danger" onClick={() => { delayedDelete('Every log entry', () => del('/api/logs'), () => { reload(); onSaved(); }); onClose(); }}>Delete all log entries</Button>
+        <p className="small muted">To clear logs by hand, or to change how long each kind is kept, go to Settings, Alerts & logs, Storage.</p>
       </div>
     </Modal>
   );

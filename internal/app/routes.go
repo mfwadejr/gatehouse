@@ -48,12 +48,6 @@ func (a *App) registerRoutes() {
 	a.registerBackupRoutes()
 	a.registerSSHRoutes()
 	s.Handle("GET /api/logs", a.logSearch)
-	s.HandleAdmin("DELETE /api/logs", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-		a.QLog.Clear()
-		a.Logs.Exec(`DELETE FROM fw_events`)
-		a.Logs.Exec(`DELETE FROM events`)
-		ok(w)
-	})
 	s.HandleAdmin("PUT /api/logs/settings", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		var in struct {
 			Allowed bool `json:"record_allowed"`

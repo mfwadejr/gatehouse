@@ -528,6 +528,16 @@ export function StepUp({ su, code, setCode, password, setPassword, autoFocus }) 
   );
 }
 
+// Both a password and, when two-factor is on, an authenticator code: asked every time, never remembered.
+export function DangerStep({ su, code, setCode, pw, setPw }) {
+  return (
+    <>
+      <Field label="Your password"><Input type="password" value={pw} onChange={setPw} autoComplete="current-password" autoFocus /></Field>
+      {su.danger === 'both' && <Field label="Code from your authenticator app"><Input className="codebox" value={code} onChange={setCode} inputMode="numeric" autoComplete="one-time-code" /></Field>}
+    </>
+  );
+}
+
 // Delete something reversible at once and offer Undo, instead of asking "Are you sure?".
 // remove() does the delete; restore() puts it back; refresh() reloads the page's list.
 export function useUndoDelete() {

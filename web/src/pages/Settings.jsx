@@ -3,7 +3,7 @@ import MapLocation from './MapLocation.jsx';
 import { useTheme } from '../theme.js';
 import React, { useEffect, useState } from 'react';
 import { del, get, post, put, useData } from '../api.js';
-import { Guard, Button, Card, Empty, Field, Form, Input, Modal, Note, Page, Pill, Segmented, Select, Tabs, ToggleRow, useAction, useCheck, CheckLine, fmt, useStepUp, stepReady, StepUp } from '../ui.jsx';
+import { Guard, Button, Card, Empty, Field, Form, Input, Modal, Note, Page, Pill, Segmented, Select, Tabs, ToggleRow, useAction, useCheck, CheckLine, fmt, useStepUp, useToast, DangerStep } from '../ui.jsx';
 import { Enrol } from './Auth.jsx';
 import Backups from './Backups.jsx';
 import Changes from './Changes.jsx';
@@ -176,15 +176,23 @@ function PowerCard({ me }) {
 }
 
 const RESET = {
+  defaults: {
+    title: 'Restore default settings',
+    verb: 'Restore default settings',
+    lines: ['Your preferences go back to how a new machine starts: backup schedule, alert choices, how long logs are kept, update checks and what the console shows.'],
+    stays: 'Networks, firewall rules, DHCP, DNS, VPNs, accounts, sign-in settings and all logs stay exactly as they are.',
+  },
   network: {
     title: 'Reset network settings',
     verb: 'Reset network settings',
-    lines: ['Networks, firewall rules, port forwards, DHCP, DNS names and lists, and VPNs go back to a clean start.', 'Your accounts, sign-in settings, update settings and the console port stay.'],
+    lines: ['Networks, firewall rules, port forwards, DHCP, DNS names and lists, and VPNs go back to a clean start.'],
+    stays: 'Your accounts, sign-in settings, update settings and the console port stay.',
   },
   factory: {
     title: 'Factory reset',
     verb: 'Erase everything',
-    lines: ['Everything is erased: all settings, accounts, logs and history. The setup wizard opens again.', 'NopeWarden itself and the installed system stay as they are.'],
+    lines: ['Everything is erased: all settings, accounts, logs and history. The setup wizard opens again.'],
+    stays: 'NopeWarden itself and the installed system stay as they are.',
   },
 };
 
@@ -195,8 +203,14 @@ function ResetModal({ level, me, onClose }) {
   const [run, busy] = useAction();
   const [waiting, setWaiting] = useReconnect();
   const su = useStepUp();
+  const toast = useToast();
   const [pw, setPw] = useState('');
-  const go = async () => { if (await run(() => post('/api/system/reset', { level, code, password: pw, confirm: word }))) setWaiting(true); };
+  const ready = pw.length > 0 && (su.danger !== 'both' || code.trim().length >= 6) && (level !== 'factory' || word.toLowerCase() === 'reset');
+  const go = async () => {
+    if (!(await run(() => post('/api/system/reset', { level, code, password: pw, confirm: word })))) return;
+    if (level === 'defaults') { toast('Settings were restored to their defaults.', 'good'); onClose(); return; }
+    setWaiting(true);
+  };
   if (waiting) {
     return (
       <Modal title="Resetting…" onClose={() => {}} footer={null}>
@@ -207,25 +221,33 @@ function ResetModal({ level, me, onClose }) {
   }
   return (
     <Modal title={meta.title} onClose={onClose}
-      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="danger" disabled={busy || !stepReady(su, code, pw) || (level === 'factory' && word.toLowerCase() !== 'reset')} onClick={go}>{meta.verb}</Button></>}>
+      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="danger" disabled={busy || !ready} onClick={go}>{meta.verb}</Button></>}>
       {meta.lines.map((l) => <p key={l}>{l}</p>)}
+      <p><strong>What stays:</strong> {meta.stays}</p>
       <p>A copy of the settings is saved on the machine first. Download one from the Backups card above to keep it somewhere safe.</p>
-      {level === 'factory' && <Field label="Type the word reset to confirm"><Input value={word} onChange={setWord} autoFocus /></Field>}
-      <StepUp su={su} code={code} setCode={setCode} password={pw} setPassword={setPw} />
+      {level === 'factory' && <Field label="Type the word reset to confirm"><Input value={word} onChange={setWord} /></Field>}
+      <DangerStep su={su} code={code} setCode={setCode} pw={pw} setPw={setPw} />
     </Modal>
   );
 }
 
 function ResetCard({ me }) {
   const [level, setLevel] = useState(null);
+  const row = (cls, level, title, text, label) => (
+    <div className={`dz-card ${cls}`}>
+      <div><h3>{title}</h3><p>{text}</p></div>
+      <Button kind={level === 'factory' ? 'danger' : undefined} onClick={() => setLevel(level)}>{label}</Button>
+    </div>
+  );
   return (
-    <Card title="Reset to default" desc="Start over. A copy of your settings is always saved first, and you can download it. Asks for your authenticator code if you use one, or your password if you do not.">
-      <div className="actions">
-        <Button onClick={() => setLevel('network')}>Reset network settings…</Button>
-        <Button kind="danger" onClick={() => setLevel('factory')}>Factory reset…</Button>
-      </div>
+    <section className="dz">
+      <h2>Danger zone</h2>
+      <p className="desc">These change a lot and ask for your password every time, plus your authenticator code if you use one. A copy of your settings is always saved first, so you can undo it.</p>
+      {row('dz-1', 'defaults', 'Restore default settings', 'Only your preferences go back to the defaults. Networks, accounts and logs stay.', 'Restore default settings…')}
+      {row('dz-2', 'network', 'Reset network settings', 'Networks, firewall, DHCP, DNS and VPNs start clean. Accounts and update settings stay.', 'Reset network settings…')}
+      {row('dz-3', 'factory', 'Factory reset', 'Everything is erased and the setup wizard opens again.', 'Factory reset…')}
       {level && <ResetModal level={level} me={me} onClose={() => setLevel(null)} />}
-    </Card>
+    </section>
   );
 }
 
