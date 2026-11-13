@@ -14,6 +14,7 @@ import Storage from './Storage.jsx';
 import GuestPortal from './GuestPortal.jsx';
 import BridgeMode from './BridgeMode.jsx';
 import DeviceMode from './DeviceMode.jsx';
+import MgmtPort from './MgmtPort.jsx';
 import HighAvailability from './HighAvailability.jsx';
 import RemoteLogin from './RemoteLogin.jsx';
 import Alerts from './Alerts.jsx';
@@ -266,6 +267,7 @@ export default function Settings({ me, reloadMe }) {
         <>
           <Guard what="Get started"><GetStarted /></Guard>
           <Guard what="Device mode"><DeviceMode /></Guard>
+          <Guard what="Management port"><MgmtPort /></Guard>
           <Guard what="PowerCard"><PowerCard me={me} /></Guard>
           <Guard what="ConsolePort"><ConsolePort /></Guard>
           <Guard what="Map location"><MapLocation /></Guard>

@@ -95,7 +95,7 @@ func (a *App) registerFWRoutes() {
 		all := r.URL.Query().Get("all") == "1" // the log asks for every rule, built in and automatic ones too
 		out := map[string]hitInfo{}
 		for k, h := range a.hitTable() {
-			if all || strings.HasPrefix(k, "rule:") || strings.HasPrefix(k, "protected:") {
+			if all || strings.HasPrefix(k, "rule:") || strings.HasPrefix(k, "protected:") || strings.HasPrefix(k, "builtin:") || k == "default" {
 				out[k] = h
 			}
 		}

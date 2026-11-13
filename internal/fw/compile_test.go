@@ -285,3 +285,27 @@ func TestEncryptedDNSToTheRouterIsRefusedAtOnceFromInside(t *testing.T) {
 		t.Fatal("the refusal must come before the default drop")
 	}
 }
+
+// Every built-in behaviour the Firewall page lists under "Always on" carries its own counter and tag,
+// so the page can show how often it fired.
+func TestBuiltInBehavioursAreCounted(t *testing.T) {
+	m := &Model{
+		Zones: []Zone{
+			{Name: "Home", Kind: KindTrusted, Ifaces: []string{"eth1"}, Gateway: true, Internet: true, Management: true},
+			{Name: "Internet", Kind: KindWan, Ifaces: []string{"eth0"}},
+		},
+		ConsolePorts: []int{443},
+	}
+	out, err := Compile(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tag := range []string{"builtin:invalid", "builtin:replies", "builtin:health", "builtin:ping", "builtin:dhcpdns", "builtin:dot"} {
+		if !strings.Contains(out, `counter`) || !strings.Contains(out, `comment "`+tag+`"`) {
+			t.Errorf("no counted rule tagged %s", tag)
+		}
+	}
+	if !strings.Contains(out, `counter drop comment "default"`) {
+		t.Error("the last rule must be counted as the default")
+	}
+}

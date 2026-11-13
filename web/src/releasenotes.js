@@ -1,6 +1,15 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.30',
+    title: 'Firewall: who can reach whom first, and what is always on',
+    items: [
+      'On Firewall, Networks, the Who can reach whom grid is now the first card, above Your networks. Select a box to change it or see its rules.',
+      'A new folded card at the bottom of Firewall, Rules, called Always on, lists the seven things NopeWarden does before any rule of yours: dropping broken connections, letting replies back in, limiting ping to this box, letting devices ask for an address and for names, letting network health messages through, refusing encrypted DNS sent to this box so apps fall back quickly, and dropping everything else. Each has a plain reason and a count of the packets it has handled. Nothing in it can be changed, and the firewall does the same as before.',
+      'The Management port card moved from Firewall, Protection to Settings, General, beside Device mode, because it is a setting of the device. Firewall, Protection points to it, and search finds it.',
+    ],
+  },
+  {
     version: '0.9.4.29',
     title: 'Search finds every setting',
     items: [

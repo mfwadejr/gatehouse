@@ -8,7 +8,7 @@ Your account, and how this box is run. It is split into five tabs.
 The picture is an example from a new, empty box; yours will show your own devices and numbers.
 
 ## What is on the page
-- **General**: **Finish setting up** (only while something is left) and **Common setups**, **Device mode** (Router or Bridge, with a three-step change), **Power** (restart or shut down), **Console address**, **Your place on the map** (**Find a place** by zip or postal code, city or address, or type your latitude and longitude, click the map or pick a country; only the words you search for are sent, to OpenStreetMap, and the saved place stays on this machine and is placed within about a degree) and **Appearance**.
+- **General**: **Finish setting up** (only while something is left) and **Common setups**, **Device mode** (Router or Bridge, with a three-step change), **Management port** (a spare port for managing this device), **Power** (restart or shut down), **Console address**, **Your place on the map** (**Find a place** by zip or postal code, city or address, or type your latitude and longitude, click the map or pick a country; only the words you search for are sent, to OpenStreetMap, and the saved place stays on this machine and is placed within about a degree) and **Appearance**.
 - **Account & sign-in**: **Two-factor sign-in**, **Password**, **Where you are signed in** (the round arrow button at the bottom of the left menu signs you out of this browser at once) and **Remote login** (SSH, off unless you turn it on; if the machine has no SSH identity yet, NopeWarden makes one when you turn it on).
 - **Alerts & logs**: **Alerts** (ntfy or email, with quiet hours), **Send logs elsewhere**, **Send traffic records (NetFlow / IPFIX)**, SNMP and **Storage** (what is kept on this machine's disk, about how much room each kind takes, and when it is removed).
 - **Backup & recovery**: **Backups**, **Changes** (a copy before every change, to go back to) and **Reset to default**.
@@ -38,3 +38,13 @@ A mode change that is not kept goes back on its own, and the card says so. See G
 
 ## One schedule for every recurring job
 Update checks (set on the Updates page), blocklist refreshes, country lists and threat rules all use the same schedule editor: **Every N hours**, **Daily at** a time, **Weekly on** a day and time, or **Off**. The sentence beside it says in plain English when the next run is. A job that fails retries after 5 minutes, 15, 30, and then every hour until it works.
+
+## A port just for managing the device
+**Management port** (on the **General** tab) sets one spare port aside for managing NopeWarden and nothing else. The console and remote login answer on it, and nothing is routed through it: no internet, no DHCP server, no sharing with your other networks.
+
+1. Plug a cable from a management computer or switch into a spare port.
+2. Choose the port, then choose **From DHCP** or **Fixed address**. A fixed address needs a range no network on this device already uses; NopeWarden refuses one that overlaps. If no DHCP server answers, the port has no address, so use a fixed address if you need to be sure of reaching it.
+3. Press **Save and test**. Open the console on the new address within a minute. If nobody does, the change is undone on its own, or press **Undo now**.
+4. The firewall rules for the port go live with the next firewall apply.
+
+Once the port is proven you can turn on **Close the console on the LAN while this port is healthy**. You can only do this from the management address, so you cannot shut yourself out. The LAN console closes after the port has been healthy for half a minute, and opens again by itself if the port stops answering for a minute. Bridge mode has its own out-of-band port, so a management port is not used there.

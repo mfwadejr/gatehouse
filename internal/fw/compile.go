@@ -246,8 +246,8 @@ func (c *compiler) input() {
 	m := c.m
 	c.line(1, "chain input {")
 	c.line(2, "type filter hook input priority filter; policy drop;")
-	c.line(2, "ct state invalid drop")
-	c.line(2, "ct state { established, related } accept")
+	c.line(2, `ct state invalid counter drop comment "builtin:invalid"`)
+	c.line(2, `ct state { established, related } counter accept comment "builtin:replies"`)
 	c.line(2, `iifname "lo" accept`)
 
 	// The protected management rule: always first among the accepts, and not part of the editable model.
@@ -332,14 +332,14 @@ func (c *compiler) input() {
 	}
 
 	// Basic protocol health.
-	c.line(2, "icmp type { destination-unreachable, time-exceeded, parameter-problem } accept")
-	c.line(2, "icmpv6 type { destination-unreachable, packet-too-big, time-exceeded, parameter-problem, nd-neighbor-solicit, nd-neighbor-advert, nd-router-solicit, nd-router-advert } accept")
+	c.line(2, "icmp type { destination-unreachable, time-exceeded, parameter-problem } counter accept comment \"builtin:health\"")
+	c.line(2, "icmpv6 type { destination-unreachable, packet-too-big, time-exceeded, parameter-problem, nd-neighbor-solicit, nd-neighbor-advert, nd-router-solicit, nd-router-advert } counter accept comment \"builtin:health\"")
 	clients := c.clientIfaces()
 	if len(clients) > 0 {
-		c.line(2, "iifname %s icmp type echo-request limit rate 20/second accept", ifSet(clients))
-		c.line(2, "iifname %s icmpv6 type echo-request limit rate 20/second accept", ifSet(clients))
-		c.line(2, "iifname %s udp dport 67 accept comment \"dhcp server\"", ifSet(clients))
-		c.line(2, "iifname %s meta l4proto { tcp, udp } th dport 53 accept comment \"dns\"", ifSet(clients))
+		c.line(2, "iifname %s icmp type echo-request limit rate 20/second counter accept comment \"builtin:ping\"", ifSet(clients))
+		c.line(2, "iifname %s icmpv6 type echo-request limit rate 20/second counter accept comment \"builtin:ping\"", ifSet(clients))
+		c.line(2, "iifname %s udp dport 67 counter accept comment \"builtin:dhcpdns\"", ifSet(clients))
+		c.line(2, "iifname %s meta l4proto { tcp, udp } th dport 53 counter accept comment \"builtin:dhcpdns\"", ifSet(clients))
 	}
 	if len(m.MDNS) > 0 {
 		c.line(2, "iifname %s ip daddr 224.0.0.251 udp dport 5353 accept comment \"discovery between networks\"", ifSet(m.MDNS))
@@ -379,8 +379,8 @@ func (c *compiler) input() {
 	if c.m.LogDrops {
 		c.line(2, "%smeta l4proto { tcp, udp } th dport 853 ct state new limit rate 20/second burst 50 packets log prefix %s", dot, q(logPrefix("drop", "default:dot")))
 	}
-	c.line(2, "%smeta l4proto tcp th dport 853 counter reject with tcp reset comment \"encrypted DNS to the router: quick refusal\"", dot)
-	c.line(2, "%smeta l4proto udp th dport 853 counter reject comment \"encrypted DNS to the router: quick refusal\"", dot)
+	c.line(2, "%smeta l4proto tcp th dport 853 counter reject with tcp reset comment \"builtin:dot\"", dot)
+	c.line(2, "%smeta l4proto udp th dport 853 counter reject comment \"builtin:dot\"", dot)
 	c.dropTail(2, "in")
 	c.line(1, "}")
 }
@@ -389,7 +389,7 @@ func (c *compiler) forward() {
 	m := c.m
 	c.line(1, "chain forward {")
 	c.line(2, "type filter hook forward priority filter; policy drop;")
-	c.line(2, "ct state invalid drop")
+	c.line(2, `ct state invalid counter drop comment "builtin:invalid"`)
 	// The management port is never routed through, in either direction.
 	c.line(2, "iifname @%s counter drop comment \"protected: the management port is not routed\"", MgmtIfSet)
 	c.line(2, "oifname @%s counter drop comment \"protected: the management port is not routed\"", MgmtIfSet)
@@ -416,7 +416,7 @@ func (c *compiler) forward() {
 		c.line(2, "oifname %s add @%s { ip daddr }", ifSet(wan), AcctTo)
 		c.line(2, "iifname %s add @%s { ip saddr }", ifSet(wan), AcctFrom)
 	}
-	c.line(2, "ct state { established, related } accept")
+	c.line(2, `ct state { established, related } counter accept comment "builtin:replies"`)
 	plan := c.dnsEnforced()
 	offMACs, gateMACs, srvMACs, srvKeys := m.exceptionMACs()
 	if m.BlockDoT && len(wan) > 0 {

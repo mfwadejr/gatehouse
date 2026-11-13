@@ -263,9 +263,9 @@ func TestGuestSignInPageOnlyCoversSafeNetworksAndBlocksUntilSignedIn(t *testing.
 		}
 	}
 	// The block comes before the rule that lets open connections carry on.
-	if i, j := strings.Index(out, "portal: not signed in"), strings.Index(out, "ct state { established, related } accept"); i < 0 || j < 0 {
+	if i, j := strings.Index(out, "portal: not signed in"), strings.Index(out, "ct state { established, related } counter accept"); i < 0 || j < 0 {
 		t.Fatal("rules missing")
-	} else if i2 := strings.Index(out[strings.Index(out, "chain forward"):], "portal: not signed in"); i2 > strings.Index(out[strings.Index(out, "chain forward"):], "ct state { established, related } accept") {
+	} else if i2 := strings.Index(out[strings.Index(out, "chain forward"):], "portal: not signed in"); i2 > strings.Index(out[strings.Index(out, "chain forward"):], "ct state { established, related } counter accept") {
 		t.Fatal("the sign-in block must come before the established-connections rule in the forward chain")
 	}
 	if strings.Contains(out, `iifname "eth1" ip saddr != @portal_ok`) || strings.Contains(out, `"eth0" ip saddr != @portal_ok`) {

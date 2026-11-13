@@ -172,7 +172,7 @@ func (a *Applier) Counters() (map[string]Counter, error) {
 			}
 			continue
 		}
-		if it.Rule == nil || !(strings.HasPrefix(it.Rule.Comment, "rule:") || strings.HasPrefix(it.Rule.Comment, "protected:")) {
+		if it.Rule == nil || !(strings.HasPrefix(it.Rule.Comment, "rule:") || strings.HasPrefix(it.Rule.Comment, "protected:") || strings.HasPrefix(it.Rule.Comment, "builtin:") || it.Rule.Comment == "default") {
 			continue
 		}
 		var c Counter

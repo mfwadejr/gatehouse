@@ -43,7 +43,7 @@ func TestSpeedRulesCompile(t *testing.T) {
 	}
 	// The jumps come before the connection tracking accept, so every packet is marked and counted.
 	fwd := strings.SplitN(out, "chain forward", 2)[1]
-	if strings.Index(fwd, "jump speed_limit") > strings.Index(fwd, "ct state { established, related } accept") {
+	if strings.Index(fwd, "jump speed_limit") > strings.Index(fwd, "ct state { established, related } counter accept") {
 		t.Fatalf("speed rules must run before established traffic is accepted:\n%s", fwd)
 	}
 	// No rules, no chains, no jumps; and without an internet connection nothing is written.

@@ -7,7 +7,7 @@ import AddNetwork from '../AddNetwork.jsx';
 import { go } from '../App.jsx';
 import { linkState } from '../linkstate.js';
 import ForcedDns from './ForcedDns.jsx';
-import MgmtPort from './MgmtPort.jsx';
+import AlwaysOn from './AlwaysOn.jsx';
 import Countries from './Countries.jsx';
 import UPnPCard from './UPnPCard.jsx';
 import Forwards from './Forwards.jsx';
@@ -264,11 +264,11 @@ export default function Firewall({ me }) {
     <Page title="Firewall" sub="Decide what each network may reach. A saved change goes live in a moment, or waits on the Review page if you choose Save for later.">
       <Protected reload={reload} />
       <Tabs value={tab} onChange={setTab} tabs={[{ value: 'networks', label: 'Networks' }, { value: 'rules', label: `Rules${(rules || []).filter((r) => !r.countries).length ? ` (${(rules || []).filter((r) => !r.countries).length})` : ''}` }, { value: 'groups', label: 'Groups & lists' }, { value: 'ports', label: 'Open ports' }, { value: 'countries', label: 'Countries' }, { value: 'discovery', label: 'Discovery' }, { value: 'protection', label: 'Protection' }, { value: 'history', label: 'History' }]} />
-      {tab === 'networks' && <><Networks ov={ov} presets={presets} reload={reload} /><Matrix ov={ov} rules={(rules || []).filter((r) => !r.countries)} onPick={(from, to, p) => setPair({ from, to, p })} /></>}
-      {tab === 'rules' && <RulesList ov={ov} rules={(rules || []).filter((r) => !r.countries)} countryRules={countryRules} pickers={pickers} reloadPickers={reloadPickers} reload={all} filter={filter} setFilter={setFilter} startNew={(init) => setNewRule(init)} goPorts={() => setTab('ports')} goTab={setTab} />}
+      {tab === 'networks' && <><Matrix ov={ov} rules={(rules || []).filter((r) => !r.countries)} onPick={(from, to, p) => setPair({ from, to, p })} /><Networks ov={ov} presets={presets} reload={reload} /></>}
+      {tab === 'rules' && <><RulesList ov={ov} rules={(rules || []).filter((r) => !r.countries)} countryRules={countryRules} pickers={pickers} reloadPickers={reloadPickers} reload={all} filter={filter} setFilter={setFilter} startNew={(init) => setNewRule(init)} goPorts={() => setTab('ports')} goTab={setTab} /><AlwaysOn /></>}
       {tab === 'groups' && <GroupsAndLists pickers={pickers} reloadPickers={reloadPickers} reload={all} />}
       {tab === 'ports' && <><NatNotice compact /><Forwards reload={reload} /><UPnPCard /></>}
-      {tab === 'protection' && <><MgmtPort /><Protection ov={ov} reload={reload} pickers={pickers} /></>}
+      {tab === 'protection' && <><Note tone="info">The management port, the spare port kept for managing this device, is now under <a href="#/settings/general">Settings, General</a>.</Note><Protection ov={ov} reload={reload} pickers={pickers} /></>}
       {tab === 'countries' && <Countries reload={all} />}
       {tab === 'discovery' && <Discovery reload={all} />}
       {tab === 'history' && <History />}
