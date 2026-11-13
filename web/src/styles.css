@@ -384,7 +384,8 @@ details.more > summary { cursor: pointer; color: var(--color-text-secondary); ma
 .ov-wan .num { text-align: right; font-variant-numeric: tabular-nums; color: var(--color-text-secondary); }
 .ov-g4 { display: grid; gap: var(--space-4); grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .ov-g3 { display: grid; gap: var(--space-4); grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.ov-gm { display: grid; gap: var(--space-4); grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr); }
+.ov-gm { display: grid; gap: var(--space-4); grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+.ov-gm .ov-map svg { max-height: 13rem; }
 @media (max-width: 70rem) { .ov-g4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ov-g3, .ov-gm { grid-template-columns: 1fr; } }
 @media (max-width: 36rem) { .ov-g4 { grid-template-columns: 1fr; } }
 .ov-tile .val { font-size: 2rem; }

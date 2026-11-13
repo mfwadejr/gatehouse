@@ -159,10 +159,18 @@ func (s *Service) SystemCheck() (SystemUpdates, error) {
 	if err := onDebian13(); err != nil {
 		return out, err
 	}
-	if b, err := aptRun(3*time.Minute, "apt-get", aptArgs("update")...); err != nil {
+	b, err := aptRun(3*time.Minute, "apt-get", aptArgs("update")...)
+	if err != nil && repairAptCache(b) {
+		b, err = aptRun(3*time.Minute, "apt-get", aptArgs("update")...)
+	}
+	if err != nil {
 		return out, fmt.Errorf("could not reach Debian's update servers: %s", lastLine(b, err))
 	}
-	b, err := aptRun(2*time.Minute, "apt-get", aptArgs("-s", "--no-remove", "full-upgrade")...)
+	b, err = aptRun(2*time.Minute, "apt-get", aptArgs("-s", "--no-remove", "full-upgrade")...)
+	if err != nil && repairAptCache(b) {
+		// The cache is only a speed-up copy of the package lists, so it is safe to throw away and rebuild.
+		b, err = aptRun(2*time.Minute, "apt-get", aptArgs("-s", "--no-remove", "full-upgrade")...)
+	}
 	if err != nil {
 		return out, fmt.Errorf("could not work out the system updates: %s", lastLine(b, err))
 	}
@@ -173,6 +181,28 @@ func (s *Service) SystemCheck() (SystemUpdates, error) {
 	}
 	out.Names = names
 	return out, nil
+}
+
+// aptCacheDir is where apt keeps its two speed-up cache files.
+var aptCacheDir = "/var/cache/apt"
+
+// repairAptCache removes apt's cache files when its output says they are corrupted, and reports
+// whether it removed anything, so the caller can try once more.
+func repairAptCache(out []byte) bool {
+	t := strings.ToLower(string(out))
+	if !strings.Contains(t, "pkgcache") && !strings.Contains(t, "package cache") && !strings.Contains(t, "cache file is corrupt") {
+		return false
+	}
+	if !strings.Contains(t, "corrupt") && !strings.Contains(t, "mmap") {
+		return false
+	}
+	removed := false
+	for _, f := range []string{"pkgcache.bin", "srcpkgcache.bin"} {
+		if os.Remove(filepath.Join(aptCacheDir, f)) == nil {
+			removed = true
+		}
+	}
+	return removed
 }
 
 func lastLine(b []byte, err error) string {

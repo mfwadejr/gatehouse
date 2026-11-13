@@ -139,3 +139,11 @@ Record the machine, the version (Settings, About) and the date at the top of eac
 | 132 | Threats install page (0.9.4.32) | With threat watching not installed, Threats, Overview explains it and has Install threat watching; other tabs point there. Rules holds Allowed checks and Devices never checked; Advanced does not. | | |
 | 133 | Wildcard in a website (0.9.4.33) | Protection, Blocks, Add a block, Websites: type *.youtube.com and Save. It saves as youtube.com and blocks music.youtube.com too. A name like a*b.com is still refused with a reason. | | |
 | 134 | Plain update notice (0.9.4.33) | When an update is ready, Updates and the Overview notice show its notes as plain lines: no ** marks, no Full Changelog link. | | |
+| 135 | Console is a service (0.9.4.34) | Services shows console under Built-in with its note. In a rule, pick console as the service. Move the console port and the service follows. Built-in rows show Setup port or Management port in From. | | |
+| 136 | Access check wording (0.9.4.34) | Firewall, Test access reads You are connected from your address through the port's name; renaming the port changes the name. | | |
+| 137 | Logs tabs (0.9.4.34) | Logs tabs read Events, Summary, Data use, Admin activity; old links and bookmarks still open the right tab. | | |
+| 138 | Overview map and cards (0.9.4.34) | Overview map is about a third shorter with Top countries beside it. With no country data it says it could not be downloaded, Show details gives the reason. Hide or show cards hides a card and it stays hidden after a reload. What's using it? opens Diagnostics, which has What is using the disk. | | |
+| 139 | Console connections (0.9.4.34) | Diagnostics, Health & services: Console connections sits under Services, one row per visit, 10 shown, Show older lists the rest. | | |
+| 140 | Package cache repair (0.9.4.34) | After an update with a corrupted package cache, Updates does not show the warning; Check now works. | | |
+| 141 | Profile device link (0.9.4.34) | On Profiles, choose a device count; Devices opens with only that profile's devices and a Profile filter set. Clear filters shows all. | | |
+| 142 | Advanced links (0.9.4.34) | Updates (Updates, Schedule) and Threats (all tabs but Advanced) end with a link that opens their Advanced tab. | | |

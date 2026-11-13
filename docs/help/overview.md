@@ -13,11 +13,12 @@ The picture is an example from a new, empty box; yours will show your own device
 - A box with two lists: **Needs your attention** (amber and red) and **Suggestions** (blue, such as a first backup or turning on two-factor sign-in). Each row has an **Open** button. A suggestion can be **Dismissed**; it stays hidden until what it says changes, and the link under the suggestions (for example “Show 1 dismissed suggestion”) brings it back. An amber row has **Remind me later** (in a day or in a week) and returns by itself; **Remind me now** brings it back sooner. A red row, something broken, can be hidden with the whole box but never dismissed or snoozed. The same things always show as a small dot beside the page in the left menu, whatever you hid here. Your choices are saved under your account, so they follow you to every browser.
 - A large card for the internet connection: speed now, and a chart over 10 minutes, an hour, 24 hours or 30 days.
 - **Devices**, **DNS**, **DHCP** and **Protection**: one card each with the numbers that matter now, such as how many devices are online and how many connections were blocked in the last day.
-- **Where connections go**: a world map of where your connections went, by country, with lines from your place to the busiest countries. Choose **Outgoing**, **Incoming** or **Both**, and a period. **Both** draws green lines for what your devices connect to and amber lines for attempts from the internet, shades each country by the two added together (green where outgoing is busier, amber where incoming is), and lists each country once with its outgoing and incoming counts. Until you set your place, the lines start from the middle of your country.
+- **Where connections go**: a small world map of where your connections went, by country (the full map is on Logs, **Summary**), with lines from your place to the busiest countries. Choose **Outgoing**, **Incoming** or **Both**, and a period. **Both** draws green lines for what your devices connect to and amber lines for attempts from the internet, shades each country by the two added together (green where outgoing is busier, amber where incoming is), and lists each country once with its outgoing and incoming counts. Until you set your place, the lines start from the middle of your country.
 - **What happened**: the latest events in plain words, newest first, with repeats folded into one row and a count.
 - **Your networks**: each network and how busy it is.
 - **Busiest devices** and **Data used, last 24 hours**.
-- **This machine**: processor, memory and disk.
+- **This machine**: processor, memory and disk. **What's using it?** opens Diagnostics, where the biggest places on the disk are listed.
+- **Hide or show cards** (bottom of the page): untick a card to hide it from your own Overview, tick it to bring it back. Each person has their own choice.
 
 Cards update on their own. If updates stop, a "Reconnecting" label appears at the top right.
 

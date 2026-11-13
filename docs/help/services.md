@@ -15,7 +15,7 @@ The picture is an example from a new, empty box; yours will show your own device
 ## Common tasks
 1. Make a service: **New service**, give it a **Name**. Under **Ports** choose **Protocol** (TCP, UDP, **TCP and UDP**, or ICMP for ping), type a port or a range such as 27000-27050, and press **Add**. Each port appears in the list below, and ✕ removes one. A wrong entry is explained in words under the box. For a known name such as https use **add a known name**; for a long list use **paste a list**, one entry per line like tcp/32400. Then **Save**.
 2. Use it: in any rule or open port, type its name in the "What for" box. Several can go in one box, separated by commas or spaces.
-3. Find a built-in one: type its name in **Search services**.
+3. Find a built-in one: type its name in **Search services**. The built-in **console** service is this console itself. It follows the console port, so it changes if you move the console to another port.
 
 4. Rename a service you made: **Edit**, change the **Name**, **Save**. Rules and open ports that use it follow the new name. A service used by an open port cannot be deleted until the port is removed.
 

@@ -154,7 +154,7 @@ export default function Services() {
         <div className="list">
           <Paged items={known}>{(shownKnown) => shownKnown.map((s) => (
             <div className="item" key={s.name}>
-              <div><div className="name">{s.name}</div><div className="meta mono">{s.ports.join(', ')}</div></div>
+              <div><div className="name">{s.name}</div><div className="meta mono">{s.ports.join(', ')}</div>{s.note && <div className="small muted">{s.note}</div>}</div>
             </div>
           ))}</Paged>
           {!known.length && <Empty>No built-in service matches.</Empty>}

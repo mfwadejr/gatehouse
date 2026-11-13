@@ -206,6 +206,7 @@ export default function Updates({ me }) {
       {tab === 'schedule' && <Guard what="Update schedule"><ScheduleTab data={data} reload={reload} /></Guard>}
       {tab === 'whatsnew' && <Guard what="What's new"><ReleasesTab /></Guard>}
       {tab === 'advanced' && <Guard what="Update source"><AdvancedTab data={data} reload={reload} /></Guard>}
+      {(tab === 'updates' || tab === 'schedule') && <p className="small muted">Need more control, such as where updates come from? Open the <button type="button" className="link" onClick={() => setTab('advanced')}>Advanced</button> tab.</p>}
     </Page>
   );
 }

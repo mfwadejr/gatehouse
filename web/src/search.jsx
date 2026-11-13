@@ -83,6 +83,8 @@ const ROWS = [
   ['Where you are signed in', 'settings/account', 'See and end sign-ins', 'sessions sign out', 'Where you are signed in'],
   ['Remote login (SSH)', 'settings/account', 'Turn SSH on or off', 'ssh remote login', 'Remote login'],
   ['Logs', 'logs/log', 'What happened and when', 'events history blocked connections'],
+  ['What is using the disk', 'diagnostics/services', 'The biggest places on the disk', 'disk space full storage using clear', 'What is using the disk'],
+  ['Data use', 'logs/activity', 'Data used by devices, apps and sites over the last hours', 'data use activity bandwidth devices apps sites'],
   ['Map of connections', 'logs/summary', 'Where connections go, and the busiest devices and sites', 'map countries summary data used', 'Where connections go'],
   ['Settings', 'settings/general', 'Restart and reset', 'backup restore restart reboot reset power console port'],
   ['Updates', 'updates', 'Install a new version of NopeWarden and the system updates', 'upgrade version install update available restart reboot'],

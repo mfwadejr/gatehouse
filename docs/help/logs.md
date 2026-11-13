@@ -8,7 +8,7 @@ What happened on your network and why: connections the firewall allowed or block
 The picture is an example from a new, empty box; yours will show your own devices and numbers.
 
 ## What is on the page
-- Tabs: **Log**, **Summary & map**, **Activity** and, for administrators, **Admin activity**.
+- Tabs: **Events**, **Summary** (with the full map), **Data use** and, for administrators, **Admin activity**.
 - The search words are highlighted in each row, and the search is part of the address (for example #/logs/log?q=printer), so a search can be bookmarked or sent to someone.
 - **Admin activity** answers who did what to NopeWarden: sign-ins and failed attempts, and the changes people made, each with who, what, when and from which address. Search with several words (every word must match a person, an action or an address) and choose a time range; the count says how many match and how far back it searched.
 - Three places hold three kinds of log. **Logs** is what your network did. **Diagnostics** is how NopeWarden itself is running (its system log). **Admin activity** is who changed what.

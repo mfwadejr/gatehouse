@@ -10,7 +10,7 @@ Tabs along the top:
 - **Network tools**: the connection tests, ping, traceroute and name lookups.
 - **Terminal**: a command line on the firewall. See below.
 
-**Console connections**, under Services, records the live connection your browser keeps open: when each opened and closed, from which address, and why it closed. A failed write usually means the network between you and the box dropped it.
+**Console connections**, under Services, records the live connection your browser keeps open: one row for each visit, with when it opened, from which address, how long it lasted and why it ended. The latest 10 are shown; **Show older** lists the rest. **What is using the disk** lists the biggest places on the disk. A failed write usually means the network between you and the box dropped it.
 
 The **Log** card under Services has **Show the log of** (one service, or **Warnings from everything**), **How many lines**, **Only lines containing** and **Refresh**.
 

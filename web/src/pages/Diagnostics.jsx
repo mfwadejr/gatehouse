@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { get, post, useData } from '../api.js';
 import { Button, Card, Empty, Field, Input, Note, Page, Pill, Select, Tabs, useAction, fmt } from '../ui.jsx';
 import { Hit } from './AdminActivity.jsx';
+import { fmtBytes } from '../charts.jsx';
 import NetTools from './NetTools.jsx';
 import Terminal from './Terminal.jsx';
 
@@ -19,7 +20,7 @@ function Services() {
   if (!data) return null;
   return (
     <div className="stack">
-      <Card title="Services" desc={`NopeWarden ${data.version || ''}. Each part of the system, and how it is doing.`}
+      <Card title="Services" desc={`${data.version ? `NopeWarden ${data.version}. ` : ''}Each part of the system, and how it is doing.`}
         actions={<Button small onClick={() => run(async () => { const r = await fetch('/api/diag/bundle', { credentials: 'same-origin' }); if (!r.ok) throw new Error('The bundle could not be made.'); const u = URL.createObjectURL(await r.blob()); const a = document.createElement('a'); a.href = u; a.download = 'nopewarden-support-bundle.txt'; a.click(); URL.revokeObjectURL(u); }, 'Saved. Passwords and keys are hidden in it.')} disabled={busy}>Save a support bundle</Button>}>
         <div className="list">
           {(data.services || []).filter((s) => s.state !== 'missing').map((s) => (
@@ -34,7 +35,7 @@ function Services() {
               </div>
             </div>
           ))}
-          {!(data.services || []).length && <Empty>No services to show.</Empty>}
+          {!(data.services || []).length && <Empty>No services found on this machine.</Empty>}
         </div>
         <p className="small muted">Services that are not installed on this machine are left out. A support bundle is a text file with the machine, network and service logs, with passwords and keys hidden. Send it when asking for help.</p>
       </Card>
@@ -97,17 +98,24 @@ function Verdict() {
 
 function Connections() {
   const { data } = useData('/api/diag/connections', { every: 15000 });
+  const [older, setOlder] = useState(false);
   if (!data) return null;
+  // One row per visit: the closing entry says how long it lasted and why, so the matching opening row is left out.
+  const visits = (data.recent || []).filter((e) => e.event === 'closed');
+  const shown = older ? visits : visits.slice(0, 10);
   const reasons = Object.entries(data.by_reason || {});
   return (
     <Card title="Console connections" desc="The live connection your browser keeps open to NopeWarden. If the browser reports dropped connections, this shows whether NopeWarden ended them or the network between ended them.">
       <div className="stack">
         <p className="small muted">{data.open} open now, {fmt.n(data.opened)} opened and {fmt.n(data.closed)} closed since NopeWarden started.{reasons.length ? ` Closed because: ${reasons.map(([w, n]) => `${w} (${n})`).join(', ')}.` : ''} The browser going away is normal (a page closed or reloaded); a failed write usually means the network between you and the box dropped it.</p>
-        {!data.recent.length ? <Empty>No console has connected since NopeWarden started.</Empty> : (
-          <div className="scroll"><table className="table">
-            <thead><tr><th>When</th><th>What</th><th>From</th><th>Lasted</th><th>Why</th></tr></thead>
-            <tbody>{data.recent.slice(0, 30).map((e, i) => <tr key={i}><td className="small">{fmt.dt(e.at)}</td><td>{e.event === 'opened' ? 'Opened' : 'Closed'}</td><td className="mono small">{e.addr}</td><td className="small">{e.seconds ? `${e.seconds} s` : ''}</td><td className="small muted">{e.why || ''}</td></tr>)}</tbody>
-          </table></div>
+        {!visits.length ? <Empty>{data.open ? 'The only console connection so far is still open.' : 'No console has connected since NopeWarden started.'}</Empty> : (
+          <>
+            <div className="scroll"><table className="table">
+              <thead><tr><th>Opened</th><th>From</th><th>Lasted</th><th>Why it ended</th></tr></thead>
+              <tbody>{shown.map((e, i) => <tr key={i}><td className="small">{fmt.dt(e.at - (e.seconds || 0))}</td><td className="mono small">{e.addr}</td><td className="small">{e.seconds ? `${e.seconds} s` : 'under a second'}</td><td className="small muted">{e.why || ''}</td></tr>)}</tbody>
+            </table></div>
+            {visits.length > 10 && <div><Button small onClick={() => setOlder(!older)}>{older ? 'Show fewer' : `Show older (${visits.length - 10})`}</Button></div>}
+          </>
         )}
       </div>
     </Card>
@@ -174,12 +182,25 @@ function SystemLog() {
   );
 }
 
+function DiskUse() {
+  const { data } = useData('/api/system/disk', { every: 60000 });
+  return (
+    <Card title="What is using the disk" desc="The biggest places on this machine's disk, so you can see what to clear if it fills up.">
+      {!data ? <Empty>Working it out…</Empty> : !data.parts?.length ? <Empty>Could not work that out.</Empty> : (
+        <div className="list">
+          {data.parts.map((p) => <div className="item" key={p.name}><div className="fill"><div className="name">{p.name}</div></div><span className="num muted">{fmtBytes(p.bytes)}</span></div>)}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 export default function Diagnostics() {
   const [tab, setTab] = useHashTab('diagnostics', ['services','log','tools','terminal'], 'services');
   return (
     <Page title="Diagnostics" sub="How NopeWarden itself is running: its services, its system log, and tools to test the connection. Looking for what your network did? Open Logs.">
       <Tabs value={tab} onChange={setTab} tabs={[{ value: 'services', label: 'Health & services' }, { value: 'log', label: 'System log' }, { value: 'tools', label: 'Network tools' }, { value: 'terminal', label: 'Terminal' }]} />
-      {tab === 'services' && <><Verdict /><Services /><Connections />
+      {tab === 'services' && <><Verdict /><Services /><DiskUse /><Connections />
         <Card title="My network" desc="A printable summary for a handover or your records: networks, addresses, devices, open ports and how to get back in. It never contains passwords or keys.">
           <a className="btn" href="/api/summary/print" target="_blank" rel="noreferrer">Open the printable page</a>
         </Card></>}

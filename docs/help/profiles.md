@@ -16,7 +16,8 @@ The picture is an example from a new, empty box; yours will show your own device
 ## Common tasks
 1. Pause a profile: open **Pause…** on the profile and choose how long.
 2. Make a Kids profile: under **Add a profile**, choose the **Kids** preset, name it, set the hours, **Save**.
-3. Put a device in a profile: on **Devices & access**, open the device and choose its **Profile**.
+3. See the devices in a profile: choose the device count on the profile. **Devices & access** opens with only those devices.
+4. Put a device in a profile: on **Devices & access**, open the device and choose its **Profile**.
 
 ## Example
 Kids: **Enhanced** filtering, **Safe search** on, internet off from 21:00 to 07:00.

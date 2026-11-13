@@ -15,6 +15,7 @@ const tableName = "nopewarden"
 // Compile validates the model and returns an nftables script that replaces the whole
 // nopewarden table in one atomic step. It never touches any other table.
 func Compile(m *Model) (string, error) {
+	SetConsolePorts(m.ConsolePorts) // the service "console" means this model's console ports
 	if m.BridgeOn() {
 		return compileBridge(m)
 	}

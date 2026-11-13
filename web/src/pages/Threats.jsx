@@ -475,6 +475,7 @@ export default function Threats() {
           {p.installed && tab === 'alerts' && <Alerts data={data} reload={reload} />}
           {p.installed && tab === 'rules' && <Rules data={data} reload={reload} goSettings={() => setTab('settings')} />}
           {p.installed && tab === 'advanced' && <Advanced data={data} reload={reload} />}
+          {p.installed && !setupNeeded && tab !== 'advanced' && <p className="small muted">Need more control? Open the <button type="button" className="link" onClick={() => setTab('advanced')}>Advanced</button> tab.</p>}
         </div>
       )}
     </Page>

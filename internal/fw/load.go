@@ -60,6 +60,7 @@ func sanitizeIf(s string) string {
 // Load builds the model from the configuration database.
 func Load(db Queryer) (*Model, error) {
 	m := &Model{Groups: map[string][]string{}, ConsolePorts: ConsolePortsFrom(db, time.Now())}
+	SetConsolePorts(m.ConsolePorts)
 	m.RescueIface = rescueDevice(db, strings.TrimSpace(setting(db, "mgmt.rescue_iface", "")))
 	m.MgmtAllow = MgmtAllowFrom(db).Resolved
 	var mp struct {

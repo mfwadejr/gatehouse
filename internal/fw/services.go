@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 )
 
 // PortSpec is one protocol and port range.
@@ -34,12 +35,40 @@ var services = map[string][]PortSpec{
 	"vpn-wg": {{"udp", 51820, 51820}},
 }
 
+// consoleSpecs holds the ports of the service called "console": the ports this console answers on.
+// They are not fixed, because the console port is a setting, so they are set whenever a model is
+// loaded or compiled and read when the name is looked up.
+var consoleSpecs atomic.Value // []PortSpec
+
+// SetConsolePorts says which ports the built-in service "console" stands for. An empty list means
+// the usual port.
+func SetConsolePorts(ports []int) {
+	if len(ports) == 0 {
+		ports = DefaultConsolePorts
+	}
+	specs := make([]PortSpec, 0, len(ports))
+	for _, p := range ports {
+		if p >= 1 && p <= 65535 {
+			specs = append(specs, PortSpec{"tcp", p, p})
+		}
+	}
+	consoleSpecs.Store(specs)
+}
+
+func consoleService() []PortSpec {
+	if v, ok := consoleSpecs.Load().([]PortSpec); ok && len(v) > 0 {
+		return v
+	}
+	return []PortSpec{{"tcp", DefaultConsolePorts[0], DefaultConsolePorts[0]}}
+}
+
 // ServiceNames lists the names offered in the console.
 func ServiceNames() []string {
 	out := make([]string, 0, len(services))
 	for k := range services {
 		out = append(out, k)
 	}
+	out = append(out, "console")
 	return out
 }
 
@@ -51,6 +80,9 @@ func ParseService(s string) ([]PortSpec, error) {
 	}
 	if v, ok := services[s]; ok {
 		return v, nil
+	}
+	if s == "console" {
+		return consoleService(), nil
 	}
 	proto, ports, found := strings.Cut(s, "/")
 	if !found || (proto != "tcp" && proto != "udp") {
@@ -148,6 +180,7 @@ func (p PortSpec) String() string {
 type BuiltinService struct {
 	Name  string   `json:"name"`
 	Ports []string `json:"ports"`
+	Note  string   `json:"note,omitempty"`
 }
 
 // BuiltinServices lists the named services with their ports, sorted by name.
@@ -160,6 +193,11 @@ func BuiltinServices() []BuiltinService {
 		}
 		out = append(out, b)
 	}
+	c := BuiltinService{Name: "console", Note: "This console. It follows the console port, so it changes if you move the console to another port."}
+	for _, sp := range consoleService() {
+		c.Ports = append(c.Ports, sp.String())
+	}
+	out = append(out, c)
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
 }

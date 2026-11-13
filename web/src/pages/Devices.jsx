@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { hashQuery } from '../hashtab.js';
 import { del, get, patch, post, put, useData } from '../api.js';
 import DeviceIcon, { ICON_LABELS } from '../DeviceIcon.jsx';
 import { NewDevice } from '../AddrPicker.jsx';
@@ -148,6 +149,7 @@ function Details({ d, groups, onClose, onSaved }) {
 }
 
 function Filters({ rows, f, setF }) {
+  const profiles = [...new Set(rows.map((d) => d.group || 'Default'))].sort();
   const count = (fn) => rows.filter(fn).length;
   const networks = [...new Set(rows.map((d) => d.network).filter(Boolean))].sort();
   const groups = [...new Set(rows.flatMap((d) => d.groups || []))].sort();
@@ -160,8 +162,9 @@ function Filters({ rows, f, setF }) {
         { value: '', label: 'Any connection' }, { value: 'wired', label: `Wired ${count((d) => d.conn === 'wired')}` },
         { value: 'vpn', label: `VPN ${count((d) => d.conn === 'vpn')}` }]} />
       {networks.length > 0 && <div style={{ width: '11rem' }}><Select value={f.network} onChange={set('network')} aria-label="Network" options={[{ value: '', label: 'All networks' }, ...networks.map((n) => ({ value: n, label: n }))]} /></div>}
+      {(profiles.length > 1 || f.profile) && <div style={{ width: '11rem' }}><Select value={f.profile} onChange={set('profile')} aria-label="Profile" options={[{ value: '', label: 'All profiles' }, ...profiles.map((n) => ({ value: n, label: n }))]} /></div>}
       {groups.length > 0 && <div style={{ width: '11rem' }}><Select value={f.group} onChange={set('group')} aria-label="Group" options={[{ value: '', label: 'All groups' }, ...groups.map((g) => ({ value: g, label: g }))]} /></div>}
-      {(f.state || f.conn || f.network || f.group) && <Button small onClick={() => setF({ state: '', conn: '', network: '', group: '' })}>Clear filters</Button>}
+      {(f.state || f.conn || f.network || f.group || f.profile) && <Button small onClick={() => setF({ state: '', conn: '', network: '', group: '', profile: '' })}>Clear filters</Button>}
     </div>
   );
 }
@@ -177,7 +180,7 @@ export default function Devices({ me }) {
   const takeFind = () => { try { const v = sessionStorage.getItem('gh.find.device'); sessionStorage.removeItem('gh.find.device'); return v || ''; } catch { return ''; } };
   const [q, setQ] = useState(takeFind);
   useEffect(() => { const on = () => { const v = takeFind(); if (v) setQ(v); }; window.addEventListener('gh-find-device', on); return () => window.removeEventListener('gh-find-device', on); }, []);
-  const [f, setF] = useState({ state: '', conn: '', network: '', group: '' });
+  const [f, setF] = useState(() => ({ state: '', conn: '', network: '', group: '', profile: hashQuery('profile') }));
   const [open, setOpen] = useState(null);
   const [adding, setAdding] = useState(false);
   const [cols, setCols] = useState(null);
@@ -201,6 +204,7 @@ export default function Devices({ me }) {
       if (f.conn && d.conn !== f.conn) return false;
       if (f.network && d.network !== f.network) return false;
       if (f.group && !d.groups?.includes(f.group)) return false;
+      if (f.profile && (d.group || 'Default') !== f.profile) return false;
       return !s || [d.name, d.hostname, d.vendor, d.mac, d.ip, d.network].some((x) => (x || '').toLowerCase().includes(s));
     });
   }, [all, q, f]);

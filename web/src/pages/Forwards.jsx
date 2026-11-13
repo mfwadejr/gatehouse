@@ -187,7 +187,7 @@ export function OpenPortModal({ initial, preset, apps, connections, existing, on
         {(more || editing) && f.app && f.mac && (
           <div className="stack">
             {connections.length > 1 && (
-              <Field label="Through which internet connection?">
+              <Field label="Through which internet connection?" hint="Shown because you have more than one internet connection.">
                 <div className="stack">
                   {connections.map((n) => (
                     <label key={n} className="small" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>

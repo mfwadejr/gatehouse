@@ -182,3 +182,13 @@ func TestSessionThroughManagementPortStaysSafe(t *testing.T) {
 		t.Fatal("an address outside the limit on who may manage must still be refused")
 	}
 }
+
+// The access check names the port the administrator is connected through; it used to come back empty.
+func TestSessionCheckNamesThePort(t *testing.T) {
+	a, _ := newSpeedApp(t)
+	m := fw.DefaultModel([]string{"eth0"}, []string{"eth1"})
+	checked, safe, via := a.sessionSafeVia(m, "eth1", "192.168.1.20")
+	if !checked || !safe || via != "eth1" {
+		t.Fatalf("checked=%v safe=%v via=%q", checked, safe, via)
+	}
+}

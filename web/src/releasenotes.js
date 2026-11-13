@@ -1,6 +1,17 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.34',
+    title: 'Console is a real service, a calmer Overview, Logs and Diagnostics, and a self-repairing update check',
+    items: [
+      'console is now a built-in service. It shows on the Services page, can be picked in a rule, and follows the console port if you move it. Built-in rows say Setup port or Management port in From, and the access check reads You are connected from <address> through <port name>.',
+      'Overview: the world map is smaller, with the top countries beside it; the full map stays on Logs, Summary. A failed country download now says so in plain words, with the technical reason under Show details. This machine is lighter, and What\'s using it? opens Diagnostics. You can hide cards you do not use with Hide or show cards at the bottom.',
+      'Logs tabs are now Events, Summary, Data use and Admin activity. Diagnostics shows one row per console visit (the latest 10, older behind Show older) below Services, with a new What is using the disk card. An empty Services list reads properly.',
+      'If the update check finds a corrupted package cache, NopeWarden clears it and tries again by itself, and warns only if that fails.',
+      'On Profiles the device count opens Devices already filtered to that profile, and Devices has a Profile filter. Updates and Threats end with a link to their Advanced tab.',
+    ],
+  },
+  {
     version: '0.9.4.33',
     title: 'Wildcards in website names, and a cleaner update notice',
     items: [

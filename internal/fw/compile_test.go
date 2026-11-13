@@ -309,3 +309,26 @@ func TestBuiltInBehavioursAreCounted(t *testing.T) {
 		t.Error("the last rule must be counted as the default")
 	}
 }
+
+func TestConsoleIsARealService(t *testing.T) {
+	m := DefaultModel([]string{"eth0"}, []string{"eth1"})
+	m.ConsolePorts = []int{8443, 9443}
+	SetConsolePorts(m.ConsolePorts)
+	sp, err := ParseService("console")
+	if err != nil || len(sp) != 2 || sp[0].Proto != "tcp" || sp[0].Lo != 8443 || sp[1].Lo != 9443 {
+		t.Fatalf("%v %v", sp, err)
+	}
+	found := false
+	for _, b := range BuiltinServices() {
+		if b.Name == "console" && len(b.Ports) == 2 && b.Note != "" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("console is not listed with the built-in services")
+	}
+	SetConsolePorts(nil)
+	if sp, _ := ParseService("console"); len(sp) != 1 || sp[0].Lo != 443 {
+		t.Fatalf("empty ports must mean the usual one: %v", sp)
+	}
+}

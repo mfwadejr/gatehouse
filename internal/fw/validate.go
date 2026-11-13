@@ -84,6 +84,7 @@ func parseAddrs(s string, groups map[string][]string, depth int) (set addrSet, a
 
 // Validate reports every problem in the model. A model that passes compiles to a safe ruleset.
 func (m *Model) Validate() error {
+	SetConsolePorts(m.ConsolePorts)
 	var errs []string
 	add := func(f string, a ...any) { errs = append(errs, fmt.Sprintf(f, a...)) }
 

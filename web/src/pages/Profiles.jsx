@@ -133,7 +133,7 @@ export default function Profiles() {
           <Card key={x.id} title={x.name} desc={x.description || levelText[x.level]}
             actions={<><PauseMenu until={x.paused_until} name={x.name} onPause={(m) => pause(x.id, m, m === 0 ? `${x.name} resumed.` : `${x.name} paused.`)} /><Button small onClick={() => setEdit({ ...x, hours: { ...x.hours } })}>Edit</Button>{x.name !== 'Default' && x.name !== 'Trusted' && <Button small onClick={() => remove(x)}>Delete</Button>}</>}>
             <div className="row" style={{ gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-              <a href="#/devices" style={{ textDecoration: 'none' }}><Pill>{x.devices} device{x.devices === 1 ? '' : 's'}</Pill></a>
+              <a href={`#/devices?profile=${encodeURIComponent(x.name)}`} title="Show these devices" style={{ textDecoration: 'none' }}><Pill>{x.devices} device{x.devices === 1 ? '' : 's'}</Pill></a>
               <Pill tone={x.level === 'off' ? '' : 'good'}>{x.level === 'custom' ? `Custom filtering, ${x.categories.length} categor${x.categories.length === 1 ? 'y' : 'ies'}` : `${LEVELS.find((l) => l.value === x.level)?.label} filtering`}{x.lists?.length ? ` + ${x.lists.length} list${x.lists.length === 1 ? '' : 's'}` : ''}</Pill>
               {x.safe_search && <Pill tone="good">Safe search</Pill>}
               {x.hours.on && <Pill>Off {x.hours.from}–{x.hours.to}</Pill>}

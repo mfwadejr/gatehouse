@@ -243,7 +243,7 @@ export default function Logs({ me }) {
   const none = !loading && !rows.length;
   const chips = Object.entries(flt).filter(([, v]) => v !== '' && v != null);
   return (
-    <Page title="Logs" sub="What your network did: connections, names looked up, devices joining or leaving, and threat alerts. For how NopeWarden itself is running, open Diagnostics."
+    <Page title="Logs" sub="What your network did. For how NopeWarden itself is running, open Diagnostics."
       actions={<><label className="inline small"><Switch checked={live} onChange={setLive} label="Live updates" />Live</label><Button small onClick={() => setRec(true)}>Recording &amp; storage</Button></>}>
       {(!meta.record_allowed || !meta.record_blocked) && (
         <Note tone="warn" title="Some connections are not being recorded">
@@ -251,7 +251,7 @@ export default function Logs({ me }) {
           <button className="link" onClick={() => setRec(true)}>Change this</button>
         </Note>
       )}
-      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'log', label: 'Log' }, { value: 'summary', label: 'Summary & map' }, { value: 'activity', label: 'Activity' }, ...(admin ? [{ value: 'admin', label: 'Admin activity' }] : [])]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'log', label: 'Events' }, { value: 'summary', label: 'Summary' }, { value: 'activity', label: 'Data use' }, ...(admin ? [{ value: 'admin', label: 'Admin activity' }] : [])]} />
       {tab === 'admin' ? <AdminActivity /> : tab === 'activity' ? null : (
       <Card>
         <div className="stack">

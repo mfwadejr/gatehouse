@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useData, useStream, useThroughput, put, post, get } from '../api.js';
+import { useData, useStream, useThroughput, put, post } from '../api.js';
 import { Button, Card, Empty, Icon, Note, Page, Pill, Segmented, fmt, Bar, useAction, usePortNames } from '../ui.jsx';
 import { go } from '../App.jsx';
 import { COUNTRIES, MAP_H, MAP_W } from '../worldmap.js';
@@ -334,8 +334,9 @@ function WorldCard() {
         actions={<div className="inline"><Segmented value={dir} onChange={setDir} options={[{ value: 'out', label: 'Outgoing' }, { value: 'in', label: 'Incoming' }, { value: 'both', label: 'Both' }]} /><Segmented value={range} onChange={setRange} options={[{ value: '5m', label: '5 min' }, { value: '15m', label: '15 min' }, { value: '1h', label: '1 h' }, { value: '24h', label: '24 h' }, { value: '7d', label: '7 d' }, { value: '30d', label: '30 d' }]} /></div>}>
         {geo && !geo.ready && (
           <Note tone={geo.error ? 'warn' : ''} title="Country data not downloaded yet">
-            {geo.busy ? 'Downloading the country address lists now. The map fills in once they arrive.' : geo.error ? `The last try failed: ${geo.error}` : 'NopeWarden needs the country address lists to place connections on the map.'}
+            {geo.busy ? 'Downloading the country address lists now. The map fills in once they arrive.' : geo.error ? 'Country data could not be downloaded. NopeWarden will try again; you can try now.' : 'NopeWarden needs the country address lists to place connections on the map.'}
             {' '}<Button small disabled={geo.busy || dlBusy} onClick={() => dl(async () => { await post('/api/fw/geo/refresh', {}); reloadGeo(); })}>{geo.busy ? 'Downloading…' : 'Download now'}</Button>
+            {geo.error && <details className="small muted"><summary>Show details</summary>{geo.error}</details>}
           </Note>
         )}
         <div className="ov-map" onMouseLeave={() => { setHover(null); setMouse(null); }} onMouseMove={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMouse({ x: e.clientX - r.left, y: e.clientY - r.top, w: r.width, h: r.height }); }}>
@@ -521,13 +522,6 @@ function HappenedCard({ items }) {
 const upText = (s) => { const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60); return d ? `${d} d ${h} h` : h ? `${h} h ${m} min` : `${m} min`; };
 
 function MachineCard({ sys, upd }) {
-  const [disk, setDisk] = useState(null);
-  const [open, setOpen] = useState(false);
-  const toggleDisk = async () => {
-    if (open) return setOpen(false);
-    setOpen(true);
-    try { setDisk(await get('/api/system/disk')); } catch { setDisk({ parts: [] }); }
-  };
   const gb = (n) => (n >= 1e11 ? Math.round(n / 1e9) : Math.round(n / 1e8) / 10);
   const g = (label, v, text, title, extra) => (
     <div key={label} title={title}>
@@ -547,14 +541,7 @@ function MachineCard({ sys, upd }) {
         {g('Memory', sys?.mem, memText, 'Memory in use, not counting what the system keeps as a speed-up cache')}
         {g('Disk', sys?.disk, diskText, undefined, (
           <>
-            <button type="button" className="linkbtn small" onClick={toggleDisk}>{open ? 'Hide' : "What's using it?"}</button>
-            {open && (
-              <div className="small stack" style={{ gap: 'var(--space-1)', marginTop: 'var(--space-1)' }}>
-                {!disk ? <span className="muted">Working it out…</span> : !disk.parts?.length ? <span className="muted">Could not work that out.</span> : disk.parts.map((p) => (
-                  <div className="spread" key={p.name}><span>{p.name}</span><span className="num muted">{fmtBytes(p.bytes)}</span></div>
-                ))}
-              </div>
-            )}
+            <button type="button" className="linkbtn small" onClick={() => go('diagnostics/services')}>What's using it?</button>
           </>
         ))}
         {sys?.temp > 0 && g('Temperature', sys.temp, `${Math.round(sys.temp)} °C`)}
@@ -678,7 +665,40 @@ function UpdateBanner({ c }) {
   );
 }
 
+// Cards a person can hide from their own Overview. The hidden list is remembered per person.
+const HIDEABLE = [
+  { id: 'world', label: 'Where connections go' },
+  { id: 'happened', label: 'What happened' },
+  { id: 'busiest', label: 'Busiest devices' },
+  { id: 'machine', label: 'This machine' },
+  { id: 'networks', label: 'Your networks' },
+  { id: 'vpns', label: 'Your VPNs' },
+];
+
+function CardChooser({ hidden, setHidden }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="stack">
+      <div><button type="button" className="linkbtn small" onClick={() => setOpen(!open)}>{open ? 'Done' : `Hide or show cards${hidden.length ? ` (${hidden.length} hidden)` : ''}`}</button></div>
+      {open && (
+        <div className="inline">
+          {HIDEABLE.map((c) => (
+            <label key={c.id} className="small" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+              <input type="checkbox" checked={!hidden.includes(c.id)} onChange={(e) => setHidden(e.target.checked ? hidden.filter((x) => x !== c.id) : [...hidden, c.id])} /> {c.label}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Overview() {
+  const { data: prefs } = useData('/api/prefs/overview');
+  const [mine, setMine] = useState(null);
+  const hidden = mine || prefs?.hidden || [];
+  const setHidden = (h) => { setMine(h); put('/api/prefs/overview', { hidden: h }).catch(() => {}); };
+  const show = (id) => !hidden.includes(id);
   const { data: dns, setData: setDns, updatedAt: dnsAt } = useData('/api/dns/summary', { every: 5000 });
   useStream(['dns.stats'], (t, p) => p && setDns((d) => (d ? { ...d, stats: p } : d)));
   const { data: net, updatedAt: netAt } = useData('/api/net/status', { topics: ['net.status'], every: 5000 });
@@ -714,14 +734,17 @@ export default function Overview() {
         <DhcpTile util={util} h={h1} />
         <SecurityTile sec={sec} fw={fw} h={h1} />
       </section>
-      <WorldCard />
-      <section className="ov-g3">
-        <HappenedCard items={happened} />
-        <BusiestCard rows={busiest} />
-        <MachineCard sys={sys} upd={upd} />
-      </section>
-      <NetworksCard fw={fw} wanList={wanList} links={links} devs={devs} h24={h1} />
-      <VpnsCard h24={h1} />
+      {show('world') && <WorldCard />}
+      {(show('happened') || show('busiest') || show('machine')) && (
+        <section className="ov-g3">
+          {show('happened') && <HappenedCard items={happened} />}
+          {show('busiest') && <BusiestCard rows={busiest} />}
+          {show('machine') && <MachineCard sys={sys} upd={upd} />}
+        </section>
+      )}
+      {show('networks') && <NetworksCard fw={fw} wanList={wanList} links={links} devs={devs} h24={h1} />}
+      {show('vpns') && <VpnsCard h24={h1} />}
+      <CardChooser hidden={hidden} setHidden={setHidden} />
     </Page>
   );
 }

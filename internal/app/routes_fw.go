@@ -390,7 +390,7 @@ func sessionSafe(m *fw.Model, clientIP string) (checked, safe bool, iface string
 }
 
 // sessionSafeVia is sessionSafe for a known interface.
-func sessionSafeVia(m *fw.Model, iface, clientIP string) (checked, safe bool, _ string) {
+func sessionSafeVia(m *fw.Model, iface, clientIP string) (checked, safe bool, via string) {
 	if m.BridgeOn() {
 		// In bridge mode the console is reached through the bridge; the bridge setup checks its own safety.
 		return false, true, iface
@@ -424,9 +424,9 @@ func (a *App) sessionSafe(m *fw.Model, clientIP string) (checked, safe bool, ifa
 	return a.sessionSafeVia(m, ifaceOf(clientIP), clientIP)
 }
 
-func (a *App) sessionSafeVia(m *fw.Model, iface, clientIP string) (checked, safe bool, _ string) {
-	checked, safe, iface = sessionSafeVia(m, iface, clientIP)
-	if checked && !safe && iface != "" && iface == a.mgmtCfg().Iface {
+func (a *App) sessionSafeVia(m *fw.Model, iface, clientIP string) (checked, safe bool, via string) {
+	checked, safe, via = sessionSafeVia(m, iface, clientIP)
+	if checked && !safe && via != "" && via == a.mgmtCfg().Iface {
 		safe = len(m.MgmtAllow) == 0 || inRanges(m.MgmtAllow, clientIP)
 	}
 	return

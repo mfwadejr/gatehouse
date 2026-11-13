@@ -113,7 +113,7 @@ export function RuleLines({ prot, pages, rules, opened, live, hits, onEdit, onMo
         <tbody>
           {sys.length > 0 && <tr className="lsect"><td colSpan={8}>Built in, always above your rules (cannot be changed)</td></tr>}
           {sys.map((p, i) => (
-            <Row key={`s${i}`} k={`s${i}`} num={`S${i + 1}`} name={<><span aria-hidden="true">🔒</span> {p.title}</>} from={p.tag ? ['Management'] : ['–']} to={p.tag ? ['This device'] : ['–']} svc={p.tag ? ['console'] : ['–']}
+            <Row key={`s${i}`} k={`s${i}`} num={`S${i + 1}`} name={<><span aria-hidden="true">🔒</span> {p.title}</>} from={p.tag ? [p.tag === 'protected: setup port' ? 'Setup port' : p.tag === 'protected: management port console' ? 'Management port' : 'Management'] : ['–']} to={p.tag ? ['This device'] : ['–']} svc={p.tag ? ['console'] : ['–']}
               action={<Pill tone={p.active ? 'good' : ''}>{p.active ? 'Always on' : 'Standing by'}</Pill>} info={hits.hit(p.tag, p)} tag={p.tag} when="Always">
               <div className="say">{p.text}</div>
               <div className="note">Built in. It keeps you able to manage NopeWarden, so it cannot be edited, moved or removed.{p.note ? ` ${p.note}` : ''}</div>
