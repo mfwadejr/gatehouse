@@ -132,3 +132,8 @@ Record the machine, the version (Settings, About) and the date at the top of eac
 | 125 | Routes inside Policies (0.9.4.31) | The menu has no Routes entry. Policies has two tabs, All policies and Routes. An old bookmark to Routes opens the Routes tab. Edit on a route in the policy list opens its form there. | | |
 | 126 | DHCP overview (0.9.4.31) | DHCP opens on Overview: the sentence, a bar for each pool, the devices that asked lately. Fill a pool above 80 percent and the sentence turns to a warning. | | |
 | 127 | Traffic first on Internet (0.9.4.31) | Internet, Connections shows Traffic on each connection above Internet connections. | | |
+| 128 | One place to edit profiles (0.9.4.32) | DNS has tabs Overview, Blocking, Your names and Settings. Opening a saved link to DNS, Profiles lands on Profiles. DNS, Blocking says where profiles are. | | |
+| 129 | Profile block lists (0.9.4.32) | Profiles, Edit, Advanced: pick block lists. Tick a list, Save, reopen: it is still ticked, and the card says plus 1 list. A device in that profile has that list's names blocked. | | |
+| 130 | Pause on Profiles (0.9.4.32) | Each profile has one Pause… drop-down; choosing a length pauses it and the button becomes Resume now. The device count opens Devices. | | |
+| 131 | Protection overview (0.9.4.32) | Security check is first, then Also protecting you. Blocks starts with Where do I block things? and its links open the right pages. | | |
+| 132 | Threats install page (0.9.4.32) | With threat watching not installed, Threats, Overview explains it and has Install threat watching; other tabs point there. Rules holds Allowed checks and Devices never checked; Advanced does not. | | |

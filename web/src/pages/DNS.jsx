@@ -399,37 +399,6 @@ function Records() {
   );
 }
 
-function Groups() {
-  const delayedDelete = useDelayedDelete();
-  const { data: groups, reload } = useData('/api/dns/groups');
-  const { data: lists } = useData('/api/dns/lists');
-  const [edit, setEdit] = useState(null);
-  const [run] = useAction();
-  return (
-    <Card title="Filtering profiles" desc="Choose which lists apply to which devices. Assign a device to a profile on the Devices page." actions={<Button small icon="plus" onClick={() => setEdit({ name: '', filtering: true, description: '', lists: [] })}>Add profile</Button>}>
-      <div className="list">
-        {<Limited items={(groups || [])} noun="groups" render={(g) => (
-          <div className="item" key={g.id}>
-            <div><div className="name">{g.name}</div><div className="meta">{g.filtering ? `${g.lists?.length || 0} lists` : 'No filtering'} · {g.devices} device{g.devices === 1 ? '' : 's'}{g.description ? ` · ${g.description}` : ''}</div></div>
-            <div className="actions"><Button small icon="edit" onClick={() => setEdit(g)}>Edit</Button><Button small kind="danger" icon="trash" onClick={() => delayedDelete(`The profile ${g.name}`, () => del(`/api/dns/groups/${g.id}`), reload)}>Delete</Button></div>
-          </div>
-        )} />}
-      </div>
-      {edit && (
-        <Modal title={edit.id ? `Edit ${edit.name}` : 'New profile'} onClose={() => setEdit(null)} footer={<><Button onClick={() => setEdit(null)}>Cancel</Button><Button kind="primary" disabled={!edit.name} onClick={async () => { if (await run(() => put('/api/dns/groups', edit), 'Saved.')) { reload(); setEdit(null); } }}>Save</Button></>}>
-          <Field label="Name"><Input value={edit.name} onChange={(v) => setEdit({ ...edit, name: v })} /></Field>
-          <Field label="Note"><Input value={edit.description} onChange={(v) => setEdit({ ...edit, description: v })} /></Field>
-          <ToggleRow title="Filter ads and trackers" checked={edit.filtering} onChange={(v) => setEdit({ ...edit, filtering: v })} />
-          {edit.filtering && (lists || []).map((l) => (
-            <ToggleRow key={l.id} title={l.name} desc={`${fmt.n(l.entries)} blocked`} checked={(edit.lists || []).includes(l.id)}
-              onChange={(v) => setEdit({ ...edit, lists: v ? [...(edit.lists || []), l.id] : edit.lists.filter((x) => x !== l.id) })} />
-          ))}
-        </Modal>
-      )}
-    </Card>
-  );
-}
-
 function SettingsTab() {
   const { data, reload } = useData('/api/dns/settings');
   const [f, setF] = useState(null);
@@ -457,14 +426,13 @@ function SettingsTab() {
 }
 
 export default function DNS() {
-  const [tab, setTab] = useHashTab('dns', ['overview','lists','records','groups','settings'], 'overview');
+  const [tab, setTab] = useHashTab('dns', ['overview','lists','records','settings'], 'overview');
   return (
     <Page title="DNS" sub="Translates names to addresses for every device, and blocks the ones you do not want.">
-      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'overview', label: 'Overview' }, { value: 'lists', label: 'Blocking' }, { value: 'records', label: 'Your names' }, { value: 'groups', label: 'Profiles' }, { value: 'settings', label: 'Settings' }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'overview', label: 'Overview' }, { value: 'lists', label: 'Blocking' }, { value: 'records', label: 'Your names' }, { value: 'settings', label: 'Settings' }]} />
       {tab === 'overview' && <Overview />}
-      {tab === 'lists' && <><Lists /><p className="small muted">Blocking an app or a category for one device or at set hours is under <a href="#/protection">Protection</a>.</p></>}
+      {tab === 'lists' && <><Lists /><p className="small muted">Which devices get which lists is set per profile, on the <a href="#/profiles">Profiles</a> page. Blocking an app or a category for one device or at set hours is under <a href="#/protection">Protection</a>.</p></>}
       {tab === 'records' && <Records />}
-      {tab === 'groups' && <Groups />}
       {tab === 'settings' && <SettingsTab />}
     </Page>
   );

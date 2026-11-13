@@ -140,6 +140,7 @@ type profileOut struct {
 	Preset      string   `json:"preset"`
 	Level       string   `json:"level"`
 	Categories  []string `json:"categories"`
+	Lists       []int64  `json:"lists"` // block lists chosen by hand, besides the category lists
 	SafeSearch  bool     `json:"safe_search"`
 	Hours       fw.Hours `json:"hours"`
 	PausedUntil int64    `json:"paused_until"`
@@ -180,6 +181,16 @@ func (a *App) profileList() ([]profileOut, error) {
 	for _, g := range groups {
 		x := extra[g.ID]
 		cats := []string{}
+		own := []int64{}
+		isCatID := map[int64]bool{}
+		for _, id := range ids {
+			isCatID[id] = true
+		}
+		for _, l := range g.Lists {
+			if !isCatID[l] {
+				own = append(own, l)
+			}
+		}
 		for _, c := range categoryCatalog {
 			if id, ok := ids[c.Key]; ok {
 				for _, l := range g.Lists {
@@ -194,7 +205,7 @@ func (a *App) profileList() ([]profileOut, error) {
 			h.Days = []int{}
 		}
 		out = append(out, profileOut{ID: g.ID, Name: g.Name, Description: g.Description, Preset: x.preset,
-			Level: levelOf(g.Filtering, cats), Categories: cats, SafeSearch: x.safe, Hours: h, PausedUntil: x.paused,
+			Level: levelOf(g.Filtering, cats), Categories: cats, Lists: own, SafeSearch: x.safe, Hours: h, PausedUntil: x.paused,
 			Devices: g.Devices, OffNow: x.paused > now.Unix() || h.Active(now)})
 	}
 	return out, nil
@@ -207,6 +218,7 @@ type profileIn struct {
 	Preset      string   `json:"preset"`
 	Level       string   `json:"level"`
 	Categories  []string `json:"categories"`
+	Lists       []int64  `json:"lists"` // nil = keep the lists the profile already has; [] = none
 	SafeSearch  bool     `json:"safe_search"`
 	Hours       fw.Hours `json:"hours"`
 }
@@ -243,6 +255,15 @@ func (a *App) saveProfile(in profileIn) (int64, error) {
 						lists = append(lists, l)
 					}
 				}
+			}
+		}
+	}
+	if in.Lists != nil {
+		// The screen sent the hand-picked lists: use exactly those (category lists are added below).
+		lists = nil
+		for _, l := range in.Lists {
+			if !isCat[l] {
+				lists = append(lists, l)
 			}
 		}
 	}

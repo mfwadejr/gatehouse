@@ -182,7 +182,6 @@ function Settings({ data, reload }) {
   const p = data.program || {};
   const base = (data.presets || []).find((x) => x.key === data.preset);
   const choose = (key) => run(() => put('/api/threat/settings', { preset: key }), 'Saved.').then(reload);
-  if (!p.installed || p.state === 'installing' || p.state === 'removing') return <ProgramCard data={data} reload={reload} />;
   return (
     <div className="stack">
       <ModeCard data={data} reload={reload} />
@@ -291,6 +290,7 @@ function Rules({ data, reload, goSettings }) {
           </div>
         )}
       </Card>
+      <Exceptions data={data} reload={reload} />
     </div>
   );
 }
@@ -322,26 +322,6 @@ function Advanced({ data, reload }) {
   };
   return (
     <div className="stack">
-      <Card title="Allowed checks" desc="Things you let through. Remove one to be told about it again.">
-        <div className="list">
-          {<Limited items={(data.allowed || [])} noun="allowed items" render={(x) => (
-            <div className="item" key={x.id}>
-              <div><div className="name">Check {x.sid} {x.auto && <Pill>Quieted by NopeWarden</Pill>}</div><div className="meta">{x.device || 'All devices'} · {x.until ? `until ${fmt.dt(x.until)}` : 'until removed'} · {x.note}</div></div>
-              <Button small kind="danger" disabled={busy} onClick={() => run(() => del(`/api/threat/allow/${x.id}`), 'Removed.').then(reload)}>Remove</Button>
-            </div>
-          )} />}
-          {!(data.allowed || []).length && <Empty>Nothing is allowed yet.</Empty>}
-        </div>
-      </Card>
-      <Card title="Devices never checked" desc="Traffic to and from these devices is ignored.">
-        <div className="list">
-          {<Limited items={(data.trusted || [])} noun="trusted devices" render={(x) => (
-            <div className="item" key={x.mac}><div><div className="name">{x.device}</div><div className="meta mono">{x.mac}</div></div>
-              <Button small kind="danger" disabled={busy} onClick={() => run(() => del(`/api/threat/trust/${encodeURIComponent(x.mac)}`), 'Removed.').then(reload)}>Check again</Button></div>
-          )} />}
-          {!(data.trusted || []).length && <Empty>Every device is checked.</Empty>}
-        </div>
-      </Card>
       <Card title="Save or load your tuning" desc="Your preset, limits, switched-off checks, allowed checks and devices never checked, as one file.">
         <div className="actions">
           <a className="btn" href="/api/threat/export" download="nopewarden-threat-tuning.json">Save tuning to a file</a>
@@ -451,11 +431,28 @@ function StatusLine({ data, goTab }) {
   const p = data.program || {};
   const watching = data.mode === 'watch';
   const link = (label) => <button type="button" className="link" onClick={() => goTab('settings')}>{label}</button>;
-  if (p.state === 'installing' || p.state === 'removing') return <Note title={p.state === 'installing' ? 'Installing' : 'Removing'}>Working on it. The steps are under {link('Settings')}.</Note>;
-  if (!p.installed) return <Note>Threat watching is not installed. It is an extra program, installed only if you ask. Install it under {link('Settings')}.</Note>;
   if (!watching) return data.paused_reason ? <Note tone="warn" title="NopeWarden switched watching off">{data.paused_reason} Your traffic was never held up. Switch it on again under {link('Settings')}.</Note> : <Note>Threat watching is off. Switch it on under {link('Settings')}.</Note>;
   if (!p.running) return <Note tone={p.failing ? 'bad' : 'warn'} title={p.failing ? 'The program keeps failing' : 'The program is not running'}>{p.why} Your traffic is not affected.</Note>;
   return <Note tone={data.engine?.state === 'missing' ? 'warn' : undefined}>{data.engine?.text}</Note>;
+}
+
+// The Overview of a box without threat watching: what it is, what it costs, and the install button.
+function Install({ data, reload }) {
+  const p = data.program || {};
+  return (
+    <div className="stack">
+      {p.state !== 'installing' && p.state !== 'removing' && (
+        <Card title="What threat watching does" desc="Watches for infected devices, break-in attempts and probing, and tells you in plain words.">
+          <div className="list">
+            <div className="item"><div><div className="name">What you get</div><div className="meta">Alerts here, and by email or push if you set that up. It only watches and tells you; it never blocks anything.</div></div></div>
+            <div className="item"><div><div className="name">What it costs</div><div className="meta">An extra program (Suricata) that uses some of the processor and memory. It switches itself off if it uses too much, and your traffic is never held up.</div></div></div>
+            <div className="item"><div><div className="name">Only if you ask</div><div className="meta">Nothing is installed until you press the button below, and you can remove it again at any time.</div></div></div>
+          </div>
+        </Card>
+      )}
+      <ProgramCard data={data} reload={reload} />
+    </div>
+  );
 }
 
 export default function Threats() {
@@ -465,15 +462,16 @@ export default function Threats() {
   const working = data?.program?.state === 'installing' || data?.program?.state === 'removing';
   useEffect(() => { setFast(!!working); }, [working]);
   const p = data?.program || {};
+  const setupNeeded = !!data && (!p.installed || working);
   const tabs = [{ value: 'overview', label: 'Overview' }, { value: 'alerts', label: 'Alerts' }, { value: 'settings', label: 'Settings' }, { value: 'rules', label: 'Rules' }, { value: 'advanced', label: 'Advanced' }];
   return (
     <Page title="Threats" sub="Watches for infected devices, break-in attempts and probing, and tells you in plain words.">
       <Tabs value={tab} onChange={setTab} tabs={tabs} />
       {data && (
         <div className="stack">
-          {tab === 'overview' && <><StatusLine data={data} goTab={setTab} />{p.installed && !working && <ThreatOverview data={data} goTab={setTab} />}</>}
-          {tab === 'settings' && <Settings data={data} reload={reload} />}
-          {tab !== 'overview' && tab !== 'settings' && !p.installed && <Note>Threat watching is not installed yet. Install it under <button type="button" className="link" onClick={() => setTab('settings')}>Settings</button>.</Note>}
+          {tab === 'overview' && (setupNeeded ? <Install data={data} reload={reload} /> : <><StatusLine data={data} goTab={setTab} />{p.installed && !working && <ThreatOverview data={data} goTab={setTab} />}</>)}
+          {tab !== 'overview' && setupNeeded && <Note>Threat watching is not installed yet. Install it on the <button type="button" className="link" onClick={() => setTab('overview')}>Overview</button> tab.</Note>}
+          {tab === 'settings' && !setupNeeded && <Settings data={data} reload={reload} />}
           {p.installed && tab === 'alerts' && <Alerts data={data} reload={reload} />}
           {p.installed && tab === 'rules' && <Rules data={data} reload={reload} goSettings={() => setTab('settings')} />}
           {p.installed && tab === 'advanced' && <Advanced data={data} reload={reload} />}

@@ -191,6 +191,14 @@ export default function Blocks() {
   const start = (s) => setEdit({ allow: false, name: s.name, enabled: true, method: 'fast', items: [...s.apps.filter((n) => known.has(n)).map((value) => ({ kind: 'app', value })), ...s.topics.map((value) => ({ kind: 'topic', value }))], targets: [] });
   return (
     <div className="stack">
+      <Card title="Where do I block things?" desc="There are a few places, because they block different things.">
+        <div className="list">
+          <div className="item"><div><div className="name">An app, a category or a website, for some devices or at set hours</div><div className="meta">Here, on this page. For example social media for the kids, at night.</div></div></div>
+          <div className="item"><div><div className="name">Ads, trackers and malware for everyone</div><div className="meta">DNS, Blocking tab. These are the big downloaded lists.</div></div><a className="link" href="#/dns/lists">Open</a></div>
+          <div className="item"><div><div className="name">Which devices get which lists</div><div className="meta">Profiles. Each profile has a filtering level and can pick its own lists.</div></div><a className="link" href="#/profiles">Open</a></div>
+          <div className="item"><div><div className="name">A country, a port or one address</div><div className="meta">Firewall. Rules and Countries.</div></div><a className="link" href="#/firewall/rules">Open</a></div>
+        </div>
+      </Card>
       <BlockList title="Blocks" desc="Each block is a named list of apps, categories and websites, kept away from everyone or from the networks, profiles and devices you choose, always or on a schedule."
         rows={blocks} empty="Nothing is blocked this way yet." allow={false} data={data} reload={reload} setEdit={setEdit}
         extra={<>

@@ -1,6 +1,16 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.32',
+    title: 'Profiles in one place, a cleaner Protection page, and Threats installs from its Overview',
+    items: [
+      'Profiles are now edited in one place. The DNS page no longer has a Profiles tab (an old link to it opens Profiles). A profile\'s edit window has a new Advanced: pick block lists choice, so a profile can use extra lists from DNS, Blocking on top of its filtering level.',
+      'On Profiles, Pause is one drop-down, like on Policies, instead of four buttons on every profile. The device count is a link to Devices, and a Custom profile says how many categories it blocks instead of just Choose.',
+      'Protection, Overview starts with the Security check, followed by Also protecting you (your blocks and threat watching). The repeated summary card is gone. Protection, Blocks starts with Where do I block things?, which says which page blocks what.',
+      'Threats: when threat watching is not installed, Overview is the install page, with what it does, what it costs and the Install button. Allowed checks and Devices never checked moved from Advanced to Rules, next to the checks they relate to.',
+    ],
+  },
+  {
     version: '0.9.4.31',
     title: 'No more waiting change after an update, Routes inside Policies, and DHCP opens on how it is doing',
     items: [

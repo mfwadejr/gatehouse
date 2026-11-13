@@ -57,6 +57,8 @@ const fixOldLink = () => {
   // Routes became a tab of Policies.
   const r = window.location.hash.match(/^#\/?routes(\?.*)?$/);
   if (r) window.history.replaceState(null, '', `#/policies/routes${r[1] || ''}`);
+  // Filtering profiles are edited on the Profiles page; the DNS tab is gone.
+  if (/^#\/?dns\/groups(\?.*)?$/.test(window.location.hash)) window.history.replaceState(null, '', '#/profiles');
   const m = window.location.hash.match(/^#\/?protection\/threats(?:\/([a-z]+))?(\?.*)?$/);
   if (m) window.history.replaceState(null, '', `#/threats${m[1] ? `/${m[1]}` : ''}${m[2] || ''}`);
 };

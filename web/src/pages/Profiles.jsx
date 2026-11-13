@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { del, post, put, useData } from '../api.js';
+import { PauseMenu } from '../policykit.jsx';
 import { Button, Card, Field, Input, Modal, Note, Page, Pill, Segmented, Select, TimeField, ToggleRow, useAction , useDelayedDelete } from '../ui.jsx';
 
 // Profiles: a name for a kind of person or device (Kids, Guests, Smart home, Work) with how much to
@@ -11,7 +12,7 @@ const LEVELS = [
   { value: 'off', label: 'Off' },
   { value: 'basic', label: 'Basic' },
   { value: 'enhanced', label: 'Enhanced' },
-  { value: 'custom', label: 'Choose' },
+  { value: 'custom', label: 'Custom' },
 ];
 const levelText = {
   off: 'No filtering.',
@@ -33,12 +34,15 @@ export function whenText(until) {
 function Editor({ init, data, onClose, onSaved }) {
   const [p, setP] = useState(init);
   const [run, busy] = useAction();
+  const { data: allLists } = useData('/api/dns/lists');
+  const own = (allLists || []).filter((l) => !String(l.name).startsWith('Category: '));
+  const [more, setMore] = useState((init.lists || []).length > 0);
   const set = (k, v) => setP((x) => ({ ...x, [k]: v }));
   const setH = (k, v) => set('hours', { ...p.hours, [k]: v });
   const toggleDay = (d) => setH('days', p.hours.days.includes(d) ? p.hours.days.filter((x) => x !== d) : [...p.hours.days, d].sort());
   const toggleCat = (k) => set('categories', p.categories.includes(k) ? p.categories.filter((x) => x !== k) : [...p.categories, k]);
   const save = async () => {
-    const body = { id: p.id, name: p.name, description: p.description || '', preset: p.preset || '', level: p.level, categories: p.categories, safe_search: p.safe_search, hours: p.hours };
+    const body = { id: p.id, name: p.name, description: p.description || '', preset: p.preset || '', level: p.level, categories: p.categories, lists: p.lists, safe_search: p.safe_search, hours: p.hours };
     const r = await run(() => put('/api/profiles', body), 'Profile saved.');
     if (r) { onSaved(); onClose(); }
   };
@@ -55,6 +59,20 @@ function Editor({ init, data, onClose, onSaved }) {
             {data.categories.map((c) => (
               <ToggleRow key={c.key} title={c.name} desc={c.descr} checked={p.categories.includes(c.key)} onChange={() => toggleCat(c.key)} />
             ))}
+          </div>
+        )}
+        {p.level !== 'off' && own.length > 0 && (
+          <div className="stack">
+            <Button small onClick={() => setMore(!more)}>{more ? 'Hide advanced' : 'Advanced: pick block lists'}</Button>
+            {more && (
+              <>
+                <span className="small muted">Block lists from the DNS page, Blocking tab. A list ticked here applies to this profile as well as the level above.</span>
+                {own.map((l) => (
+                  <ToggleRow key={l.id} title={l.name} desc={`${l.entries ? `${l.entries.toLocaleString()} names` : 'Not downloaded yet'}`} checked={(p.lists || []).includes(l.id)}
+                    onChange={(v) => set('lists', v ? [...(p.lists || []), l.id] : (p.lists || []).filter((x) => x !== l.id))} />
+                ))}
+              </>
+            )}
           </div>
         )}
         <ToggleRow title="Safe search" desc="Makes Google, Bing, DuckDuckGo and YouTube hide adult results. It works for browsers that use NopeWarden for DNS (turn on Forced DNS for devices that do not)." checked={p.safe_search} onChange={(v) => set('safe_search', v)} />
@@ -103,7 +121,7 @@ export default function Profiles() {
   const [edit, setEdit] = useState(null);
   const [run] = useAction();
   if (!data) return <Page title="Profiles"><Card title="Profiles"><span className="muted">Loading…</span></Card></Page>;
-  const blank = { id: 0, name: '', description: '', preset: '', level: 'basic', categories: [], safe_search: false, hours: { on: false, days: [0, 1, 2, 3, 4, 5, 6], from: '21:00', to: '07:00' } };
+  const blank = { id: 0, name: '', description: '', preset: '', level: 'basic', categories: [], lists: [], safe_search: false, hours: { on: false, days: [0, 1, 2, 3, 4, 5, 6], from: '21:00', to: '07:00' } };
   const fromPreset = (s) => ({ ...blank, name: s.name, preset: s.key, level: s.level, categories: s.categories || [], safe_search: s.safe_search, hours: s.hours.on ? s.hours : blank.hours });
   const have = new Set(data.profiles.map((x) => x.preset));
   const pause = (id, minutes, text) => run(async () => { await post(`/api/profiles/${id}/pause`, { minutes }); reload(); }, text);
@@ -113,18 +131,13 @@ export default function Profiles() {
       <div className="stack">
         {data.profiles.map((x) => (
           <Card key={x.id} title={x.name} desc={x.description || levelText[x.level]}
-            actions={<><Button small onClick={() => setEdit({ ...x, hours: { ...x.hours } })}>Edit</Button>{x.name !== 'Default' && x.name !== 'Trusted' && <Button small onClick={() => remove(x)}>Delete</Button>}</>}>
+            actions={<><PauseMenu until={x.paused_until} name={x.name} onPause={(m) => pause(x.id, m, m === 0 ? `${x.name} resumed.` : `${x.name} paused.`)} /><Button small onClick={() => setEdit({ ...x, hours: { ...x.hours } })}>Edit</Button>{x.name !== 'Default' && x.name !== 'Trusted' && <Button small onClick={() => remove(x)}>Delete</Button>}</>}>
             <div className="row" style={{ gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-              <Pill>{x.devices} device{x.devices === 1 ? '' : 's'}</Pill>
-              <Pill tone={x.level === 'off' ? '' : 'good'}>{LEVELS.find((l) => l.value === x.level)?.label} filtering</Pill>
+              <a href="#/devices" style={{ textDecoration: 'none' }}><Pill>{x.devices} device{x.devices === 1 ? '' : 's'}</Pill></a>
+              <Pill tone={x.level === 'off' ? '' : 'good'}>{x.level === 'custom' ? `Custom filtering, ${x.categories.length} categor${x.categories.length === 1 ? 'y' : 'ies'}` : `${LEVELS.find((l) => l.value === x.level)?.label} filtering`}{x.lists?.length ? ` + ${x.lists.length} list${x.lists.length === 1 ? '' : 's'}` : ''}</Pill>
               {x.safe_search && <Pill tone="good">Safe search</Pill>}
               {x.hours.on && <Pill>Off {x.hours.from}–{x.hours.to}</Pill>}
               {x.off_now && <Pill tone="warn">{whenText(x.paused_until) || 'Internet off now'}</Pill>}
-            </div>
-            <div className="row" style={{ gap: 'var(--space-2)', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
-              {x.paused_until * 1000 > Date.now()
-                ? <Button small kind="primary" onClick={() => pause(x.id, 0, `${x.name} resumed.`)}>Resume internet</Button>
-                : pauseChoices().map((c) => <Button key={c.m} small onClick={() => pause(x.id, c.m, `${x.name} paused.`)}>Pause {c.t.toLowerCase()}</Button>)}
             </div>
           </Card>
         ))}

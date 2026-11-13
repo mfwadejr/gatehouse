@@ -129,3 +129,42 @@ func TestNetworkProfileAppliesToDevicesWithoutOwn(t *testing.T) {
 		t.Fatal("unknown profile accepted")
 	}
 }
+
+func TestProfileKeepsAndEditsItsOwnBlockLists(t *testing.T) {
+	c, _, _ := siteBox(t, "192.168.1.1/24")
+	a := c.app
+	if a == nil {
+		t.Skip("box has no app")
+	}
+	lid, err := a.Lists.Add("My list", "http://127.0.0.1:9/none.txt", "hosts", 24)
+	if err != nil {
+		t.Fatal(err)
+	}
+	find := func(id int64) *profileOut {
+		ps, _ := a.profileList()
+		for i := range ps {
+			if ps[i].ID == id {
+				return &ps[i]
+			}
+		}
+		return nil
+	}
+	rc, m, raw := c.call("PUT", "/api/profiles", map[string]any{"name": "Mine", "level": "basic", "lists": []int64{lid}})
+	if rc != 200 {
+		t.Fatalf("%d %s", rc, raw)
+	}
+	id := int64(m["id"].(float64))
+	if p := find(id); p == nil || len(p.Lists) != 1 || p.Lists[0] != lid {
+		t.Fatalf("%+v", p)
+	}
+	// Saving without "lists" keeps them (older screens, presets).
+	c.call("PUT", "/api/profiles", map[string]any{"id": id, "name": "Mine", "level": "enhanced"})
+	if p := find(id); p == nil || len(p.Lists) != 1 {
+		t.Fatalf("lists lost: %+v", p)
+	}
+	// An empty list removes them; the category lists stay.
+	c.call("PUT", "/api/profiles", map[string]any{"id": id, "name": "Mine", "level": "enhanced", "lists": []int64{}})
+	if p := find(id); p == nil || len(p.Lists) != 0 || p.Level != "enhanced" {
+		t.Fatalf("%+v", p)
+	}
+}
