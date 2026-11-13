@@ -31,7 +31,8 @@ export function AttentionProvider({ children }) {
     if (net && !wanList.length) add('bad', 'no-wan', 'No internet connection is set up yet', 'Devices cannot reach the internet until you add one.', 'internet');
     if (fw && !fw.zones?.length) add('warn', 'no-zones', 'No networks defined in the firewall', 'Create your first network so devices are protected.', 'networks');
     if (fw?.status?.last_error) add('bad', 'fw-error', 'The last firewall change did not apply', `${fw.status.last_error} Open Diagnostics to see what else is wrong.`, 'firewall');
-    if (fw?.status?.dirty) add('warn', 'fw-dirty', 'Firewall changes are waiting to be applied', 'Open the Review page and commit them.', 'review');
+    if (fw?.status?.dirty && fw.status.refresh_only) add('info', 'fw-refresh', 'The firewall rules were refreshed by an update', 'NopeWarden writes its rules a little differently now. What is allowed has not changed. It puts them live by itself; you can also commit them on the Review page.', 'review');
+    else if (fw?.status?.dirty) add('warn', 'fw-dirty', 'Firewall changes are waiting to be applied', 'Open the Review page and commit them.', 'review');
     if (net?.status?.dirty) add('warn', 'net-dirty', 'Internet settings are waiting to be applied', 'Open the Review page and commit them.', 'review');
     (rogue || []).forEach((r) => add('warn', `rogue:${r.name}`, `Another DHCP server is answering on ${r.name}`, `${r.found.map((f) => f.server).join(', ')} hands out addresses too. Switch it off, or devices may get the wrong settings.`, 'dhcp'));
     wanList.filter((w) => w.enabled).forEach((w) => {

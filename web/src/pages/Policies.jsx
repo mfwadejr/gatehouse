@@ -3,14 +3,14 @@ import { del, post, put, useData } from '../api.js';
 import { PolicyControls, whenText } from '../policykit.jsx';
 import CreatePolicy from '../CreatePolicy.jsx';
 import { actionWord, ruleBody } from './FirewallRules.jsx';
-import { Button, Card, Empty, Page, Pill, Select, useAction, useUndoDelete , useDelayedDelete } from '../ui.jsx';
+import { Button, Card, Empty, PageOrPart, Pill, Select, useAction, useUndoDelete , useDelayedDelete } from '../ui.jsx';
 
 // Every policy in one list, in plain words. Firewall rules, routes, blocks and open ports are four
 // kinds of the same thing: who it covers, where to, what for, when. Each kind keeps its own page for
 // ordering and the finer settings; this page reads the very same records and never keeps a copy.
 const KINDS = [
   { id: 'rule', name: 'Firewall rule', page: 'firewall/rules' },
-  { id: 'route', name: 'Route', page: 'routes' },
+  { id: 'route', name: 'Route', page: 'policies/routes' },
   { id: 'block', name: 'Block', page: 'protection/blocks' },
   { id: 'port', name: 'Open port', page: 'firewall/ports' },
   { id: 'speed', name: 'Speed control', page: 'internet/control' },
@@ -25,7 +25,7 @@ function ruleWords(r) {
   return `${actionWord(r.action)} ${who} to ${to}${what}.`;
 }
 
-export default function Policies() {
+export default function Policies({ part }) {
   const delayedDelete = useDelayedDelete();
   const { data: rules, reload: rr } = useData('/api/fw/rules', { every: 20000 });
   const { data: routes, reload: rt } = useData('/api/routes', { topics: ['vpn.status', 'net.status'], every: 20000 });
@@ -80,9 +80,9 @@ export default function Policies() {
   ];
   const shown = items.filter((x) => !kind || x.k === kind);
   return (
-    <Page title="Policies" sub="Everything that allows, blocks, routes, opens or speeds something for your devices, in one list and in plain words."
+    <PageOrPart part={part} title="Policies" sub="Everything that allows, blocks, routes, opens or speeds something for your devices, in one list and in plain words."
       actions={<Button kind="primary" small icon="plus" onClick={() => setCreating(true)}>Create policy</Button>}>
-      <Card title="Your policies" desc="Firewall rules, routes, blocks, open ports and speed control. Ordering and the finer settings stay on the Firewall, Routes and Protection pages.">
+      <Card title="Your policies" desc="Firewall rules, routes, blocks, open ports and speed control. Ordering and the finer settings stay on the Firewall and Protection pages and the Routes tab.">
         <div className="filterbar">
           <Select value={kind} onChange={setKind} aria-label="Show" options={[{ value: '', label: 'All kinds' }, ...KINDS.map((k) => ({ value: k.id, label: `${k.name}s` }))]} />
           <span className="small muted">{loaded ? `${shown.length} ${shown.length === 1 ? 'policy' : 'policies'}` : 'Loading…'}</span>
@@ -105,6 +105,6 @@ export default function Policies() {
         </div>
       </Card>
       {creating && <CreatePolicy onClose={() => setCreating(false)} />}
-    </Page>
+    </PageOrPart>
   );
 }

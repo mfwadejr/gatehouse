@@ -4,7 +4,7 @@ import { del, holdAnd, post, put, useData } from '../api.js';
 import { SAVED_LATER, SaveChoice } from '../changes.jsx';
 import { OnToggle, PolicyControls, ServiceField, usePickers, WhenField, WhereField, WhoField, whenText } from '../policykit.jsx';
 import { go } from '../App.jsx';
-import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, Select, ToggleRow, useAction, useUndoDelete, Limited } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, PageOrPart, Pill, Segmented, Select, ToggleRow, useAction, useUndoDelete, Limited } from '../ui.jsx';
 
 const STATE = {
   working: { tone: 'good', label: 'Working' },
@@ -102,7 +102,7 @@ function RouteForm({ initial, targets, onClose, onSaved }) {
   );
 }
 
-export default function Routes() {
+export default function Routes({ part }) {
   const { data, reload } = useData('/api/routes', { topics: ['vpn.status', 'net.status'], every: 15000 });
   const [run] = useAction();
   const undoDelete = useUndoDelete();
@@ -122,7 +122,7 @@ export default function Routes() {
   const body = routeBody;
   const pauseFor = (r, m) => run(() => post(`/api/routes/${r.id}/pause`, { minutes: m }), m === 0 ? 'Resumed.' : 'Paused.').then(again);
   return (
-    <Page title="Routes" sub="Send chosen devices or networks through a VPN or one internet connection, for everything or only for some destinations."
+    <PageOrPart part={part} title="Routes" sub="Send chosen devices or networks through a VPN or one internet connection, for everything or only for some destinations."
       actions={<Button kind="primary" small icon="plus" disabled={!targets.length} onClick={() => setEdit({})}>Add a route</Button>}>
       {!targets.length && data && (
         <Note tone="warn" title="Nothing to route to yet">Add a VPN on the VPN page, or a second internet connection on the Internet page, then come back here.</Note>
@@ -171,6 +171,6 @@ export default function Routes() {
         </Card>
       )}
       {edit && targets.length > 0 && <RouteForm initial={edit.id ? edit : undefined} targets={targets} onClose={() => setEdit(null)} onSaved={again} />}
-    </Page>
+    </PageOrPart>
   );
 }

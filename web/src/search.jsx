@@ -25,7 +25,10 @@ const ROWS = [
   ['Encrypted DNS', 'dns/overview', 'One switch for encrypted lookups', 'doh dot private dns cloudflare quad9', 'Encrypted DNS'],
   ['Upstream DNS servers', 'dns/overview', 'Where NopeWarden asks when it does not know the answer', 'upstream resolver cloudflare google quad9 provider', 'Upstream DNS servers'],
   ['Forced DNS', 'dns/overview', 'Make devices use this DNS even if they try another', 'force redirect port 53 hardcoded dns', 'Forced DNS'],
-  ['DHCP', 'dhcp/scopes', 'Address pools', 'address pool lease range', 'Address pools'],
+  ['DHCP', 'dhcp/overview', 'How DHCP is doing right now', 'overview status address use pool full devices lately'],
+  ['How full the address pools are', 'dhcp/overview', 'Which pools are nearly out of addresses', 'pool utilisation full out of addresses range exhausted', 'Address use'],
+  ['Newest devices on the network', 'dhcp/overview', 'The devices that asked for an address most lately', 'recent joined new device lease', 'Most recently active'],
+  ['Address pools', 'dhcp/scopes', 'Each network gets its own pool of addresses', 'address pool lease range', 'Address pools'],
   ['Devices with an address', 'dhcp/leases', 'Every device that has been given an address', 'leases clients hostname mac ip', 'Devices with an address'],
   ['Reserve an address', 'dhcp/resv', 'Keep the same address for a device', 'reservation static ip', 'Reserved addresses'],
   ['Firewall', 'firewall/networks', 'Networks, rules and protection', 'rules allow block zone', 'Your networks'],
@@ -68,10 +71,10 @@ const ROWS = [
   ['Alerts', 'settings/alerts', 'Be told by email or push when something happens', 'notify notification ntfy email push quiet hours new device offline', 'Alerts'],
   ['Services', 'services', 'Extra services on this machine', 'ntp time ssh'],
   ['VPN', 'vpn', 'VPN server and VPN providers', 'openvpn wireguard tunnel expressvpn remote access'],
-  ['Routes', 'routes', 'Send devices, websites or ports through a VPN or one or several connections', 'route vpn policy kill switch tunnel pin wan failover backup balance ntp nntps port service schedule pause', 'Your routes'],
+  ['Routes', 'policies/routes', 'Send devices, websites or ports through a VPN or one or several connections', 'route vpn policy kill switch tunnel pin wan failover backup balance ntp nntps port service schedule pause', 'Your routes'],
   ['Create policy', 'policies', 'One button to make a route, firewall rule, block or port forward', 'create new policy rule route block forward add', 'Your policies'],
   ['Policies', 'policies', 'Every rule, route, block and open port in one list, in plain words', 'policies policy list all rules routes blocks ports plain words pause turn off', 'Your policies'],
-  ['Pause a rule, route, block or port forward', 'routes', 'Pause for a set time or until you resume; the same on every page', 'pause resume timer temporarily disable policy rule route block forward schedule', 'Your routes'],
+  ['Pause a rule, route, block or port forward', 'policies/routes', 'Pause for a set time or until you resume; the same on every page', 'pause resume timer temporarily disable policy rule route block forward schedule', 'Your routes'],
   ['Keep a device on the same address', 'devices', 'Keep address on a device row gives it a DHCP reservation', 'dhcp reservation fixed static ip keep address release', 'Devices'],
   ['Devices & access', 'devices', 'Devices and who can sign in', 'users admin devices names approve'],
   ['Two-factor sign-in', 'settings/account', 'Ask for a code from an authenticator app', 'users admin password two-step 2fa mfa authenticator', 'Two-factor sign-in'],
@@ -246,5 +249,5 @@ export function SearchBox({ onClose, go }) {
 }
 
 // "dns/lists" reads as "DNS" in the list.
-const NAMES = { internet: 'Internet', networks: 'Networks', dns: 'DNS', dhcp: 'DHCP', firewall: 'Firewall', protection: 'Protection', threats: 'Threats', services: 'Services', vpn: 'VPN', routes: 'Routes', profiles: 'Profiles', devices: 'Devices', logs: 'Logs', diagnostics: 'Diagnostics', settings: 'Settings', overview: 'Overview' };
+const NAMES = { internet: 'Internet', networks: 'Networks', dns: 'DNS', dhcp: 'DHCP', firewall: 'Firewall', protection: 'Protection', threats: 'Threats', services: 'Services', vpn: 'VPN', policies: 'Policies', profiles: 'Profiles', devices: 'Devices', logs: 'Logs', diagnostics: 'Diagnostics', settings: 'Settings', overview: 'Overview' };
 const where = (p) => NAMES[p.split('/')[0]] || p;

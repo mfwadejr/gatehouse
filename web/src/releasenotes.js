@@ -1,6 +1,16 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.31',
+    title: 'No more waiting change after an update, Routes inside Policies, and DHCP opens on how it is doing',
+    items: [
+      'After an update, the console no longer shows a change waiting that you never made. NopeWarden now notes which settings every applied firewall change came from. If an update only changes how the rules are written, Review says so in words (NopeWarden was updated and writes its rules a little differently; what is allowed has not changed), the menu stops showing a dot, and NopeWarden puts the refreshed rules live by itself a short while after the update. It checks them like any change, keeps the old rules if a protected one would go missing, keeps the new ones only when the firewall answers with them loaded, and records it as Updated by NopeWarden. A change you made yourself is never put live this way. The first update after this release still needs one Verify and commit, because older changes did not record their settings.',
+      'Routes is now a tab of Policies, next to All policies, so everything that decides where traffic goes is on one page. Old links to Routes still open it.',
+      'DHCP opens on a new Overview tab: how many networks hand out addresses, how many devices have one, a warning when a pool is nearly full, a bar for each pool and the devices that asked for an address most lately. Address pools, Devices and Reservations follow it.',
+      'On Internet, Connections now starts with the traffic flowing through each connection, above the list of connections.',
+    ],
+  },
+  {
     version: '0.9.4.30',
     title: 'Firewall: who can reach whom first, and what is always on',
     items: [

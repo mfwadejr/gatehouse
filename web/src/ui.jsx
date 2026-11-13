@@ -63,10 +63,25 @@ export function Card({ title, desc, actions, children, className = '', enter = f
   );
 }
 
-const HELP_PAGES = ['overview', 'internet', 'networks', 'dns', 'dhcp', 'firewall', 'services', 'vpn', 'routes', 'policies', 'review', 'profiles', 'devices', 'logs', 'protection', 'threats', 'diagnostics', 'updates', 'settings'];
+const HELP_PAGES = ['overview', 'internet', 'networks', 'dns', 'dhcp', 'firewall', 'services', 'vpn', 'policies', 'review', 'profiles', 'devices', 'logs', 'protection', 'threats', 'diagnostics', 'updates', 'settings'];
 function helpPage() {
   const id = (window.location.hash.replace(/^#\/?/, '').split('?')[0] || 'overview').split('/')[0];
   return HELP_PAGES.includes(id) ? `${id}.html` : '';
+}
+
+// A page's content that is also one tab of a bigger page: with part set it drops the title and keeps the
+// sentence and the buttons, so a page made of tabs shows one heading.
+export function PageOrPart({ part, title, sub, actions, children }) {
+  if (!part) return <Page title={title} sub={sub} actions={actions}>{children}</Page>;
+  return (
+    <>
+      <div className="spread">
+        <p className="sub" style={{ margin: 0 }}>{sub}</p>
+        <div className="actions">{actions}</div>
+      </div>
+      {children}
+    </>
+  );
 }
 
 export function Page({ title, sub, actions, children }) {

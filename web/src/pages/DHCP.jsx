@@ -160,8 +160,62 @@ function Reservations() {
   );
 }
 
+// The first tab: how it is going right now, before any setting. Pools in use, who joined lately.
+function Overview({ goTab }) {
+  const { data: scopes } = useData('/api/dhcp/scopes', { topics: ['dhcp.leases'] });
+  const { data: util } = useData('/api/dhcp/utilisation', { topics: ['dhcp.utilisation', 'dhcp.leases'], every: 15000 });
+  const { data: leases } = useData('/api/dhcp/leases', { topics: ['dhcp.leases'], every: 10000 });
+  const serving = (scopes || []).filter((x) => x.enabled && x.mode === 'serve');
+  const active = (leases || []).length;
+  const pools = (util || []).filter((u) => serving.some((x) => x.id === u.scope_id));
+  const tight = pools.filter((u) => u.size > 0 && u.active / u.size > 0.8);
+  const recent = [...(leases || [])].filter((l) => !l.static).sort((a, b) => (b.expires || 0) - (a.expires || 0)).slice(0, 6);
+  const link = (tab, label) => <button type="button" className="link" onClick={() => goTab(tab)}>{label}</button>;
+  return (
+    <>
+      {scopes && !scopes.length
+        ? <Note>No network hands out addresses yet. Add one under {link('scopes', 'Address pools')}, and devices get addresses by themselves.</Note>
+        : <Note tone={tight.length ? 'warn' : undefined} title={tight.length ? 'A pool is nearly full' : undefined}>
+          {tight.length
+            ? `${tight.map((u) => u.name).join(', ')} ${tight.length === 1 ? 'is' : 'are'} nearly out of addresses. Widen the range or keep addresses for less time under `
+            : `NopeWarden hands out addresses on ${serving.length} ${serving.length === 1 ? 'network' : 'networks'}. ${active} ${active === 1 ? 'device has' : 'devices have'} an address right now. Change how it works under `}
+          {link('scopes', 'Address pools')}.
+        </Note>}
+      <Card title="Address use" desc="How full each pool is. A pool that fills up cannot give new devices an address.">
+        <div className="list">
+          {pools.map((u) => (
+            <div className="item" key={u.scope_id}>
+              <div className="fill">
+                <div className="name">{u.name}</div>
+                <div className="stack" style={{ gap: 'var(--space-1)', marginTop: 'var(--space-2)', maxWidth: '24rem' }}><Bar pct={u.size ? (100 * u.active) / u.size : 0} thin /><span className="small muted">{u.active} of {u.size} addresses in use</span></div>
+              </div>
+            </div>
+          ))}
+          {util && !pools.length && <Empty>No pool is handing out addresses.</Empty>}
+        </div>
+      </Card>
+      <Card title="Most recently active" desc="The devices that asked for an address most lately." actions={<Button small onClick={() => goTab('leases')}>All devices</Button>}>
+        <div className="scroll">
+          <table className="table">
+            <thead><tr><th>Name</th><th>Address</th><th>Network</th><th>Until</th></tr></thead>
+            <tbody>
+              {recent.map((l) => (
+                <tr key={`${l.scope_id}-${l.ip}`}>
+                  <td>{l.hostname || <span className="muted">unnamed</span>}</td>
+                  <td className="mono">{l.ip}</td><td>{l.scope}</td><td>{fmt.dt(l.expires)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {leases && !recent.length && <Empty>No devices have asked for an address yet.</Empty>}
+        </div>
+      </Card>
+    </>
+  );
+}
+
 export default function DHCP() {
-  const [tab, setTab] = useHashTab('dhcp', ['scopes','leases','resv'], 'scopes');
+  const [tab, setTab] = useHashTab('dhcp', ['overview','scopes','leases','resv'], 'overview');
   const { data: rogue } = useData('/api/dhcp/alerts', { topics: ['dhcp.alerts'] });
   return (
     <Page title="DHCP" sub="Gives every device an address when it joins the network.">
@@ -170,7 +224,8 @@ export default function DHCP() {
           {r.found.map((f) => f.server).join(', ')} hands out addresses here as well, so devices may get the wrong settings. Switch that device's DHCP off, or turn DHCP off for this network in NopeWarden.
         </Note>
       ))}
-      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'scopes', label: 'Address pools' }, { value: 'leases', label: 'Devices' }, { value: 'resv', label: 'Reservations' }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'overview', label: 'Overview' }, { value: 'scopes', label: 'Address pools' }, { value: 'leases', label: 'Devices' }, { value: 'resv', label: 'Reservations' }]} />
+      {tab === 'overview' && <Overview goTab={setTab} />}
       {tab === 'scopes' && <Scopes />}
       {tab === 'leases' && <Leases />}
       {tab === 'resv' && <Reservations />}

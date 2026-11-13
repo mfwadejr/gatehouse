@@ -311,6 +311,8 @@ func (a *App) fwStatus() map[string]any {
 		st["error"] = err.Error()
 	}
 	st["dirty"] = err == nil && script != a.lastApplied()
+	// Waiting only because an update writes the rules differently: the settings are the ones that were applied.
+	st["refresh_only"] = st["dirty"] == true && a.rulesRefreshOnly()
 	if msg := a.setting("fw.last_error", ""); msg != "" {
 		st["last_error"] = msg
 		st["last_error_at"] = int64(a.settingFloat("fw.last_error_at", 0))
@@ -521,7 +523,7 @@ func (a *App) fwApply(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 	if len(summary) > 500 {
 		summary = summary[:500]
 	}
-	res, _ := a.Config.Exec(`INSERT INTO fw_revisions(created_at,author,summary,ruleset,status) VALUES(?,?,?,?,'pending')`, time.Now().Unix(), c.User.Username, summary, script)
+	res, _ := a.Config.Exec(`INSERT INTO fw_revisions(created_at,author,summary,ruleset,status,model) VALUES(?,?,?,?,'pending',?)`, time.Now().Unix(), c.User.Username, summary, script, revisionPrint(m))
 	ver, _ := res.LastInsertId()
 	a.apply.mu.Lock()
 	a.apply.connID, a.apply.version = api.ConnID(r), ver
@@ -562,6 +564,7 @@ func (a *App) fwConfirm(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 	a.prog.finish("kept")
 	a.Config.Exec(`UPDATE fw_revisions SET status='confirmed' WHERE version=?`, ver)
 	a.Config.Exec(`UPDATE fw_revisions SET status='superseded' WHERE status='confirmed' AND version<?`, ver)
+	a.stampRules()
 	a.fwSync()
 	a.publishFW()
 	ok(w)

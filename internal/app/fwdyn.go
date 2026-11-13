@@ -497,8 +497,9 @@ func (a *App) retimeIfNeeded() {
 		return
 	}
 	a.Config.Exec(`UPDATE fw_revisions SET status='superseded' WHERE status='confirmed'`)
-	a.Config.Exec(`INSERT INTO fw_revisions(created_at,author,summary,ruleset,status) VALUES(?,?,?,?,'confirmed')`,
-		time.Now().Unix(), "schedule", "Scheduled rules moved with the change between summer and winter time.", script)
+	a.Config.Exec(`INSERT INTO fw_revisions(created_at,author,summary,ruleset,status,model) VALUES(?,?,?,?,'confirmed',?)`,
+		time.Now().Unix(), "schedule", "Scheduled rules moved with the change between summer and winter time.", script, revisionPrint(m))
+	a.stampRules()
 	a.event("system", "info", "Scheduled firewall rules were adjusted for the time change", "")
 	a.publishFW()
 }
@@ -514,6 +515,9 @@ func (a *App) dynLoop(ctx context.Context) {
 	defer slow.Stop()
 	a.syncSets(true)
 	a.geoMaybeRefreshIfNeeded(ctx)
+	// A while after start, when everything is up, bring the live rules up to this version if only the program changed.
+	first := time.NewTimer(40 * time.Second)
+	defer first.Stop()
 	var due time.Time
 	for {
 		select {
@@ -535,8 +539,11 @@ func (a *App) dynLoop(ctx context.Context) {
 				a.dyn.lastPaused.Store(sig)
 				a.fwSync()
 			}
+		case <-first.C:
+			a.refreshRulesIfNeeded()
 		case <-slow.C:
 			a.retimeIfNeeded()
+			a.refreshRulesIfNeeded()
 			a.geoMaybeRefreshIfNeeded(ctx)
 		}
 	}

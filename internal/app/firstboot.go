@@ -99,7 +99,8 @@ func (a *App) applyStored() error {
 	if len(summary) > 500 {
 		summary = summary[:500]
 	}
-	a.Config.Exec(`INSERT INTO fw_revisions(created_at,author,summary,ruleset,status) VALUES(?,?,?,?,'confirmed')`, time.Now().Unix(), "setup", summary, script)
+	a.Config.Exec(`INSERT INTO fw_revisions(created_at,author,summary,ruleset,status,model) VALUES(?,?,?,?,'confirmed',?)`, time.Now().Unix(), "setup", summary, script, revisionPrint(m))
+	a.stampRules()
 	return nil
 }
 

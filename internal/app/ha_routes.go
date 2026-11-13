@@ -595,8 +595,9 @@ func (a *App) haAutoApply() {
 				note("firewall", err)
 			} else {
 				a.Config.Exec(`UPDATE fw_revisions SET status='superseded' WHERE status='confirmed'`)
-				a.Config.Exec(`INSERT INTO fw_revisions(created_at,author,summary,ruleset,status) VALUES(?,?,?,?,'confirmed')`,
-					time.Now().Unix(), "partner unit", "Settings copied from the active unit.", script)
+				a.Config.Exec(`INSERT INTO fw_revisions(created_at,author,summary,ruleset,status,model) VALUES(?,?,?,?,'confirmed',?)`,
+					time.Now().Unix(), "partner unit", "Settings copied from the active unit.", script, revisionPrint(m))
+				a.stampRules()
 				a.fwSync()
 			}
 		}

@@ -3,6 +3,9 @@
 ## What it is for
 Saving a change to the firewall, the network or a policy puts it live straight away. Sometimes you would rather collect several changes first and put them live together. **Save for later** does that, and this page is where those changes wait.
 
+## After an update
+Sometimes an update changes how NopeWarden writes the firewall rules without changing what they allow. Review then says **The firewall rules were refreshed** instead of listing changes, and NopeWarden puts them live by itself a short while after the update, with the same checks as any change. You never have to do anything. A change you made yourself is never put live this way.
+
 ## How saving works
 - **Save and apply** (the main button) saves the change and puts it live after a moment. NopeWarden then checks that you can still reach it and keeps the change. If a change cuts you off, nothing more is needed: it undoes itself within 60 seconds.
 - **Save for later** saves the change but leaves it waiting. It is offered on the forms for rules, routes, open ports, services, device groups, internet connections, connection groups, networks, network types, DHCP networks and reservations, VPN settings, letting networks see each other, and who may manage NopeWarden. A small badge showing how many changes are waiting, with a link to **Review changes**, appears at the top of every page.

@@ -48,4 +48,4 @@ DNS changes (lists, groups, servers, your own names) now wait on the **Review ch
 Blocklist refreshes follow the one schedule editor (every N hours, daily, weekly or off). A failed refresh retries after 5 minutes, then 15, 30 and every hour.
 
 ## DNS follows the route
-A device sent through a VPN or a particular internet connection looks up names through that same path, so a website route does not leak lookups to your normal connection. The Routes page lists the addresses learned for each website route.
+A device sent through a VPN or a particular internet connection looks up names through that same path, so a website route does not leak lookups to your normal connection. The Routes tab on Policies lists the addresses learned for each website route.

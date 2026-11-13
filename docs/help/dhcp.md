@@ -8,6 +8,7 @@ DHCP gives every device on a network an address when it joins. NopeWarden does t
 The picture is an example from a new, empty box; yours will show your own devices and numbers.
 
 ## What is on the page
+- **Overview** opens first: a sentence on how DHCP is doing right now (how many networks hand out addresses, how many devices have one, and a warning when a pool is nearly full), **Address use** with a bar for each pool, and **Most recently active**, the devices that asked for an address most lately, with a button to **All devices**.
 - **Address pools**: one per network, with **First address to give out**, **Last address to give out**, **Gateway**, **DNS server**, **How long an address is kept** and **Home domain**. **Who hands out addresses here?** is **NopeWarden**, **Another router, relayed to NopeWarden**, or **Another device (NopeWarden stays out of it)**. **Check for other servers** listens for a second DHCP server, which causes trouble.
 - **Devices with an address**: every device that has one now, with **Reserve** and **Release**.
 - **Reserved addresses**: devices that always get the same address. **Add reservation** takes the device address (MAC) and the address to keep.

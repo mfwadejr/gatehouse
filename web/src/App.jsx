@@ -18,8 +18,7 @@ const Networks = lazy(() => import('./pages/Networks.jsx'));
 const DNS = lazy(() => import('./pages/DNS.jsx'));
 const DHCP = lazy(() => import('./pages/DHCP.jsx'));
 const VPN = lazy(() => import('./pages/VPN.jsx'));
-const Routes = lazy(() => import('./pages/Routes.jsx'));
-const Policies = lazy(() => import('./pages/Policies.jsx'));
+const Policies = lazy(() => import('./pages/PoliciesPage.jsx'));
 const Review = lazy(() => import('./pages/Review.jsx'));
 const Firewall = lazy(() => import('./pages/Firewall.jsx'));
 const Protection = lazy(() => import('./pages/Protection.jsx'));
@@ -38,7 +37,6 @@ export const PAGES = [
   { id: 'networks', label: 'Networks', icon: 'networks', el: Networks, group: 'Network' },
   { id: 'dns', label: 'DNS', icon: 'dns', el: DNS, group: 'Network' },
   { id: 'dhcp', label: 'DHCP', icon: 'dhcp', el: DHCP, group: 'Network' },
-  { id: 'routes', label: 'Routes', icon: 'routes', el: Routes, group: 'Network' },
   { id: 'policies', label: 'Policies', icon: 'policies', el: Policies, group: 'Network' },
   { id: 'firewall', label: 'Firewall', icon: 'firewall', el: Firewall, group: 'Security' },
   { id: 'protection', label: 'Protection', icon: 'protection', el: Protection, group: 'Security' },
@@ -56,6 +54,9 @@ export const PAGES = [
 
 // The Threats page used to be a tab of Protection. Old links and bookmarks still land in the right place.
 const fixOldLink = () => {
+  // Routes became a tab of Policies.
+  const r = window.location.hash.match(/^#\/?routes(\?.*)?$/);
+  if (r) window.history.replaceState(null, '', `#/policies/routes${r[1] || ''}`);
   const m = window.location.hash.match(/^#\/?protection\/threats(?:\/([a-z]+))?(\?.*)?$/);
   if (m) window.history.replaceState(null, '', `#/threats${m[1] ? `/${m[1]}` : ''}${m[2] || ''}`);
 };
@@ -83,7 +84,7 @@ function Shell({ me, onSignOut, reloadMe }) {
   const { data: net } = useData('/api/net/status', { topics: ['net.status'] });
   const { data: ha, reload: reloadHa } = useData('/api/ha', { every: 15000 });
   const pending = (fw?.status?.pending || net?.status?.pending) ? true : false;
-  const dirty = !!(fw?.status?.dirty || net?.status?.dirty);
+  const dirty = !!((fw?.status?.dirty && !fw.status.refresh_only) || net?.status?.dirty);
   const [finding, setFinding] = useState(false);
   const [notes, setNotes] = useState(false);
   const [theme, setTheme] = useTheme();

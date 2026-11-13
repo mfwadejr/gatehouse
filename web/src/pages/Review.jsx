@@ -32,6 +32,8 @@ export default function Review() {
   const problems = dirty.flatMap((k) => prev[k]?.ok === false ? (prev[k].problems || []) : []);
   const warnings = dirty.flatMap((k) => prev[k]?.warnings || []);
   const summary = dirty.flatMap((k) => (prev[k]?.ok ? prev[k].summary || [] : []));
+  // Waiting only because an update writes the firewall rules differently; the person changed nothing.
+  const refresh = dirty.length === 1 && dirty[0] === 'fw' && !!ch.st?.fw?.refresh_only && items.length === 0;
   const run = async () => {
     setMsg('');
     const err = await ch.commit(code);
@@ -59,8 +61,13 @@ export default function Review() {
       )}
       {dirty.length > 0 && (
         <>
-          <Card title={`${items.length || dirty.length} ${(items.length || dirty.length) === 1 ? 'change' : 'changes'} waiting`} desc="In the order you made them.">
-            {items.length > 0 ? (
+          <Card title={refresh ? 'The firewall rules were refreshed' : `${items.length || dirty.length} ${(items.length || dirty.length) === 1 ? 'change' : 'changes'} waiting`} desc={refresh ? 'Nothing you changed.' : 'In the order you made them.'}>
+            {refresh ? (
+              <>
+                <p>NopeWarden was updated and writes its rules a little differently. What is allowed has not changed. You can put them live now, or leave it: NopeWarden does it by itself shortly after an update.</p>
+                {summary.length > 0 && <details className="mt2"><summary className="small">What the firewall does</summary><ul className="stack small">{summary.map((x, i) => <li key={i}>{x}</li>)}</ul></details>}
+              </>
+            ) : items.length > 0 ? (
               <ul className="reviewlist">{items.map((e, i) => (
                 <li key={e.id}><time>{fmt.time(e.ts)}</time><span>{e.text}</span>
                   {e.can_discard && <button type="button" className="link small" disabled={ch.busy || !!ch.pend} onClick={() => discardFrom(e, i === items.length - 1)}>{i === items.length - 1 ? 'Discard' : 'Discard this and later'}</button>}

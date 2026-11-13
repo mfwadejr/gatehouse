@@ -5,7 +5,7 @@ import { Button, Modal } from './ui.jsx';
 // person wants to do and opens the right form there.
 const KINDS = [
   { to: 'firewall/rules', name: 'Allow or block traffic', desc: 'A firewall rule between networks, devices, websites or ports, always or on a schedule.' },
-  { to: 'routes', name: 'Send traffic through a VPN or connection', desc: 'A route: choose who, where to and what for, and which VPN, internet connection or group carries it.' },
+  { to: 'policies/routes', name: 'Send traffic through a VPN or connection', desc: 'A route: choose who, where to and what for, and which VPN, internet connection or group carries it.' },
   { to: 'firewall/ports', name: 'Open a port to the internet', desc: 'A port forward for an app on one of your devices.' },
   { to: 'internet/control', q: 'limit', name: 'Limit speed', desc: 'Hold a network, profile or device (or just some apps or websites) to a number of Mb/s, shared or each.' },
   { to: 'internet/control', q: 'priority', name: 'Give priority', desc: 'Let some traffic go first, or wait last, when the internet connection is full.' },

@@ -304,6 +304,13 @@ export function WaitingBadge() {
   const ch = useChanges();
   if (!ch || ch.pend || !ch.dirtyKinds.length) return null;
   const n = Math.max(1, (ch.staged?.items || []).length);
+  if (ch.dirtyKinds.length === 1 && ch.dirtyKinds[0] === 'fw' && ch.st?.fw?.refresh_only && !(ch.staged?.items || []).length) {
+    return (
+      <a className="waitbadge" href="#/review" title="An update writes the firewall rules a little differently. What is allowed has not changed.">
+        <span className="navdot info" aria-hidden="true" />Rules refreshed by the update · Review
+      </a>
+    );
+  }
   return (
     <a className="waitbadge" href="#/review" title="Changes saved for later, not in use yet">
       <span className="navdot warn" aria-hidden="true" />{n} {n === 1 ? 'change' : 'changes'} waiting · Review

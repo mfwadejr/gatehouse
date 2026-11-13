@@ -200,6 +200,7 @@ export default function Internet({ me }) {
 
       <NatNotice />
       {showTabs && <Tabs value={tab} onChange={choose} tabs={tabs} />}
+      {(!showTabs || tab === 'connections') && wans.length > 0 && <Traffic wans={wans} links={links} />}
       {(!showTabs || tab === 'connections') && (wans.length > 0 || !isNew) ? (
         <Card title="Internet connections" actions={<Button icon="plus" onClick={() => setEdit({})}>Add connection</Button>}
           desc={wans.length > 1 ? 'Choose how these share the work, or send certain devices through specific ones, in Connection groups below.' : 'The links that connect this firewall to the internet.'}>
@@ -228,7 +229,7 @@ export default function Internet({ me }) {
         </Card>
       ) : null}
 
-      {(!showTabs || tab === 'connections') && <><WanGroups wans={wans} links={links} onChanged={all} /><Traffic wans={wans} links={links} /></>}
+      {(!showTabs || tab === 'connections') && <WanGroups wans={wans} links={links} onChanged={all} />}
       {(!showTabs || tab === 'speed') && wans.some((w) => w.enabled) && <SpeedTest wans={wans} links={links} />}
       {showTabs && tab === 'control' && <SpeedControl />}
       {showTabs && tab === 'troubleshoot' && <><NetTools /><Why /></>}
