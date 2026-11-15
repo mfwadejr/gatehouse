@@ -92,7 +92,9 @@ export default function ForcedDns({ s, save, pickers, reload }) {
           </div>
         </>
       )}
-      <div className="stack" style={{ marginTop: 'var(--space-4)' }}>
+      <details className="more" style={{ marginTop: 'var(--space-4)' }}>
+      <summary>More: exceptions ({(data?.exceptions || []).length}) and what this cannot stop</summary>
+      <div className="stack" style={{ marginTop: 'var(--space-3)' }}>
         <b>Exceptions</b>
         {!(data?.exceptions || []).length && !adding && <span className="small muted">None. A device or group can be left alone, or sent to a different server, whatever its network says.</span>}
         <div className="list">
@@ -119,6 +121,7 @@ export default function ForcedDns({ s, save, pickers, reload }) {
       <Note title="What this cannot stop">
         Forced DNS redirects ordinary DNS. A device that sends its lookups hidden inside normal web traffic (DNS-over-HTTPS, which some browsers and phones use) can still go around it. Turn that off in the browser or device if it matters.
       </Note>
+      </details>
     </Card>
   );
 }

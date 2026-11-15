@@ -596,6 +596,7 @@ func (a *App) registerBlockSetRoutes() {
 		}
 		a.Config.Exec(`DELETE FROM scope_rules WHERE set_id=?`, id)
 		a.Config.Exec(`DELETE FROM block_sets WHERE id=?`, id)
+		a.dropItem("block", strconv.FormatInt(id, 10))
 		a.dropScopeCache()
 		ok(w)
 	})

@@ -36,7 +36,7 @@ export default function GetStarted() {
   return (
     <div className="stack">
       <SetupChecklist />
-      <Card title="Common setups" desc="Step-by-step guides for things people often want to do."><Recipes bare /></Card>
+      <Card title="Common setups" desc="Step-by-step guides for things people often want to do."><details className="more"><summary>Show the guides</summary><Recipes bare /></details></Card>
     </div>
   );
 }

@@ -723,6 +723,7 @@ func (a *App) registerAppForwardRoutes() {
 			fail(w, err)
 			return
 		}
+		a.dropItem("port", g)
 		a.markDirty()
 		a.refreshVPN()
 		ok(w)

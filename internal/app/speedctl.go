@@ -442,6 +442,7 @@ func (a *App) registerSpeedCtlRoutes() {
 			return
 		}
 		a.Config.Exec(`DELETE FROM speed_rules WHERE id=?`, id)
+		a.dropItem("speed", strconv.FormatInt(id, 10))
 		a.markDirty()
 		a.fwSync()
 		a.sqmSync(false)

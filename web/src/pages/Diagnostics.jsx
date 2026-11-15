@@ -102,7 +102,7 @@ function Connections() {
   if (!data) return null;
   // One row per visit: the closing entry says how long it lasted and why, so the matching opening row is left out.
   const visits = (data.recent || []).filter((e) => e.event === 'closed');
-  const shown = older ? visits : visits.slice(0, 10);
+  const shown = older ? visits : visits.slice(0, 5);
   const reasons = Object.entries(data.by_reason || {});
   return (
     <Card title="Console connections" desc="The live connection your browser keeps open to NopeWarden. If the browser reports dropped connections, this shows whether NopeWarden ended them or the network between ended them.">
@@ -114,7 +114,7 @@ function Connections() {
               <thead><tr><th>Opened</th><th>From</th><th>Lasted</th><th>Why it ended</th></tr></thead>
               <tbody>{shown.map((e, i) => <tr key={i}><td className="small">{fmt.dt(e.at - (e.seconds || 0))}</td><td className="mono small">{e.addr}</td><td className="small">{e.seconds ? `${e.seconds} s` : 'under a second'}</td><td className="small muted">{e.why || ''}</td></tr>)}</tbody>
             </table></div>
-            {visits.length > 10 && <div><Button small onClick={() => setOlder(!older)}>{older ? 'Show fewer' : `Show older (${visits.length - 10})`}</Button></div>}
+            {visits.length > 5 && <div><Button small onClick={() => setOlder(!older)}>{older ? 'Show fewer' : `Show older (${visits.length - 5})`}</Button></div>}
           </>
         )}
       </div>
@@ -184,11 +184,13 @@ function SystemLog() {
 
 function DiskUse() {
   const { data } = useData('/api/system/disk', { every: 60000 });
+  const [all, setAll] = useState(false);
   return (
     <Card title="What is using the disk" desc="The biggest places on this machine's disk, so you can see what to clear if it fills up.">
       {!data ? <Empty>Working it out…</Empty> : !data.parts?.length ? <Empty>Could not work that out.</Empty> : (
         <div className="list">
-          {data.parts.map((p) => <div className="item" key={p.name}><div className="fill"><div className="name">{p.name}</div></div><span className="num muted">{fmtBytes(p.bytes)}</span></div>)}
+          {(all ? data.parts : data.parts.slice(0, 3)).map((p) => <div className="item" key={p.name}><div className="fill"><div className="name">{p.name}</div></div><span className="num muted">{fmtBytes(p.bytes)}</span></div>)}
+          {data.parts.length > 3 && <div><Button small onClick={() => setAll(!all)}>{all ? 'Show fewer' : `Show all (${data.parts.length})`}</Button></div>}
         </div>
       )}
     </Card>

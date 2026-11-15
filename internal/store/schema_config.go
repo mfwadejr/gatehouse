@@ -577,4 +577,27 @@ CREATE TABLE speed_rules(
   targets TEXT NOT NULL DEFAULT '[]',
   created_at INTEGER NOT NULL DEFAULT 0
 );
+`, `
+-- Rule sets and tags (v0.9.4.37). A set groups policies of any kind so they can be paused, turned off or
+-- turned on together; a policy is in at most one set. A tag is only a label. kind is rule, route, block,
+-- port, speed or device; ref is the item's id (a device's MAC address, an open port's group name).
+CREATE TABLE policy_sets(
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  off_refs TEXT NOT NULL DEFAULT '[]',
+  created_at INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE policy_set_members(
+  kind TEXT NOT NULL,
+  ref TEXT NOT NULL,
+  set_id INTEGER NOT NULL REFERENCES policy_sets(id) ON DELETE CASCADE,
+  PRIMARY KEY(kind, ref)
+);
+CREATE TABLE item_tags(
+  kind TEXT NOT NULL,
+  ref TEXT NOT NULL,
+  tag TEXT NOT NULL,
+  PRIMARY KEY(kind, ref, tag)
+);
+CREATE INDEX idx_item_tags_tag ON item_tags(tag);
 `}

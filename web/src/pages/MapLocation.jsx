@@ -14,6 +14,7 @@ export default function MapLocation() {
   const [ll, setLl] = useState({ lat: '', lon: '' });
   const [q, setQ] = useState('');
   const [found, setFound] = useState(null);
+  const [editing, setEditing] = useState(false);
   if (!data) return null;
   const setFromLatLon = (next) => {
     setLl(next);
@@ -28,6 +29,15 @@ export default function MapLocation() {
     setPt([Math.round(((e.clientX - r.left) / r.width) * MAP_W), Math.round(((e.clientY - r.top) / r.height) * MAP_H)]);
   };
   const options = [{ value: '', label: 'Choose a country…' }, ...Object.entries(COUNTRIES).filter(([cc]) => cc !== 'AQ').map(([cc, c]) => ({ value: cc, label: c.name })).sort((a, b) => a.label.localeCompare(b.label))];
+  if (!editing) {
+    const [la, lo] = data.set ? unproject(data.x, data.y).map((n) => n.toFixed(1)) : [];
+    return (
+      <Card title="Your place on the map" desc="Where the lines on the Overview map start."
+        actions={<Button small onClick={() => setEditing(true)}>{data.set ? 'Change' : 'Set my place'}</Button>}>
+        <p className="small muted" style={{ margin: 0 }}>{data.set ? `Placed at about ${la}, ${lo} (latitude, longitude). It stays on this machine.` : 'No place set. The Overview uses the middle of the country your browser is set to.'}</p>
+      </Card>
+    );
+  }
   return (
     <Card title="Your place on the map" desc="Where the lines on the Overview map start. Search for a zip code, city or address, type your latitude and longitude, click the map, or pick a country. It stays on this machine and is not sent anywhere.">
       <div className="stack">
@@ -59,7 +69,8 @@ export default function MapLocation() {
         </div>
         {!shown && <Note>No place set. The Overview uses the middle of the country your browser is set to.</Note>}
         <div className="actions">
-          <Button kind="primary" disabled={busy || !pt} onClick={() => run(() => put('/api/overview/home', { x: pt[0], y: pt[1] }), 'Saved.').then(() => { setPt(null); reload(); })}>Save my place</Button>
+          <Button kind="primary" disabled={busy || !pt} onClick={() => run(() => put('/api/overview/home', { x: pt[0], y: pt[1] }), 'Saved.').then(() => { setPt(null); setEditing(false); reload(); })}>Save my place</Button>
+          <Button onClick={() => { setPt(null); setEditing(false); }}>Cancel</Button>
           <Button disabled={busy || !data.set} onClick={() => run(() => put('/api/overview/home', { clear: true }), 'Back to the default.').then(() => { setPt(null); reload(); })}>Use the default</Button>
         </div>
       </div>

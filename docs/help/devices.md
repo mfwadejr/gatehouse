@@ -13,6 +13,9 @@ The picture is an example from a new, empty box; yours will show your own device
 - Open a device to change its **Name**, **Icon**, **Profile**, **DNS filtering**, **Notes** and **Fixed address**, or **Pause the internet** for a set time. **Allowed online** turns it off without losing its settings. For a device on a VPN there is also **Sent through** and a Check. The panel also lists **Firewall rules that mention it**.
 - **Add a device** records one that has not joined yet.
 
+## Tags
+In a device's window, **Tags** gives it up to five labels, such as media or living room. Tags only help you find things: they show beside the device name, the **Any tag** filter narrows the list to one, Search finds them, and the search box on the list matches them too. They never change what the device is allowed to do; use profiles and Device groups for that.
+
 ## Common tasks
 1. Pause a device: press its row button, or open it and choose a pause length. **Resume now** brings it back.
 2. Rename a device: click it, type the name, press Enter.

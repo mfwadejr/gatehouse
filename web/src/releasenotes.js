@@ -1,6 +1,17 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.37',
+    title: 'Rule sets, tags, and a Danger zone tab',
+    items: [
+      'Policies can now be put in a rule set. A set can hold any kind of policy (rule, route, block, open port, speed), a policy is in at most one set, and the whole set can be paused, turned off or turned on. Turning a set back on only turns on the policies that were on before. Deleting a set keeps its policies. On each policy, Set & tags opens one small window for it.',
+      'Tags are plain labels, up to five per policy or device, with no colours and no effect on behaviour. Policies and Devices can be filtered by tag, search finds tags and sets, and only administrators can change sets and tags.',
+      'The Danger zone is now its own red tab in Settings, with the three resets unchanged.',
+      'Longer pages are shorter: rarely used parts of Overview, Get started, Alerts, Storage, Services, Diagnostics and Forced DNS are folded.',
+      'The help has a new How it works chapter and fresh screenshots, including Policies, Backups and the Danger zone.',
+    ],
+  },
+  {
     version: '0.9.4.36',
     title: 'A Danger zone for resets, backup history, and clearer log keeping',
     items: [

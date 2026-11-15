@@ -46,6 +46,7 @@ func (a *App) registerRoutes() {
 	a.registerPowerRoutes()
 	a.registerResetRoutes()
 	a.registerBackupRoutes()
+	a.registerSetRoutes()
 	a.registerSSHRoutes()
 	s.Handle("GET /api/logs", a.logSearch)
 	s.HandleAdmin("PUT /api/logs/settings", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {

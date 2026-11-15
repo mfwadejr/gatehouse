@@ -69,6 +69,9 @@ export default function Alerts() {
             </div>
           </Field>
         )}
+        <details className="more" open={f.quiet.enabled || undefined}>
+          <summary>More: quiet hours</summary>
+          <div className="stack">
         <ToggleRow title="Quiet hours" desc={f.quiet.enabled ? `Nothing is sent between ${f.quiet.from} and ${f.quiet.to}. What happened is sent as one message afterwards.${data.held ? ` ${data.held} waiting now.` : ''}` : 'Off. Alerts are sent at once, day or night.'} checked={f.quiet.enabled} onChange={(v) => set('quiet', { ...f.quiet, enabled: v })} />
         {f.quiet.enabled && (
           <div className="formgrid">
@@ -76,6 +79,8 @@ export default function Alerts() {
             <Field label="Until"><TimeField value={f.quiet.to} onChange={(v) => set('quiet', { ...f.quiet, to: v })} /></Field>
           </div>
         )}
+          </div>
+        </details>
         <div className="actions"><Button kind="primary" onClick={save} disabled={busy}>Save</Button></div>
       </div>
     </Card>

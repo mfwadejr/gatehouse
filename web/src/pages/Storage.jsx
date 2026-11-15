@@ -82,6 +82,8 @@ export default function Storage() {
       <div className="stack">
         {low && <Note tone="warn" title="This machine is running low on disk space">{bytes(free)} free of {bytes(size)}. Lower the number of days or the size limit under Logs, What gets recorded, or the settings below.</Note>}
         <p className="small muted">Logs and history use about {bytes(data.logs_bytes)} (limit {fmt.n(data.max_mb)} MB; the limit trims the oldest connections and lookups first, then the smaller histories). Settings and rules use {bytes(data.config_bytes)}.{size > 0 ? ` The disk has ${bytes(free)} free of ${bytes(size)}.` : ''}</p>
+        <details className="more">
+          <summary>Show what is stored ({rows.length} kinds, {bytes(total)})</summary>
         <div className="scroll">
           <table className="table">
             <thead><tr><th>Kept</th><th className="num">Entries</th><th className="num">About</th><th>Oldest</th><th>Removed when</th></tr></thead>
@@ -99,6 +101,7 @@ export default function Storage() {
             <tfoot><tr><td><b>Total</b></td><td /><td className="num"><b>{bytes(total)}</b></td><td /><td /></tr></tfoot>
           </table>
         </div>
+        </details>
         {f && (
           <div className="formgrid">
             <Field label="Keep traffic and events for (days)" hint="Connections, DNS lookups, general activity, device traffic and country data. 1 to 365."><NumberInput value={f.days} min={1} max={365} onChange={(v) => setF({ ...f, days: v })} /></Field>

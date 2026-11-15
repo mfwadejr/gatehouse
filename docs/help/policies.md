@@ -3,19 +3,28 @@
 ## What it is for
 One list of everything you have set up to allow, block, route or open something for your devices, written in plain words. Firewall rules, routes, blocks and open ports are four kinds of the same thing: who it covers, where to, what for, and when.
 
+![The policies page with a rule set and tags, shown with example data](img/policies.png)
+
 ## What is on the page
 The page has two tabs: **All policies**, the list below, and **Routes**, where traffic is sent through a VPN or a chosen connection. Routes used to be a page of their own in the menu; old links still land on the Routes tab.
 
 - **Create policy** asks what you want to do (allow or block traffic, send traffic through a VPN or connection, open a port, or block an app, category or website) and opens the right form.
 - **Your policies** shows every policy with its kind, whether it is working, and one sentence saying what it does. A warning shows on the row when something needs a look.
-- **All kinds** narrows the list to one kind.
+- **All kinds** narrows the list to one kind. **All sets**, **Any tag** and the search box narrow it by set, by tag, or by any word in a policy's name, description, tags or set.
+- **Set & tags** on a row opens one small window for that policy: pick its **Rule set** (or **Make set and add** for a new one) and give it up to five tags.
 - Each row has **Pause…**, **Turn off** (or **Turn on**), **Edit** and **Remove**. **Edit** opens the form on the page that owns that kind of policy. **Remove** can be undone for a few seconds, except blocks and open ports, which ask first.
 - The order of rules and routes, the network matrix and the finer settings stay on the **Firewall** and **Protection** pages and the **Routes** tab. This page reads the same policies as they do, so a change made on either shows on both.
+
+## Rule sets and tags
+A **rule set** groups policies of any kind (a rule, a route, a block, an open port and a speed entry can sit in the same set) so you can pause, turn off or turn on the whole group at once. A policy is in one set at most. Sets are folded on the list, each showing how many policies it holds and how many are on, with **Pause…** (or **Resume now**), **Turn off**, **Turn on** and **Rename** on its heading. **Turn on** brings back only the policies that were on before the set was turned off. **Rename** also holds **Delete set**, which keeps every policy that was in it. Policies in no set are listed under **Not in a set**.
+
+A **tag** is only a label, a word such as guest or media. A policy or a device can have up to five. Tags never change what anything does: they let you filter and search. They are lowercase, up to 24 characters, and have no colours of their own. The same tag works on policies and devices. Press a tag on a row to filter by it, or find it with Search, which opens the list already filtered. Administrators make sets and set tags; other accounts can see them. Removing a policy takes it out of its set and drops its tags.
 
 ## Common tasks
 1. Keep a device offline at night: **Create policy**, **Allow or block traffic**.
 2. See everything that affects one kind of traffic: scan the list, or use **All kinds**.
 3. Turn something off for a while without deleting it: **Pause…**.
+4. Switch a group of policies together: **Set & tags**, make a set, add the policies, then use **Pause…** or **Turn off** on the set.
 
 ## If something goes wrong
 A policy marked **Needs a look** or showing a warning explains itself on its row. Policies made by the countries page and the network matrix are not listed here; they live on the Firewall page.

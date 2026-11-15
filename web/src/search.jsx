@@ -95,7 +95,7 @@ const ROWS = [
   ['Your place on the map', 'settings/general', 'Set where the lines on the Overview map start', 'map location home pin country zip postal code city address find lookup', 'Your place on the map'],
   ['Dark or light', 'settings/general', 'Choose the look of the console', 'appearance theme dark light', 'Appearance'],
   ['Backups', 'settings/backup', 'Save and restore your settings', 'backup restore export import', 'Backups'],
-  ['Danger zone', 'settings/backup', 'Restore default settings, reset the network, or erase everything', 'reset default restore factory wipe erase start over', 'Danger zone'],
+  ['Danger zone', 'settings/danger', 'Restore default settings, reset the network, or erase everything', 'reset default restore factory wipe erase start over', 'Danger zone'],
   ['Restart or shut down', 'settings/general', 'Power controls', 'reboot power off shutdown', 'Power'],
   ['Diagnostics', 'diagnostics/services', 'How each service is doing, its log, and a terminal', 'logs services status restart support bundle troubleshoot failing', 'Services'],
   ['Network tools', 'diagnostics/tools', 'Ping, trace a route, look up a name', 'ping traceroute lookup dig tools', 'Tools'],
@@ -163,7 +163,7 @@ export function useSearchShortcut(open) {
   }, [open]);
 }
 
-const SECTIONS = [['Page', 'Pages', 5], ['Setting', 'Settings', 8], ['Device', 'Devices', 5], ['Network', 'Networks', 4], ['Help', 'Help', 5]];
+const SECTIONS = [['Page', 'Pages', 5], ['Setting', 'Settings', 8], ['Tag', 'Tags', 4], ['Rule set', 'Rule sets', 3], ['Device', 'Devices', 5], ['Network', 'Networks', 4], ['Help', 'Help', 5]];
 
 export function SearchBox({ onClose, go }) {
   const [q, setQ] = useState('');
@@ -183,6 +183,17 @@ export function SearchBox({ onClose, go }) {
       try {
         const d = await get('/api/devices');
         (d?.devices || []).forEach((x) => out.push({ label: x.name || x.hostname || x.mac, page: 'devices', hint: `${x.ip || ''} · ${x.mac || ''}${x.network ? ` · ${x.network}` : ''}`, words: `${x.ip || ''} ${x.mac || ''} ${x.hostname || ''} ${x.vendor || ''}`, find: '', device: x.name || x.hostname || x.mac, kind: 'Device' }));
+      } catch { /* same */ }
+      try {
+        // Tags and rule sets open the list already filtered to them.
+        const st = await get('/api/sets');
+        const use = {};
+        Object.entries(st?.tags || {}).forEach(([k, tags]) => tags.forEach((t) => { const dev = k.startsWith('device:'); const u = (use[t] = use[t] || { p: 0, d: 0 }); if (dev) u.d += 1; else u.p += 1; }));
+        Object.entries(use).forEach(([t, u]) => {
+          if (u.p) out.push({ label: `Tag: ${t}`, page: `policies?tag=${encodeURIComponent(t)}`, hint: `on ${u.p} ${u.p === 1 ? 'policy' : 'policies'}`, words: `tag ${t}`, find: '', kind: 'Tag' });
+          if (u.d) out.push({ label: `Tag: ${t}`, page: `devices?tag=${encodeURIComponent(t)}`, hint: `on ${u.d} ${u.d === 1 ? 'device' : 'devices'}`, words: `tag ${t}`, find: '', kind: 'Tag' });
+        });
+        (st?.sets || []).forEach((x) => out.push({ label: x.name, page: `policies?set=${x.id}`, hint: `Rule set · ${x.members.length} ${x.members.length === 1 ? 'policy' : 'policies'}`, words: 'rule set group', find: '', kind: 'Rule set' }));
       } catch { /* same */ }
       try {
         const h = await fetch('/help/search.json', { credentials: 'same-origin' });

@@ -161,6 +161,8 @@ export default function Services({ part, goPorts }) {
         </Card>
       )}
       <Card title="Built in" desc="NopeWarden already knows these by name. They cannot be changed.">
+        <details className="more" open={needle ? true : undefined}>
+          <summary>Show the {(data?.builtin || []).length} built-in services{needle ? ` (${known.length} match)` : ''}</summary>
         <div className="list">
           <Paged items={known}>{(shownKnown) => shownKnown.map((s) => (
             <div className="item" key={s.name}>
@@ -169,6 +171,7 @@ export default function Services({ part, goPorts }) {
           ))}</Paged>
           {!known.length && <Empty>No built-in service matches.</Empty>}
         </div>
+        </details>
       </Card>
       {edit && <ServiceForm initial={edit} builtin={data?.builtin} onClose={() => setEdit(null)} onSaved={reload} />}
     </PageOrPart>

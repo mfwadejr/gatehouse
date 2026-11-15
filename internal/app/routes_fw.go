@@ -160,6 +160,7 @@ func (a *App) registerFWRoutes() {
 			fail(w, err)
 			return
 		}
+		a.dropItem("rule", strconv.FormatInt(id, 10))
 		a.markDirty()
 		ok(w)
 	})
@@ -209,6 +210,7 @@ func (a *App) registerFWRoutes() {
 			fail(w, err)
 			return
 		}
+		a.dropItem("port", strconv.FormatInt(id, 10))
 		a.markDirty()
 		a.refreshVPN()
 		ok(w)

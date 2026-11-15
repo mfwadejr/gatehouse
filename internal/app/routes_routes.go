@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -342,6 +343,7 @@ func (a *App) registerRouteRoutes() {
 			fail(w, err)
 			return
 		}
+		a.dropItem("route", strconv.FormatInt(id, 10))
 		a.refreshVPN()
 		ok(w)
 	})

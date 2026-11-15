@@ -1,3 +1,4 @@
+import { TagChips, TagEditor, useSets } from '../sets.jsx';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { hashQuery, useHashTab } from '../hashtab.js';
 import { del, get, patch, post, put, useData } from '../api.js';
@@ -85,7 +86,7 @@ function IconPicker({ d, onChanged }) {
   );
 }
 
-function Details({ d, groups, onClose, onSaved, onManage }) {
+function Details({ d, groups, sets, onClose, onSaved, onManage }) {
   const pn = usePortNames();
   const toast = useToast();
   const [run, busy] = useAction();
@@ -123,6 +124,7 @@ function Details({ d, groups, onClose, onSaved, onManage }) {
           <ToggleRow title="Allowed online" desc="Turn off to pause this device without losing its settings." checked={f.internet} onChange={(v) => setF({ ...f, internet: v })} />
           <VirtualOverride d={d} onSaved={onSaved} />
           <Field label="Notes"><Input value={f.notes} onChange={(v) => setF({ ...f, notes: v })} /></Field>
+          {d.mac && <Field label="Tags"><TagEditor tags={sets.tagsOf('device', d.mac)} known={sets.allTags} disabled={busy} onChange={(tags) => run(() => put('/api/tags', { kind: 'device', ref: d.mac, tags })).then(() => sets.reload())} /></Field>}
 
           <Field label="Fixed address" hint="Always hand this device the same address.">
             {det?.reservation ? (
@@ -148,7 +150,7 @@ function Details({ d, groups, onClose, onSaved, onManage }) {
   );
 }
 
-function Filters({ rows, f, setF }) {
+function Filters({ rows, f, setF, tags }) {
   const profiles = [...new Set(rows.map((d) => d.group || 'Default'))].sort();
   const count = (fn) => rows.filter(fn).length;
   const networks = [...new Set(rows.map((d) => d.network).filter(Boolean))].sort();
@@ -164,7 +166,8 @@ function Filters({ rows, f, setF }) {
       {networks.length > 0 && <div style={{ width: '11rem' }}><Select value={f.network} onChange={set('network')} aria-label="Network" options={[{ value: '', label: 'All networks' }, ...networks.map((n) => ({ value: n, label: n }))]} /></div>}
       {(profiles.length > 1 || f.profile) && <div style={{ width: '11rem' }}><Select value={f.profile} onChange={set('profile')} aria-label="Profile" options={[{ value: '', label: 'All profiles' }, ...profiles.map((n) => ({ value: n, label: n }))]} /></div>}
       {groups.length > 0 && <div style={{ width: '11rem' }}><Select value={f.group} onChange={set('group')} aria-label="Group" options={[{ value: '', label: 'All groups' }, ...groups.map((g) => ({ value: g, label: g }))]} /></div>}
-      {(f.state || f.conn || f.network || f.group || f.profile) && <Button small onClick={() => setF({ state: '', conn: '', network: '', group: '', profile: '' })}>Clear filters</Button>}
+      {(tags.length > 0 || f.tag) && <div style={{ width: '11rem' }}><Select value={f.tag} onChange={set('tag')} aria-label="Tag" options={[{ value: '', label: 'Any tag' }, ...tags.map((t) => ({ value: t, label: t }))]} /></div>}
+      {(f.state || f.conn || f.network || f.group || f.profile || f.tag) && <Button small onClick={() => setF({ state: '', conn: '', network: '', group: '', profile: '', tag: '' })}>Clear filters</Button>}
     </div>
   );
 }
@@ -180,7 +183,9 @@ export default function Devices({ me }) {
   const takeFind = () => { try { const v = sessionStorage.getItem('gh.find.device'); sessionStorage.removeItem('gh.find.device'); return v || ''; } catch { return ''; } };
   const [q, setQ] = useState(takeFind);
   useEffect(() => { const on = () => { const v = takeFind(); if (v) setQ(v); }; window.addEventListener('gh-find-device', on); return () => window.removeEventListener('gh-find-device', on); }, []);
-  const [f, setF] = useState(() => ({ state: '', conn: '', network: '', group: '', profile: hashQuery('profile') }));
+  const [f, setF] = useState(() => ({ state: '', conn: '', network: '', group: '', profile: hashQuery('profile'), tag: hashQuery('tag') }));
+  const sets = useSets();
+  const devTags = [...new Set(Object.entries(sets.tags).filter(([k]) => k.startsWith('device:')).flatMap(([, v]) => v))].sort();
   const [open, setOpen] = useState(null);
   const [adding, setAdding] = useState(false);
   const [cols, setCols] = useState(null);
@@ -206,9 +211,10 @@ export default function Devices({ me }) {
       if (f.network && d.network !== f.network) return false;
       if (f.group && !d.groups?.includes(f.group)) return false;
       if (f.profile && (d.group || 'Default') !== f.profile) return false;
-      return !s || [d.name, d.hostname, d.vendor, d.mac, d.ip, d.network].some((x) => (x || '').toLowerCase().includes(s));
+      if (f.tag && !sets.tagsOf('device', d.mac || '').includes(f.tag)) return false;
+      return !s || [d.name, d.hostname, d.vendor, d.mac, d.ip, d.network, ...sets.tagsOf('device', d.mac || '')].some((x) => (x || '').toLowerCase().includes(s));
     });
-  }, [all, q, f]);
+  }, [all, q, f, sets.tags]);
   useEffect(() => setPage(0), [q, f, per]);
   const pages = Math.max(1, Math.ceil(rows.length / per));
   const shown = rows.slice(page * per, page * per + per);
@@ -227,7 +233,7 @@ export default function Devices({ me }) {
             <div style={{ width: '15rem' }}><Input value={q} onChange={setQ} placeholder="Search name, maker, address" aria-label="Search devices" /></div>
             <Button small onClick={() => setPick(true)}>Columns</Button>
           </div>}>
-          <Filters rows={all} f={f} setF={setF} />
+          <Filters rows={all} f={f} setF={setF} tags={devTags} />
           <div className="scroll">
             <table className="table">
               <thead><tr><th>Device</th>{COLUMNS.filter((c) => colIds.includes(c.id)).map((c) => <th key={c.id}>{c.label}</th>)}<th /></tr></thead>
@@ -237,7 +243,7 @@ export default function Devices({ me }) {
                     <td>
                       <div className="inline">
                         <span className={`devicon ${d.online ? '' : 'off'}`}><DeviceIcon d={d} /></span>
-                        <div><div className="name">{d.name || d.hostname || <span className="muted">unnamed</span>}</div><div className="small muted mono">{d.mac || ''}</div></div>
+                        <div><div className="name">{d.name || d.hostname || <span className="muted">unnamed</span>}</div><div className="small muted mono">{d.mac || ''}</div>{d.mac && sets.tagsOf('device', d.mac).length > 0 && <div style={{ marginLeft: 'calc(var(--space-1-5) * -1)', marginTop: 'var(--space-1)' }}><TagChips tags={sets.tagsOf('device', d.mac)} onPick={(t) => setF((x) => ({ ...x, tag: t }))} /></div>}</div>
                       </div>
                     </td>
                     {COLUMNS.filter((c) => colIds.includes(c.id)).map((c) => <td key={c.id}>{c.show(d)}</td>)}
@@ -269,7 +275,7 @@ export default function Devices({ me }) {
           )}
         </Card>
       </div>
-      {open1 && <Details d={open1} groups={groups || []} onClose={() => setOpen(null)} onSaved={reload} onManage={() => { setOpen(null); setTab('profiles'); }} />}
+      {open1 && <Details d={open1} groups={groups || []} sets={sets} onClose={() => setOpen(null)} onSaved={reload} onManage={() => { setOpen(null); setTab('profiles'); }} />}
       {opening && <OpenPortModal preset={{ mac: opening.mac, ip: opening.ip, device_name: opening.name || opening.hostname || opening.mac }} apps={fwf?.apps || []} connections={fwf?.connections || []} existing={fwf?.forwards || []} onClose={() => setOpening(null)} onSaved={reloadFwf} reloadApps={reloadFwf} />}
       {adding && <NewDevice onClose={() => setAdding(false)} onCreated={reload} seen={all.filter((d) => d.mac && !d.name)} />}
       {pick && (

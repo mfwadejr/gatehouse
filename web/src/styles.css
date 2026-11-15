@@ -125,6 +125,8 @@ textarea.in { height: auto; padding: var(--space-2-5) var(--component-input-padd
 .tabs { display: flex; gap: var(--space-1); border-bottom: var(--border-width-thin) solid var(--color-border-default); flex-wrap: wrap; }
 .tabs button { height: var(--size-tab-height); padding: 0 var(--space-4); background: transparent; border: 0; border-bottom: var(--border-width-thick) solid transparent; color: var(--color-text-secondary); }
 .tabs button.on { color: var(--color-text-primary); border-bottom-color: var(--color-accent-fill); }
+.tabs button.danger { color: var(--color-status-bad); }
+.tabs button.danger.on { color: var(--color-status-bad); border-bottom-color: var(--color-status-bad); }
 
 /* ---------- tables and lists ---------- */
 .table { width: 100%; border-collapse: collapse; font-size: var(--font-size-base); }
@@ -716,3 +718,18 @@ mark { background: color-mix(in srgb, var(--color-status-warning) 35%, transpare
 .dz-1 { --dz-c: var(--color-status-warning); }
 .dz-2 { --dz-c: color-mix(in srgb, var(--color-status-warning) 50%, var(--color-status-bad)); }
 .dz-3 { --dz-c: var(--color-status-bad); }
+
+/* Tags: plain outline chips with no colours of their own. */
+.tag { display: inline-flex; align-items: center; gap: var(--space-1); padding: 0 var(--space-2-5); border-radius: var(--radius-full); font-size: var(--font-size-sm); border: var(--border-width-thin) solid var(--color-border-default); color: var(--color-text-secondary); background: transparent; margin-left: var(--space-1-5); line-height: 1.6; }
+button.tag { cursor: pointer; font: inherit; font-size: var(--font-size-sm); }
+button.tag:hover { color: var(--color-text-primary); border-color: var(--color-border-strong); }
+.tagx { background: transparent; border: 0; color: inherit; cursor: pointer; padding: 0; font-size: var(--font-size-sm); }
+.set { border: var(--border-width-thin) solid var(--color-border-default); border-radius: var(--radius-md); margin-bottom: var(--space-2); background: var(--color-bg-surface); }
+.set > summary { list-style: none; cursor: pointer; display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; padding: var(--space-3) var(--space-4); }
+.set > summary::-webkit-details-marker { display: none; }
+.set > summary::before { content: "▸"; color: var(--color-text-secondary); }
+.set[open] > summary::before { content: "▾"; }
+.set .sn { font-weight: 600; }
+.set .sc { color: var(--color-text-secondary); font-size: var(--font-size-sm); }
+.set .sp { margin-left: auto; display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.set .list { border-top: var(--border-width-thin) solid var(--color-border-default); padding: 0 var(--space-4); }

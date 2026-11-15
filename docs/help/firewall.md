@@ -55,7 +55,7 @@ The picture is an example from a new, empty box; yours will show your own device
 **What is on the page**
 - **Search services**: type a name or a port.
 - **Your services**: the ones you made, with **New service**, **Edit** and **Delete**. Deleting one can be undone for a few seconds, unless a rule uses it.
-- **Built in**: names NopeWarden already knows. They cannot be changed.
+- **Built in**: names NopeWarden already knows. They cannot be changed. The list is folded to keep the page short: the line beneath it, which says how many there are, opens it, and typing in **Search services** opens it by itself.
 
 **Common tasks**
 1. Make a service: **New service**, give it a **Name**. Under **Ports** choose **Protocol** (TCP, UDP, **TCP and UDP**, or ICMP for ping), type a port or a range such as 27000-27050, and press **Add**. Each port appears in the list below, and ✕ removes one. A wrong entry is explained in words under the box. For a known name such as https use **add a known name**; for a long list use **paste a list**, one entry per line like tcp/32400. Then **Save**.

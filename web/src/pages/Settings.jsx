@@ -258,6 +258,7 @@ const TABS = [
   { value: 'alerts', label: 'Alerts & logs' },
   { value: 'backup', label: 'Backup & recovery' },
   { value: 'advanced', label: 'Advanced' },
+  { value: 'danger', label: 'Danger zone', tone: 'danger' },
 ];
 const TAB_KEY = 'gh.settings.tab';
 const readTab = () => {
@@ -316,9 +317,9 @@ export default function Settings({ me, reloadMe }) {
         <>
           <Guard what="Backups"><Backups me={me} /></Guard>
           <Guard what="Changes"><Changes me={me} /></Guard>
-          <Guard what="ResetCard"><ResetCard me={me} /></Guard>
         </>
       )}
+      {admin && tab === 'danger' && <Guard what="ResetCard"><ResetCard me={me} /></Guard>}
       {admin && tab === 'advanced' && (
         <>
           <div id="set-ha"><Guard what="High availability"><HighAvailability me={me} /></Guard></div>
