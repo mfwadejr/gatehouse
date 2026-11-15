@@ -232,6 +232,11 @@ func (q *QueryLog) TopBlocked(since int64, n int) ([]Top, error) {
 	return q.top(`SELECT qname, '', COUNT(*) c FROM dns_queries WHERE ts>=? AND result='blocked' AND `+notHealth+` GROUP BY qname ORDER BY c DESC LIMIT ?`, since, n)
 }
 
+// TopBlockedBy ranks what stopped the lookups: the blocklist's name, or your own rules.
+func (q *QueryLog) TopBlockedBy(since int64, n int) ([]Top, error) {
+	return q.top(`SELECT CASE WHEN instr(rule,':')>0 THEN substr(rule,1,instr(rule,':')-1) WHEN rule='' THEN 'Your blocks' ELSE rule END k, '', COUNT(*) c FROM dns_queries WHERE ts>=? AND result='blocked' AND `+notHealth+` GROUP BY k ORDER BY c DESC LIMIT ?`, since, n)
+}
+
 // TopDomains ranks all queried domains.
 func (q *QueryLog) TopDomains(since int64, n int) ([]Top, error) {
 	return q.top(`SELECT qname, '', COUNT(*) c FROM dns_queries WHERE ts>=? AND `+notHealth+` GROUP BY qname ORDER BY c DESC LIMIT ?`, since, n)

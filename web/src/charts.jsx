@@ -146,3 +146,52 @@ export function Chart({ series, from, to, kind = 'count', unit = '', height = 20
     </figure>
   );
 }
+
+// Layers drawn on top of each other (for example answered, from memory and blocked), so the whole
+// shows the total and each band shows its share. layers: [{ key, name, color, values: [n, n, ...] }],
+// every layer with the same number of values, oldest first. xLabels: three words under the chart.
+export function StackedArea({ layers, span = 60, height = 140, unit = '', xLabels = ['', '', 'now'], empty = 'Nothing in this period', label = 'Chart', fmt = (n) => (Math.round(n * 10) / 10).toLocaleString() }) {
+  const [hover, setHover] = useState(null);
+  const n = Math.max(0, ...layers.map((l) => l.values.length));
+  const H = 100;
+  const totals = Array.from({ length: n }, (_, i) => layers.reduce((a, l) => a + (l.values[i] || 0), 0));
+  const peak = Math.max(0, ...totals);
+  const top = niceMax(peak);
+  const X = (i) => (n > 1 ? (i / (n - 1)) * W : 0);
+  const Y = (v) => H - Math.min(1, v / top) * H;
+  const below = new Array(n).fill(0);
+  const bands = layers.map((l) => {
+    const lo = below.slice();
+    const hi = lo.map((v, i) => v + (l.values[i] || 0));
+    hi.forEach((v, i) => { below[i] = v; });
+    const up = hi.map((v, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join('');
+    const down = lo.map((v, i) => `L${X(n - 1 - i).toFixed(1)},${Y(lo[n - 1 - i]).toFixed(1)}`).join('');
+    return { l, area: n > 1 ? `${up}${down}Z` : '', line: up };
+  });
+  const at = hover == null ? n - 1 : Math.max(0, Math.min(n - 1, Math.round(hover * (n - 1))));
+  return (
+    <figure className="ch2 stk" style={{ margin: 0 }}>
+      <div className="ch2-legend small">
+        {layers.map((l) => <span key={l.key} className="ch2-lg"><i className="sw" style={{ background: l.color }} />{l.name}<b>{n ? fmt(l.values[at] || 0) : '–'}{unit}</b></span>)}
+        <span className="muted ch2-lgwhen">{hover != null ? (at >= n - 1 ? 'now' : `${agoText((1 - at / Math.max(1, n - 1)) * span)} ago`) : 'latest'}</span>
+      </div>
+      <div className="ch2-body">
+        <div className="ch2-y small muted" aria-hidden="true" style={{ height }}>{[1, 0.75, 0.5, 0.25, 0].map((f) => <span key={f}>{Math.round(top * f * 10) / 10}</span>)}</div>
+        <div className="ch2-plot" style={{ height }} onMouseMove={(e) => { const r = e.currentTarget.getBoundingClientRect(); setHover(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width))); }} onMouseLeave={() => setHover(null)} role="img" aria-label={label}>
+          <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+            {[0, 25, 50, 75, 100].map((y) => <line key={y} x1="0" x2={W} y1={y} y2={y} className="gl" vectorEffect="non-scaling-stroke" />)}
+            {bands.map(({ l, area, line }) => (
+              <g key={l.key} style={{ '--c': l.color }}>
+                {area && <path d={area} className="stk-fill" />}
+                {n > 1 && l.values.some((v) => v > 0) && <path d={line} className="ln" vectorEffect="non-scaling-stroke" />}
+              </g>
+            ))}
+          </svg>
+          {peak === 0 && <span className="ch2-empty small muted">{empty}</span>}
+          {hover != null && n > 1 && <div className="ch2-cur" style={{ left: `${(at / (n - 1)) * 100}%` }} />}
+        </div>
+      </div>
+      <div className="ch2-x small muted" aria-hidden="true">{xLabels.map((t, i) => <span key={i}>{t}</span>)}</div>
+    </figure>
+  );
+}

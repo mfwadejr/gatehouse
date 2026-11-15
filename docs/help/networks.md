@@ -8,6 +8,8 @@ Your own networks, such as Home, Guests or Cameras. Each one is separate; what i
 The picture is an example from a new, empty box; yours will show your own devices and numbers.
 
 ## What is on the page
+- **Network layout**: the internet connection at the top and each of your networks below it with live speeds, devices online and tags. Select a network to open it.
+- **What changed**: recent updates and warnings, or a line saying nothing changed.
 - **Your networks**: one row per network with its address, its ports and whether it hands out addresses (DHCP). **Add a network** makes another.
 - **Edit** a network to change its **Address of this router on the network**, the **Port** it is plugged into, a **VLAN number** if it shares a port, and **What it can reach**. **In use** switches it off without deleting it.
 - **Ports on this network** and **Add more ports to this network**: tick the ports that act as a switch for this network. Devices on any ticked port share its addresses.

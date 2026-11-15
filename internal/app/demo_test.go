@@ -14,7 +14,8 @@ import (
 
 // TestDemoConsole is a picture-taking tool, not a test: with NW_DEMO set it starts the real console on
 // 127.0.0.1:8099 with made-up data and waits, so screenshots of the website and the help can be taken
-// from the real screens. NW_SCENE picks the state: main, review, setup.
+// from the real screens. NW_SCENE picks the state: main, review, setup, engine (main, with the threat
+// engine installed and watching, so the screens that only exist then can be seen).
 func TestDemoConsole(t *testing.T) {
 	if os.Getenv("NW_DEMO") == "" {
 		t.Skip("picture-taking tool; set NW_DEMO=1")
@@ -41,6 +42,13 @@ func TestDemoConsole(t *testing.T) {
 	}
 	fn.mu.Unlock()
 	seedDemo(t, c, scene)
+	if scene == "engine" {
+		fn.mu.Lock()
+		fn.threatInfo = netd.ThreatInfo{Installed: true, Version: "7.0.8", Running: true, State: "idle", DiskFreeMB: 20000, MemoryMB: 8192, CPUs: 4,
+			RulesUpdated: time.Now().Add(-6 * time.Hour).Unix(), RulesCount: 48213, CPUNSec: 4_000_000_000, MemoryBytes: 310 << 20}
+		fn.mu.Unlock()
+		c.call("PUT", "/api/threat/settings", map[string]any{"mode": "watch"})
+	}
 	fmt.Println("DEMO READY", scene, c.base)
 	time.Sleep(time.Duration(envInt("NW_SECONDS", 600)) * time.Second)
 }

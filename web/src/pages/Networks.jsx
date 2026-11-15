@@ -1,6 +1,9 @@
+import { WhatChanged } from '../whatchanged.jsx';
+import { usePeriod } from '../period.js';
 import React, { useState } from 'react';
 import TrafficPanel from '../TrafficPanel.jsx';
 import { del, holdAnd, post, put, useData } from '../api.js';
+import { NetworkLayout } from '../netlayout.jsx';
 import { SAVED_LATER, SaveChoice } from '../changes.jsx';
 import { confirmRemoval } from '../removal.js';
 import AddNetwork from '../AddNetwork.jsx';
@@ -178,6 +181,7 @@ export default function Networks({ me }) {
   const { data: dev } = useData('/api/devices', { topics: ['dhcp.leases'], every: 15000 });
   const { data: st, reload: rs } = useData('/api/net/status', { topics: ['net.status'], every: 4000 });
   const { data: fwo, reload: rfw } = useData('/api/fw/overview', { topics: ['fw.status'] });
+  const [period] = usePeriod('networks');
   const { data: alerts } = useData('/api/dhcp/alerts', { topics: ['dhcp.alerts'] });
   const { ports, reload: rp } = usePortWatch(false);
   const pn = usePortNames();
@@ -207,6 +211,8 @@ export default function Networks({ me }) {
           {r.found.map((f) => f.server).join(', ')} hands out addresses here as well, so devices may get the wrong settings. Switch that device's DHCP off, or turn DHCP off for this network.
         </Note>
       ))}
+      {ifs && <NetworkLayout nets={nets} zones={zones} scopes={scopes} onOpen={(n) => setEdit(n)} />}
+      <WhatChanged match={/network|bridge|port|vlan|dhcp|wan|vpn|tunnel|link/i} range={period} />
       <Card title="Your networks" desc="Each one is separate. What it can reach is decided on the Firewall page.">
         {!ifs ? null : !nets.length ? (
           <Empty>

@@ -1,6 +1,17 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.39',
+    title: 'Livelier Networks, DNS, DHCP and Threats pages',
+    items: [
+      'Networks opens with a Network layout: the internet connection at the top, each of your networks below it with live speeds, devices online and tags such as DHCP, Guest and pool fullness. Select a network to open it.',
+      'DNS shows lookups split by how they were answered, a live feed of the latest lookups, small trend lines in the number cards, answer time, a What blocked it list, plain messages when there is nothing to show, and a health dot for the DNS servers it asks.',
+      'DHCP opens with addresses in use, devices online, reservations and leases ending soon, a chart of devices over time, a bar for each pool that warns past 80% full, a Last seen column, Lease ends instead of Until, and a Name button for devices without a name.',
+      'Threats no longer says Watching while it is still waiting for the program. It says Starting until the first reading arrives, and the notice above no longer says the engine is missing when it is running.',
+      'Threats, DNS, DHCP and Networks share the same layout and the same 1 h, 24 h or 7 d choice, which is remembered between pages. Each ends with What changed, and the numbers open the page that explains them.',
+    ],
+  },
+  {
     version: '0.9.4.38',
     title: 'Fixes the Threats, Rules page',
     items: [

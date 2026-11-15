@@ -77,7 +77,7 @@ Record the machine, the version (Settings, About) and the date at the top of eac
 | 70 | Map defaults | Open Overview: the map is on Both and 15 min | | |
 | 71 | Install steps and size | Protection, Threats, Install threat watching: the box shows a real download size (not 0 MB); during the install a ticked step list moves from the package list to downloading to installing | | |
 | 72 | Switch responds at once | Off / Watch and tell: the highlight moves the moment you click and a "Working on it" line shows until it finishes | | |
-| 73 | Threats Overview | Protection, Threats opens on Overview: Status, Traffic watched, Load, Rules and Alerts cards, charts, What was seen, Devices involved and What it has been doing; with watching off, the cards say so | | |
+| 73 | Threats Overview | Protection, Threats opens on Overview: Status, Traffic watched, Load, Rules and Alerts cards, charts, What was seen, Devices involved and What changed; with watching off, the cards say so | | |
 | 74 | Blocks tab | The Protection tab reads Blocks, and the screens say category (not topic) | | |
 | 75 | Threat engine stays up (0.9.4.16) | After updating to 0.9.4.16, with Watch and tell on: within a few minutes Threats shows Watching (not Failing); the Overview shows traffic and load; "keeps failing" does not appear | | |
 | 76 | Threats page (0.9.4.17) | Threats is in the left menu with Overview, Alerts, Settings, Rules, Advanced; Overview opens with a status line; the Off / Watch switch and install box are under Settings; the charts show axes and a peak; an old #/protection/threats link lands on it | | |
@@ -164,3 +164,9 @@ Record the machine, the version (Settings, About) and the date at the top of eac
 | 157 | Folds (0.9.4.37) | Overview, Alerts, Storage, Services, Diagnostics and Forced DNS are shorter, with folded parts opening on click. | | |
 | 158 | How it works (0.9.4.37) | The help has a How it works chapter in the list and it opens. | | |
 | 159 | Threats, Rules tab (0.9.4.38) | With threat watching installed, Threats, Rules opens without an error and ends with Allowed checks and Devices never checked. Allow one check from an alert and make one device never checked: both are listed there and Remove or Check again takes them off. | | |
+| 160 | Network layout (0.9.4.39) | Networks opens with the layout: internet at the top, each network below with live down and up speeds, devices online and tags. Selecting a network opens its editor. | | |
+| 161 | DNS overview (0.9.4.39) | DNS opens on Live: lookups split by answered, from memory and blocked, with the latest lookups listed. 1 h, 24 h and 7 d show history. Number cards have trend lines; What blocked it and Answer time show; the upstream card has a health dot. | | |
+| 162 | DHCP overview (0.9.4.39) | DHCP, Overview shows four numbers, Devices over time, a bar per pool (Nearly full past 80%), and the table with Last seen and Lease ends. Name on an unnamed device saves a name that then shows in Devices. | | |
+| 163 | Threats status (0.9.4.39) | With the engine just started, Status says Starting, not Watching, and the notice does not say the engine is missing. Once read, it says Watching with load figures. | | |
+| 164 | Shared period (0.9.4.39) | Choose 24 h on Threats; DHCP and DNS (not Live) open on 24 h. DNS keeps Live as its own remembered choice. | | |
+| 165 | What changed (0.9.4.39) | Networks, DNS, DHCP and Threats each end with What changed, listing recent updates and warnings or saying nothing changed. Number cards open the page that explains them. | | |

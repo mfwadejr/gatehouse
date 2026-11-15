@@ -335,7 +335,13 @@ func (a *App) histPoints(now time.Time) []histPoint {
 		}
 		add("devices.online", float64(on))
 	}
-	add("dns.qps", a.DNS.Stats().Snapshot().QPS)
+	dsnap := a.DNS.Stats().Snapshot()
+	add("dns.qps", dsnap.QPS)
+	add("dns.blocked", dsnap.QPSBlocked)
+	add("dns.cached", dsnap.QPSCached)
+	if dsnap.RecentMS > 0 {
+		add("dns.ms", dsnap.RecentMS)
+	}
 	for _, p := range a.threatHistPoints() {
 		add(p.Key, p.Val)
 	}

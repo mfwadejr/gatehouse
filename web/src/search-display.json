@@ -11,10 +11,12 @@
  "Sites that probably used the most data": "An estimate on Logs > Activity; nothing to set",
  "Over time": "A chart on the Threats overview; nothing to set",
  "What was seen": "A list on the Threats overview; nothing to set",
- "What it has been doing": "A list on the Threats overview; nothing to set",
  "Your VPNs": "A status card on the Overview that links to the VPN page",
  "This machine": "A status card on the Overview; nothing to set",
  "Nothing is waiting": "The empty state of Review changes; reached from the Apply bar",
  "Open ports": "A read-only list on Services that links to Firewall > Open ports",
- "Set up on the VPN page": "A note on Routes that links to the VPN page"
+ "Set up on the VPN page": "A note on Routes that links to the VPN page",
+ "Answer time": "A chart on the DNS overview; nothing to set",
+ "What blocked it": "A ranked list on the DNS overview; nothing to set",
+ "What changed": "A short list of recent updates and warnings on the Overview of Threats, DNS, DHCP and Networks; nothing to set"
 }

@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { del, post, put, get, useData } from '../api.js';
 import { ScheduleEditor } from '../ScheduleEditor.jsx';
 import { Chart, fmtBits } from '../charts.jsx';
+import { usePeriod } from '../period.js';
 import { Button, Card, Empty, Field, Input, Modal, Note, NumberInput, Page, Pill, Segmented, Steps, Switch, Tabs, Limited, Bar, useAction, useCheck, CheckLine, fmt } from '../ui.jsx';
 
 // Threat watching. An engine (Suricata) is installed only when the owner asks. It watches copies of
@@ -390,13 +391,16 @@ const when = (ts) => (ts ? new Date(ts * 1000).toLocaleString([], { month: 'shor
 // The Overview tab, built like the DNS one: the numbers first, then charts, then who and what.
 function ThreatOverview({ data, goTab }) {
   const { data: ov } = useData('/api/threat/overview', { every: 10000 });
-  const [range, setRange] = useState('1h');
+  const [range, setRange, rangeOptions] = usePeriod('threats');
   const { data: h } = useData(`/api/overview/history?range=${range}`, { every: 30000 });
   if (!ov) return null;
   const now = Date.now() / 1000;
   const watching = ov.mode === 'watch';
-  const state = !watching ? 'Off' : ov.running ? 'Watching' : ov.failing ? 'Failing' : 'Not running';
-  const up = watching && ov.running && ov.since ? dur(now - ov.since) : '';
+  // The program can be running a moment before NopeWarden has taken its first reading. Until then the
+  // card says it is starting, so it never says Watching next to a line that says it is waiting.
+  const measured = watching && ov.running && !!ov.since;
+  const state = !watching ? 'Off' : measured ? 'Watching' : ov.running ? 'Starting' : ov.failing ? 'Failing' : 'Not running';
+  const up = measured ? dur(now - ov.since) : '';
   const ser = (key) => h?.series?.[key] || [];
   const last = (key) => { const p = ser(key); return p.length ? p[p.length - 1][1] : null; };
   const peakOf = (key) => Math.max(0, ...ser(key).map((p) => p[1]));
@@ -405,14 +409,14 @@ function ThreatOverview({ data, goTab }) {
   return (
     <>
       <section className="dns-tiles">
-        <div className="card tile"><span className="lbl">Status</span><div><span className="val">{state}</span></div><span className="foot">{!watching ? 'Switch it on above' : up ? `Seen running for ${up}` : ov.why || 'Waiting for the program'}</span></div>
-        <div className="card tile"><span className="lbl">Traffic watched</span><div><span className="val">{watched == null ? '–' : fmtBits(watched).split(' ')[0]}</span><span className="unit">{watched == null ? '' : fmtBits(watched).split(' ')[1]}</span></div><span className="foot">{ov.ports?.length ? `On ${ov.ports.length} port${ov.ports.length === 1 ? '' : 's'}: ${ov.ports.join(', ')}` : 'No ports yet'}</span></div>
-        <div className="card tile"><span className="lbl">Load on this machine</span><div><span className="val">{watching && ov.running ? fmt.d1(ov.cpu_now) : '–'}</span><span className="unit">% processor</span></div><span className="foot">{watching && ov.running ? `${fmt.n(ov.mem_now_mb)} MB of ${fmt.n(ov.mem_limit_mb)} MB memory${cpuTone ? '. Close to its limit' : ''}` : `Limits: ${ov.cpu_limit}% and ${fmt.n(ov.mem_limit_mb)} MB`}</span></div>
-        <div className="card tile"><span className="lbl">Rules</span><div><span className="val">{fmt.n(ov.rules_count)}</span><span className="unit">loaded</span></div><span className="foot">{ov.rules_updated ? `Updated ${when(ov.rules_updated)}` : 'Not updated yet'}{ov.rules_next ? ` · next ${when(ov.rules_next)}` : ''}</span></div>
-        <div className="card tile"><span className="lbl">Alerts</span><div><span className="val">{fmt.n(ov.alerts.hour)}</span><span className="unit">last hour</span></div><span className="foot">{fmt.n(ov.alerts.day)} in a day · {fmt.n(ov.alerts.week)} in a week</span></div>
+        <button type="button" className="card tile tilebtn" onClick={() => goTab('settings')}><span className="lbl">Status</span><div><span className="val">{state}</span></div><span className="foot">{!watching ? 'Switch it on above' : up ? `Seen running for ${up}` : ov.why || (ov.running ? 'Taking the first reading' : 'Waiting for the program')}</span></button>
+        <button type="button" className="card tile tilebtn" onClick={() => goTab('settings')}><span className="lbl">Traffic watched</span><div><span className="val">{watched == null ? '–' : fmtBits(watched).split(' ')[0]}</span><span className="unit">{watched == null ? '' : fmtBits(watched).split(' ')[1]}</span></div><span className="foot">{ov.ports?.length ? `On ${ov.ports.length} port${ov.ports.length === 1 ? '' : 's'}: ${ov.ports.join(', ')}` : 'No ports yet'}</span></button>
+        <button type="button" className="card tile tilebtn" onClick={() => goTab('advanced')}><span className="lbl">Load on this machine</span><div><span className="val">{measured ? fmt.d1(ov.cpu_now) : '–'}</span><span className="unit">% processor</span></div><span className="foot">{measured ? `${fmt.n(ov.mem_now_mb)} MB of ${fmt.n(ov.mem_limit_mb)} MB memory${cpuTone ? '. Close to its limit' : ''}` : `Limits: ${ov.cpu_limit}% and ${fmt.n(ov.mem_limit_mb)} MB`}</span></button>
+        <button type="button" className="card tile tilebtn" onClick={() => goTab('rules')}><span className="lbl">Rules</span><div><span className="val">{fmt.n(ov.rules_count)}</span><span className="unit">loaded</span></div><span className="foot">{ov.rules_updated ? `Updated ${when(ov.rules_updated)}` : 'Not updated yet'}{ov.rules_next ? ` · next ${when(ov.rules_next)}` : ''}</span></button>
+        <button type="button" className="card tile tilebtn" onClick={() => goTab('alerts')}><span className="lbl">Alerts</span><div><span className="val">{fmt.n(ov.alerts.hour)}</span><span className="unit">last hour</span></div><span className="foot">{fmt.n(ov.alerts.day)} in a day · {fmt.n(ov.alerts.week)} in a week</span></button>
       </section>
       <Card title="Over time" desc={range === '1h' ? 'Last hour' : range === '24h' ? 'Last 24 hours' : 'Last 7 days'}
-        actions={<Segmented value={range} onChange={setRange} options={[{ value: '1h', label: '1 h' }, { value: '24h', label: '24 h' }, { value: '7d', label: '7 d' }]} />}>
+        actions={<Segmented value={range} onChange={setRange} options={rangeOptions} />}>
         <div className="dns-cards">
           <div className="stack gap1"><div className="spread small"><b>Traffic on the watched ports</b><span className="muted">{peakOf('threat.watched') > 0 ? `peak ${fmtBits(peakOf('threat.watched'))}` : ''}</span></div>
             <Chart series={[{ key: 'threat.watched', name: 'Traffic watched', color: 'var(--color-chart-series-1)', pts: ser('threat.watched') }]} from={h?.from || 0} to={h?.to || 1} kind="bits" height={150} label="Traffic on the watched ports" empty="Nothing saved yet. Points appear once watching has been on for a minute." /></div>
@@ -442,7 +446,7 @@ function ThreatOverview({ data, goTab }) {
           )}
         </Card>
       </div>
-      <Card title="What it has been doing" desc="Updates, switch-offs and changes. Individual alerts are on the Alerts tab.">
+      <Card title="What changed" desc="Updates, switch-offs and changes. Individual alerts are on the Alerts tab.">
         {!ov.feed.length ? <Empty>Nothing yet.</Empty> : (
           <div className="list">
             {ov.feed.map((f, i) => (

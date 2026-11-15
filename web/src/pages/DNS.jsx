@@ -1,11 +1,13 @@
+import { WhatChanged } from '../whatchanged.jsx';
 import { useHashTab } from '../hashtab.js';
 import ResolverCard from './Resolver.jsx';
 import { ScheduleEditor } from '../ScheduleEditor.jsx';
 import EncryptedDns from './EncryptedDns.jsx';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { del, get, patch, post, put, useData, useStream } from '../api.js';
 import { go } from '../App.jsx';
-import { Chart } from '../charts.jsx';
+import { Chart, StackedArea } from '../charts.jsx';
+import { usePeriod } from '../period.js';
 import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, Spark, Trend, Tabs, ToggleRow, useAction, useUndoDelete, fmt, Bar, Limited , useDelayedDelete } from '../ui.jsx';
 
 function Overview() {
@@ -15,8 +17,15 @@ function Overview() {
   const [self, setSelf] = useState(false);
   const { data: top } = useData(`/api/dns/top?hours=24${self ? '&self=1' : ''}`, { every: 30000 });
   const { data: force } = useData('/api/fw/dnsforce', { every: 60000 });
-  const [range, setRange] = useState('live');
+  const [range, setRange, rangeOptions] = usePeriod('dns', { live: true });
   const { data: h } = useData(`/api/overview/history?range=${range}`, { every: 30000, enabled: range !== 'live' });
+  const { data: d24 } = useData('/api/overview/history?range=24h', { every: 60000 });
+  const [feed, setFeed] = useState([]);
+  useStream(['dns.live'], (t, p) => {
+    if (!Array.isArray(p)) return;
+    const fresh = p.filter((e) => !(e.qname === 'health.nopewarden.invalid')).reverse();
+    if (fresh.length) setFeed((f) => [...fresh, ...f].slice(0, 8));
+  });
   const [add, setAdd] = useState(false);
   const st = data?.stats;
   const total = st?.hour_total || 0;
@@ -29,27 +38,55 @@ function Overview() {
   const upTone = !list.length ? '' : working === 0 ? 'bad' : working < list.length || slow ? 'warn' : 'good';
   const forcedOn = (force?.networks || []).filter((n) => n.mode !== 'off').map((n) => n.name);
   const series = [{ key: 'dns.qps', name: 'Queries per second', color: 'var(--color-chart-series-1)', pts: h?.series?.['dns.qps'] || [] }];
+  const vals = (src, key) => (src?.series?.[key] || []).map((p) => p[1]);
+  const rest = (tot, b, c) => tot.map((v, i) => Math.max(0, v - (b[i] || 0) - (c[i] || 0)));
+  const liveLayers = (() => {
+    const b = st?.history_blocked || [], c = st?.history_cached || [];
+    return [['answered', 'Answered', 'var(--color-chart-series-1)', rest(hist, b, c)], ['cached', 'From memory', 'var(--color-chart-series-3)', c], ['blocked', 'Blocked', 'var(--color-status-bad)', b]].map(([key, name, color, values]) => ({ key, name, color, values }));
+  })();
+  const histLayers = (() => {
+    const tot = vals(h, 'dns.qps'), b = vals(h, 'dns.blocked'), c = vals(h, 'dns.cached');
+    const pad = (a) => (a.length >= tot.length ? a.slice(a.length - tot.length) : [...new Array(tot.length - a.length).fill(0), ...a]);
+    const bb = pad(b), cc = pad(c);
+    return [['answered', 'Answered', 'var(--color-chart-series-1)', rest(tot, bb, cc)], ['cached', 'From memory', 'var(--color-chart-series-3)', cc], ['blocked', 'Blocked', 'var(--color-status-bad)', bb]].map(([key, name, color, values]) => ({ key, name, color, values }));
+  })();
+  const SPAN = { '1h': 3600, '24h': 86400, '7d': 604800 }[range] || 60;
+  const trend = (key) => vals(d24, key).slice(-96);
+  const msSeries = [{ key: 'dns.ms', name: 'Answer time', color: 'var(--color-chart-series-4)', pts: h?.series?.['dns.ms'] || d24?.series?.['dns.ms'] || [] }];
+  const msWindow = h?.series?.['dns.ms'] ? h : d24;
+  const biggest = (rows) => Math.max(1, ...(rows || []).map((r) => r.n));
   return (
     <>
       {data && data.lists_enabled > 0 && !data.blocking_active && (
         <Note tone="warn" title="Blocking is not active yet">Your blocklists have not downloaded yet, so nothing is being blocked. NopeWarden keeps trying and starts blocking as soon as one arrives. The Blocklists tab shows how it is going.</Note>
       )}
       <section className="dns-tiles">
-        <div className="card tile"><span className="lbl">Lookups, 24 hours</span><div><span className="val">{top ? fmt.n(top.total) : '–'}</span></div><span className="foot">{fmt.d1(st?.qps)} a second right now</span></div>
-        <div className="card tile"><span className="lbl">Blocked</span><div><span className="val">{fmt.d1(st?.blocked_pct)}</span><span className="unit">%</span></div><span className="foot">{fmt.n(data?.unique_blocked ?? data?.blocked_entries)} different names on your lists</span></div>
-        <div className="card tile"><span className="lbl">Answered from memory</span><div><span className="val">{fmt.d1(st?.cached_pct)}</span><span className="unit">%</span></div><span className="foot">{fmt.n(st?.cache_size)} saved answers</span></div>
-        <div className="card tile"><span className="lbl">Response time</span><div><span className="val">{fmt.d1(st?.avg_ms)}</span><span className="unit">ms</span></div><span className="foot">95% under {fmt.d1(st?.p95_ms)} ms</span></div>
-        <div className="card tile"><span className="lbl">Upstream servers</span><div><span className="val">{working}</span><span className="unit">of {list.length} working</span></div><span className="foot">{slow ? `${slow} slow` : upTone === 'bad' ? 'None answering' : 'All answering normally'}</span></div>
+        <button type="button" className="card tile tilebtn" onClick={() => { window.location.hash = '#/logs'; }}><span className="lbl">Lookups, 24 hours</span><div><span className="val">{top ? fmt.n(top.total) : '–'}</span></div><div className="tspark"><Spark values={trend('dns.qps')} fluid /></div><span className="foot">{fmt.d1(st?.qps)} a second right now</span></button>
+        <button type="button" className="card tile tilebtn" onClick={() => { window.location.hash = '#/logs'; }}><span className="lbl">Blocked</span><div><span className="val">{fmt.d1(st?.blocked_pct)}</span><span className="unit">%</span></div><div className="tspark"><Spark values={trend('dns.blocked')} fluid tone="bad" /></div><span className="foot">{total > 0 && !(st?.blocked_pct > 0) ? 'Nothing blocked in the last hour' : `${fmt.n(st?.outcomes?.blocked || 0)} blocked in the last hour`} · {fmt.n(data?.unique_blocked ?? data?.blocked_entries)} names on your lists</span></button>
+        <div className="card tile"><span className="lbl">Answered from memory</span><div><span className="val">{fmt.d1(st?.cached_pct)}</span><span className="unit">%</span></div><div className="tspark"><Spark values={trend('dns.cached')} fluid /></div><span className="foot">{fmt.n(st?.cache_size)} saved answers</span></div>
+        <div className="card tile"><span className="lbl">Response time</span><div><span className="val">{fmt.d1(st?.avg_ms)}</span><span className="unit">ms</span></div><div className="tspark"><Spark values={trend('dns.ms')} fluid /></div><span className="foot">95% under {fmt.d1(st?.p95_ms)} ms</span></div>
+        <button type="button" className="card tile tilebtn" onClick={() => { window.location.hash = '#/dns/settings'; }}><span className="lbl">Upstream servers</span><div><span className="val">{working}</span><span className="unit">of {list.length} working</span></div><span className="foot"><i className={`sdot ${upTone}`} aria-hidden="true" /> {slow ? `${slow} slow` : upTone === 'bad' ? 'None answering' : 'All answering normally'}</span></button>
       </section>
-      <Card title="Lookups over time" desc={range === 'live' ? 'Queries per second, last minute' : 'Queries per second, averaged over each period'}
-        actions={<Segmented value={range} onChange={setRange} options={[{ value: 'live', label: 'Live' }, { value: '1h', label: '1 h' }, { value: '24h', label: '24 h' }, { value: '7d', label: '7 d' }]} />}>
+      <Card title="Lookups over time" desc={range === 'live' ? 'Lookups per second, last minute, split by how each was answered' : 'Lookups per second, averaged over each period, split by how each was answered'}
+        actions={<Segmented value={range} onChange={setRange} options={rangeOptions} />}>
         {range === 'live' ? (
           <>
             <div className="small muted" style={{ textAlign: 'right' }}>{peak > 0 ? `peak ${fmt.d1(peak)} a second` : ''}</div>
-            <Trend values={hist} unit="/s" series="Queries per second" height={96} empty="No queries in the last minute" />
+            <StackedArea layers={liveLayers} span={60} height={120} unit="/s" xLabels={['60 s ago', '30 s', 'now']} empty="No lookups in the last minute" label="Lookups per second, last minute, by how they were answered" />
+            <div className="livefeed" aria-live="off">
+              <div className="small muted">Latest lookups</div>
+              {!feed.length ? <div className="small muted">Waiting for the next lookup.</div> : feed.map((e, i) => (
+                <div className="lf-row" key={`${e.ts}-${e.qname}-${i}`}>
+                  <span>{new Date(e.ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                  <span className="lf-who">{e.client_name || e.client}</span>
+                  <span className="lf-name">{e.qname}</span>
+                  <Pill tone={e.result === 'blocked' ? 'bad' : e.result === 'failed' ? 'warn' : ''}>{{ forwarded: 'Answered', cached: 'From memory', blocked: 'Blocked', local: 'Your names', rate_limited: 'Slowed', failed: 'Failed' }[e.result] || e.result}</Pill>
+                </div>
+              ))}
+            </div>
           </>
         ) : (
-          <Chart series={series} from={h?.from || 0} to={h?.to || 1} unit="queries/s" height={160} label={`DNS queries per second, ${range}`} />
+          <StackedArea layers={histLayers} span={SPAN} height={150} unit="/s" xLabels={[`${{ '1h': '60 min', '24h': '24 h', '7d': '7 days' }[range]} ago`, '', 'now']} empty="Nothing recorded for this period yet" label={`Lookups per second, ${range}, by how they were answered`} />
         )}
       </Card>
       <div className="dns-cards">
@@ -65,29 +102,64 @@ function Overview() {
             </div>
           )}
         </Card>
+        <Card title="Answer time" desc="How long forwarded lookups took to answer. Lower is better.">
+          <Chart series={msSeries} from={msWindow?.from || 0} to={msWindow?.to || 1} kind="ms" height={110} label="Answer time" empty="Collecting data. Answer times appear after a few minutes of lookups." />
+        </Card>
         <Card title="Busiest devices" desc="DNS queries, last 24 hours"
           actions={<button type="button" className="link small" onClick={() => setSelf((x) => !x)}>{self ? 'Hide this router' : 'Show this router'}</button>}>
           {!top?.clients?.length ? <Empty>No activity yet.</Empty> : (
-            <div className="list">
-              {top.clients.slice(0, 6).map((c) => { const self = c.addrs?.length === 1 && (c.addrs[0] === '127.0.0.1' || c.addrs[0] === '::1'); return <div className="item" key={c.key}><div><div className="name">{c.label || (c.addrs || [c.key])[0]}</div><div className="meta">{self ? 'This router, asking for itself' : (c.addrs || [c.key]).join(' · ')}</div></div><span>{fmt.n(c.n)}</span></div>; })}
+            <div className="rank">
+              {top.clients.slice(0, 6).map((c) => {
+                const me = c.addrs?.length === 1 && (c.addrs[0] === '127.0.0.1' || c.addrs[0] === '::1');
+                return (
+                  <div key={c.key} className="stack gap1">
+                    <div className="rk-top"><span className="name">{c.label || (c.addrs || [])[0] || c.key}{me && ' (this router)'}</span><b>{fmt.n(c.n)}</b></div>
+                    {c.label && (c.addrs || [])[0] && <div className="rk-sub mono">{c.addrs[0]}</div>}
+                    <Bar pct={(100 * c.n) / biggest(top.clients)} thin />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+        <Card title="What blocked it" desc="Which list or rule stopped the lookups, last 24 hours">
+          {!top?.blocked_by?.length ? <Empty>Nothing has been blocked in this period.</Empty> : (
+            <div className="rank">
+              {top.blocked_by.map((c) => (
+                <div key={c.key} className="stack gap1">
+                  <div className="rk-top"><span className="name">{c.key}</span><b>{fmt.n(c.n)}</b></div>
+                  <Bar pct={(100 * c.n) / biggest(top.blocked_by)} thin />
+                </div>
+              ))}
             </div>
           )}
         </Card>
         <Card title="Most blocked" desc="Names that were stopped by a blocklist or your own rules, last 24 hours">
-          {!top?.blocked?.length ? <Empty>Nothing has been blocked yet.</Empty> : (
-            <div className="list">
-              {top.blocked.slice(0, 6).map((c) => <div className="item" key={c.key}><span className="name" style={{ wordBreak: 'break-all' }}>{c.key}</span><span>{fmt.n(c.n)}</span></div>)}
+          {!top?.blocked?.length ? <Empty>Nothing has been blocked in this period.</Empty> : (
+            <div className="rank">
+              {top.blocked.slice(0, 6).map((c) => (
+                <div key={c.key} className="stack gap1">
+                  <div className="rk-top"><span className="name mono">{c.key}</span><b>{fmt.n(c.n)}</b></div>
+                  <Bar pct={(100 * c.n) / biggest(top.blocked)} thin />
+                </div>
+              ))}
             </div>
           )}
         </Card>
         <Card title="Most asked" desc="Names devices looked up most, last 24 hours">
           {!top?.domains?.length ? <Empty>No lookups yet.</Empty> : (
-            <div className="list">
-              {top.domains.slice(0, 6).map((c) => <div className="item" key={c.key}><span className="name" style={{ wordBreak: 'break-all' }}>{c.key}</span><span>{fmt.n(c.n)}</span></div>)}
+            <div className="rank">
+              {top.domains.slice(0, 6).map((c) => (
+                <div key={c.key} className="stack gap1">
+                  <div className="rk-top"><span className="name mono">{c.key}</span><b>{fmt.n(c.n)}</b></div>
+                  <Bar pct={(100 * c.n) / biggest(top.domains)} thin />
+                </div>
+              ))}
             </div>
           )}
         </Card>
       </div>
+      <WhatChanged match={/dns|resolver|forwarder|blocklist|lookups|upstream|encrypted/i} range={range} />
       <Card title="Forced DNS" desc="Devices that use a DNS server of their own are sent to the one you chose.">
         <div className="spread">
           <span>{!force ? 'Loading…' : !force.master ? 'Off. Devices may use any DNS server.' : forcedOn.length ? `On for ${forcedOn.join(', ')}.${force.redirected ? ` ${fmt.n(force.redirected)} lookups redirected so far.` : ''}` : 'On, but no network is forced.'}</span>

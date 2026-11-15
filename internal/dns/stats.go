@@ -31,12 +31,18 @@ type minute struct {
 
 // Stats keeps one hour of per-minute counters plus a per-second rate history.
 type Stats struct {
-	mu      sync.Mutex
-	now     func() time.Time
-	mins    [60]*minute
-	secs    [60]float64
-	secBuf  uint64
-	lastSec int64
+	mu     sync.Mutex
+	now    func() time.Time
+	mins   [60]*minute
+	secs   [60]float64
+	secBuf uint64
+	// The same one-second history for blocked and cached answers, so the Live chart can be split by
+	// how each lookup was answered.
+	secsBlocked [60]float64
+	secsCached  [60]float64
+	bufBlocked  uint64
+	bufCached   uint64
+	lastSec     int64
 }
 
 func NewStats() *Stats { return &Stats{now: time.Now} }
@@ -75,6 +81,12 @@ func (s *Stats) Record(o Outcome, latency time.Duration, nxdomain bool) {
 		m.hist[idx]++
 	}
 	s.secBuf++
+	switch o {
+	case OutBlocked:
+		s.bufBlocked++
+	case OutCached:
+		s.bufCached++
+	}
 }
 
 // Tick must be called once per second; it moves the current second into the rate history.
@@ -84,20 +96,31 @@ func (s *Stats) Tick() {
 	copy(s.secs[:], s.secs[1:])
 	s.secs[59] = float64(s.secBuf)
 	s.secBuf = 0
+	copy(s.secsBlocked[:], s.secsBlocked[1:])
+	s.secsBlocked[59] = float64(s.bufBlocked)
+	s.bufBlocked = 0
+	copy(s.secsCached[:], s.secsCached[1:])
+	s.secsCached[59] = float64(s.bufCached)
+	s.bufCached = 0
 }
 
 // Snapshot is the data the Overview and DNS pages show.
 type Snapshot struct {
-	QPS         float64            `json:"qps"`
-	History     []float64          `json:"history"`
-	HourTotal   uint64             `json:"hour_total"`
-	Outcomes    map[Outcome]uint64 `json:"outcomes"`
-	BlockedPct  float64            `json:"blocked_pct"`
-	CachedPct   float64            `json:"cached_pct"`
-	NXDomainPct float64            `json:"nxdomain_pct"`
-	AvgMS       float64            `json:"avg_ms"`
-	P95MS       float64            `json:"p95_ms"`
-	CacheSize   int                `json:"cache_size"`
+	QPS            float64            `json:"qps"`
+	QPSBlocked     float64            `json:"qps_blocked"`
+	QPSCached      float64            `json:"qps_cached"`
+	RecentMS       float64            `json:"recent_ms"` // average forwarded answer time over the last two minutes
+	History        []float64          `json:"history"`
+	HistoryBlocked []float64          `json:"history_blocked"`
+	HistoryCached  []float64          `json:"history_cached"`
+	HourTotal      uint64             `json:"hour_total"`
+	Outcomes       map[Outcome]uint64 `json:"outcomes"`
+	BlockedPct     float64            `json:"blocked_pct"`
+	CachedPct      float64            `json:"cached_pct"`
+	NXDomainPct    float64            `json:"nxdomain_pct"`
+	AvgMS          float64            `json:"avg_ms"`
+	P95MS          float64            `json:"p95_ms"`
+	CacheSize      int                `json:"cache_size"`
 }
 
 // Snapshot summarises the last hour.
@@ -105,7 +128,8 @@ func (s *Stats) Snapshot() Snapshot {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	cutoff := s.now().Unix()/60 - 59
-	out := Snapshot{Outcomes: map[Outcome]uint64{}, History: append([]float64(nil), s.secs[:]...)}
+	out := Snapshot{Outcomes: map[Outcome]uint64{}, History: append([]float64(nil), s.secs[:]...),
+		HistoryBlocked: append([]float64(nil), s.secsBlocked[:]...), HistoryCached: append([]float64(nil), s.secsCached[:]...)}
 	var nx, latSum, latN uint64
 	var hist [11]uint64
 	for _, m := range s.mins {
@@ -150,5 +174,21 @@ func (s *Stats) Snapshot() Snapshot {
 		sum += v
 	}
 	out.QPS = sum / 5
+	var sb, sc float64
+	for i := 55; i < 60; i++ {
+		sb += s.secsBlocked[i]
+		sc += s.secsCached[i]
+	}
+	out.QPSBlocked, out.QPSCached = sb/5, sc/5
+	var rs, rn uint64
+	for _, m := range s.mins {
+		if m != nil && m.at >= s.now().Unix()/60-1 {
+			rs += m.latSumUS
+			rn += m.latN
+		}
+	}
+	if rn > 0 {
+		out.RecentMS = float64(rs) / float64(rn) / 1000
+	}
 	return out
 }

@@ -212,7 +212,12 @@ func (a *App) threatLoop(ctx context.Context) {
 func (a *App) threatEngine() map[string]any {
 	p := a.threatEvePath()
 	fi, err := os.Stat(p)
+	info := a.threatInfo()
 	switch {
+	case err != nil && info.Installed && info.Running:
+		return map[string]any{"state": "quiet", "text": "The engine is running and has not reported anything yet. That is normal on a quiet network."}
+	case err != nil && info.Installed:
+		return map[string]any{"state": "missing", "text": "The detection engine is installed but not running right now."}
 	case err != nil:
 		return map[string]any{"state": "missing", "text": "The detection engine is not installed or not running on this machine, so there is nothing to watch yet."}
 	case time.Since(fi.ModTime()) > 10*time.Minute:
