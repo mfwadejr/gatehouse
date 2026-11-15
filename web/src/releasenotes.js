@@ -1,6 +1,25 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.41',
+    title: 'Dots on tabs, and shorter backup lists',
+    items: [
+      'The coloured dots in the left menu now also show on the tab that holds the reason, in the same colour. Hover one to read why. For example, a Protection dot lands on Overview, and a backup that has not been test-checked lands on Backup & recovery.',
+      'A backup that has not been checked by hand in 90 days, or no backup that has passed its check, now shows as a suggestion or a warning like any other item.',
+      'Long lists show the newest 10 with a count (Showing 10 of 34 backups) and a button for ten more. Backups and Backup history both work this way.',
+      'On Protection, both Open links under Also protecting you now look the same.',
+    ],
+  },
+  {
+    version: '0.9.4.40',
+    title: 'A shorter DNS page, split into more tabs',
+    items: [
+      'DNS now has six tabs. Overview is short: the number cards, Lookups over time, How queries were answered, Answer time and What changed.',
+      'Activity is new. Busiest devices, What blocked it, Most blocked and Most asked live there, for the last hour, 24 hours or 7 days.',
+      'Servers is new. Forced DNS, Encrypted DNS, Resolve directly and Upstream DNS servers moved there from the bottom of the Overview. Search finds them in their new place.',
+    ],
+  },
+  {
     version: '0.9.4.39',
     title: 'Livelier Networks, DNS, DHCP and Threats pages',
     items: [

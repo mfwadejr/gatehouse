@@ -1,4 +1,5 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { AttentionContext, useAttention } from './attentionctx.js';
 import { put, useData } from './api.js';
 import { linkState } from './linkstate.js';
 import { plainNotes } from './whatsnew.jsx';
@@ -8,9 +9,7 @@ import { plainNotes } from './whatsnew.jsx';
 // steady (it never blinks); red is something broken, amber needs you, blue is a suggestion.
 
 const RANK = { info: 1, warn: 2, bad: 3 };
-const AttentionContext = createContext({ items: [], byPage: {}, loaded: false, worst: '' });
-
-export const useAttention = () => useContext(AttentionContext);
+export { useAttention };
 
 export function AttentionProvider({ children }) {
   const { data: net } = useData('/api/net/status', { topics: ['net.status'], every: 20000 });
@@ -24,6 +23,7 @@ export function AttentionProvider({ children }) {
   const { data: sec } = useData('/api/security/check', { topics: ['fw.status'], every: 60000 });
   const { data: setup } = useData('/api/setup/checklist', { topics: ['net.status', 'fw.status'], every: 30000 });
   const { data: ov } = useData('/api/overview/security', { every: 30000 });
+  const { data: bk } = useData('/api/backups', { every: 300000 });
   const value = useMemo(() => {
     const a = [];
     const add = (level, id, t, s, to) => a.push({ level, id, t, s, to });
@@ -35,7 +35,7 @@ export function AttentionProvider({ children }) {
     if (fw?.status?.dirty && fw.status.refresh_only) add('info', 'fw-refresh', 'The firewall rules were refreshed by an update', 'NopeWarden writes its rules a little differently now. What is allowed has not changed. It puts them live by itself; you can also commit them on the Review page.', 'review');
     else if (fw?.status?.dirty) add('warn', 'fw-dirty', 'Firewall changes are waiting to be applied', 'Open the Review page and commit them.', 'review');
     if (net?.status?.dirty) add('warn', 'net-dirty', 'Internet settings are waiting to be applied', 'Open the Review page and commit them.', 'review');
-    (rogue || []).forEach((r) => add('warn', `rogue:${r.name}`, `Another DHCP server is answering on ${r.name}`, `${r.found.map((f) => f.server).join(', ')} hands out addresses too. Switch it off, or devices may get the wrong settings.`, 'dhcp'));
+    (rogue || []).forEach((r) => add('warn', `rogue:${r.name}`, `Another DHCP server is answering on ${r.name}`, `${r.found.map((f) => f.server).join(', ')} hands out addresses too. Switch it off, or devices may get the wrong settings.`, 'dhcp/overview'));
     wanList.filter((w) => w.enabled).forEach((w) => {
       const s = linkState(links[w.name]);
       if (s.tone === 'bad') add('bad', `wan:${w.name}`, `${w.name}: ${s.text}`, s.detail, 'internet');
@@ -49,12 +49,12 @@ export function AttentionProvider({ children }) {
       if (!s.size || s.active / s.size <= 0.8) return;
       const left = Math.max(0, s.size - s.active);
       add(left === 0 ? 'bad' : 'warn', `dhcp-full:${s.name}`, left === 0 ? `${s.name} has no addresses left` : `${s.name} is nearly out of addresses`,
-        `${s.active} of ${s.size} in use, ${left} left. ${left === 0 ? 'New devices cannot join until some are freed. ' : ''}Widen the range or shorten how long addresses are kept.`, 'dhcp');
+        `${s.active} of ${s.size} in use, ${left} left. ${left === 0 ? 'New devices cannot join until some are freed. ' : ''}Widen the range or shorten how long addresses are kept.`, 'dhcp/scopes');
     });
     // Red only when every server is down and none has answered for 30 seconds. A slow server still works.
     if (dns?.upstreams?.length && dns.upstreams.every((u) => u.state === 'down') && dns.upstreams.every((u) => !u.last_ok || Date.now() / 1000 - u.last_ok > 30)) {
       const names = dns.upstreams.map((u) => u.name).filter(Boolean).join(', ');
-      add('bad', 'dns-down', 'No DNS server is answering', `${names ? `${names} did not answer. ` : ''}Devices cannot look up names until one answers. Open DNS and press Test.`, 'dns');
+      add('bad', 'dns-down', 'No DNS server is answering', `${names ? `${names} did not answer. ` : ''}Devices cannot look up names until one answers. Open DNS and press Test.`, 'dns/servers');
     }
     // Updates have their own page. An update that is ready is shown whatever the update mode is.
     const failedAt = upd?.result && !upd.result.ok ? upd.result.at || 0 : 0;
@@ -69,17 +69,35 @@ export function AttentionProvider({ children }) {
     // The security check and threat alerts both live on Protection.
     const bad = (sec?.items || []).filter((i) => i.level === 'bad').length;
     const warn = (sec?.items || []).filter((i) => i.level === 'warn').length;
-    if (bad) add('bad', 'security', `Security check: ${bad} to fix now${warn ? `, ${warn} worth fixing` : ''}`, 'Open Protection to see what and how to fix it.', 'protection');
-    else if (warn) add('warn', 'security', `Security check: ${warn} worth fixing`, 'Open Protection to see what and how to fix it.', 'protection');
+    if (bad) add('bad', 'security', `Security check: ${bad} to fix now${warn ? `, ${warn} worth fixing` : ''}`, 'Open Protection to see what and how to fix it.', 'protection/overview');
+    else if (warn) add('warn', 'security', `Security check: ${warn} worth fixing`, 'Open Protection to see what and how to fix it.', 'protection/overview');
     if (ov?.threat_alerts_24h > 0) add('warn', 'threat', `Threat watching raised ${ov.threat_alerts_24h} alert${ov.threat_alerts_24h === 1 ? '' : 's'} in the last day`, `${ov.threat_devices_24h || 1} device${ov.threat_devices_24h === 1 ? '' : 's'} involved. Open Threats to look.`, 'threats/alerts');
-    if (setup?.items?.length && setup.left > 0) add('info', 'setup', `Finish setting up: ${setup.items.length - setup.left} of ${setup.items.length} done`, 'You can do these in any order.', 'settings');
+    if (setup?.items?.length && setup.left > 0) add('info', 'setup', `Finish setting up: ${setup.items.length - setup.left} of ${setup.items.length} done`, 'You can do these in any order.', 'settings/general');
+    // A backup is only worth having if it restores: say so when none has been tried in 90 days.
+    const copies = bk?.backups || [];
+    if (copies.length) {
+      const good = copies.find((b) => b.report && b.report.ok);
+      const tried = copies.find((b) => b.hand_checked);
+      if (!good) add('warn', 'backup-none-good', 'No backup has passed its check', 'Open Backup & recovery and make a new one.', 'settings/backup');
+      else if (!tried || Date.now() / 1000 - tried.hand_checked > 90 * 86400) add('info', 'backup-restore-check', 'Try a restore check on a backup', 'No backup has been checked by hand in 90 days. Press Check on one to be sure it will work.', 'settings/backup');
+    }
     const byPage = {};
-    a.forEach((x) => { if (!byPage[x.to] || RANK[x.level] > RANK[byPage[x.to]]) byPage[x.to] = x.level; });
+    const byTab = {};
+    const top = (to) => String(to || '').split('/')[0];
+    a.forEach((x) => {
+      const pg = top(x.to);
+      if (!byPage[pg] || RANK[x.level] > RANK[byPage[pg]]) byPage[pg] = x.level;
+      if (String(x.to).includes('/')) {
+        const t = byTab[x.to] || (byTab[x.to] = { level: x.level, titles: [] });
+        if (RANK[x.level] > RANK[t.level]) t.level = x.level;
+        t.titles.push(x.t);
+      }
+    });
     const worst = a.reduce((m, x) => (RANK[x.level] > (RANK[m] || 0) ? x.level : m), '');
     // What the status line counts: things that need the person, not suggestions.
     const needs = a.filter((x) => x.level !== 'info');
-    return { items: a, needs, byPage, worst, loaded: !!(net && wans && fw) };
-  }, [net, wans, fw, rogue, vpn, util, dns, upd, sec, setup, ov]);
+    return { items: a, needs, byPage, byTab, worst, loaded: !!(net && wans && fw) };
+  }, [net, wans, fw, rogue, vpn, util, dns, upd, sec, setup, ov, bk]);
   return <AttentionContext.Provider value={value}>{children}</AttentionContext.Provider>;
 }
 

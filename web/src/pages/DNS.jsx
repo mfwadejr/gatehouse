@@ -13,10 +13,7 @@ import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill
 function Overview() {
   const { data, setData } = useData('/api/dns/summary', { every: 10000 });
   useStream(['dns.stats'], (t, p) => p && setData((d) => (d ? { ...d, stats: p } : d)));
-  const { data: ups, reload: ru } = useData('/api/dns/upstreams', { topics: ['dns.upstreams'], every: 10000 });
-  const [self, setSelf] = useState(false);
-  const { data: top } = useData(`/api/dns/top?hours=24${self ? '&self=1' : ''}`, { every: 30000 });
-  const { data: force } = useData('/api/fw/dnsforce', { every: 60000 });
+  const { data: ups } = useData('/api/dns/upstreams', { topics: ['dns.upstreams'], every: 10000 });
   const [range, setRange, rangeOptions] = usePeriod('dns', { live: true });
   const { data: h } = useData(`/api/overview/history?range=${range}`, { every: 30000, enabled: range !== 'live' });
   const { data: d24 } = useData('/api/overview/history?range=24h', { every: 60000 });
@@ -26,7 +23,6 @@ function Overview() {
     const fresh = p.filter((e) => !(e.qname === 'health.nopewarden.invalid')).reverse();
     if (fresh.length) setFeed((f) => [...fresh, ...f].slice(0, 8));
   });
-  const [add, setAdd] = useState(false);
   const st = data?.stats;
   const total = st?.hour_total || 0;
   const outcomes = st ? [['Forwarded', st.outcomes?.forwarded], ['Blocked', st.outcomes?.blocked], ['Cached', st.outcomes?.cached], ['Local', st.outcomes?.local]] : [];
@@ -36,7 +32,6 @@ function Overview() {
   const working = list.filter((u) => u.state !== 'down').length;
   const slow = list.filter((u) => u.state === 'degraded').length;
   const upTone = !list.length ? '' : working === 0 ? 'bad' : working < list.length || slow ? 'warn' : 'good';
-  const forcedOn = (force?.networks || []).filter((n) => n.mode !== 'off').map((n) => n.name);
   const series = [{ key: 'dns.qps', name: 'Queries per second', color: 'var(--color-chart-series-1)', pts: h?.series?.['dns.qps'] || [] }];
   const vals = (src, key) => (src?.series?.[key] || []).map((p) => p[1]);
   const rest = (tot, b, c) => tot.map((v, i) => Math.max(0, v - (b[i] || 0) - (c[i] || 0)));
@@ -54,7 +49,6 @@ function Overview() {
   const trend = (key) => vals(d24, key).slice(-96);
   const msSeries = [{ key: 'dns.ms', name: 'Answer time', color: 'var(--color-chart-series-4)', pts: h?.series?.['dns.ms'] || d24?.series?.['dns.ms'] || [] }];
   const msWindow = h?.series?.['dns.ms'] ? h : d24;
-  const biggest = (rows) => Math.max(1, ...(rows || []).map((r) => r.n));
   return (
     <>
       {data && data.lists_enabled > 0 && !data.blocking_active && (
@@ -65,7 +59,7 @@ function Overview() {
         <button type="button" className="card tile tilebtn" onClick={() => { window.location.hash = '#/logs'; }}><span className="lbl">Blocked</span><div><span className="val">{fmt.d1(st?.blocked_pct)}</span><span className="unit">%</span></div><div className="tspark"><Spark values={trend('dns.blocked')} fluid tone="bad" /></div><span className="foot">{total > 0 && !(st?.blocked_pct > 0) ? 'Nothing blocked in the last hour' : `${fmt.n(st?.outcomes?.blocked || 0)} blocked in the last hour`} · {fmt.n(data?.unique_blocked ?? data?.blocked_entries)} names on your lists</span></button>
         <div className="card tile"><span className="lbl">Answered from memory</span><div><span className="val">{fmt.d1(st?.cached_pct)}</span><span className="unit">%</span></div><div className="tspark"><Spark values={trend('dns.cached')} fluid /></div><span className="foot">{fmt.n(st?.cache_size)} saved answers</span></div>
         <div className="card tile"><span className="lbl">Response time</span><div><span className="val">{fmt.d1(st?.avg_ms)}</span><span className="unit">ms</span></div><div className="tspark"><Spark values={trend('dns.ms')} fluid /></div><span className="foot">95% under {fmt.d1(st?.p95_ms)} ms</span></div>
-        <button type="button" className="card tile tilebtn" onClick={() => { window.location.hash = '#/dns/settings'; }}><span className="lbl">Upstream servers</span><div><span className="val">{working}</span><span className="unit">of {list.length} working</span></div><span className="foot"><i className={`sdot ${upTone}`} aria-hidden="true" /> {slow ? `${slow} slow` : upTone === 'bad' ? 'None answering' : 'All answering normally'}</span></button>
+        <button type="button" className="card tile tilebtn" onClick={() => { window.location.hash = '#/dns/servers'; }}><span className="lbl">Upstream servers</span><div><span className="val">{working}</span><span className="unit">of {list.length} working</span></div><span className="foot"><i className={`sdot ${upTone}`} aria-hidden="true" /> {slow ? `${slow} slow` : upTone === 'bad' ? 'None answering' : 'All answering normally'}</span></button>
       </section>
       <Card title="Lookups over time" desc={range === 'live' ? 'Lookups per second, last minute, split by how each was answered' : 'Lookups per second, averaged over each period, split by how each was answered'}
         actions={<Segmented value={range} onChange={setRange} options={rangeOptions} />}>
@@ -105,7 +99,25 @@ function Overview() {
         <Card title="Answer time" desc="How long forwarded lookups took to answer. Lower is better.">
           <Chart series={msSeries} from={msWindow?.from || 0} to={msWindow?.to || 1} kind="ms" height={110} label="Answer time" empty="Collecting data. Answer times appear after a few minutes of lookups." />
         </Card>
-        <Card title="Busiest devices" desc="DNS queries, last 24 hours"
+      </div>
+      <WhatChanged match={/dns|resolver|forwarder|blocklist|lookups|upstream|encrypted/i} range={range} />
+    </>
+  );
+}
+
+// Who asked and what was stopped, for a period of your choice.
+function Activity() {
+  const [range, setRange, rangeOptions] = usePeriod('dns-activity');
+  const hours = { '1h': 1, '24h': 24, '7d': 168 }[range] || 24;
+  const words = hours === 1 ? 'last hour' : hours === 24 ? 'last 24 hours' : 'last 7 days';
+  const [self, setSelf] = useState(false);
+  const { data: top } = useData(`/api/dns/top?hours=${hours}${self ? '&self=1' : ''}`, { every: 30000 });
+  const biggest = (rows) => Math.max(1, ...(rows || []).map((r) => r.n));
+  return (
+    <>
+      <div className="spread"><span className="small muted">Who asked, and what was stopped.</span><Segmented value={range} onChange={setRange} options={rangeOptions} /></div>
+      <div className="dns-cards">
+        <Card title="Busiest devices" desc={`DNS queries, ${words}`}
           actions={<button type="button" className="link small" onClick={() => setSelf((x) => !x)}>{self ? 'Hide this router' : 'Show this router'}</button>}>
           {!top?.clients?.length ? <Empty>No activity yet.</Empty> : (
             <div className="rank">
@@ -122,7 +134,7 @@ function Overview() {
             </div>
           )}
         </Card>
-        <Card title="What blocked it" desc="Which list or rule stopped the lookups, last 24 hours">
+        <Card title="What blocked it" desc={`Which list or rule stopped the lookups, ${words}`}>
           {!top?.blocked_by?.length ? <Empty>Nothing has been blocked in this period.</Empty> : (
             <div className="rank">
               {top.blocked_by.map((c) => (
@@ -134,7 +146,7 @@ function Overview() {
             </div>
           )}
         </Card>
-        <Card title="Most blocked" desc="Names that were stopped by a blocklist or your own rules, last 24 hours">
+        <Card title="Most blocked" desc={`Names that were stopped by a blocklist or your own rules, ${words}`}>
           {!top?.blocked?.length ? <Empty>Nothing has been blocked in this period.</Empty> : (
             <div className="rank">
               {top.blocked.slice(0, 6).map((c) => (
@@ -146,7 +158,7 @@ function Overview() {
             </div>
           )}
         </Card>
-        <Card title="Most asked" desc="Names devices looked up most, last 24 hours">
+        <Card title="Most asked" desc={`Names devices looked up most, ${words}`}>
           {!top?.domains?.length ? <Empty>No lookups yet.</Empty> : (
             <div className="rank">
               {top.domains.slice(0, 6).map((c) => (
@@ -159,7 +171,19 @@ function Overview() {
           )}
         </Card>
       </div>
-      <WhatChanged match={/dns|resolver|forwarder|blocklist|lookups|upstream|encrypted/i} range={range} />
+    </>
+  );
+}
+
+// Where names are looked up: the DNS servers NopeWarden asks, encrypted DNS, and forcing devices to use it.
+function Servers() {
+  const { data: ups, reload: ru } = useData('/api/dns/upstreams', { topics: ['dns.upstreams'], every: 10000 });
+  const { data: force } = useData('/api/fw/dnsforce', { every: 60000 });
+  const [add, setAdd] = useState(false);
+  const list = ups || [];
+  const forcedOn = (force?.networks || []).filter((n) => n.mode !== 'off').map((n) => n.name);
+  return (
+    <>
       <Card title="Forced DNS" desc="Devices that use a DNS server of their own are sent to the one you chose.">
         <div className="spread">
           <span>{!force ? 'Loading…' : !force.master ? 'Off. Devices may use any DNS server.' : forcedOn.length ? `On for ${forcedOn.join(', ')}.${force.redirected ? ` ${fmt.n(force.redirected)} lookups redirected so far.` : ''}` : 'On, but no network is forced.'}</span>
@@ -498,11 +522,13 @@ function SettingsTab() {
 }
 
 export default function DNS() {
-  const [tab, setTab] = useHashTab('dns', ['overview','lists','records','settings'], 'overview');
+  const [tab, setTab] = useHashTab('dns', ['overview','activity','servers','lists','records','settings'], 'overview');
   return (
     <Page title="DNS" sub="Translates names to addresses for every device, and blocks the ones you do not want.">
-      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'overview', label: 'Overview' }, { value: 'lists', label: 'Blocking' }, { value: 'records', label: 'Your names' }, { value: 'settings', label: 'Settings' }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'overview', label: 'Overview' }, { value: 'activity', label: 'Activity' }, { value: 'servers', label: 'Servers' }, { value: 'lists', label: 'Blocking' }, { value: 'records', label: 'Your names' }, { value: 'settings', label: 'Settings' }]} />
       {tab === 'overview' && <Overview />}
+      {tab === 'activity' && <Activity />}
+      {tab === 'servers' && <Servers />}
       {tab === 'lists' && <><Lists /><p className="small muted">Which devices get which lists is set per profile, on the <a href="#/devices/profiles">Profiles</a> tab of Devices & access. Blocking an app or a category for one device or at set hours is under <a href="#/protection">Protection</a>.</p></>}
       {tab === 'records' && <Records />}
       {tab === 'settings' && <SettingsTab />}

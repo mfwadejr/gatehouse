@@ -9,9 +9,10 @@ The picture is an example from a new, empty box; yours will show your own device
 
 ## What is on the page
 Tabs along the top:
-- **Overview**: number cards with trend lines (select one to open the page that explains it), **Lookups over time** (Live shows the last minute and the latest lookups; 1 h, 24 h and 7 d show history), **How queries were answered**, **Answer time**, **Busiest devices**, **What blocked it**, **Most blocked**, **Most asked** and **What changed**.
+- **Overview**: number cards with trend lines (select one to open the page that explains it), **Lookups over time** (Live shows the last minute and the latest lookups; 1 h, 24 h and 7 d show history), **How queries were answered**, **Answer time** and **What changed**.
+- **Activity**: who asked and what was stopped, for the last hour, 24 hours or 7 days: **Busiest devices**, **What blocked it**, **Most blocked** and **Most asked**.
+- **Servers**: where names are looked up. **Upstream DNS servers** (where NopeWarden asks when it does not know), **Which server is asked first**, **Add a DNS server**, **Encrypted DNS**, **Resolve directly** and **Forced DNS**.
 - **Blocking**: **Blocklists** you can switch on (which devices get which lists is set per profile, on the Profiles tab of Devices & access), **Always allow or block** exceptions that beat every list, and **Why is this blocked?** to find which list blocks a name.
-- **Servers**: **Upstream DNS servers** (where NopeWarden asks when it does not know), **Which server is asked first**, **Add a DNS server**, and the encrypted DNS switch.
 - **Your own names**: **Give this firewall a name**, and names that point somewhere on your network, like nas.lan to 192.168.1.10.
 - **Settings**: **What to do with blocked names**, **Home domain**, **Queries per second per device**, **Remember answers (entries)**, **Keep the query history for (days)**, **Hide device addresses in the history** and **Tell browsers to use this DNS**.
 

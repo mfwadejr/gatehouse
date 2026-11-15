@@ -1,8 +1,8 @@
 {
  "Lookups over time": "A chart of DNS activity; the controls it has are on the same tab as the DNS page itself",
- "How queries were answered": "A chart on the DNS overview; nothing to set",
- "Most blocked": "A top-ten list on the DNS overview; nothing to set",
- "Most asked": "A top-ten list on the DNS overview; nothing to set",
+ "How queries were answered": "A chart on the DNS Activity tab; nothing to set",
+ "Most blocked": "A top-ten list on the DNS Activity tab; nothing to set",
+ "Most asked": "A top-ten list on the DNS Activity tab; nothing to set",
  "Busiest devices": "A top-ten list of data or lookups; nothing to set",
  "Connections": "A total on Logs > Summary; nothing to set",
  "Download speed": "A chart on Logs > Activity; nothing to set",
@@ -16,7 +16,7 @@
  "Nothing is waiting": "The empty state of Review changes; reached from the Apply bar",
  "Open ports": "A read-only list on Services that links to Firewall > Open ports",
  "Set up on the VPN page": "A note on Routes that links to the VPN page",
- "Answer time": "A chart on the DNS overview; nothing to set",
- "What blocked it": "A ranked list on the DNS overview; nothing to set",
+ "Answer time": "A chart on the DNS Activity tab; nothing to set",
+ "What blocked it": "A ranked list on the DNS Activity tab; nothing to set",
  "What changed": "A short list of recent updates and warnings on the Overview of Threats, DNS, DHCP and Networks; nothing to set"
 }

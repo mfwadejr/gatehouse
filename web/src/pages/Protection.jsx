@@ -23,7 +23,7 @@ function Summary({ go }) {
       <Card title="Also protecting you" desc="Two more things that work alongside the security check.">
         <div className="list">
           <div className="item"><div><div className="name">Blocks</div><div className="meta">{nBlocks ? `${nBlocks} block${nBlocks === 1 ? '' : 's'} in place.` : 'Nothing is blocked.'}</div></div><button type="button" className="link" onClick={() => go('blocks')}>Open</button></div>
-          <div className="item"><div><div className="name">Threat watching</div><div className="meta">{!installed ? 'Not installed. Install it on the Threats page if you want it.' : watching ? 'On. Watching and telling you; it never blocks.' : 'Installed, switched off.'}</div></div><a className="link" href="#/threats">Open</a></div>
+          <div className="item"><div><div className="name">Threat watching</div><div className="meta">{!installed ? 'Not installed. Install it on the Threats page if you want it.' : watching ? 'On. Watching and telling you; it never blocks.' : 'Installed, switched off.'}</div></div><button type="button" className="link" onClick={() => { window.location.hash = '#/threats'; }}>Open</button></div>
         </div>
         <p className="small muted">Block lists for ads, trackers and adult sites are under <a href="#/dns/lists">DNS</a>.</p>
       </Card>

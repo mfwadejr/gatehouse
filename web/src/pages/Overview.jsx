@@ -588,7 +588,7 @@ function AttentionArea({ c, stamp }) {
     <>
       <div className="ov-statusline">
         <span className={`ov-state ${tone}`}><i className="dot" />{text}</span>
-        {all.length === 1 && <button type="button" className="link" onClick={() => go(first.to)}>Open {pageLabel[first.to] || 'it'} →</button>}
+        {all.length === 1 && <button type="button" className="link" onClick={() => go(first.to)}>Open {pageLabel[String(first.to).split('/')[0]] || 'it'} →</button>}
         {all.length > 1 && <button type="button" className="link" onClick={() => go(first.to)}>{first.t} →</button>}
         {all.length > 1 && !c.open && needs.length > 1 && <button type="button" className="link" onClick={() => c.setOpen(true)}>and {all.length - 1} more</button>}
         {!all.length && !c.open && suggestions.length > 0 && <button type="button" className="link" onClick={() => c.setOpen(true)}>{n(suggestions.length, 'suggestion', 'suggestions')}</button>}

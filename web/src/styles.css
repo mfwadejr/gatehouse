@@ -773,3 +773,4 @@ button.tag:hover { color: var(--color-text-primary); border-color: var(--color-b
 .tilebtn { text-align: left; cursor: pointer; font: inherit; color: inherit; }
 .tilebtn:hover { border-color: var(--color-border-strong); }
 .btn { text-decoration: none; }
+.tabdot { display: inline-block; margin-left: var(--space-2); vertical-align: middle; animation: none; }

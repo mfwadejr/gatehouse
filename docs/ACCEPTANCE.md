@@ -170,3 +170,9 @@ Record the machine, the version (Settings, About) and the date at the top of eac
 | 163 | Threats status (0.9.4.39) | With the engine just started, Status says Starting, not Watching, and the notice does not say the engine is missing. Once read, it says Watching with load figures. | | |
 | 164 | Shared period (0.9.4.39) | Choose 24 h on Threats; DHCP and DNS (not Live) open on 24 h. DNS keeps Live as its own remembered choice. | | |
 | 165 | What changed (0.9.4.39) | Networks, DNS, DHCP and Threats each end with What changed, listing recent updates and warnings or saying nothing changed. Number cards open the page that explains them. | | |
+| 166 | DNS tabs (0.9.4.40) | DNS has Overview, Activity, Servers, Blocking, Your names and Settings. Overview no longer has the ranked lists or the server cards. | | |
+| 167 | DNS Activity (0.9.4.40) | Activity shows Busiest devices, What blocked it, Most blocked and Most asked; 1 h, 24 h and 7 d change them and their descriptions. | | |
+| 168 | DNS Servers (0.9.4.40) | Servers shows Forced DNS, Encrypted DNS, Resolve directly and Upstream DNS servers; add, move and remove an upstream works. Searching Encrypted DNS opens Servers. The old #/dns/settings link still opens Settings. | | |
+| 169 | Tab dots (0.9.4.41) | With a dot beside Protection in the menu, Protection opens with the same-coloured dot on Overview. With Settings dotted, the dot shows on General or Backup & recovery. Hovering a tab dot gives the reason. | | |
+| 170 | Restore check item (0.9.4.41) | With backups present and none checked by hand in 90 days, Settings, Backup & recovery has a blue dot and Overview lists Try a restore check on a backup. Pressing Check on one clears it. | | |
+| 171 | Shorter lists (0.9.4.41) | With more than 10 backups, the list shows 10 and Showing 10 of N backups, and Show more adds ten. Backup history behaves the same. | | |

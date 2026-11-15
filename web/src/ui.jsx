@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useId, useMemo, useState, useCallback, useRef } from 'react';
 import { get, post, refreshAll, useFailing, useData } from './api.js';
+import { useAttention } from './attentionctx.js';
 
 export const ICONS = {
   overview: 'M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z',
@@ -135,7 +136,7 @@ export function ToggleRow({ title, desc, checked, onChange, disabled }) {
 }
 
 // Long-list pattern: show the first n rows, with a button for the rest.
-export function Limited({ items, n = 15, render, noun = 'rows' }) {
+export function Limited({ items, n = 10, render, noun = 'rows' }) {
   const [shown, setShown] = useState(n);
   const rows = items.slice(0, shown);
   return (
@@ -143,6 +144,7 @@ export function Limited({ items, n = 15, render, noun = 'rows' }) {
       {rows.map(render)}
       {items.length > n && (
         <div className="inline">
+          <span className="small muted">{`Showing ${Math.min(shown, items.length)} of ${items.length} ${noun}`}</span>
           {shown < items.length && <button type="button" className="link small" onClick={() => setShown(shown + n)}>{`Show more (${Math.min(n, items.length - shown)} of the ${items.length - shown} left)`}</button>}
           {shown > n && <button type="button" className="link small" onClick={() => setShown(n)}>Show fewer</button>}
         </div>
@@ -200,12 +202,23 @@ export function Steps({ steps, label = 'Progress' }) {
   );
 }
 
+// A tab shows the same quiet dot as the left menu when something on it needs the person, in the same
+// colour, so the dot in the menu leads to the tab that holds the reason.
+const levelWords = { bad: 'Something is broken', warn: 'Needs you', info: 'A suggestion' };
 export function Tabs({ value, onChange, tabs }) {
+  const { byTab } = useAttention();
+  const page = window.location.hash.replace(/^#\/?/, '').split('?')[0].split('/')[0];
   return (
     <div className="tabs" role="tablist">
-      {tabs.map((t) => (
-        <button key={t.value} role="tab" aria-selected={value === t.value} className={`${value === t.value ? 'on' : ''} ${t.tone || ''}`.trim()} onClick={() => onChange(t.value)}>{t.label}</button>
-      ))}
+      {tabs.map((t) => {
+        const d = byTab[`${page}/${t.value}`];
+        return (
+          <button key={t.value} role="tab" aria-selected={value === t.value} className={`${value === t.value ? 'on' : ''} ${t.tone || ''}`.trim()} onClick={() => onChange(t.value)}>
+            {t.label}
+            {d && <span className={`navdot tabdot ${d.level}`} role="img" aria-label={`${levelWords[d.level]}: ${d.titles.join('. ')}`} title={d.titles.join('\n')} />}
+          </button>
+        );
+      })}
     </div>
   );
 }
