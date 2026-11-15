@@ -259,6 +259,35 @@ function GroupsCard({ groups, reload, goSettings }) {
   );
 }
 
+// Things you told the engine to leave alone: single checks you let through, and whole devices it never looks at.
+function Exceptions({ data, reload }) {
+  const [run, busy] = useAction();
+  return (
+    <>
+      <Card title="Allowed checks" desc="Things you let through. Remove one to be told about it again.">
+        <div className="list">
+          {(data.allowed || []).map((x) => (
+            <div className="item" key={x.id}>
+              <div><div className="name">Check {x.sid} {x.auto && <Pill>Quieted by NopeWarden</Pill>}</div><div className="meta">{x.device || 'All devices'} · {x.until ? `until ${fmt.dt(x.until)}` : 'until removed'} · {x.note}</div></div>
+              <Button small kind="danger" disabled={busy} onClick={() => run(() => del(`/api/threat/allow/${x.id}`), 'Removed.').then(reload)}>Remove</Button>
+            </div>
+          ))}
+          {!(data.allowed || []).length && <Empty>Nothing is allowed yet.</Empty>}
+        </div>
+      </Card>
+      <Card title="Devices never checked" desc="Traffic to and from these devices is ignored.">
+        <div className="list">
+          {(data.trusted || []).map((x) => (
+            <div className="item" key={x.mac}><div><div className="name">{x.device}</div><div className="meta mono">{x.mac}</div></div>
+              <Button small kind="danger" disabled={busy} onClick={() => run(() => del(`/api/threat/trust/${encodeURIComponent(x.mac)}`), 'Removed.').then(reload)}>Check again</Button></div>
+          ))}
+          {!(data.trusted || []).length && <Empty>Every device is checked.</Empty>}
+        </div>
+      </Card>
+    </>
+  );
+}
+
 function Rules({ data, reload, goSettings }) {
   const [run, busy] = useAction();
   const [chk, chkGo] = useCheck();

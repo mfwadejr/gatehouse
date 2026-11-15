@@ -1,6 +1,14 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.38',
+    title: 'Fixes the Threats, Rules page',
+    items: [
+      'The Rules tab on Threats showed "This page could not be shown" when threat watching was installed. Allowed checks and Devices never checked, which had moved there, were missing from the page. They are back.',
+      'The build now checks that every part of a page is defined, so a page that builds but fails in the browser like this one is caught before a release.',
+    ],
+  },
+  {
     version: '0.9.4.37',
     title: 'Rule sets, tags, and a Danger zone tab',
     items: [

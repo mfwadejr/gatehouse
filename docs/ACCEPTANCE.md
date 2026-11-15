@@ -163,3 +163,4 @@ Record the machine, the version (Settings, About) and the date at the top of eac
 | 156 | Tags (0.9.4.37) | Give a policy and a device the tag media. Policies and Devices both filter by Any tag; the search box and the top Search find the tag. A sixth tag on one item is refused. | | |
 | 157 | Folds (0.9.4.37) | Overview, Alerts, Storage, Services, Diagnostics and Forced DNS are shorter, with folded parts opening on click. | | |
 | 158 | How it works (0.9.4.37) | The help has a How it works chapter in the list and it opens. | | |
+| 159 | Threats, Rules tab (0.9.4.38) | With threat watching installed, Threats, Rules opens without an error and ends with Allowed checks and Devices never checked. Allow one check from an alert and make one device never checked: both are listed there and Remove or Check again takes them off. | | |
