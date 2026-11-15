@@ -97,7 +97,7 @@ func ResetConfig(db *DB, level string) error {
 // DHCP, VPNs, accounts, sign-in, the console port and outside connections (syslog, NetFlow, SNMP) stay.
 var preferenceKeys = []string{
 	"alerts.config", "alerts.new_since", "backup.config", "logs.long_days", "logs.max_mb", "logs.retention_days",
-	"logs.admin_days", "logs.include_history", "dns.log_retention_days", "fw.revisions_keep", "fw.log_allowed", "fw.log_drops",
+	"logs.admin_days", "logs.history_days", "logs.hourly_days", "logs.include_history", "dns.log_retention_days", "fw.revisions_keep", "fw.log_allowed", "fw.log_drops",
 	"update.check_hours", "speed.on", "speedtest.config",
 }
 

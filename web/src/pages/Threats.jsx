@@ -4,7 +4,7 @@ import { del, post, put, get, useData } from '../api.js';
 import { ScheduleEditor } from '../ScheduleEditor.jsx';
 import { Chart, fmtBits } from '../charts.jsx';
 import { usePeriod } from '../period.js';
-import { Button, Card, Empty, Field, Input, Modal, Note, NumberInput, Page, Pill, Segmented, Steps, Switch, Tabs, Limited, Bar, useAction, useCheck, CheckLine, fmt } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, NumberInput, Page, Pill, Segmented, Steps, Switch, Tabs, Limited, Bar, useToast, useAction, useCheck, CheckLine, fmt } from '../ui.jsx';
 
 // Threat watching. An engine (Suricata) is installed only when the owner asks. It watches copies of
 // the traffic and NopeWarden says what it noticed in plain words. It never holds traffic up, so a
@@ -389,6 +389,76 @@ const dur = (secs) => {
 const when = (ts) => (ts ? new Date(ts * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'never');
 
 // The Overview tab, built like the DNS one: the numbers first, then charts, then who and what.
+// Who is knocking on the door: blocked attempts from the internet, from the firewall log. It works
+// whether or not the threat-watching program is installed.
+const EDGE_LEVELS = ['quiet', 'low', 'mid', 'high'];
+const EDGE_HOURS = { '1h': 1, '24h': 24, '7d': 168 };
+function EdgeNumbers() {
+  const [range, setRange, rangeOptions] = usePeriod('threats-edge');
+  const toast = useToast();
+  const { data: e } = useData(`/api/threat/edge?hours=${EDGE_HOURS[range] || 24}`, { every: 30000 });
+  if (!e) return null;
+  const words = range === '1h' ? 'the last hour' : range === '24h' ? 'the last 24 hours' : 'the last 7 days';
+  const copy = async (a) => { try { await navigator.clipboard.writeText(a); toast('Copied.'); } catch { toast('Could not copy. Select the address and copy it.', 'bad'); } };
+  const topDay = Math.max(1, ...e.days.map((d) => d.worst));
+  const level = (d) => (d.total === 0 ? 0 : d.worst >= topDay * 0.66 ? 3 : d.worst >= topDay * 0.25 ? 2 : 1);
+  const dayText = (d) => `${new Date(d.day * 1000).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}: ${d.total ? `${fmt.n(d.total)} blocked, worst hour ${new Date(d.worst_at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (${fmt.n(d.worst)})` : 'nothing blocked'}`;
+  const maxPort = Math.max(1, ...e.ports.map((p) => p.attempts));
+  const maxNet = Math.max(1, ...e.networks.map((n) => n.attempts));
+  return (
+    <>
+      <Card title="At your front door" desc={e.total ? `${fmt.n(e.total)} attempts from the internet were blocked in ${words}, from ${fmt.n(e.sources)} address${e.sources === 1 ? '' : 'es'}.` : `Nothing from the internet was blocked in ${words}.`}
+        actions={<Segmented value={range} onChange={setRange} options={rangeOptions} />}>
+        <div className="stack">
+          <div className="dns-cards">
+            <div className="stack gap1">
+              <b className="small">Who is probing you</b>
+              {!e.probers.length ? <Empty>Nobody, in this period.</Empty> : (
+                <div className="list">
+                  {e.probers.map((p) => (
+                    <div className="item" key={p.addr}>
+                      <div><div className="name mono">{p.addr}{p.country ? ` · ${p.country}` : ''}</div><div className="meta">{p.reason}{p.ports >= 4 && p.top.length ? `. Most tried: ${p.top.join(', ')}` : ''}</div></div>
+                      <div className="actions"><span className="meta">{fmt.n(p.attempts)} tries</span><Button small onClick={() => copy(p.addr)}>Copy address</Button></div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="stack">
+              <div className="stack gap1">
+                <b className="small">Doors being tried</b>
+                {!e.ports.length ? <Empty>None, in this period.</Empty> : e.ports.slice(0, 6).map((p) => (
+                  <div key={`${p.proto}${p.port}`} className="stack gap1">
+                    <div className="spread small"><span>{p.label}</span><span className="muted">{fmt.n(p.attempts)} from {fmt.n(p.sources)} address{p.sources === 1 ? '' : 'es'}</span></div>
+                    <Bar pct={(100 * p.attempts) / maxPort} thin />
+                  </div>
+                ))}
+              </div>
+              <div className="stack gap1">
+                <b className="small">Aimed at</b>
+                {!e.networks.length ? <Empty>Nothing.</Empty> : e.networks.map((n) => (
+                  <div key={n.network} className="stack gap1">
+                    <div className="spread small"><span>{n.network}</span><span className="muted">{fmt.n(n.attempts)}</span></div>
+                    <Bar pct={(100 * n.attempts) / maxNet} thin />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="stack gap1">
+            <b className="small">The last 30 days, with each day's worst hour</b>
+            <div className="edge-strip" role="img" aria-label="Blocked attempts for each of the last 30 days">
+              {e.days.map((d) => <span key={d.day} className={`edge-day ${EDGE_LEVELS[level(d)]}`} title={dayText(d)} />)}
+            </div>
+            <div className="spread small muted"><span>30 days ago</span><span>Today</span></div>
+            <p className="small muted">Grey is a quiet day, yellow a busy one and red the busiest. Hover a day to read it. Days older than the firewall log keeps (Settings, Storage) show as empty.</p>
+          </div>
+        </div>
+      </Card>
+    </>
+  );
+}
+
 function ThreatOverview({ data, goTab }) {
   const { data: ov } = useData('/api/threat/overview', { every: 10000 });
   const [range, setRange, rangeOptions] = usePeriod('threats');
@@ -502,7 +572,7 @@ export default function Threats() {
       <Tabs value={tab} onChange={setTab} tabs={tabs} />
       {data && (
         <div className="stack">
-          {tab === 'overview' && (setupNeeded ? <Install data={data} reload={reload} /> : <><StatusLine data={data} goTab={setTab} />{p.installed && !working && <ThreatOverview data={data} goTab={setTab} />}</>)}
+          {tab === 'overview' && (setupNeeded ? <><EdgeNumbers /><Install data={data} reload={reload} /></> : <><StatusLine data={data} goTab={setTab} /><EdgeNumbers />{p.installed && !working && <ThreatOverview data={data} goTab={setTab} />}</>)}
           {tab !== 'overview' && setupNeeded && <Note>Threat watching is not installed yet. Install it on the <button type="button" className="link" onClick={() => setTab('overview')}>Overview</button> tab.</Note>}
           {tab === 'settings' && !setupNeeded && <Settings data={data} reload={reload} />}
           {p.installed && tab === 'alerts' && <Alerts data={data} reload={reload} />}

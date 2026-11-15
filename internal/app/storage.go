@@ -66,12 +66,29 @@ func (a *App) storTables() []storTable {
 		{"admin", "Admin activity", fmt.Sprintf("%d days. Never cleared by hand: it is the record of what people did", a.adminDays()), "logs", "events", "ts", adm, false},
 		{"traffic", "Data used by each device", fmt.Sprintf("%d days", days), "logs", "traffic", "ts", "", true},
 		{"countries", "Data by country", fmt.Sprintf("%d days", days), "logs", "country_traffic", "ts", "", true},
-		{"history", "Overview charts", "Kept in three steps: fine for 2 hours, medium for 25 hours, coarse for 31 days", "logs", "metrics", "ts", "", true},
+		{"history", "Overview charts", a.historyPolicy(), "logs", "metrics", "ts", "", true},
 		{"speed", "Speed tests", "365 days", "logs", "speedtests", "ts", "", true},
 		{"threats", "Threat alerts", fmt.Sprintf("%d days", long), "logs", "threat_alerts", "ts", "", true},
 		{"outages", "Internet outages", fmt.Sprintf("%d days", long), "logs", "outages", "start", "", true},
 		{"revisions", "Firewall change copies", fmt.Sprintf("The newest %d, plus the one in use and any waiting to be kept", a.revKeep()), "config", "fw_revisions", "created_at", "", false},
 	}
+}
+
+func (a *App) historyPolicy() string {
+	d := a.historyDays()
+	long := "never removed"
+	if d > 0 {
+		long = fmt.Sprintf("%d days", d)
+	}
+	return fmt.Sprintf("Kept in four steps: fine for 2 hours, medium for 25 hours, hourly for %d days, and one point a day (with the lowest and highest) for %s. Never trimmed by the size limit", a.hourlyDays(), long)
+}
+
+// historySizes estimates what one more year of daily history and one more 30 days of hourly history
+// would add, from the number of charts being recorded now.
+func (a *App) historySizes() (series int64, perYear int64, hourlyMonth int64) {
+	a.Logs.QueryRow(`SELECT COUNT(DISTINCT key) FROM metrics WHERE key LIKE 'b|%'`).Scan(&series)
+	const row = 40 // bytes for one stored point: key, time, value and index
+	return series, series * 3 * 365 * row, series * 24 * 30 * row
 }
 
 func (a *App) adminDays() int {
@@ -177,6 +194,7 @@ func (a *App) storageReport() map[string]any {
 		out = append(out, r)
 	}
 	usage := a.logUsage()
+	hs, hy, hm := a.historySizes()
 	var st syscall.Statfs_t
 	var free, total int64
 	if syscall.Statfs(a.Config.Path, &st) == nil {
@@ -189,7 +207,10 @@ func (a *App) storageReport() map[string]any {
 		"tables": out, "logs_bytes": usage["used_bytes"], "config_bytes": cfgPages * cfgSize,
 		"disk_free": free, "disk_total": total,
 		"days": a.logDays(), "long_days": a.longDays(), "admin_days": a.adminDays(), "max_mb": int(a.settingFloat("logs.max_mb", 200)), "revisions_keep": a.revKeep(),
-		"last_prune": usage["last_prune"],
+		"last_prune":   usage["last_prune"],
+		"history_days": a.historyDays(), "hourly_days": a.hourlyDays(),
+		"history_choices": historyChoices, "hourly_choices": hourlyChoices,
+		"history_series": hs, "history_year_bytes": hy, "hourly_month_bytes": hm,
 	}
 }
 
@@ -208,10 +229,12 @@ func (a *App) registerStorageRoutes() {
 	})
 	a.API.HandleAdmin("PUT /api/logs/storage", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		var in struct {
-			Days          int `json:"days"`
-			LongDays      int `json:"long_days"`
-			AdminDays     int `json:"admin_days"`
-			RevisionsKeep int `json:"revisions_keep"`
+			Days          int  `json:"days"`
+			LongDays      int  `json:"long_days"`
+			AdminDays     int  `json:"admin_days"`
+			RevisionsKeep int  `json:"revisions_keep"`
+			HistoryDays   *int `json:"history_days"`
+			HourlyDays    *int `json:"hourly_days"`
 		}
 		if !api.Decode(w, r, &in) {
 			return
@@ -231,6 +254,32 @@ func (a *App) registerStorageRoutes() {
 		if in.RevisionsKeep < 20 || in.RevisionsKeep > 5000 {
 			fail(w, fmt.Errorf("keep between 20 and 5000 firewall change copies"))
 			return
+		}
+		if in.HistoryDays != nil {
+			ok := false
+			for _, c := range historyChoices {
+				ok = ok || c == *in.HistoryDays
+			}
+			if !ok {
+				fail(w, fmt.Errorf("keep chart history for 90 days, 1, 2, 5 or 10 years, or everything"))
+				return
+			}
+		}
+		if in.HourlyDays != nil {
+			ok := false
+			for _, c := range hourlyChoices {
+				ok = ok || c == *in.HourlyDays
+			}
+			if !ok {
+				fail(w, fmt.Errorf("keep hourly detail for 31, 90 or 365 days"))
+				return
+			}
+		}
+		if in.HistoryDays != nil {
+			a.Config.SetSetting("logs.history_days", strconv.Itoa(*in.HistoryDays))
+		}
+		if in.HourlyDays != nil {
+			a.Config.SetSetting("logs.hourly_days", strconv.Itoa(*in.HourlyDays))
 		}
 		if in.Days != 0 {
 			a.Config.SetSetting("logs.retention_days", strconv.Itoa(in.Days))

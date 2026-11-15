@@ -43,6 +43,7 @@ func (a *App) registerRoutes() {
 	a.registerDNSStageRoutes()
 	a.registerResolverRoutes()
 	a.registerThreatOverviewRoutes()
+	a.registerThreatEdgeRoutes()
 	a.registerPowerRoutes()
 	a.registerResetRoutes()
 	a.registerBackupRoutes()

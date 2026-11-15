@@ -135,6 +135,25 @@ func seedDemoLogs(c *client) {
 		{TS: now - 40, Verdict: "allow", Tag: "rule:Home:Internet:Web", In: "eth1", Out: "eth0", Src: "192.168.1.110", Dst: "142.250.80.46", Proto: "tcp", SPort: 51000, DPort: 443},
 		{TS: now - 30, Verdict: "drop", Tag: "default:fwd", In: "eth1", Out: "eth0", Src: "192.168.1.115", Dst: "203.0.113.9", Proto: "tcp", SPort: 51001, DPort: 25},
 	})
+	// Blocked attempts from the internet over the last month, for the Threats front-door card.
+	scanners := []struct {
+		addr  string
+		ports []int
+	}{
+		{"198.51.100.7", []int{22, 23, 80, 443, 445, 3389, 8080, 5060, 21, 25, 110, 143, 993, 1883, 8443, 9100, 631, 554}},
+		{"203.0.113.50", []int{22}},
+		{"192.0.2.77", []int{3389, 445}},
+		{"198.18.0.9", []int{23, 2323}},
+	}
+	for day := 0; day < 30; day++ {
+		for si, sc := range scanners {
+			for k := 0; k < (day*7+si*13)%9+1; k++ {
+				p := sc.ports[(day+k)%len(sc.ports)]
+				c.app.Logs.Exec(`INSERT INTO fw_events(ts,action,from_zone,from_addr,to_zone,to_addr,proto,dport) VALUES(?,?,?,?,?,?,?,?)`,
+					now-int64(day)*86400-int64(k)*600-int64(si)*60, "drop", "Internet", sc.addr, "Home", "192.0.2.2", "tcp", p)
+			}
+		}
+	}
 	c.app.Logs.Exec(`UPDATE fw_events SET outcome='Completed',bytes_out=2600,bytes_in=1480000,dur=25 WHERE dport=443`)
 	c.app.QLog.Add(dnssrv.LogEntry{TS: now - 20, Client: "192.168.1.110", ClientName: "Living room TV", QName: "api.example.com", QType: "A", Result: "forwarded", RCode: "NOERROR", Upstream: "1.1.1.1", LatencyUS: 14200})
 	c.app.QLog.Add(dnssrv.LogEntry{TS: now - 10, Client: "192.168.1.112", ClientName: "Marvin's laptop", QName: "nothing-here.example.net", QType: "AAAA", Result: "forwarded", RCode: "NXDOMAIN", Upstream: "1.1.1.1", LatencyUS: 31800})

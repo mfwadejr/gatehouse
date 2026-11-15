@@ -1,6 +1,16 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.43',
+    title: 'Longer chart history, and who is knocking on your door',
+    items: [
+      'Charts can now remember years. A new Keep chart history for choice in Settings, Alerts & logs, Storage offers 90 days, 1 year (the default), 2, 5 or 10 years, or Everything. One point a day is kept for every chart, with that day\'s lowest and highest, and the size limit never trims it. The size of each extra year is shown beside the choice.',
+      'Keep hourly chart detail for lets the hourly points last 31, 90 or 365 days, with the extra size shown.',
+      'Threats opens with At your front door, even before threat watching is installed: how many attempts from the internet were blocked (1 h, 24 h or 7 d), Who is probing you with a plain reason and Copy address, Doors being tried, which of your networks they were aimed at, and a strip of the last 30 days showing each day\'s worst hour.',
+      'Restore default settings puts the two new choices back to their defaults. Clearing the Overview charts or resetting the box clears the daily history too.',
+    ],
+  },
+  {
     version: '0.9.4.42',
     title: 'Look and feel',
     items: [

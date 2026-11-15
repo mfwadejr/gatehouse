@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { post, put, useData } from '../api.js';
-import { Button, Card, DangerStep, Field, Modal, Note, NumberInput, useAction, useStepUp, fmt } from '../ui.jsx';
+import { Button, Card, DangerStep, Field, Modal, Note, NumberInput, Select, useAction, useStepUp, fmt } from '../ui.jsx';
 
 const bytes = (n) => {
   if (!n) return '0 B';
@@ -58,6 +58,8 @@ function ClearByHand({ rows, reload }) {
 
 const PV = { connections: 'connections', lookups: 'DNS lookups', events: 'activity entries', admin: 'admin activity entries', traffic: 'device traffic rows', countries: 'country rows', threats: 'threat alerts', outages: 'outages' };
 
+const HISTORY_LABEL = { 90: '90 days', 365: '1 year', 730: '2 years', 1825: '5 years', 3650: '10 years', 0: 'Everything' };
+
 // What the rules would remove if they ran right now.
 function Preview({ pv }) {
   const parts = Object.keys(PV).filter((k) => pv[k] > 0).map((k) => `${fmt.n(pv[k])} ${PV[k]}`);
@@ -71,7 +73,7 @@ export default function Storage() {
   const [run, busy] = useAction();
   const [f, setF] = useState(null);
   const { data: pv, reload: reloadPv } = useData('/api/logs/cleanup-preview', { every: 30000 });
-  useEffect(() => { if (data && !f) setF({ days: data.days, long_days: data.long_days, admin_days: data.admin_days, revisions_keep: data.revisions_keep }); }, [data, f]);
+  useEffect(() => { if (data && !f) setF({ days: data.days, long_days: data.long_days, admin_days: data.admin_days, revisions_keep: data.revisions_keep, history_days: data.history_days, hourly_days: data.hourly_days }); }, [data, f]);
   if (!data) return <Card title="Storage"><span className="muted">Loading…</span></Card>;
   const rows = [...data.tables].sort((a, b) => b.bytes - a.bytes);
   const total = data.tables.reduce((a, t) => a + t.bytes, 0);
@@ -110,6 +112,17 @@ export default function Storage() {
             <Field label="Keep this many firewall change copies" hint="The copies you can go back to. The one in use is always kept. 20 to 5000."><NumberInput value={f.revisions_keep} min={20} max={5000} onChange={(v) => setF({ ...f, revisions_keep: v })} /></Field>
           </div>
         )}
+        {f && (
+          <div className="formgrid">
+            <Field label="Keep chart history for" hint={`One point a day for every chart, with the day's lowest and highest. About ${bytes(data.history_year_bytes)} for each year kept. The size limit never trims it.`}>
+              <Select value={String(f.history_days)} onChange={(v) => setF({ ...f, history_days: Number(v) })} options={(data.history_choices || []).map((d) => ({ value: String(d), label: HISTORY_LABEL[d] || `${d} days` }))} />
+            </Field>
+            <Field label="Keep hourly chart detail for" hint={`Hourly points for the charts. About ${bytes(data.hourly_month_bytes)} for each extra 30 days. 31 days is the default.`}>
+              <Select value={String(f.hourly_days)} onChange={(v) => setF({ ...f, hourly_days: Number(v) })} options={(data.hourly_choices || []).map((d) => ({ value: String(d), label: `${d} days` }))} />
+            </Field>
+          </div>
+        )}
+        {f && f.history_days === 0 && <Note tone="warn">Everything is kept until you clear it by hand or reset the box. That is a small amount of data (about {bytes(data.history_year_bytes)} a year).</Note>}
         {pv && <Preview pv={pv.would_remove} last={pv} />}
         <p className="small muted">Cleaned up automatically once an hour{data.last_prune ? `; last at ${fmt.dt(data.last_prune)}${data.last_prune && pv ? `, ${fmt.n(pv.last_removed)} entries removed` : ''}` : ''}.</p>
         <ClearByHand rows={data.tables} reload={() => { reload(); reloadPv(); }} />

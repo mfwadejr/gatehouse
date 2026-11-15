@@ -278,11 +278,12 @@ type zoneCounters struct {
 }
 
 type histState struct {
-	mu       sync.Mutex
-	lastAt   time.Time
-	lastFW   int64
-	zones    map[string]zoneCounters
-	lastRoll [2]int64
+	mu        sync.Mutex
+	lastAt    time.Time
+	lastFW    int64
+	zones     map[string]zoneCounters
+	lastRoll  [2]int64
+	lastDaily int64
 }
 
 func avgTail(s []float64, n int) float64 {
@@ -438,9 +439,77 @@ func (a *App) recordHistory(now time.Time) {
 	}
 	roll("a", "b|", tierB, 0)
 	roll("b", "c|", tierC, 1)
+	a.rollDaily(now)
 	a.Logs.Exec(`DELETE FROM metrics WHERE key LIKE 'a|%' AND ts<?`, ts-2*3600)
 	a.Logs.Exec(`DELETE FROM metrics WHERE key LIKE 'b|%' AND ts<?`, ts-25*3600)
-	a.Logs.Exec(`DELETE FROM metrics WHERE key LIKE 'c|%' AND ts<?`, ts-31*24*3600)
+	a.Logs.Exec(`DELETE FROM metrics WHERE key LIKE 'c|%' AND ts<?`, ts-int64(a.hourlyDays())*24*3600)
+	if days := a.historyDays(); days > 0 {
+		cut := ts - int64(days)*24*3600
+		a.Logs.Exec(`DELETE FROM metrics WHERE (key LIKE 'd|%' OR key LIKE 'n|%' OR key LIKE 'x|%') AND ts<?`, cut)
+	}
+}
+
+// Chart history lasts as long as the admin chose. The daily step (d| average, n| lowest, x| highest,
+// one point for each local day) is kept for historyDays; 0 means it is never removed. The hourly
+// step keeps its own, shorter period. Neither is touched by the size limit: the daily step is tiny.
+const (
+	defaultHistoryDays = 365
+	defaultHourlyDays  = 31
+)
+
+var historyChoices = []int{90, 365, 730, 1825, 3650, 0}
+var hourlyChoices = []int{31, 90, 365}
+
+func (a *App) historyDays() int {
+	d := int(a.settingFloat("logs.history_days", defaultHistoryDays))
+	for _, c := range historyChoices {
+		if c == d {
+			return d
+		}
+	}
+	return defaultHistoryDays
+}
+
+func (a *App) hourlyDays() int {
+	d := int(a.settingFloat("logs.hourly_days", defaultHourlyDays))
+	for _, c := range hourlyChoices {
+		if c == d {
+			return d
+		}
+	}
+	return defaultHourlyDays
+}
+
+func dayStart(t time.Time) int64 {
+	t = t.Local()
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location()).Unix()
+}
+
+// rollDaily writes yesterday's average, lowest and highest for every series once, from the
+// five-minute step, which still holds the whole of yesterday. It looks at most once an hour, so a
+// restart just after midnight still catches up.
+func (a *App) rollDaily(now time.Time) {
+	hour := now.Unix() / 3600
+	a.hist.mu.Lock()
+	if a.hist.lastDaily == hour {
+		a.hist.mu.Unlock()
+		return
+	}
+	a.hist.lastDaily = hour
+	a.hist.mu.Unlock()
+	end := dayStart(now)
+	start := dayStart(time.Unix(end-3600, 0))
+	var have int64
+	a.Logs.QueryRow(`SELECT COUNT(*) FROM metrics WHERE key LIKE 'd|%' AND ts=?`, start).Scan(&have)
+	if have > 0 {
+		return
+	}
+	a.Logs.Exec(`INSERT OR REPLACE INTO metrics(ts,key,value)
+		SELECT ?, 'd|'||substr(key,3), AVG(value) FROM metrics WHERE key LIKE 'b|%' AND ts>=? AND ts<? GROUP BY key`, start, start, end)
+	a.Logs.Exec(`INSERT OR REPLACE INTO metrics(ts,key,value)
+		SELECT ?, 'n|'||substr(key,3), MIN(value) FROM metrics WHERE key LIKE 'b|%' AND ts>=? AND ts<? GROUP BY key`, start, start, end)
+	a.Logs.Exec(`INSERT OR REPLACE INTO metrics(ts,key,value)
+		SELECT ?, 'x|'||substr(key,3), MAX(value) FROM metrics WHERE key LIKE 'b|%' AND ts>=? AND ts<? GROUP BY key`, start, start, end)
 }
 
 func (a *App) collectHistory(ctx context.Context) {
@@ -465,6 +534,13 @@ var histRanges = map[string]struct {
 	"24h": {"b", 24 * 3600, tierB},
 	"7d":  {"c", 7 * 24 * 3600, tierC},
 	"30d": {"c", 30 * 24 * 3600, tierC},
+	// Longer ranges come from the daily step (or the hourly one when it is kept that long).
+	"90d": {"d", 90 * 24 * 3600, 86400},
+	"1y":  {"d", 365 * 24 * 3600, 86400},
+	"2y":  {"d", 730 * 24 * 3600, 86400},
+	"5y":  {"d", 1825 * 24 * 3600, 86400},
+	"10y": {"d", 3650 * 24 * 3600, 86400},
+	"all": {"d", 100 * 365 * 24 * 3600, 86400},
 }
 
 // history returns the saved points of a range: series name -> [[time, value], ...], oldest first.
@@ -489,7 +565,27 @@ func (a *App) history(rng string) map[string]any {
 			series[k] = append(series[k], [2]float64{float64(ts), v})
 		}
 	}
-	return map[string]any{"range": rng, "step": r.step, "from": from, "to": to, "series": series}
+	out := map[string]any{"range": rng, "step": r.step, "from": from, "to": to, "series": series}
+	if r.tier == "d" {
+		// Each day also carries its lowest and highest reading.
+		low, high := map[string][][2]float64{}, map[string][][2]float64{}
+		for letter, dst := range map[string]map[string][][2]float64{"n": low, "x": high} {
+			rows, err := a.Logs.Query(`SELECT key,ts,value FROM metrics WHERE key LIKE ? AND ts>=? ORDER BY ts`, letter+"|%", from)
+			if err != nil {
+				continue
+			}
+			for rows.Next() {
+				var k string
+				var ts int64
+				var v float64
+				rows.Scan(&k, &ts, &v)
+				dst[k[2:]] = append(dst[k[2:]], [2]float64{float64(ts), v})
+			}
+			rows.Close()
+		}
+		out["low"], out["high"] = low, high
+	}
+	return out
 }
 
 // ---- world map ----
