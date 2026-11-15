@@ -3,7 +3,7 @@ import MapLocation from './MapLocation.jsx';
 import { useTheme } from '../theme.js';
 import React, { useEffect, useState } from 'react';
 import { del, get, post, put, useData } from '../api.js';
-import { Guard, Button, Card, Empty, Field, Form, Input, Modal, Note, Page, Pill, Segmented, Select, Tabs, ToggleRow, useAction, useCheck, CheckLine, fmt, useStepUp, useToast, DangerStep } from '../ui.jsx';
+import { Guard, Button, Card, Empty, Field, Form, Input, Modal, Note, Page, Pill, Segmented, Select, Tabs, ToggleRow, useAction, useCheck, CheckLine, fmt, useStepUp, useToast, DangerStep, CodeInput } from '../ui.jsx';
 import { Enrol } from './Auth.jsx';
 import Backups from './Backups.jsx';
 import Changes from './Changes.jsx';
@@ -104,7 +104,7 @@ function TwoStep({ me, data, reload, boot }) {
             onClick={async () => { if (await run(() => post('/api/auth/mfa/disable', { password: f.password, code: f.code.trim() }), 'Two-factor sign-in is off.')) { setTurningOff(false); setF({ password: '', code: '' }); reload(); boot?.(); } }}>Turn off</Button></>}>
           <p className="sec">Confirm it is you. Enter your password and a current code from your phone (or a recovery code).</p>
           <Field label="Password"><Input type="password" value={f.password} onChange={(v) => setF({ ...f, password: v })} autoComplete="current-password" /></Field>
-          <Field label="Code"><Input className="codebox" value={f.code} onChange={(v) => setF({ ...f, code: v })} inputMode="numeric" autoComplete="one-time-code" /></Field>
+          <Field label="Code"><CodeInput value={f.code} onChange={(v) => setF({ ...f, code: v })} /></Field>
         </Modal>
       )}
     </Card>

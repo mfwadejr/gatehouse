@@ -1,5 +1,4 @@
 import { WhatChanged } from '../whatchanged.jsx';
-import { usePeriod } from '../period.js';
 import React, { useState } from 'react';
 import TrafficPanel from '../TrafficPanel.jsx';
 import { del, holdAnd, post, put, useData } from '../api.js';
@@ -181,7 +180,6 @@ export default function Networks({ me }) {
   const { data: dev } = useData('/api/devices', { topics: ['dhcp.leases'], every: 15000 });
   const { data: st, reload: rs } = useData('/api/net/status', { topics: ['net.status'], every: 4000 });
   const { data: fwo, reload: rfw } = useData('/api/fw/overview', { topics: ['fw.status'] });
-  const [period] = usePeriod('networks');
   const { data: alerts } = useData('/api/dhcp/alerts', { topics: ['dhcp.alerts'] });
   const { ports, reload: rp } = usePortWatch(false);
   const pn = usePortNames();
@@ -212,7 +210,7 @@ export default function Networks({ me }) {
         </Note>
       ))}
       {ifs && <NetworkLayout nets={nets} zones={zones} scopes={scopes} onOpen={(n) => setEdit(n)} />}
-      <WhatChanged match={/network|bridge|port|vlan|dhcp|wan|vpn|tunnel|link/i} range={period} />
+      <WhatChanged match={/network|bridge|port|vlan|dhcp|wan|vpn|tunnel|link/i} page="networks" />
       <Card title="Your networks" desc="Each one is separate. What it can reach is decided on the Firewall page.">
         {!ifs ? null : !nets.length ? (
           <Empty>

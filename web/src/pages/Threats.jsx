@@ -449,9 +449,9 @@ function ThreatOverview({ data, goTab }) {
       <Card title="What changed" desc="Updates, switch-offs and changes. Individual alerts are on the Alerts tab.">
         {!ov.feed.length ? <Empty>Nothing yet.</Empty> : (
           <div className="list">
-            {ov.feed.map((f, i) => (
+            <Limited items={ov.feed} noun="changes" render={(f, i) => (
               <div className="item" key={`${f.ts}-${i}`}><div><div className="name">{f.title}</div>{f.detail && <div className="meta">{f.detail}</div>}</div><div className="meta">{when(f.ts)}</div></div>
-            ))}
+            )} />
           </div>
         )}
       </Card>

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { post } from '../api.js';
-import { Button, Field, Input, Modal, useAction, useStepUp } from '../ui.jsx';
+import { Button, Field, Input, Modal, useAction, useStepUp, CodeInput } from '../ui.jsx';
 
 const POWER = {
   reboot: { title: 'Restart this machine', verb: 'Restart', warn: 'The network is down for about a minute while it restarts. This page reconnects by itself.', waiting: 'Restarting…' },
@@ -44,7 +44,7 @@ export function PowerModal({ action, me, onClose }) {
     <Modal title={meta.title} onClose={onClose}
       footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy || (needCode && code.length < 6)} onClick={go}>{meta.verb}</Button></>}>
       <p>{meta.warn}</p>
-      {needCode && <Field label="Code from your authenticator app"><Input value={code} onChange={setCode} inputMode="numeric" autoComplete="one-time-code" autoFocus /></Field>}
+      {needCode && <Field label="Code from your authenticator app"><CodeInput value={code} onChange={setCode} autoFocus /></Field>}
     </Modal>
   );
 }

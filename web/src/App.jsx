@@ -1,7 +1,7 @@
 import { AttentionProvider, useAttention, levelText } from './attention.jsx';
-import React, { Suspense, lazy, useCallback, useEffect, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ApiError, get, post, setCsrf, useData } from './api.js';
-import { Guard, Icon, Loading } from './ui.jsx';
+import { Guard, Icon, Loading, Segmented } from './ui.jsx';
 import { Logo } from './logo.jsx';
 import { Enrol, Login, Setup } from './pages/Auth.jsx';
 import FailbackPrompt from './pages/FailbackPrompt.jsx';
@@ -75,6 +75,49 @@ function useRoute() {
   return route;
 }
 
+// The person's corner of the menu: their name opens a short list of things that are about them or the
+// whole console (account, look, help, what is new, sign out), instead of loose buttons.
+function ProfileMenu({ me, theme, setTheme, version, updateReady, onNotes, onSignOut, initials }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef(null);
+  const trig = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const away = (e) => { if (box.current && !box.current.contains(e.target)) setOpen(false); };
+    const key = (e) => { if (e.key === 'Escape') { setOpen(false); trig.current?.focus(); } };
+    document.addEventListener('mousedown', away);
+    document.addEventListener('keydown', key);
+    return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', key); };
+  }, [open]);
+  const role = `${me.user.role === 'admin' ? 'Admin' : 'Viewer'}${me.user.totp_enabled ? ' · 2-step' : ''}`;
+  const pick = (fn) => () => { setOpen(false); fn(); };
+  return (
+    <div className="me" ref={box}>
+      <button type="button" className="me-trigger" ref={trig} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <span className="avatar">{initials}</span>
+        <span className="who">
+          <span title={me.user.username}>{me.user.username}</span>
+          <span className="small muted" title={role}>{role}</span>
+        </span>
+        {updateReady && <span className="navdot" role="img" aria-label="An update is ready" title="An update is ready" />}
+        <Icon name="chevup" size={16} />
+      </button>
+      {open && (
+        <div className="me-menu" role="menu">
+          <button type="button" role="menuitem" onClick={pick(() => go('settings/account'))}>Account &amp; sign-in</button>
+          <div className="me-row" role="group" aria-label="Appearance"><span>Appearance</span><Segmented value={theme === 'light' ? 'light' : 'dark'} onChange={setTheme} options={[{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} /></div>
+          <a role="menuitem" href="/help/" target="_blank" rel="noopener" onClick={() => setOpen(false)}>Help</a>
+          {updateReady
+            ? <button type="button" role="menuitem" onClick={pick(() => go('updates'))}>Update available</button>
+            : <button type="button" role="menuitem" onClick={pick(onNotes)}>What's new</button>}
+          {version && <div className="me-ver small muted">Version {version}</div>}
+          <button type="button" role="menuitem" className="me-out" onClick={pick(onSignOut)}><Icon name="logout" size={16} /> Sign out</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export const go = (id) => { window.location.hash = `#/${id}`; };
 
 function Shell({ me, onSignOut, reloadMe }) {
@@ -92,6 +135,22 @@ function Shell({ me, onSignOut, reloadMe }) {
   const [theme, setTheme] = useTheme();
   const [open, setOpen] = useState(false);
   useEffect(() => { setOpen(false); }, [route]);
+  // The highlight behind the current page slides to the new one. It is measured from the real link, so
+  // it follows resizes, zoom and the group headings; the first placement does not animate.
+  const navRef = useRef(null);
+  const [pill, setPill] = useState(null);
+  const place = useCallback(() => {
+    const on = navRef.current?.querySelector('a.on');
+    if (!on) { setPill(null); return; }
+    setPill((p) => (p && p.top === on.offsetTop && p.height === on.offsetHeight ? p : { top: on.offsetTop, height: on.offsetHeight, seen: !!p }));
+  }, []);
+  useLayoutEffect(() => { place(); }, [place, route, open, attn.items.length]);
+  useEffect(() => {
+    if (!navRef.current || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(place);
+    ro.observe(navRef.current);
+    return () => ro.disconnect();
+  }, [place]);
   const { data: upd } = useData('/api/system/update', { every: 600000 });
   useSearchShortcut(useCallback(() => setFinding(true), []));
   const initials = (me.user.username || '?').slice(0, 2).toUpperCase();
@@ -101,7 +160,8 @@ function Shell({ me, onSignOut, reloadMe }) {
         <div className="brand"><Logo size={32} /><span>NopeWarden</span></div>
         <button type="button" className="srchbtn" onClick={() => setFinding(true)} aria-label="Search"><Icon name="search" /><span>Search</span><kbd>/</kbd></button>
         <button type="button" className="menubtn" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls="primary-nav"><Icon name={open ? 'x' : 'menu'} /><span>Menu</span></button>
-        <nav className="nav" id="primary-nav" aria-label="Primary">
+        <nav className="nav" id="primary-nav" aria-label="Primary" ref={navRef}>
+          {pill && <span className={`nav-pill ${pill.seen ? 'slides' : ''}`} aria-hidden="true" style={{ transform: `translateY(${pill.top}px)`, height: pill.height }} />}
           {PAGES.filter((p) => !p.hidden).map((p, i, vis) => (
             <React.Fragment key={p.id}>
             {p.group && p.group !== vis[i - 1]?.group && <span className="navgroup">{p.group}</span>}
@@ -115,18 +175,7 @@ function Shell({ me, onSignOut, reloadMe }) {
             </React.Fragment>
           ))}
         </nav>
-        <div className="me">
-          <div className="avatar">{initials}</div>
-          <div className="who">
-            <span title={me.user.username}>{me.user.username}</span>
-            <span className="small muted" title={`${me.user.role === 'admin' ? 'Admin' : 'Viewer'}${me.user.totp_enabled ? ' · 2-step on' : ''}`}>{me.user.role === 'admin' ? 'Admin' : 'Viewer'}{me.user.totp_enabled ? ' · 2-step' : ''}</span>
-          </div>
-          <button type="button" className="themebtn" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} aria-label={theme === 'light' ? 'Switch to the dark look' : 'Switch to the light look'} title={theme === 'light' ? 'Switch to the dark look' : 'Switch to the light look'}><Icon name={theme === 'light' ? 'moon' : 'sun'} size={16} /></button>
-          <button type="button" className="signoutbtn" onClick={onSignOut} aria-label="Sign out" title="Sign out"><Icon name="logout" size={16} /></button>
-          {upd?.current && (attn.items.some((x) => x.id === 'updates')
-            ? <a className="link small verline" href="#/updates" title="An update is ready">Version {upd.current} · Update available</a>
-            : <button type="button" className="link small verline" onClick={() => setNotes(true)}>Version {upd.current} · What's new</button>)}
-        </div>
+        <ProfileMenu me={me} theme={theme} setTheme={setTheme} version={upd?.current} updateReady={attn.items.some((x) => x.id === 'updates')} onNotes={() => setNotes(true)} onSignOut={onSignOut} initials={initials} />
       </aside>
       <main className="main" id="main">
         {ha?.standby && <div className="note warn" role="status" style={{ margin: 'var(--space-3)' }}><div><strong>This is the standby unit.</strong> Settings are read-only here; make changes on the active unit{ha.peer_addr ? ` (${ha.peer_addr})` : ''}. <a href="#/settings">High availability</a></div></div>}

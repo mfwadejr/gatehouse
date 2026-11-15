@@ -1,6 +1,18 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.42',
+    title: 'Look and feel',
+    items: [
+      'Long lists now have pages instead of Show more: Previous, page numbers and Next, a count such as Showing 1 to 10 of 27 backups, and Rows per page (10, 25 or 50, remembered). Backups, Backup history, Changes, and What changed on Networks, DNS, DHCP and Threats all use it.',
+      'Internet, Firewall and Updates now show the coloured dot on the tab that holds the reason, like the other pages.',
+      'On Networks, the tags under each network are buttons that open the page explaining them, and What changed has its own 1 h, 24 h and 7 d choice.',
+      'Your name at the bottom of the menu opens a small menu: Account & sign-in, Appearance (Light or Dark), Help, What\'s new or Update available, the version, and Sign out.',
+      'Authenticator codes are typed into six boxes everywhere. Paste or auto-fill spreads across them, the phone shows the number keypad, the code is sent after the sixth digit, and a recovery code can still be used.',
+      'The highlight behind the current page in the menu slides to the next page. It stays still if your device is set to reduce motion.',
+    ],
+  },
+  {
     version: '0.9.4.41',
     title: 'Dots on tabs, and shorter backup lists',
     items: [

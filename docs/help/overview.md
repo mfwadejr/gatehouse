@@ -37,7 +37,7 @@ If a card is empty, it has nothing to show yet, or the machine has no sensor for
 
 ## New in 0.9.4.11
 - The status line and box were reworked as described above, and the map has **Both**.
-- Sign-in, setup and the browser installer show a larger badge above the name. The left menu's header is larger too, and the box at the bottom of the menu has the theme button, a **Sign out** button and a small "Version … · What's new" line.
+- Sign-in, setup and the browser installer show a larger badge above the name. The left menu's header is larger too, and the box at the bottom of the menu shows your name and role. Select it to open a small menu: **Account & sign-in**, **Appearance** (Light or Dark), **Help**, **What's new** (or **Update available** when one is ready), the version, and **Sign out**. Press Esc or click elsewhere to close it. The highlight behind the current page slides to the new page when you move.
 
 ## New in 0.9.4
 - The map has **5 minute** and **15 minute** ranges as well as 1 hour, 24 hours, 7 days and 30 days. Hover a country to see a popout beside it with its numbers.

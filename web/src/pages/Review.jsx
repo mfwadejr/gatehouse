@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { post } from '../api.js';
 import { ApplyPanel, useChanges } from '../changes.jsx';
-import { Button, Card, Empty, Field, Input, Note, Page, Problems, confirmBox, fmt, useStepUp, useToast } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Note, Page, Problems, confirmBox, fmt, useStepUp, useToast, CodeInput } from '../ui.jsx';
 
 // Everything that is saved but not in use yet, in plain words, with what NopeWarden found when it
 // checked it. One button puts all of it live with the usual 60-second safety.
@@ -84,7 +84,7 @@ export default function Review() {
           {!problems.length && <Note tone="good">When you commit, NopeWarden checks that you can still reach it and keeps the changes. If a change cuts you off, nothing more is needed: it undoes itself within 60 seconds.</Note>}
           {stepUp.everyday && !problems.length && (
             <Field label="Code from your authenticator app" hint="Needed to apply changes to the network. NopeWarden remembers it for 15 minutes.">
-              <Input className="codebox" value={code} onChange={setCode} inputMode="numeric" autoComplete="one-time-code" />
+              <CodeInput value={code} onChange={setCode} />
             </Field>
           )}
           {msg && <Note tone="bad">{msg}</Note>}

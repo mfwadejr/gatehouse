@@ -2,6 +2,7 @@ import React from 'react';
 import { useData, useThroughput } from './api.js';
 import { fmtBits } from './charts.jsx';
 import { Card, Pill, Empty } from './ui.jsx';
+import { go } from './App.jsx';
 import { linkState, linkMeasure } from './linkstate.js';
 
 // The picture at the top of Networks: the internet at the top, every network hanging off it, each
@@ -69,14 +70,14 @@ export function NetworkLayout({ nets, zones, scopes, onOpen }) {
                       <b>{c.name}</b>
                       <span className="nl-sn mono">{c.first.iface.kind === 'vlan' ? `VLAN ${c.first.iface.vlan} · ` : ''}{c.first.iface.ipv4 || 'no address'}</span>
                       <span className="nl-rate mono"><span className="nl-d">▼ {c.sp ? fmtBits(c.sp.down) : '0'}</span><span className="nl-u">▲ {c.sp ? fmtBits(c.sp.up) : '0'}</span></span>
-                      <span className="nl-meta">
-                        <span>{c.online} online{c.total > c.online ? ` of ${c.total}` : ''}</span>
-                        {c.dhcp && <Pill>DHCP</Pill>}
-                        {KIND[c.zone?.kind] && <Pill>{KIND[c.zone.kind]}</Pill>}
-                        {c.pct !== null && c.pct >= 80 && <Pill tone="warn">Pool {c.pct}% full</Pill>}
-                        {!c.first.iface.enabled && <Pill tone="warn">Off</Pill>}
-                      </span>
                     </button>
+                    <div className="nl-meta">
+                      <button type="button" className="pillbtn" onClick={() => go('devices')}>{c.online} online{c.total > c.online ? ` of ${c.total}` : ''}</button>
+                      {c.dhcp && <button type="button" className="pillbtn" onClick={() => go('dhcp/overview')}>DHCP</button>}
+                      {KIND[c.zone?.kind] && <button type="button" className="pillbtn" onClick={() => go('firewall/networks')}>{KIND[c.zone.kind]}</button>}
+                      {c.pct !== null && c.pct >= 80 && <button type="button" className="pillbtn warn" onClick={() => go('dhcp/scopes')}>Pool {c.pct}% full</button>}
+                      {!c.first.iface.enabled && <Pill tone="warn">Off</Pill>}
+                    </div>
                   </div>
                 ))}
               </div>

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { get, post, put, useData } from '../api.js';
-import { Guard, Button, Card, Field, Form, Input, Modal, Note, Page, Segmented, Select, Tabs, useAction, useCheck, CheckLine, fmt, useStepUp } from '../ui.jsx';
+import { Guard, Button, Card, Field, Form, Input, Modal, Note, Page, Segmented, Select, Tabs, useAction, useCheck, CheckLine, fmt, useStepUp, CodeInput } from '../ui.jsx';
 import { useHashTab } from '../hashtab.js';
 import { ScheduleEditor, ScheduleTable } from '../ScheduleEditor.jsx';
 import { ReleaseList, plainNotes } from '../whatsnew.jsx';
@@ -129,7 +129,7 @@ function StatusTab({ me, data, reload, goTab }) {
       {asking && (
         <Modal title="Install the updates" onClose={() => setAsking(false)}
           footer={<><Button onClick={() => setAsking(false)}>Cancel</Button><Button kind="primary" disabled={busy || code.length < 6} onClick={go}>Install</Button></>}>
-          <Field label="Code from your authenticator app"><Input value={code} onChange={setCode} inputMode="numeric" autoComplete="one-time-code" autoFocus /></Field>
+          <Field label="Code from your authenticator app"><CodeInput value={code} onChange={setCode} autoFocus /></Field>
         </Modal>
       )}
     </Card>

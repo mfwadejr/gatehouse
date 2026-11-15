@@ -29,16 +29,16 @@ export function AttentionProvider({ children }) {
     const add = (level, id, t, s, to) => a.push({ level, id, t, s, to });
     const wanList = wans?.wans || [];
     const links = net?.links || {};
-    if (net && !wanList.length) add('bad', 'no-wan', 'No internet connection is set up yet', 'Devices cannot reach the internet until you add one.', 'internet');
+    if (net && !wanList.length) add('bad', 'no-wan', 'No internet connection is set up yet', 'Devices cannot reach the internet until you add one.', 'internet/connections');
     if (fw && !fw.zones?.length) add('warn', 'no-zones', 'No networks defined in the firewall', 'Create your first network so devices are protected.', 'networks');
-    if (fw?.status?.last_error) add('bad', 'fw-error', 'The last firewall change did not apply', `${fw.status.last_error} Open Diagnostics to see what else is wrong.`, 'firewall');
+    if (fw?.status?.last_error) add('bad', 'fw-error', 'The last firewall change did not apply', `${fw.status.last_error} Open Diagnostics to see what else is wrong.`, 'firewall/rules');
     if (fw?.status?.dirty && fw.status.refresh_only) add('info', 'fw-refresh', 'The firewall rules were refreshed by an update', 'NopeWarden writes its rules a little differently now. What is allowed has not changed. It puts them live by itself; you can also commit them on the Review page.', 'review');
     else if (fw?.status?.dirty) add('warn', 'fw-dirty', 'Firewall changes are waiting to be applied', 'Open the Review page and commit them.', 'review');
     if (net?.status?.dirty) add('warn', 'net-dirty', 'Internet settings are waiting to be applied', 'Open the Review page and commit them.', 'review');
     (rogue || []).forEach((r) => add('warn', `rogue:${r.name}`, `Another DHCP server is answering on ${r.name}`, `${r.found.map((f) => f.server).join(', ')} hands out addresses too. Switch it off, or devices may get the wrong settings.`, 'dhcp/overview'));
     wanList.filter((w) => w.enabled).forEach((w) => {
       const s = linkState(links[w.name]);
-      if (s.tone === 'bad') add('bad', `wan:${w.name}`, `${w.name}: ${s.text}`, s.detail, 'internet');
+      if (s.tone === 'bad') add('bad', `wan:${w.name}`, `${w.name}: ${s.text}`, s.detail, 'internet/connections');
     });
     (vpn?.vpns || []).forEach((v) => {
       if (!v.enabled) return;
@@ -58,12 +58,12 @@ export function AttentionProvider({ children }) {
     }
     // Updates have their own page. An update that is ready is shown whatever the update mode is.
     const failedAt = upd?.result && !upd.result.ok ? upd.result.at || 0 : 0;
-    if (upd?.state === 'idle' && !upd.working && failedAt && Date.now() / 1000 - failedAt < 3 * 86400) add('bad', 'update-failed', upd.result.rolled_back ? 'The last update did not work and was undone' : 'The last update did not work', `${upd.result.error || 'Open Updates to see what happened.'}`, 'updates');
-    if (upd?.needs_reboot) add('warn', 'reboot', 'A restart is needed', 'The system was updated and needs a restart to finish.', 'updates');
+    if (upd?.state === 'idle' && !upd.working && failedAt && Date.now() / 1000 - failedAt < 3 * 86400) add('bad', 'update-failed', upd.result.rolled_back ? 'The last update did not work and was undone' : 'The last update did not work', `${upd.result.error || 'Open Updates to see what happened.'}`, 'updates/updates');
+    if (upd?.needs_reboot) add('warn', 'reboot', 'A restart is needed', 'The system was updated and needs a restart to finish.', 'updates/updates');
     else if (upd?.available && upd.state === 'idle' && !upd.working) {
       const nw = upd.nopewarden_new && upd.latest ? upd.latest.version : '';
       const sys = upd.system_count > 0 ? `${upd.system_count} system update${upd.system_count === 1 ? '' : 's'}` : '';
-      const it = { level: 'info', id: 'updates', t: nw ? `NopeWarden ${nw} is available` : 'System updates are ready to install', s: [nw ? `You are on ${upd.current}.` : '', sys && nw ? `Also ${sys}.` : sys].filter(Boolean).join(' '), to: 'updates', sig: nw ? `v${nw}` : 'system', notes: nw ? plainNotes(upd.latest.notes) : '' };
+      const it = { level: 'info', id: 'updates', t: nw ? `NopeWarden ${nw} is available` : 'System updates are ready to install', s: [nw ? `You are on ${upd.current}.` : '', sys && nw ? `Also ${sys}.` : sys].filter(Boolean).join(' '), to: 'updates/updates', sig: nw ? `v${nw}` : 'system', notes: nw ? plainNotes(upd.latest.notes) : '' };
       a.push(it);
     }
     // The security check and threat alerts both live on Protection.

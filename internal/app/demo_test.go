@@ -49,6 +49,14 @@ func TestDemoConsole(t *testing.T) {
 		fn.mu.Unlock()
 		c.call("PUT", "/api/threat/settings", map[string]any{"mode": "watch"})
 	}
+	// NW_BACKUPS=25 makes that many backups, so lists that run to several pages can be seen.
+	if n := envInt("NW_BACKUPS", 0); n > 0 {
+		c.call("PUT", "/api/backups/config", map[string]any{"schedule": "daily", "hour": 2, "keep": n + 10})
+		for i := 0; i < n; i++ {
+			c.call("POST", "/api/backups", map[string]any{})
+			time.Sleep(1100 * time.Millisecond) // a backup is named by the second
+		}
+	}
 	fmt.Println("DEMO READY", scene, c.base)
 	time.Sleep(time.Duration(envInt("NW_SECONDS", 600)) * time.Second)
 }

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import qrcode from 'qrcode-generator';
 import { get, post, setCsrf } from '../api.js';
-import { Button, Field, Icon, Input, Note } from '../ui.jsx';
+import { Button, Field, Icon, Input, Note, CodeInput } from '../ui.jsx';
 import { Logo } from '../logo.jsx';
 
 function Frame({ title, children }) {
@@ -62,11 +62,12 @@ export function Login({ onSession, prefill }) {
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   useEffect(() => { if (prefill) go(); /* eslint-disable-next-line */ }, []);
-  async function go() {
+  async function go(typed) {
+    if (typeof typed === 'string' && busy) return;
     setErr(''); setBusy(true);
     try {
       if (ticket) {
-        const r = await post('/api/auth/mfa', { ticket, code: code.trim() });
+        const r = await post('/api/auth/mfa', { ticket, code: (typeof typed === 'string' ? typed : code).trim() });
         setCsrf(r.csrf); onSession();
       } else {
         const r = await post('/api/auth/login', { username: u, password: p });
@@ -85,7 +86,7 @@ export function Login({ onSession, prefill }) {
           </>
         ) : (
           <Field label="Code from your authenticator app" hint="Lost your phone? Type one of your recovery codes instead.">
-            <Input className="codebox" value={code} onChange={setCode} autoComplete="one-time-code" inputMode="numeric" autoFocus />
+            <CodeInput value={code} onChange={setCode} onComplete={(c) => go(c)} autoFocus invalid={!!err} />
           </Field>
         )}
         {err && <Note tone="bad">{err}</Note>}
@@ -110,9 +111,9 @@ export function Enrol({ onDone }) {
   const [codes, setCodes] = useState(null);
   const [err, setErr] = useState('');
   useEffect(() => { post('/api/auth/enrol/begin').then(setInfo).catch((e) => setErr(e.message)); }, []);
-  const confirm = async () => {
+  const confirm = async (typed) => {
     setErr('');
-    try { const r = await post('/api/auth/enrol/confirm', { code: code.trim() }); setCodes(r.recovery_codes || r.codes || []); }
+    try { const r = await post('/api/auth/enrol/confirm', { code: (typeof typed === 'string' ? typed : code).trim() }); setCodes(r.recovery_codes || r.codes || []); }
     catch (e) { setErr(e.message); }
   };
   if (codes) {
@@ -130,7 +131,7 @@ export function Enrol({ onDone }) {
       {info && <Qr text={info.uri} />}
       {info && <details><summary className="small muted">Can't scan? Enter this key by hand</summary><p className="mono" style={{ wordBreak: 'break-all' }}>{info.secret}</p></details>}
       <form className="stack" onSubmit={submitOnEnter(confirm)}>
-        <Field label="6-digit code"><Input className="codebox" value={code} onChange={setCode} inputMode="numeric" autoComplete="one-time-code" /></Field>
+        <Field label="6-digit code"><CodeInput value={code} onChange={setCode} onComplete={(c) => confirm(c)} recovery={false} /></Field>
         {err && <Note tone="bad">{err}</Note>}
         <Button kind="primary" type="submit" disabled={!info}>Turn on</Button>
       </form>

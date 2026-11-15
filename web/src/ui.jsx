@@ -32,6 +32,7 @@ export const ICONS = {
   sun: 'M12 8a4 4 0 100 8 4 4 0 000-8zM12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
   moon: 'M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z',
   menu: 'M4 6h16M4 12h16M4 18h16',
+  chevup: 'M6 15l6-6 6 6',
   logout: 'M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9',
   logo: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM9 12h6',
 };
@@ -136,18 +137,45 @@ export function ToggleRow({ title, desc, checked, onChange, disabled }) {
 }
 
 // Long-list pattern: show the first n rows, with a button for the rest.
+// A long list shown a page at a time, so the page keeps its height however many rows there are.
+// Rows per page (10, 25 or 50) is remembered. The list goes back to page 1 when its length changes,
+// and render gets each row's place in the whole list, not on the page.
+const PER_PAGES = [10, 25, 50];
+const readPer = (n) => { try { const v = Number(window.localStorage.getItem('nw.perpage')); if (PER_PAGES.includes(v)) return v; } catch { /* not remembered */ } return PER_PAGES.includes(n) ? n : 10; };
+const pageNumbers = (page, pages) => {
+  if (pages <= 7) return Array.from({ length: pages }, (_, i) => i);
+  const out = [0];
+  const lo = Math.max(1, page - 1), hi = Math.min(pages - 2, page + 1);
+  if (lo > 1) out.push('gap-a');
+  for (let i = lo; i <= hi; i++) out.push(i);
+  if (hi < pages - 2) out.push('gap-b');
+  out.push(pages - 1);
+  return out;
+};
 export function Limited({ items, n = 10, render, noun = 'rows' }) {
-  const [shown, setShown] = useState(n);
-  const rows = items.slice(0, shown);
+  const [per, setPer] = useState(() => readPer(n));
+  const [page, setPage] = useState(0);
+  const total = items.length;
+  useEffect(() => { setPage(0); }, [total]);
+  const pages = Math.max(1, Math.ceil(total / per));
+  const at = Math.min(page, pages - 1);
+  const start = at * per;
+  const choose = (v) => { setPer(v); setPage(0); try { window.localStorage.setItem('nw.perpage', String(v)); } catch { /* not remembered */ } };
   return (
     <>
-      {rows.map(render)}
-      {items.length > n && (
-        <div className="inline">
-          <span className="small muted">{`Showing ${Math.min(shown, items.length)} of ${items.length} ${noun}`}</span>
-          {shown < items.length && <button type="button" className="link small" onClick={() => setShown(shown + n)}>{`Show more (${Math.min(n, items.length - shown)} of the ${items.length - shown} left)`}</button>}
-          {shown > n && <button type="button" className="link small" onClick={() => setShown(n)}>Show fewer</button>}
-        </div>
+      {items.slice(start, start + per).map((x, i) => render(x, start + i))}
+      {total > PER_PAGES[0] && (
+        <nav className="pager" aria-label={`Pages of ${noun}`}>
+          <span className="small muted">{`Showing ${start + 1} to ${Math.min(start + per, total)} of ${total} ${noun}`}</span>
+          <div className="pager-nav">
+            <button type="button" className="btn small" disabled={at === 0} onClick={() => setPage(at - 1)}>Previous</button>
+            {pageNumbers(at, pages).map((p) => (typeof p === 'string'
+              ? <span key={p} className="pager-gap muted" aria-hidden="true">…</span>
+              : <button key={p} type="button" className={`btn small pager-n ${p === at ? 'on' : ''}`} aria-current={p === at ? 'page' : undefined} aria-label={`Page ${p + 1} of ${pages}`} onClick={() => setPage(p)}>{p + 1}</button>))}
+            <button type="button" className="btn small" disabled={at >= pages - 1} onClick={() => setPage(at + 1)}>Next</button>
+          </div>
+          <div className="inline"><span className="small muted">Rows per page</span><Segmented value={String(per)} onChange={(v) => choose(Number(v))} options={PER_PAGES.map((v) => ({ value: String(v), label: String(v) }))} /></div>
+        </nav>
       )}
     </>
   );
@@ -199,6 +227,60 @@ export function Steps({ steps, label = 'Progress' }) {
         <li key={st.id} className={st.state}><span aria-hidden="true">{mark[st.state] || '○'}</span> {st.label}</li>
       ))}
     </ol>
+  );
+}
+
+// A code of six digits typed into six boxes. It moves on by itself, takes a pasted code (or one a
+// password manager fills in) across all six, shows the number keypad on a phone, and calls onComplete
+// when the sixth digit arrives. A recovery code is not six digits, so unless `recovery` is false there
+// is a link that swaps the boxes for one plain field.
+export function CodeInput({ value, onChange, onComplete, autoFocus, recovery = true, invalid = false }) {
+  const [alt, setAlt] = useState(false);
+  const refs = useRef([]);
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 6);
+  const put = (next, at) => {
+    const code = next.slice(0, 6);
+    onChange(code);
+    const to = Math.min(at, 5);
+    if (code.length < 6 && refs.current[to]) refs.current[to].focus();
+    if (code.length === 6 && next !== digits && onComplete) onComplete(code);
+  };
+  const type = (i, raw) => {
+    const d = raw.replace(/\D/g, '');
+    if (!d) { put(digits.slice(0, i) + digits.slice(i + 1), i); return; }
+    // One digit lands in its box; more than one (a paste, or a fill from a password manager) spreads out.
+    put((digits.slice(0, i) + d + digits.slice(i + 1)).slice(0, 6), i + d.length);
+  };
+  const keys = (i, e) => {
+    if (e.key === 'Backspace' && !digits[i] && i > 0) { e.preventDefault(); refs.current[i - 1]?.focus(); onChange(digits.slice(0, i - 1)); }
+    else if (e.key === 'ArrowLeft' && i > 0) refs.current[i - 1]?.focus();
+    else if (e.key === 'ArrowRight' && i < 5) refs.current[i + 1]?.focus();
+  };
+  const paste = (e) => {
+    const d = (e.clipboardData?.getData('text') || '').replace(/\D/g, '');
+    if (!d) return;
+    e.preventDefault();
+    put(d.slice(0, 6), d.length);
+  };
+  if (alt) {
+    return (
+      <div className="stack gap1">
+        <Input className="codebox" value={value} onChange={onChange} autoComplete="one-time-code" autoFocus />
+        <button type="button" className="link small leftalign" onClick={() => { onChange(''); setAlt(false); }}>Use the 6-digit code instead</button>
+      </div>
+    );
+  }
+  return (
+    <div className="stack gap1">
+      <div className="codeboxes" role="group" aria-label="6-digit code" onPaste={paste}>
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <input key={i} ref={(el) => { refs.current[i] = el; }} className={`in codedigit ${invalid ? 'bad' : ''}`} value={digits[i] || ''} inputMode="numeric" pattern="[0-9]*"
+            autoComplete={i === 0 ? 'one-time-code' : 'off'} autoFocus={autoFocus && i === 0} aria-label={`Digit ${i + 1} of 6`}
+            onChange={(e) => type(i, e.target.value)} onKeyDown={(e) => keys(i, e)} onFocus={(e) => e.target.select()} />
+        ))}
+      </div>
+      {recovery && <button type="button" className="link small leftalign" onClick={() => { onChange(''); setAlt(true); }}>Lost your phone? Use a recovery code</button>}
+    </div>
   );
 }
 
@@ -532,7 +614,7 @@ export function stepReady(su, code, password) {
 
 export function StepUp({ su, code, setCode, password, setPassword, autoFocus }) {
   if (su.serious === 'code') {
-    return <Field label="Code from your authenticator app"><Input className="codebox" value={code} onChange={setCode} inputMode="numeric" autoComplete="one-time-code" autoFocus={autoFocus} /></Field>;
+    return <Field label="Code from your authenticator app"><CodeInput value={code} onChange={setCode} autoFocus={autoFocus} /></Field>;
   }
   return (
     <Field label="Your password" hint="Asked before serious changes. Turn on two-factor sign-in in Settings if you would rather use a code.">
@@ -546,7 +628,7 @@ export function DangerStep({ su, code, setCode, pw, setPw }) {
   return (
     <>
       <Field label="Your password"><Input type="password" value={pw} onChange={setPw} autoComplete="current-password" autoFocus /></Field>
-      {su.danger === 'both' && <Field label="Code from your authenticator app"><Input className="codebox" value={code} onChange={setCode} inputMode="numeric" autoComplete="one-time-code" /></Field>}
+      {su.danger === 'both' && <Field label="Code from your authenticator app"><CodeInput value={code} onChange={setCode} /></Field>}
     </>
   );
 }

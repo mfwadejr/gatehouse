@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { post, useData } from '../api.js';
-import { Button, Card, Empty, Field, Input, Modal, Note, Pill, useAction, useStepUp, stepReady, StepUp } from '../ui.jsx';
+import { Button, Card, Empty, Limited, Field, Input, Modal, Note, Pill, useAction, useStepUp, stepReady, StepUp } from '../ui.jsx';
 
 // Undo. NopeWarden saves a restore point just before every firewall or network change goes live.
 // Revert puts the settings back as they were, as changes that are not live yet: you review and apply
@@ -24,12 +24,12 @@ export default function Changes({ me }) {
     <Card title="Changes" desc={`Before every change to the firewall or network, NopeWarden keeps a copy of how things were (the last ${data.keep}). Pick a point to go back to it.`}>
       {data.points.length === 0 ? <Empty>No changes yet. The first one you apply will appear here.</Empty> : (
         <div className="list">
-          {data.points.map((p, i) => (
+          <Limited items={data.points} noun="saved copies" render={(p, i) => (
             <div className="item" key={p.name}>
               <div><div className="name">Before the change on {when(p.created)} {i === 0 && <Pill>Latest</Pill>}</div><div className="meta">{p.ok ? 'Checked and ready to revert to.' : 'This copy did not pass its check, so it cannot be used.'}</div></div>
               <Button small disabled={!p.ok || busy} onClick={() => setPick(p)}>Revert to this</Button>
             </div>
-          ))}
+          )} />
         </div>
       )}
       {pick && (
