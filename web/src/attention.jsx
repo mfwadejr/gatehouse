@@ -24,6 +24,8 @@ export function AttentionProvider({ children }) {
   const { data: setup } = useData('/api/setup/checklist', { topics: ['net.status', 'fw.status'], every: 30000 });
   const { data: ov } = useData('/api/overview/security', { every: 30000 });
   const { data: bk } = useData('/api/backups', { every: 300000 });
+  const { data: disks } = useData('/api/disk/health', { every: 3600000 });
+  const { data: certs } = useData('/api/certs', { every: 3600000 });
   const value = useMemo(() => {
     const a = [];
     const add = (level, id, t, s, to) => a.push({ level, id, t, s, to });
@@ -81,6 +83,13 @@ export function AttentionProvider({ children }) {
       if (!good) add('warn', 'backup-none-good', 'No backup has passed its check', 'Open Backup & recovery and make a new one.', 'settings/backup');
       else if (!tried || Date.now() / 1000 - tried.hand_checked > 90 * 86400) add('info', 'backup-restore-check', 'Try a restore check on a backup', 'No backup has been checked by hand in 90 days. Press Check on one to be sure it will work.', 'settings/backup');
     }
+    // A drive is shown only when it reports a problem or is nearly worn out.
+    (disks?.drives || []).filter((d) => d.level).forEach((d) => add(d.level, `disk:${d.name}`, d.word === 'Worn' ? `The drive ${d.model} is wearing out` : `The drive ${d.model} reports a problem`, d.reason, 'diagnostics/services'));
+    // Certificates: blue from 60 days out, amber from 30, red once expired.
+    (certs?.certs || []).filter((c) => c.level).forEach((c) => {
+      const when = c.days < 0 ? `ran out ${-c.days} day${c.days === -1 ? '' : 's'} ago` : c.days === 0 ? 'runs out today' : `has ${c.days} day${c.days === 1 ? '' : 's'} left`;
+      add(c.level, `cert:${c.id}`, `Certificate for ${c.label} ${when}`, c.advice, 'diagnostics/services');
+    });
     const byPage = {};
     const byTab = {};
     const top = (to) => String(to || '').split('/')[0];
@@ -97,14 +106,14 @@ export function AttentionProvider({ children }) {
     // What the status line counts: things that need the person, not suggestions.
     const needs = a.filter((x) => x.level !== 'info');
     return { items: a, needs, byPage, byTab, worst, loaded: !!(net && wans && fw) };
-  }, [net, wans, fw, rogue, vpn, util, dns, upd, sec, setup, ov, bk]);
+  }, [net, wans, fw, rogue, vpn, util, dns, upd, sec, setup, ov, bk, certs, disks]);
   return <AttentionContext.Provider value={value}>{children}</AttentionContext.Provider>;
 }
 
 export const levelText = { bad: 'Something is broken', warn: 'Needs you', info: 'A suggestion' };
 
 // The words for where an item's "Open" goes (the left menu's names).
-export const pageLabel = { internet: 'Internet', networks: 'Networks', firewall: 'Firewall', review: 'Review', dhcp: 'DHCP', vpn: 'VPN', dns: 'DNS', settings: 'Settings', updates: 'Updates', protection: 'Protection', threats: 'Threats' };
+export const pageLabel = { internet: 'Internet', networks: 'Networks', firewall: 'Firewall', review: 'Review', dhcp: 'DHCP', vpn: 'VPN', dns: 'DNS', settings: 'Settings', diagnostics: 'Diagnostics', updates: 'Updates', protection: 'Protection', threats: 'Threats' };
 
 // Short fingerprint of what an item says, so a dismissed suggestion comes back when its wording changes.
 const sigOf = (it) => { let h = 5381; const t = it.sig || `${it.t}|${it.s}`; for (let i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0; return h.toString(36); };

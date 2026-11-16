@@ -1,6 +1,17 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.44',
+    title: 'Certificates, drive health and a morning summary',
+    items: [
+      'Certificates now have a countdown on Diagnostics: the days left on each VPN authority, server and user certificate and on the link between two machines in a pair. Blue about 60 days out, amber inside 30, red once one has run out, with what to do. They also appear in the Overview list and the menu dot.',
+      'Drive health is new on Diagnostics: each drive gets one word (Healthy, Worn, Warning or Not reported) and a Details box with what it reported and what this hardware did not. A drive turns amber or red only when it reports a problem. Virtual disks say they are virtual. If the small SMART program is missing, one button installs it. Temperature and wear are also charted.',
+      'Overview has a Morning summary: whether anything needs you, up to three things to open, and yesterday in a few plain sentences (internet drops, devices, lookups blocked, attempts from the internet blocked, threat alerts). It is built from fixed rules, and you can hide it under Hide or show cards.',
+      'DNS, Your names now says that names end in your Home domain and links to where to change it, and the examples use your own ending instead of .lan.',
+      'The DNS live feed says it shows the newest 8 lookups since you opened the page and links to Logs, and Devices over time says since when the box has been recording.',
+    ],
+  },
+  {
     version: '0.9.4.43',
     title: 'Longer chart history, and who is knocking on your door',
     items: [

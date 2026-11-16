@@ -67,6 +67,8 @@ type NetController interface {
 	DiagLog(unit string, lines int) (string, error)
 	DiagRestart(unit string) error
 	DiagBundle() (string, error)
+	DiskHealth() netd.DiskReport
+	DiskToolInstall() error
 	TermOpen(rows, cols int) (string, error)
 	TermRead(id string, since int, wait time.Duration) ([]byte, int, bool, error)
 	TermWrite(id string, data []byte) error
@@ -417,6 +419,10 @@ func (s *Server) dispatchNet(r request) (any, error) {
 		return nil, s.Net.DiagRestart(p.Unit)
 	case "diag.bundle":
 		return s.Net.DiagBundle()
+	case "disk.health":
+		return s.Net.DiskHealth(), nil
+	case "disk.install":
+		return nil, s.Net.DiskToolInstall()
 	case "term.open":
 		var p struct{ Rows, Cols int }
 		if err := json.Unmarshal(r.Params, &p); err != nil {
@@ -850,6 +856,18 @@ func (c *Client) DiagBundle() (string, error) {
 	var out string
 	err := c.callWithin(3*time.Minute, "diag.bundle", nil, &out)
 	return out, err
+}
+
+// DiskHealth reads what each drive reports about its health.
+func (c *Client) DiskHealth() netd.DiskReport {
+	var out netd.DiskReport
+	c.callWithin(2*time.Minute, "disk.health", nil, &out)
+	return out
+}
+
+// DiskToolInstall installs the program that reads drive health.
+func (c *Client) DiskToolInstall() error {
+	return c.callWithin(12*time.Minute, "disk.install", nil, nil)
 }
 
 // TermOpen starts a shell and returns its id.

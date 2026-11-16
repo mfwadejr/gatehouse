@@ -1,7 +1,7 @@
 import { useHashTab } from '../hashtab.js';
 import React, { useState } from 'react';
 import { get, post, useData } from '../api.js';
-import { Button, Card, Empty, Field, Input, Note, Page, Pill, Select, Tabs, useAction, fmt } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Limited, Note, Page, Pill, Select, Tabs, useAction, fmt } from '../ui.jsx';
 import { Hit } from './AdminActivity.jsx';
 import { fmtBytes } from '../charts.jsx';
 import NetTools from './NetTools.jsx';
@@ -197,12 +197,80 @@ function DiskUse() {
   );
 }
 
+// Drive health, from what each drive says about itself. One plain word for each drive; Details opens
+// a blue box with everything it reported and, in plain lines, what it did not.
+const DISK_TONE = { bad: 'bad', warn: 'warn', info: 'info' };
+function DiskHealth() {
+  const { data, reload } = useData('/api/disk/health', { every: 300000 });
+  const [run, busy] = useAction();
+  const [open, setOpen] = useState('');
+  if (!data) return null;
+  if (!data.drives?.length) return null;
+  const needsTool = !data.tool && data.drives.some((d) => d.kind !== 'Virtual disk');
+  const size = (b) => (b >= 1e12 ? `${(b / 1e12).toFixed(1)} TB` : `${Math.round(b / 1e9)} GB`);
+  return (
+    <Card title="Drive health" desc="What each drive says about itself. A drive is only marked amber or red when it reports a problem.">
+      <div className="stack">
+        {needsTool && (
+          <Note tone="info" title="NopeWarden needs a small program to read drive health">
+            It is called smartmontools. {data.can_install ? 'Install it here; it is a small download from Debian.' : 'This machine cannot install it by itself, so install smartmontools yourself.'}
+            {data.can_install && <div className="actions"><Button kind="primary" disabled={busy} onClick={() => run(() => post('/api/disk/tool', {}), 'Installed.').then(reload)}>Install the SMART tool</Button></div>}
+          </Note>
+        )}
+        <div className="list">
+          {data.drives.map((d) => (
+            <div key={d.name} className="stack gap1">
+              <div className="item">
+                <div className="fill"><div className="name">{d.model}</div><div className="meta">{d.kind}{d.bytes ? `, ${size(d.bytes)}` : ''}, /dev/{d.name}. {d.reason}</div></div>
+                <div className="actions">
+                  <Pill tone={DISK_TONE[d.level] || (d.word === 'Healthy' ? 'good' : '')}>{d.word}</Pill>
+                  {d.word !== 'Not reported' && <Button small onClick={() => setOpen(open === d.name ? '' : d.name)}>{open === d.name ? 'Hide details' : 'Details'}</Button>}
+                </div>
+              </div>
+              {open === d.name && (
+                <Note tone="info" title={`${d.model}: what it reported`}>
+                  <div className="list">
+                    {d.lines.map((l) => <div className="item" key={l.label}><div className="fill">{l.label}</div><span className="num">{l.value}</span></div>)}
+                  </div>
+                  {d.missing?.length > 0 && <p className="small muted">Not reported by this hardware: {d.missing.join(', ')}.</p>}
+                </Note>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// How long each certificate NopeWarden holds has left. Blue from 60 days out, amber from 30, red once
+// it has run out. The console's own certificate is listed only when it is in its last 30 days.
+function Certificates() {
+  const { data } = useData('/api/certs', { every: 300000 });
+  const list = data?.certs || [];
+  const word = (c) => (c.days < 0 ? `Ran out ${-c.days} day${c.days === -1 ? '' : 's'} ago` : c.days === 0 ? 'Runs out today' : c.days > 999 ? `${Math.floor(c.days / 365)} years left` : `${fmt.n(c.days)} day${c.days === 1 ? '' : 's'} left`);
+  return (
+    <Card title="Certificates" desc="How long the certificates NopeWarden holds have left: VPN authorities, servers and users, and the link between two machines in a pair.">
+      {!data ? <Empty>Looking…</Empty> : !list.length ? <Empty>No VPN or pairing certificates yet.</Empty> : (
+        <div className="list">
+          <Limited items={list} noun="certificates" render={(c) => (
+            <div className="item" key={c.id}>
+              <div className="fill"><div className="name">{c.label}</div><div className="meta">{c.level ? c.advice : `${c.kind}. Runs out ${new Date(c.expires * 1000).toLocaleDateString(undefined, { dateStyle: 'medium' })}.`}</div></div>
+              <Pill tone={c.level === 'bad' ? 'bad' : c.level === 'warn' ? 'warn' : c.level === 'info' ? 'info' : 'good'}>{word(c)}</Pill>
+            </div>
+          )} />
+        </div>
+      )}
+    </Card>
+  );
+}
+
 export default function Diagnostics() {
   const [tab, setTab] = useHashTab('diagnostics', ['services','log','tools','terminal'], 'services');
   return (
     <Page title="Diagnostics" sub="How NopeWarden itself is running: its services, its system log, and tools to test the connection. Looking for what your network did? Open Logs.">
       <Tabs value={tab} onChange={setTab} tabs={[{ value: 'services', label: 'Health & services' }, { value: 'log', label: 'System log' }, { value: 'tools', label: 'Network tools' }, { value: 'terminal', label: 'Terminal' }]} />
-      {tab === 'services' && <><Verdict /><Services /><DiskUse /><Connections />
+      {tab === 'services' && <><Verdict /><Services /><DiskUse /><DiskHealth /><Certificates /><Connections />
         <Card title="My network" desc="A printable summary for a handover or your records: networks, addresses, devices, open ports and how to get back in. It never contains passwords or keys.">
           <a className="btn" href="/api/summary/print" target="_blank" rel="noreferrer">Open the printable page</a>
         </Card></>}

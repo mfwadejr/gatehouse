@@ -306,7 +306,7 @@ export function Tabs({ value, onChange, tabs }) {
 }
 
 export function Pill({ tone = '', children }) {
-  return <span className={`pill ${tone}`}>{tone && <span className={`dot ${tone === 'good' ? '' : tone === 'warn' ? 'warn' : 'bad'}`} />}{children}</span>;
+  return <span className={`pill ${tone}`}>{tone && <span className={`dot ${tone === 'good' ? '' : tone === 'warn' ? 'warn' : tone === 'info' ? 'info' : 'bad'}`} />}{children}</span>;
 }
 
 export function Note({ tone = '', title, children }) {

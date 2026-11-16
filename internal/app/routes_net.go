@@ -64,6 +64,8 @@ type NetController interface {
 	DiagLog(unit string, lines int) (string, error)
 	DiagRestart(unit string) error
 	DiagBundle() (string, error)
+	DiskHealth() netd.DiskReport
+	DiskToolInstall() error
 	TermOpen(rows, cols int) (string, error)
 	TermRead(id string, since int, wait time.Duration) ([]byte, int, bool, error)
 	TermWrite(id string, data []byte) error

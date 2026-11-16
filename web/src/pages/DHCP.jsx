@@ -216,6 +216,9 @@ function Overview({ goTab }) {
   for (const d of (Array.isArray(devs) ? devs : devs?.devices || [])) if (d.mac && d.name) known[String(d.mac).toLowerCase()] = d.name;
   const nameOf = (l) => l.hostname || known[String(l.mac || '').toLowerCase()] || '';
   const joined = (h?.series?.['devices.online'] || []);
+  // Say plainly how far back the chart goes: it starts when this box began recording.
+  const firstAt = joined.length ? joined[0][0] : 0;
+  const shortBy = h && firstAt && firstAt > (h.from || 0) + (h.step || 60) * 3;
   const series = [{ key: 'devices.online', name: 'Devices online', color: 'var(--color-chart-series-1)', pts: joined }];
   return (
     <>
@@ -233,7 +236,7 @@ function Overview({ goTab }) {
         <button type="button" className="card tile tilebtn" onClick={() => goTab('resv')}><span className="lbl">Reservations</span><div><span className="val">{(resv || []).length}</span></div><span className="foot">always get the same address</span></button>
         <button type="button" className="card tile tilebtn" onClick={() => goTab('leases')}><span className="lbl">Leases ending soon</span><div><span className="val">{soon}</span></div><span className="foot">{soon ? 'within the next hour' : 'none in the next hour'}</span></button>
       </section>
-      <Card title="Devices over time" desc="How many devices had an address, over the chosen period." actions={<Segmented value={range} onChange={setRange} options={rangeOptions} />}>
+      <Card title="Devices over time" desc={shortBy ? `How many devices had an address. This box has only been recording since ${new Date(firstAt * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}, so the chart starts there.` : 'How many devices had an address, over the chosen period. It is recorded every 30 seconds and kept for as long as your chart history setting says.'} actions={<Segmented value={range} onChange={setRange} options={rangeOptions} />}>
         <Chart series={series} from={h?.from || 0} to={h?.to || 1} height={130} label="Devices with an address over time" empty="Collecting data. The first points appear within a minute." />
       </Card>
       <Card title="Address pools" desc="How full each pool is. A pool that fills up cannot give new devices an address.">

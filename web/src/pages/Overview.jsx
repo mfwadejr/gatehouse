@@ -8,6 +8,7 @@ import { Chart, fmtBits, fmtBytes } from '../charts.jsx';
 import { linkMeasure, linkState } from '../linkstate.js';
 import { PRESET_KEY } from './Logs.jsx';
 import { WhatsNewCard } from '../whatsnew.jsx';
+import { morningSummary } from '../morning.js';
 import { SNOOZES, pageLabel, useAttention, useAttentionChoices } from '../attention.jsx';
 
 const regionName = (cc) => { try { return new Intl.DisplayNames(undefined, { type: 'region' }).of(cc); } catch { return cc; } };
@@ -500,6 +501,27 @@ function BusiestCard({ rows }) {
   );
 }
 
+// A short summary in plain words, from fixed rules: what needs you now (the same list as the dots in
+// the left menu) and what happened yesterday.
+function MorningCard({ items }) {
+  const { data: y } = useData('/api/overview/yesterday', { every: 600000 });
+  const m = useMemo(() => morningSummary(items, y), [items, y]);
+  return (
+    <Card title="Morning summary" desc={new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}>
+      <div className="stack">
+        <div className="inline"><Pill tone={m.tone}>{m.tone === 'good' ? 'All clear' : m.tone === 'warn' ? 'Needs you' : 'Broken'}</Pill><span>{m.head}</span></div>
+        {m.top.length > 0 && (
+          <div className="list">
+            {m.top.map((it) => <div className="item" key={it.id}><div className="fill"><div className="name">{it.t}</div></div>{it.to && <Button small onClick={() => go(it.to)}>{`Open ${pageLabel[String(it.to).split('/')[0]] || ''}`.trim()}</Button>}</div>)}
+          </div>
+        )}
+        {m.suggest && <p className="small muted">{m.suggest}</p>}
+        {m.lines.length > 0 && <ul className="plain">{m.lines.map((l) => <li key={l}>{l}</li>)}</ul>}
+      </div>
+    </Card>
+  );
+}
+
 function HappenedCard({ items }) {
   return (
     <Card title="What happened" desc="Newest first. Repeats are folded together.">
@@ -667,6 +689,7 @@ function UpdateBanner({ c }) {
 
 // Cards a person can hide from their own Overview. The hidden list is remembered per person.
 const HIDEABLE = [
+  { id: 'morning', label: 'Morning summary' },
   { id: 'world', label: 'Where connections go' },
   { id: 'happened', label: 'What happened' },
   { id: 'busiest', label: 'Busiest devices' },
@@ -726,6 +749,7 @@ export default function Overview() {
       actions={<LiveDot stamp={stamp} />}>
       <UpdateBanner c={choices} />
       <AttentionArea c={choices} stamp={stamp} />
+      {show('morning') && <MorningCard items={attention} />}
       <WhatsNewCard current={upd?.current} />
       <Hero wanList={wanList} links={links} thr={thr} />
       <section className="ov-g4" aria-label="Status">

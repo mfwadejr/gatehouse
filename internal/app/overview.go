@@ -343,6 +343,9 @@ func (a *App) histPoints(now time.Time) []histPoint {
 	if dsnap.RecentMS > 0 {
 		add("dns.ms", dsnap.RecentMS)
 	}
+	for _, p := range a.diskHistPoints() {
+		add(p.Key, p.Val)
+	}
 	for _, p := range a.threatHistPoints() {
 		add(p.Key, p.Val)
 	}

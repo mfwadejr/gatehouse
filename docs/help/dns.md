@@ -13,7 +13,7 @@ Tabs along the top:
 - **Activity**: who asked and what was stopped, for the last hour, 24 hours or 7 days: **Busiest devices**, **What blocked it**, **Most blocked** and **Most asked**.
 - **Servers**: where names are looked up. **Upstream DNS servers** (where NopeWarden asks when it does not know), **Which server is asked first**, **Add a DNS server**, **Encrypted DNS**, **Resolve directly** and **Forced DNS**.
 - **Blocking**: **Blocklists** you can switch on (which devices get which lists is set per profile, on the Profiles tab of Devices & access), **Always allow or block** exceptions that beat every list, and **Why is this blocked?** to find which list blocks a name.
-- **Your own names**: **Give this firewall a name**, and names that point somewhere on your network, like nas.lan to 192.168.1.10.
+- **Your own names**: **Give this firewall a name**, and names that point somewhere on your network, like nas.lan to 192.168.1.10. A line under the heading says names end in your Home domain and links to **DNS, Settings** to change it.
 - **Settings**: **What to do with blocked names**, **Home domain**, **Queries per second per device**, **Remember answers (entries)**, **Keep the query history for (days)**, **Hide device addresses in the history** and **Tell browsers to use this DNS**.
 
 Devices sent through a VPN have their name lookups sent through it as well.

@@ -28,6 +28,7 @@ type fakeNet struct {
 	wan     map[string]wanmon.State // what the demo console shows for each internet connection
 	plan    netd.Plan
 	pending bool
+	disk    netd.DiskReport // what the demo console shows for drive health
 
 	vpn      netd.VPNPlan
 	vpnCalls int
@@ -479,6 +480,12 @@ func (f *fakeNet) DiagRestart(unit string) error {
 	return nil
 }
 func (f *fakeNet) DiagBundle() (string, error) { return "machine info password=hunter2", nil }
+func (f *fakeNet) DiskHealth() netd.DiskReport {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.disk
+}
+func (f *fakeNet) DiskToolInstall() error { return nil }
 func (f *fakeNet) TermOpen(rows, cols int) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

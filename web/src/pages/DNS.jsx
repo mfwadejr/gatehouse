@@ -68,7 +68,7 @@ function Overview() {
             <div className="small muted" style={{ textAlign: 'right' }}>{peak > 0 ? `peak ${fmt.d1(peak)} a second` : ''}</div>
             <StackedArea layers={liveLayers} span={60} height={120} unit="/s" xLabels={['60 s ago', '30 s', 'now']} empty="No lookups in the last minute" label="Lookups per second, last minute, by how they were answered" />
             <div className="livefeed" aria-live="off">
-              <div className="small muted">Latest lookups</div>
+              <div className="small muted">Latest lookups: the newest 8, starting from when you opened this page. Older ones are in <button type="button" className="link" onClick={() => { window.location.hash = '#/logs'; }}>Logs</button>.</div>
               {!feed.length ? <div className="small muted">Waiting for the next lookup.</div> : feed.map((e, i) => (
                 <div className="lf-row" key={`${e.ts}-${e.qname}-${i}`}>
                   <span>{new Date(e.ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
@@ -462,6 +462,10 @@ function Records() {
     setChanging(false);
     reload();
   };
+  // Where the ending of every name comes from, and where to change it.
+  const domainLine = (
+    <>Names here end in <b>.{domain}</b>. That ending is your Home domain; change it in <button type="button" className="link" onClick={() => { window.location.hash = '#/dns/settings'; }}>DNS, Settings</button>. Changing it does not rename names you have already added.</>
+  );
   const nameBox = (
     <div className="stack gap2">
       <div className="namerow">
@@ -474,7 +478,8 @@ function Records() {
     </div>
   );
   return (
-    <Card enter title="Your own names" desc="Make a name point somewhere on your network, like nas.lan → 192.168.1.10. Devices that get an address from NopeWarden already have a name automatically.">
+    <Card enter title="Your own names" desc={`Make a name point somewhere on your network, like nas.${domain} → 192.168.1.10. Devices that get an address from NopeWarden already have a name automatically.`}>
+      {dset && <p className="small muted">{domainLine}</p>}
       {data && dset && isV4 && !mine && <Note title="Give this firewall a name">{nameBox}</Note>}
       {data && dset && isV4 && mine && !changing && (
         <p className="small muted">Open the console at <a href={`https://${mine.name}`}>https://{mine.name}</a>. Type the https:// part, or the browser will search the web instead.{' '}
@@ -482,7 +487,7 @@ function Records() {
       )}
       {data && dset && isV4 && mine && changing && <Note title="Change this firewall's name">{nameBox}</Note>}
       <div className="ownrow">
-        <Input value={f.name} onChange={(v) => setF({ ...f, name: v })} aria-label="Name" placeholder="nas.lan" />
+        <Input value={f.name} onChange={(v) => setF({ ...f, name: v })} aria-label="Name" placeholder={`nas.${domain}`} />
         <Select aria-label="Record type" value={f.type} onChange={(v) => setF({ ...f, type: v })} options={['A', 'AAAA', 'CNAME', 'TXT', 'MX']} />
         <Input value={f.value} onChange={(v) => setF({ ...f, value: v })} aria-label="Points to" placeholder="192.168.1.10" />
         <Button kind="primary" disabled={!f.name || !f.value} onClick={() => run(() => post('/api/dns/records', f), 'Saved.').then(() => { setF({ ...f, name: '', value: '' }); reload(); })}>Add</Button>

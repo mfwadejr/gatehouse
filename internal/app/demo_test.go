@@ -8,6 +8,7 @@ import (
 
 	dnssrv "nopewarden/internal/dns"
 	"nopewarden/internal/netd"
+	"nopewarden/internal/vpn"
 	"nopewarden/internal/wanmon"
 	"nopewarden/web"
 )
@@ -48,6 +49,22 @@ func TestDemoConsole(t *testing.T) {
 			RulesUpdated: time.Now().Add(-6 * time.Hour).Unix(), RulesCount: 48213, CPUNSec: 4_000_000_000, MemoryBytes: 310 << 20}
 		fn.mu.Unlock()
 		c.call("PUT", "/api/threat/settings", map[string]any{"mode": "watch"})
+		// Drives and certificates, so Diagnostics and the menu dots have something to say.
+		fn.mu.Lock()
+		fn.disk = netd.DiskReport{Tool: true, CanInstall: true, At: time.Now().Unix(), Drives: []netd.Drive{
+			{Name: "nvme0n1", Model: "Samsung SSD 980 1TB", Kind: "NVMe SSD", Bytes: 1000204886016, Word: "Healthy", Reason: "The drive reports no problems.", Temp: 41, Wear: 3,
+				Lines: []netd.DiskLine{{Label: "Drive's own verdict", Value: "Passed"}, {Label: "Temperature", Value: "41 °C"}, {Label: "Powered on", Value: "1.2 years (437 days)"}, {Label: "Wear", Value: "3% of its rated life used"}, {Label: "Spare area left", Value: "100%"}, {Label: "Media errors", Value: "0"}}},
+			{Name: "sda", Model: "WDC WD10EZEX", Kind: "Hard disk", Bytes: 1000204886016, Word: "Warning", Level: "warn", Reason: "The drive has moved 8 sectors to its spare area. Keep an eye on it.", Temp: 38, Wear: -1,
+				Lines: []netd.DiskLine{{Label: "Drive's own verdict", Value: "Passed"}, {Label: "Temperature", Value: "38 °C"}, {Label: "Sectors moved to spare", Value: "8"}, {Label: "Sectors waiting to be moved", Value: "0"}}, Missing: []string{"wear"}},
+			{Name: "vda", Model: "Virtual disk", Kind: "Virtual disk", Bytes: 21474836480, Word: "Not reported", Reason: "This is a virtual disk. Its health belongs to the machine that provides it."},
+		}}
+		fn.mu.Unlock()
+		now := time.Now()
+		ca, _ := vpn.NewCA(now.AddDate(-10, 0, 40))
+		srv, _ := ca.ServerCert(now.AddDate(-10, 0, 40))
+		gone, _ := ca.ServerCert(now.AddDate(-10, 0, -3))
+		c.app.Config.Exec(`INSERT INTO vpn_ovpn(name,label,mode,ca_cert,srv_cert,created_at) VALUES('tun9','Office VPN','server',?,?,1)`, ca.CertPEM, srv.CertPEM)
+		c.app.Config.Exec(`INSERT INTO vpn_ovpn_users(ovpn_id,name,serial,cert,created_at) SELECT id,'Sam''s laptop','9',?,1 FROM vpn_ovpn WHERE name='tun9'`, gone.CertPEM)
 	}
 	// NW_BACKUPS=25 makes that many backups, so lists that run to several pages can be seen.
 	if n := envInt("NW_BACKUPS", 0); n > 0 {
