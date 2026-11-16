@@ -394,7 +394,7 @@ const when = (ts) => (ts ? new Date(ts * 1000).toLocaleString([], { month: 'shor
 const EDGE_LEVELS = ['quiet', 'low', 'mid', 'high'];
 const EDGE_HOURS = { '1h': 1, '24h': 24, '7d': 168 };
 function EdgeNumbers() {
-  const [range, setRange, rangeOptions] = usePeriod('threats-edge');
+  const [range, setRange, rangeOptions] = usePeriod('threats');
   const toast = useToast();
   const { data: e } = useData(`/api/threat/edge?hours=${EDGE_HOURS[range] || 24}`, { every: 30000 });
   if (!e) return null;
@@ -418,7 +418,7 @@ function EdgeNumbers() {
                   {e.probers.map((p) => (
                     <div className="item" key={p.addr}>
                       <div><div className="name mono">{p.addr}{p.country ? ` · ${p.country}` : ''}</div><div className="meta">{p.reason}{p.ports >= 4 && p.top.length ? `. Most tried: ${p.top.join(', ')}` : ''}</div></div>
-                      <div className="actions"><span className="meta">{fmt.n(p.attempts)} tries</span><Button small onClick={() => copy(p.addr)}>Copy address</Button></div>
+                      <div className="actions"><span className="meta">{fmt.n(p.attempts)} {p.attempts === 1 ? 'try' : 'tries'}</span><Button small onClick={() => copy(p.addr)}>Copy address</Button></div>
                     </div>
                   ))}
                 </div>
@@ -494,6 +494,7 @@ function ThreatOverview({ data, goTab }) {
             <Chart series={[{ key: 'threat.cpu', name: 'Processor', color: 'var(--color-chart-series-2)', pts: ser('threat.cpu') }]} from={h?.from || 0} to={h?.to || 1} unit="%" height={150} label="Processor used by the program" empty="Nothing saved yet. Points appear once watching has been on for a minute." /></div>
         </div>
       </Card>
+      <EdgeNumbers />
       <div className="dns-cards">
         <Card title="What was seen" desc="Alerts by kind, last 7 days"
           actions={<button type="button" className="link small" onClick={() => goTab('alerts')}>Open alerts →</button>}>
@@ -572,7 +573,7 @@ export default function Threats() {
       <Tabs value={tab} onChange={setTab} tabs={tabs} />
       {data && (
         <div className="stack">
-          {tab === 'overview' && (setupNeeded ? <><EdgeNumbers /><Install data={data} reload={reload} /></> : <><StatusLine data={data} goTab={setTab} /><EdgeNumbers />{p.installed && !working && <ThreatOverview data={data} goTab={setTab} />}</>)}
+          {tab === 'overview' && (setupNeeded ? <><EdgeNumbers /><Install data={data} reload={reload} /></> : <><StatusLine data={data} goTab={setTab} />{p.installed && !working && <ThreatOverview data={data} goTab={setTab} />}</>)}
           {tab !== 'overview' && setupNeeded && <Note>Threat watching is not installed yet. Install it on the <button type="button" className="link" onClick={() => setTab('overview')}>Overview</button> tab.</Note>}
           {tab === 'settings' && !setupNeeded && <Settings data={data} reload={reload} />}
           {p.installed && tab === 'alerts' && <Alerts data={data} reload={reload} />}

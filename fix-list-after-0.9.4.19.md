@@ -2,8 +2,10 @@
 
 Continues claude/fix-list-after-0.9.4.11.md, which still holds AW, AM, AT, AU, AV and the hardware checklist. Status from there: AP, AS (0.9.4.17), AQ (0.9.4.18, installed) and AR (0.9.4.19) are BUILT.
 
-## Current status (updated 15 Nov 2026, after 0.9.4.44)
-Everything below that says "not built" or "waits for go" is old history unless it is listed here. Built and delivered: 0.9.4.37 to 0.9.4.44.
+## Current status (updated 15 Nov 2026, after 0.9.4.45)
+Everything below that says "not built" or "waits for go" is old history unless it is listed here. Built and delivered: 0.9.4.37 to 0.9.4.45.
+
+Built in 0.9.4.45 (Marvin, 15 Nov: the Threats numbers should be at the top): on Threats, Overview the status line, number cards and Over time come first, then At your front door (sharing the same 1 h/24 h/7 d choice), then What was seen. Front end only; ACCEPTANCE 186.
 
 Built in 0.9.4.44 "Certificates, drive health and a morning summary" (ACCEPTANCE 181 to 185): certificate countdowns (OpenVPN CA, server, users, HA link; console cert only inside 30 days; blue 60, amber 30, red expired) on Diagnostics, in the Overview list and the menu dot; Drive health on Diagnostics (smartctl through the privileged helper, Healthy/Worn/Warning/Not reported, Details popout, install button, hourly disk.temp and disk.wear series); Morning summary card on Overview from fixed rules, no message sent (alerts are off on his box; he did not answer the question, so none was built); Home domain line on DNS, Your names; DNS live feed and Devices over time say how far back they go. Full go test passed. Disk health is untested on real hardware: ACCEPTANCE 182 is his to run on the box. Still waiting for go: Reports tab (first release Internet links, DNS, Threats, Firewall connections; second DHCP, Devices, VPN, System, Backups), and the older items to confirm shipped (Logs, Diagnostics and Overview step 4, README revamp, Backups Keep this many alignment).
 

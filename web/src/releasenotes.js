@@ -1,6 +1,13 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.45',
+    title: 'Threats: the numbers come first',
+    items: [
+      'On Threats, Overview, the status line, the number cards and Over time are back at the top. At your front door sits below Over time, above What was seen. Before threat watching is installed it still sits above the install page.',
+    ],
+  },
+  {
     version: '0.9.4.44',
     title: 'Certificates, drive health and a morning summary',
     items: [
