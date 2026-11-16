@@ -31,6 +31,16 @@ Each row shows the internet connection or VPN it left through. For a DNS lookup 
 5. Opening and closing the terminal, switching it on or off, restarting a service and saving a support bundle are recorded here too, under Diagnostics.
 6. NopeWarden's own health checks are hidden. To see them, turn on **Show NopeWarden's own checks**.
 
+## Reports
+The **Reports** tab turns what NopeWarden recorded into something you can read, print or send. Choose a subject (Internet links, DNS, Threats or Firewall connections), a period (24 h up to 1 year, or **Exact dates**), how to group the results, and any filters, then choose **Show report**. You get a summary, a chart and the rows.
+
+1. Internet links reports uptime, time down, delay, loss and each drop for one connection or all of them. **ISP report: last 30 days** makes the version to send your provider.
+2. Name a report and choose **Save report** to keep it under **Saved reports**. Run it again later for fresh numbers.
+3. **Print**, **PDF**, **CSV**, **Excel** and **JSON** are on the report. The PDF starts with the NopeWarden shield and name, then the title, period, filters, when and where it was made, a summary, a chart and the table, with page numbers. Excel puts the summary and the rows on separate sheets.
+4. On Events, **Make a report from this search** carries your search over. In Diagnostics, Network tools, **Report on this link** opens a link report ready to read.
+
+If NopeWarden has not been recording that far back, the report says from which date it has data and links to where **Keep chart history for** is set. Reports are never emailed; open them here when you want them.
+
 ## Example
 Search for a game console, set the range to 1 h, and click a blocked row. **Allow this** makes a rule for exactly that traffic.
 

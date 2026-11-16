@@ -506,17 +506,20 @@ function BusiestCard({ rows }) {
 function MorningCard({ items }) {
   const { data: y } = useData('/api/overview/yesterday', { every: 600000 });
   const m = useMemo(() => morningSummary(items, y), [items, y]);
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem('nw.morning.open') !== '0'; } catch { return true; } });
+  const toggle = () => { setOpen(!open); try { localStorage.setItem('nw.morning.open', open ? '0' : '1'); } catch { /* not remembered */ } };
   return (
-    <Card title="Morning summary" desc={new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}>
+    <Card title="Morning summary" desc={new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
+      actions={<button type="button" className="chevbtn" onClick={toggle} aria-expanded={open} aria-label={open ? 'Collapse the morning summary' : 'Expand the morning summary'} title={open ? 'Collapse' : 'Expand'} style={{ transform: open ? 'none' : 'rotate(-90deg)' }}><Icon d="M6 9l6 6 6-6" size={16} /></button>}>
       <div className="stack">
         <div className="inline"><Pill tone={m.tone}>{m.tone === 'good' ? 'All clear' : m.tone === 'warn' ? 'Needs you' : 'Broken'}</Pill><span>{m.head}</span></div>
-        {m.top.length > 0 && (
+        {open && m.top.length > 0 && (
           <div className="list">
             {m.top.map((it) => <div className="item" key={it.id}><div className="fill"><div className="name">{it.t}</div></div>{it.to && <Button small onClick={() => go(it.to)}>{`Open ${pageLabel[String(it.to).split('/')[0]] || ''}`.trim()}</Button>}</div>)}
           </div>
         )}
-        {m.suggest && <p className="small muted">{m.suggest}</p>}
-        {m.lines.length > 0 && <ul className="plain">{m.lines.map((l) => <li key={l}>{l}</li>)}</ul>}
+        {open && m.suggest && <p className="small muted">{m.suggest}</p>}
+        {open && m.lines.length > 0 && <ul className="plain">{m.lines.map((l) => <li key={l}>{l}</li>)}</ul>}
       </div>
     </Card>
   );

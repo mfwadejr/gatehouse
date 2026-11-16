@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { post } from '../api.js';
+import { openReport } from './Reports.jsx';
 import { Button, Card, Field, Input, Note, Pill, Segmented, useAction, usePortNames } from '../ui.jsx';
 
 // "Test my internet" and the small tools (ping, traceroute, name lookup) for a machine that has
@@ -26,6 +27,7 @@ function Multi({ m }) {
                 <div className="meta">{c.headline}</div>
               </div>
               <div className="inline">
+                <Button small onClick={() => openReport({ subject: 'links', range: '7', group: '', filters: { link: c.name } })}>Report on this link</Button>
                 {c.in_use && <Pill tone="good">In use</Pill>}
                 <Pill tone="">{roleWord[c.role]}</Pill>
                 {c.idle ? <Pill tone="">Waiting</Pill> : <Pill tone={tone[c.state]}>{word[c.state]}</Pill>}
@@ -55,6 +57,7 @@ function InternetTest() {
       {!res ? <p className="small muted">Press Test now. It takes a few seconds.</p> : res.multi ? <Multi m={res.multi} /> : (
         <div className="stack">
           <Note tone={res.ok ? 'good' : 'bad'}>{res.ok ? 'No problem found.' : 'Found a problem. The first red step is the one to fix.'}</Note>
+          <div className="actions"><Button small onClick={() => openReport({ subject: 'links', range: '7', group: '', filters: {} })}>Report on this link</Button></div>
           <div className="list">
             {res.steps.map((s, i) => (
               <div className="item" key={s.id}>

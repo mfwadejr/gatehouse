@@ -1,6 +1,17 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.46',
+    title: 'Reports',
+    items: [
+      'Logs has a new Reports tab. Pick Internet links, DNS, Threats or Firewall connections, a period (24 hours to 1 year, or exact dates), how to group it and any filters, and you get a summary, a chart and the rows. DHCP, Devices, VPN, System and Backups & updates come in the next release.',
+      'Save a report by name and run it again later. Print it, or download it as PDF, CSV, Excel or JSON. The PDF carries the NopeWarden shield, the period, the filters used, when and where it was made, and page numbers.',
+      'ISP report: last 30 days makes the uptime, drops, delay and loss report to send your internet provider. In Diagnostics, Network tools, Report on this link opens it for one connection, and on Events, Make a report from this search carries your search into a report.',
+      'The Morning summary on Overview can now be collapsed to its one-line verdict with the arrow on its corner; NopeWarden remembers your choice in that browser.',
+      'If a report reaches back further than NopeWarden has been recording, it says from which date it has data and links to the Storage setting that decides how far back charts are kept.',
+    ],
+  },
+  {
     version: '0.9.4.45',
     title: 'Threats: the numbers come first',
     items: [

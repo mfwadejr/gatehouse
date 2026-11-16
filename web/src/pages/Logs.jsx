@@ -1,6 +1,7 @@
 import { hashQuery, setHashQuery, useHashTab } from '../hashtab.js';
 import { Hit } from './AdminActivity.jsx';
 import AdminActivity from './AdminActivity.jsx';
+import Reports, { REPORT_PRESET_KEY } from './Reports.jsx';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { get, getWatched, post, put, setFailing, useData, useStream } from '../api.js';
 import { RuleForm } from './FirewallRules.jsx';
@@ -137,7 +138,7 @@ export default function Logs({ me }) {
   const preset = useRef(null);
   if (preset.current === null) preset.current = takePreset();
   useEffect(() => { try { sessionStorage.removeItem(PRESET_KEY); } catch { /* ignore */ } }, []);
-  const [tab, setTab] = useHashTab('logs', ['log','summary','activity','admin'], 'log');
+  const [tab, setTab] = useHashTab('logs', ['log','summary','activity','reports','admin'], 'log');
   const [q, setQ] = useState(() => hashQuery('q'));
   useEffect(() => { setHashQuery('q', q.trim()); }, [q]);
   const words = q.trim().split(/\s+/).filter(Boolean);
@@ -241,6 +242,20 @@ export default function Logs({ me }) {
   }, [ruleOpen, live]);
   const none = !loading && !rows.length;
   const chips = Object.entries(flt).filter(([, v]) => v !== '' && v != null);
+  // Carry this search over to the Reports tab: the same words, result and period.
+  const makeReport = () => {
+    const dns = kind === 'dns';
+    const f = {};
+    const text = q.trim();
+    if (text) f[dns ? 'name' : 'address'] = text;
+    if (verdict === 'blocked' || verdict === 'allowed') f[dns ? 'result' : 'action'] = verdict;
+    const range = { 1: '1', 24: '1', 168: '7', 720: '30' }[hours] || 'custom';
+    const spec = { subject: dns ? 'dns' : 'firewall', range, group: '', filters: f };
+    if (range === 'custom') spec.custom = { from: custom.from.slice(0, 10), to: custom.to.slice(0, 10) };
+    try { sessionStorage.setItem(REPORT_PRESET_KEY, JSON.stringify(spec)); } catch { /* ignore */ }
+    setTab('reports');
+  };
+
   return (
     <Page title="Logs" sub="What your network did. For how NopeWarden itself is running, open Diagnostics."
       actions={<><label className="inline small"><Switch checked={live} onChange={setLive} label="Live updates" />Live</label><Button small onClick={() => setRec(true)}>Recording &amp; storage</Button></>}>
@@ -250,14 +265,15 @@ export default function Logs({ me }) {
           <button className="link" onClick={() => setRec(true)}>Change this</button>
         </Note>
       )}
-      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'log', label: 'Events' }, { value: 'summary', label: 'Summary' }, { value: 'activity', label: 'Data use' }, ...(admin ? [{ value: 'admin', label: 'Admin activity' }] : [])]} />
-      {tab === 'admin' ? <AdminActivity /> : tab === 'activity' ? null : (
+      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'log', label: 'Events' }, { value: 'summary', label: 'Summary' }, { value: 'activity', label: 'Data use' }, { value: 'reports', label: 'Reports' }, ...(admin ? [{ value: 'admin', label: 'Admin activity' }] : [])]} />
+      {tab === 'admin' ? <AdminActivity /> : tab === 'activity' || tab === 'reports' ? null : (
       <Card>
         <div className="stack">
           <div className="inline">
             <div style={{ flex: '1 1 18rem' }}><Input value={q} onChange={setQ} placeholder="Search a device, address, website, port or reason" aria-label="Search the logs" /></div>
             <div style={{ flex: '0 0 13rem' }}><Select value={verdict} onChange={setVerdict} options={[{ value: '', label: 'Allowed and blocked' }, { value: 'blocked', label: 'Blocked only' }, { value: 'allowed', label: 'Allowed only' }]} aria-label="Result" /></div>
             <Segmented value={hours} onChange={setHours} options={RANGES} />
+            <Button small onClick={makeReport}>Make a report from this search</Button>
           </div>
           {hours === 'custom' && (
             <div className="inline small">
@@ -363,6 +379,7 @@ export default function Logs({ me }) {
       )}
       {tab === 'summary' && <Summary params={params} pick={pick} />}
       {tab === 'activity' && <Activity />}
+      {tab === 'reports' && <Reports admin={admin} />}
       {rec && <Recording state={meta} onClose={() => setRec(false)} onSaved={load} />}
       {mk && <RuleForm initial={mk} zoneNames={names} pickers={pickers} reloadPickers={reloadPickers} onClose={() => setMk(null)} onSaved={() => { setMk(null); }} />}
     </Page>

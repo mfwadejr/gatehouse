@@ -600,4 +600,13 @@ CREATE TABLE item_tags(
   PRIMARY KEY(kind, ref, tag)
 );
 CREATE INDEX idx_item_tags_tag ON item_tags(tag);
+`, `
+-- Reports a person saved to run again: a name and the choices that make the report.
+CREATE TABLE saved_reports(
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  spec TEXT NOT NULL,
+  created_at INTEGER NOT NULL DEFAULT 0,
+  created_by TEXT NOT NULL DEFAULT ''
+);
 `}

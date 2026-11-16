@@ -19,5 +19,6 @@
  "Set up on the VPN page": "A note on Routes that links to the VPN page",
  "Answer time": "A chart on the DNS Activity tab; nothing to set",
  "What blocked it": "A ranked list on the DNS Activity tab; nothing to set",
- "What changed": "A short list of recent updates and warnings on the Overview of Threats, DNS, DHCP and Networks; nothing to set"
+ "What changed": "A short list of recent updates and warnings on the Overview of Threats, DNS, DHCP and Networks; nothing to set",
+ "Save this report": "Part of the Reports tab; reached from the Make a report row"
 }

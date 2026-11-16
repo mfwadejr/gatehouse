@@ -2,8 +2,10 @@
 
 Continues claude/fix-list-after-0.9.4.11.md, which still holds AW, AM, AT, AU, AV and the hardware checklist. Status from there: AP, AS (0.9.4.17), AQ (0.9.4.18, installed) and AR (0.9.4.19) are BUILT.
 
-## Current status (updated 15 Nov 2026, after 0.9.4.45)
-Everything below that says "not built" or "waits for go" is old history unless it is listed here. Built and delivered: 0.9.4.37 to 0.9.4.45.
+## Current status (updated 15 Nov 2026, after 0.9.4.46)
+Everything below that says "not built" or "waits for go" is old history unless it is listed here. Built and delivered: 0.9.4.37 to 0.9.4.46.
+
+Built in 0.9.4.46 "Reports" (Marvin said go, 15 Nov; ACCEPTANCE 187 to 196): Reports tab in Logs (after Data use, before Admin activity) for Internet links, DNS, Threats and Firewall connections. Periods 24 h to 1 year or exact dates; grouping by hour/day/week/month or by device, name, port and so on; filters per subject; summary, chart and rows (paged); data-from-a-date note linking to Settings, Alerts & logs. Saved reports by name (admin saves/removes; stored in saved_reports, included in backup restore). Exports built into the program, no libraries: Print (light colours, no menus), PDF (shield and name, title, period, filters, made date and box name, summary, chart with legend, table, page numbers), CSV, Excel (Summary and Rows sheets), JSON. ISP report: last 30 days button; Diagnostics, Network tools has Report on this link; Logs Events has Make a report from this search; search finds Reports, ISP report, Saved reports. Also (Marvin: "I should be able to collapse these"): the Morning summary on Overview now collapses to its one-line verdict and remembers the choice. Full go test passed (31 packages). No scheduled email, as agreed. Older items confirmed shipped: Logs tabs / AM step 4, README revamp, Backups Keep this many alignment. Still waiting for go: second Reports release (DHCP, Devices, VPN, System, Backups & updates). Not yet checked on real data: link reports on a box with real link history (the demo has none) and PDF/Excel opened in his own apps (ACCEPTANCE 190).
 
 Built in 0.9.4.45 (Marvin, 15 Nov: the Threats numbers should be at the top): on Threats, Overview the status line, number cards and Over time come first, then At your front door (sharing the same 1 h/24 h/7 d choice), then What was seen. Front end only; ACCEPTANCE 186.
 
