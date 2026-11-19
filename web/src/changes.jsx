@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { get, post, useData } from './api.js';
-import { Button, Card, useToast } from './ui.jsx';
+import { Button, Card, HowLink, useToast } from './ui.jsx';
 
 // The one place that applies changes. Saving a change to the firewall, the network or a policy
 // applies it straight away (after a quiet moment, so several quick saves go live together) unless
@@ -277,6 +277,7 @@ function ChangeBar({ pend, run, left, auto, setAutoPref, busy, confirm, undo, cl
         <div className="actions">
           <Button onClick={undo} disabled={busy}>Undo now</Button>
           <Button kind="primary" onClick={confirm} disabled={busy}>Keep this change</Button>
+          <HowLink page="review" section="the-undo-timer">Why this time?</HowLink>
         </div>
       )}
       {!counting && out && <div className="actions"><Button onClick={close}>Close</Button></div>}

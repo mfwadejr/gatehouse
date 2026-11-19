@@ -1,0 +1,3 @@
+Reasons the technical chapters could not source. Each needs a yes or a reason from the owner.
+
+review: the written record gives the value and what it protects against, but not why sixty seconds was chosen over thirty or two minutes. The owner is to say whether that was a decision or a default.

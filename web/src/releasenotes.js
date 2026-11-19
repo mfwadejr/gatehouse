@@ -1,6 +1,15 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.47',
+    title: 'How it works: the technical reference begins',
+    items: [
+      'There is a new technical reference called How it works, next to the Help. It explains, page by page, how each page behaves and why: every timer, threshold and limit with its value and the reason for it, what the page reads and changes, and what happens when something goes wrong. It is reached from a new How it works link beside Help with this page, and from the top of the Help.',
+      'The first chapter is Review changes, including why a change you apply is undone after 60 seconds if it is not kept. The Keep this change card has a Why this time? link to it. More chapters follow, a few pages at a time.',
+      'The numbers in these chapters are read from NopeWarden\'s own code when the help is built, so a number cannot drift from what the box really does. Search finds the chapters too.',
+    ],
+  },
+  {
     version: '0.9.4.46',
     title: 'Reports',
     items: [

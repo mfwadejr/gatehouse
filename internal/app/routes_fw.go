@@ -19,6 +19,9 @@ import (
 
 const confirmWindow = 60 * time.Second
 
+// settleGrace is how long past the window a change must be before the history calls it undone.
+const settleGrace = 5 * time.Second
+
 // pendingApply remembers which connection started an apply so the confirmation must come
 // from a different one. Established connections survive a bad ruleset; new ones do not.
 type applyState struct {
@@ -596,7 +599,7 @@ func (a *App) clearFWFailure() {
 // settings back by itself, without telling the console, so without this the history would show the
 // attempt as waiting for ever. It only looks at changes whose time is well over.
 func (a *App) settleRevisions() {
-	cutoff := time.Now().Add(-(confirmWindow + 5*time.Second)).Unix()
+	cutoff := time.Now().Add(-(confirmWindow + settleGrace)).Unix()
 	rows, err := a.Config.Query(`SELECT version,author FROM fw_revisions WHERE status='pending' AND created_at < ?`, cutoff)
 	if err != nil {
 		return

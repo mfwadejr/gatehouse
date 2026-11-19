@@ -29,5 +29,31 @@ for (const id of ids) {
 }
 for (const h of helpPages) if (!ids.includes(h)) fail(`HELP_PAGES names ${h}, which is not a page`);
 for (const f of ['getting-started', 'recovery', 'reference']) if (!existsSync(`../docs/help/${f}.md`)) fail(`missing docs/${f}.md`);
+
+// How it works chapters (docs/how): the seven agreed sections, bold control names that exist on a screen,
+// numbers that come from the code (the build fills them in and fails on a missing constant), and every
+// "Why this value?" link in the console pointing at a section that exists.
+if (existsSync('../docs/how')) {
+  const secs = ['What the page does', 'Every tab and control', 'Timers, thresholds and limits', 'How it is measured and reported', 'What it reads, writes and calls', 'Options considered and not taken', 'When something goes wrong'];
+  const slugOf = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const anchors = {};
+  for (const f of readdirSync('../docs/how').filter((n) => n.endsWith('.md'))) {
+    const id = f.replace(/\.md$/, '');
+    const md = readFileSync(join('../docs/how', f), 'utf8');
+    if (!ids.includes(id)) fail(`docs/how/${f} is not a console page`);
+    for (const h of secs) if (!md.includes(`## ${h}`)) fail(`how/${id}.md has no "${h}" section`);
+    for (const m of md.matchAll(/\*\*([^*]{2,60})\*\*/g)) if (!code.includes(m[1].replace(/[:.]$/, '').toLowerCase())) fail(`how/${id}.md mentions **${m[1]}**, which is not on any screen`);
+    if (/\{\{go:/.test(md) === false && /\b\d+ ?(s|ms|seconds|minutes|min|hours)\b/.test(md.replace(/Needs confirming[^\n]*/g, ''))) console.warn(`how/${id}.md has a time written by hand; if it comes from the code, use {{go:file#Name}}`);
+    anchors[id] = new Set([...md.matchAll(/^#{1,3} (.*)$/gm)].map((m) => slugOf(m[1].replace(/[*`]/g, ''))));
+  }
+  const howPagesJs = readFileSync('src/howpages.js', 'utf8');
+  for (const id of Object.keys(anchors)) if (!howPagesJs.includes(`"${id}"`)) fail(`src/howpages.js does not list the ${id} chapter; run the docs build`);
+  for (const f of walk('src')) {
+    for (const m of readFileSync(f, 'utf8').matchAll(/<HowLink page="([a-z-]+)" section="([a-z0-9-]+)"/g)) {
+      if (!anchors[m[1]]) fail(`${f}: a Why this value? link points at the ${m[1]} chapter, which does not exist`);
+      else if (!anchors[m[1]].has(m[2])) fail(`${f}: a Why this value? link points at #${m[2]}, which is not a heading in how/${m[1]}.md`);
+    }
+  }
+}
 if (bad) { console.error(`docs check: ${bad} problem(s)`); process.exit(1); }
 console.log(`docs check ok (${ids.length} chapters)`);

@@ -201,3 +201,7 @@ Record the machine, the version (Settings, About) and the date at the top of eac
 | 194 | Data from a date (0.9.4.46) | Choose 1 year on a box that has recorded for less time: a blue note says NopeWarden has data from that date and links to Settings, Alerts & logs. | | |
 | 195 | Reports in search (0.9.4.46) | Search for "isp report", "uptime", "drops" and "saved reports": each opens Logs, Reports. | | |
 | 196 | Collapse Morning summary (0.9.4.46) | On Overview, the arrow on the Morning summary card folds it down to the Broken, Needs you or All clear line; the arrow unfolds it. Reload the page: it stays as you left it. | | |
+| 197 | How it works link (0.9.4.47) | On Review, the header shows How it works beside Help with this page, and it opens a technical chapter. On a page with no chapter yet (for example DNS) there is no How it works link. | | |
+| 198 | Why this time? (0.9.4.47) | Apply a harmless change: while the Keep this change and Undo now card is showing, Why this time? opens the Review chapter at the undo timer, which says 60 s. | | |
+| 199 | Help index and search (0.9.4.47) | /help/ ends with a How it works link to a page listing the written chapter and the pages still to be written. Searching for "undo timer" finds the chapter. | | |
+| 200 | Website Geek Stuff (0.9.4.47) | The website has a Geek Stuff tab with the Review chapter and a Still to be written list. It never mentions Gatehouse or GitHub. | | |

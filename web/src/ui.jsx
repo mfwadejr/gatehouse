@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useId, useMemo, useState, useCallback, useRef } from 'react';
+import { HOW_PAGES } from './howpages.js';
 import { get, post, refreshAll, useFailing, useData } from './api.js';
 import { useAttention } from './attentionctx.js';
 
@@ -66,6 +67,19 @@ export function Card({ title, desc, actions, children, className = '', enter = f
 }
 
 const HELP_PAGES = ['overview', 'internet', 'networks', 'dns', 'dhcp', 'firewall', 'vpn', 'policies', 'review', 'devices', 'logs', 'protection', 'threats', 'diagnostics', 'updates', 'settings'];
+// The page's technical chapter (docs/how), when one has been written.
+function howPage() {
+  const id = (window.location.hash.replace(/^#\/?/, '').split('?')[0] || 'overview').split('/')[0];
+  return HOW_PAGES.includes(id) ? `${id}.html` : '';
+}
+
+// A small link from a setting to the exact section of its technical chapter that explains the value.
+// It shows nothing until that chapter has been written, so no link ever opens an empty page.
+export function HowLink({ page, section, children = 'Why this value?' }) {
+  if (!HOW_PAGES.includes(page)) return null;
+  return <a className="link small" href={`/help/how/${page}.html#${section}`} target="_blank" rel="noopener">{children}</a>;
+}
+
 function helpPage() {
   const id = (window.location.hash.replace(/^#\/?/, '').split('?')[0] || 'overview').split('/')[0];
   return HELP_PAGES.includes(id) ? `${id}.html` : '';
@@ -95,7 +109,7 @@ export function Page({ title, sub, actions, children }) {
           <h1>{title}</h1>
           {sub && <p className="sub">{sub}</p>}
         </div>
-        <div className="actions">{actions}<a className="helplink small" href={`/help/${helpPage()}`} target="_blank" rel="noopener">Help with this page</a></div>
+        <div className="actions">{actions}{howPage() && <a className="helplink small" href={`/help/how/${howPage()}`} target="_blank" rel="noopener">How it works</a>}<a className="helplink small" href={`/help/${helpPage()}`} target="_blank" rel="noopener">Help with this page</a></div>
       </header>
       {stale && (
         <div className="stalenote small" role="status">
