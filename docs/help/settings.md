@@ -51,7 +51,7 @@ Update checks (set on the Updates page), blocklist refreshes, country lists and 
 **Management port** (on the **General** tab) sets one spare port aside for managing NopeWarden and nothing else. The console and remote login answer on it, and nothing is routed through it: no internet, no DHCP server, no sharing with your other networks.
 
 1. Plug a cable from a management computer or switch into a spare port.
-2. Choose the port, then choose **From DHCP** or **Fixed address**. A fixed address needs a range no network on this device already uses; NopeWarden refuses one that overlaps. If no DHCP server answers, the port has no address, so use a fixed address if you need to be sure of reaching it.
+2. Choose the port, then choose **From DHCP** or **Fixed address**. With either, people on other subnets, such as a VPN, can reach the console: with DHCP the router the server names is used, and with a fixed address the **Gateway** you type is used. That router only answers them; it never becomes this device's route to the internet. A fixed address needs a range no network on this device already uses; NopeWarden refuses one that overlaps. If no DHCP server answers, the port has no address, so use a fixed address if you need to be sure of reaching it.
 3. Press **Save and test**. Open the console on the new address within a minute. If nobody does, the change is undone on its own, or press **Undo now**.
 4. The firewall rules for the port go live with the next firewall apply.
 

@@ -1,6 +1,14 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.48',
+    title: 'Management port reachable from other subnets',
+    items: [
+      'A management port that gets its address by DHCP can now be reached from other subnets, such as over a VPN. Before, it answered only devices on its own subnet, because the router from the lease was thrown away. NopeWarden now keeps that router for answering and nothing else, and follows it when the lease changes. A fixed address with a gateway worked already.',
+      'Settings, Management port says plainly what people on other subnets need.',
+    ],
+  },
+  {
     version: '0.9.4.47',
     title: 'How it works: the technical reference begins',
     items: [

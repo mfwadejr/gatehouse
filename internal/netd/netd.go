@@ -119,6 +119,7 @@ func (s *Service) Start(ctx context.Context) error {
 	if s.Log != nil {
 		go s.Log.Run(ctx)
 	}
+	go s.mgmtWatch(ctx)
 	// A change that was never confirmed is discarded on boot, as for the firewall.
 	if _, _, ok := s.Inst.Pending(); ok {
 		s.Inst.Rollback()

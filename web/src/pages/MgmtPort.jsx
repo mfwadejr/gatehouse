@@ -52,7 +52,7 @@ export default function MgmtPort() {
             <Field label="Address">
               <Segmented value={f.mode} onChange={set('mode')} options={[{ value: 'dhcp', label: 'From DHCP' }, { value: 'static', label: 'Fixed address' }]} />
             </Field>
-            {f.mode === 'dhcp' && <p className="small muted">{data.dhcp_note}</p>}
+            {f.mode === 'dhcp' && <p className="small muted">{data.dhcp_note} The router your DHCP server names is used only to answer people on other subnets, such as a VPN. It never becomes this device's route to the internet.</p>}
             {f.mode === 'static' && (
               <>
                 <Field label="Address and prefix" hint="Use a range that no network on this device already uses, like 10.99.0.5/24."><Input value={f.cidr || ''} onChange={set('cidr')} placeholder="10.99.0.5/24" className="in mono" /></Field>
