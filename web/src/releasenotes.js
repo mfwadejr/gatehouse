@@ -1,6 +1,16 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.50',
+    title: 'A calmer Overview, and advice you can dismiss',
+    items: [
+      'The attention box and the Morning summary at the top of Overview each fold on their own. Folded, each keeps a one-line verdict, and each remembers its state under your account.',
+      '"Broken" is now only for things that have actually stopped, such as a failed service or a link that is down. Anything red that is just a decision waiting for you says "Needs you now".',
+      'Advice in the Security check, such as turning on two-factor sign-in or setting up alerts, has a Dismiss button on Protection. A dismissed item stops counting on the Overview, the Morning summary and the menu dot, stays on Protection marked Dismissed, and has Bring it back. A real fault can never be dismissed.',
+      'Threats has its own menu icon, an eye, so it no longer looks like Protection.',
+    ],
+  },
+  {
     version: '0.9.4.49',
     title: 'Search no longer blanks the page',
     items: [

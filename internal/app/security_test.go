@@ -43,3 +43,28 @@ func TestSshWarningOnlyWhenRemoteLoginIsOn(t *testing.T) {
 		t.Fatalf("remote login is on for a network that may use it, but the check said %q", l)
 	}
 }
+
+// Only recommendations can be dismissed. A real fault is never marked as advice, so it cannot be hidden.
+func TestOnlyAdviceCanBeDismissed(t *testing.T) {
+	c, _, _ := siteBox(t, "192.168.1.1/24")
+	_, m, raw := c.call("GET", "/api/security/check", nil)
+	items, _ := m["items"].([]any)
+	seen := map[string]bool{}
+	for _, it := range items {
+		x := it.(map[string]any)
+		id, _ := x["id"].(string)
+		advice, _ := x["advice"].(bool)
+		seen[id] = advice
+		if advice && id != "twostep" && id != "alerts" {
+			t.Errorf("%s is marked as advice but is a fault: %s", id, raw)
+		}
+	}
+	for _, id := range []string{"console", "ssh", "upnp", "forwards", "dot", "updates", "backup"} {
+		if seen[id] {
+			t.Errorf("%s must not be dismissable", id)
+		}
+	}
+	if !seen["twostep"] {
+		t.Errorf("two-factor advice should be dismissable while it is off: %s", raw)
+	}
+}

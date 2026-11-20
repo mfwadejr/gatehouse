@@ -9,9 +9,17 @@ export function morningSummary(items, y) {
   const bad = list.filter((i) => i.level === 'bad');
   const warn = list.filter((i) => i.level === 'warn');
   const info = list.filter((i) => i.level === 'info');
+  // "Broken" is only for what has actually stopped (a failed service, a link that is down, a certificate that
+  // ran out). A red item that is a decision the person has not made yet says "needs you now".
+  const stopped = bad.filter((i) => i.stopped);
+  const more = warn.length ? ` and ${warn.length} more need${warn.length === 1 ? 's' : ''} you` : '';
   let head;
-  if (bad.length) head = `${plural(bad.length, 'thing is', 'things are')} broken${warn.length ? ` and ${warn.length} more need${warn.length === 1 ? 's' : ''} you` : ''}.`;
-  else if (warn.length) head = `${plural(warn.length, 'thing needs', 'things need')} you.`;
+  let pill = 'All clear';
+  if (bad.length && stopped.length === bad.length) { head = `${plural(bad.length, 'thing is', 'things are')} broken${more}.`; pill = 'Broken'; }
+  else if (bad.length) {
+    head = `${plural(bad.length, 'thing needs', 'things need')} you now${stopped.length ? `, ${stopped.length === 1 ? 'one of them broken' : `${stopped.length} of them broken`}` : ''}${more}.`;
+    pill = stopped.length ? 'Broken' : 'Needs you now';
+  } else if (warn.length) { head = `${plural(warn.length, 'thing needs', 'things need')} you.`; pill = 'Needs you'; }
   else head = 'Everything is running normally.';
   const tone = bad.length ? 'bad' : warn.length ? 'warn' : 'good';
   const top = [...bad, ...warn].slice(0, 3);
@@ -29,5 +37,5 @@ export function morningSummary(items, y) {
       if (y.alerts > 0) lines.push(`Threat watching raised ${plural(y.alerts, 'alert', 'alerts')}.`);
     }
   }
-  return { head, tone, top, suggest, lines };
+  return { head, tone, pill, top, suggest, lines };
 }

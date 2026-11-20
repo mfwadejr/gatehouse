@@ -21,6 +21,9 @@ type secItem struct {
 	Title string  `json:"title"`
 	Text  string  `json:"text"`
 	Fix   *whyFix `json:"fix,omitempty"`
+	// Advice marks a recommendation, not a fault: a person may decide they accept it and dismiss it.
+	// A real fault (a guest network reaching the console, say) is never advice, so it cannot be hidden.
+	Advice bool `json:"advice,omitempty"`
 }
 
 type secReport struct {
@@ -49,7 +52,7 @@ func (a *App) securityCheck() secReport {
 	if two > 0 || a.Auth.MFARequired() {
 		add(secItem{ID: "twostep", Level: "ok", Title: "Two-factor sign-in is on", Text: "Signing in needs a code from your authenticator app."})
 	} else {
-		add(secItem{ID: "twostep", Level: "bad", Title: "Anyone with your password can sign in",
+		add(secItem{ID: "twostep", Level: "bad", Advice: true, Title: "Anyone with your password can sign in",
 			Text: "Two-factor sign-in asks for a code from an app on your phone as well, so a stolen password is not enough.",
 			Fix:  &whyFix{Label: "Turn on two-factor", Kind: "goto", Page: "settings/account"}})
 	}
@@ -158,7 +161,7 @@ func (a *App) securityCheck() secReport {
 	}
 
 	if cfg := a.alertConfig(); !cfg.Email.Enabled && !cfg.Ntfy.Enabled {
-		add(secItem{ID: "alerts", Level: "warn", Title: "Nothing will tell you if something goes wrong",
+		add(secItem{ID: "alerts", Level: "warn", Advice: true, Title: "Nothing will tell you if something goes wrong",
 			Text: "Set up an email or a push message so you hear about outages and updates.",
 			Fix:  &whyFix{Label: "Set up alerts", Kind: "goto", Page: "settings/alerts"}})
 	} else {

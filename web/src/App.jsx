@@ -38,7 +38,7 @@ export const PAGES = [
   { id: 'firewall', label: 'Firewall', icon: 'firewall', el: Firewall, group: 'Security' },
   { id: 'policies', label: 'Policies', icon: 'policies', el: Policies, group: 'Security' },
   { id: 'protection', label: 'Protection', icon: 'protection', el: Protection, group: 'Security' },
-  { id: 'threats', label: 'Threats', icon: 'protection', el: Threats, group: 'Security' },
+  { id: 'threats', label: 'Threats', icon: 'threats', el: Threats, group: 'Security' },
   { id: 'vpn', label: 'VPN', icon: 'vpn', el: VPN, group: 'Security' },
   { id: 'devices', label: 'Devices & access', icon: 'devices', el: Devices, group: 'People and devices' },
   { id: 'logs', label: 'Logs', icon: 'logs', el: Logs, group: 'System' },

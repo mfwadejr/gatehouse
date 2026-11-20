@@ -26,21 +26,35 @@ export function AttentionProvider({ children }) {
   const { data: bk } = useData('/api/backups', { every: 300000 });
   const { data: disks } = useData('/api/disk/health', { every: 3600000 });
   const { data: certs } = useData('/api/certs', { every: 3600000 });
+  const { data: advData } = useData('/api/prefs/advice');
+  const [advHide, setAdvHide] = useState(null);
+  useEffect(() => { if (advData && advHide === null) setAdvHide(advData.hide || {}); }, [advData, advHide]);
+  const advice = useMemo(() => {
+    const hide = advHide || {};
+    const save = (next) => { setAdvHide(next); put('/api/prefs/advice', { hide: next }).catch(() => {}); };
+    return {
+      // Dismissed only while the item still says what it said when it was dismissed.
+      hidden: (it) => !!it.advice && hide[it.id] === adviceSig(it),
+      dismiss: (it) => save({ ...hide, [it.id]: adviceSig(it) }),
+      bringBack: (it) => { const next = { ...hide }; delete next[it.id]; save(next); },
+    };
+  }, [advHide]);
   const value = useMemo(() => {
     const a = [];
-    const add = (level, id, t, s, to) => a.push({ level, id, t, s, to });
+    // stopped: something has actually stopped working (as opposed to a setting that needs a decision).
+    const add = (level, id, t, s, to, stopped = false) => a.push({ level, id, t, s, to, stopped });
     const wanList = wans?.wans || [];
     const links = net?.links || {};
-    if (net && !wanList.length) add('bad', 'no-wan', 'No internet connection is set up yet', 'Devices cannot reach the internet until you add one.', 'internet/connections');
+    if (net && !wanList.length) add('bad', 'no-wan', 'No internet connection is set up yet', 'Devices cannot reach the internet until you add one.', 'internet/connections', true);
     if (fw && !fw.zones?.length) add('warn', 'no-zones', 'No networks defined in the firewall', 'Create your first network so devices are protected.', 'networks');
-    if (fw?.status?.last_error) add('bad', 'fw-error', 'The last firewall change did not apply', `${fw.status.last_error} Open Diagnostics to see what else is wrong.`, 'firewall/rules');
+    if (fw?.status?.last_error) add('bad', 'fw-error', 'The last firewall change did not apply', `${fw.status.last_error} Open Diagnostics to see what else is wrong.`, 'firewall/rules', true);
     if (fw?.status?.dirty && fw.status.refresh_only) add('info', 'fw-refresh', 'The firewall rules were refreshed by an update', 'NopeWarden writes its rules a little differently now. What is allowed has not changed. It puts them live by itself; you can also commit them on the Review page.', 'review');
     else if (fw?.status?.dirty) add('warn', 'fw-dirty', 'Firewall changes are waiting to be applied', 'Open the Review page and commit them.', 'review');
     if (net?.status?.dirty) add('warn', 'net-dirty', 'Internet settings are waiting to be applied', 'Open the Review page and commit them.', 'review');
     (rogue || []).forEach((r) => add('warn', `rogue:${r.name}`, `Another DHCP server is answering on ${r.name}`, `${r.found.map((f) => f.server).join(', ')} hands out addresses too. Switch it off, or devices may get the wrong settings.`, 'dhcp/overview'));
     wanList.filter((w) => w.enabled).forEach((w) => {
       const s = linkState(links[w.name]);
-      if (s.tone === 'bad') add('bad', `wan:${w.name}`, `${w.name}: ${s.text}`, s.detail, 'internet/connections');
+      if (s.tone === 'bad') add('bad', `wan:${w.name}`, `${w.name}: ${s.text}`, s.detail, 'internet/connections', true);
     });
     (vpn?.vpns || []).forEach((v) => {
       if (!v.enabled) return;
@@ -51,16 +65,16 @@ export function AttentionProvider({ children }) {
       if (!s.size || s.active / s.size <= 0.8) return;
       const left = Math.max(0, s.size - s.active);
       add(left === 0 ? 'bad' : 'warn', `dhcp-full:${s.name}`, left === 0 ? `${s.name} has no addresses left` : `${s.name} is nearly out of addresses`,
-        `${s.active} of ${s.size} in use, ${left} left. ${left === 0 ? 'New devices cannot join until some are freed. ' : ''}Widen the range or shorten how long addresses are kept.`, 'dhcp/scopes');
+        `${s.active} of ${s.size} in use, ${left} left. ${left === 0 ? 'New devices cannot join until some are freed. ' : ''}Widen the range or shorten how long addresses are kept.`, 'dhcp/scopes', left === 0);
     });
     // Red only when every server is down and none has answered for 30 seconds. A slow server still works.
     if (dns?.upstreams?.length && dns.upstreams.every((u) => u.state === 'down') && dns.upstreams.every((u) => !u.last_ok || Date.now() / 1000 - u.last_ok > 30)) {
       const names = dns.upstreams.map((u) => u.name).filter(Boolean).join(', ');
-      add('bad', 'dns-down', 'No DNS server is answering', `${names ? `${names} did not answer. ` : ''}Devices cannot look up names until one answers. Open DNS and press Test.`, 'dns/servers');
+      add('bad', 'dns-down', 'No DNS server is answering', `${names ? `${names} did not answer. ` : ''}Devices cannot look up names until one answers. Open DNS and press Test.`, 'dns/servers', true);
     }
     // Updates have their own page. An update that is ready is shown whatever the update mode is.
     const failedAt = upd?.result && !upd.result.ok ? upd.result.at || 0 : 0;
-    if (upd?.state === 'idle' && !upd.working && failedAt && Date.now() / 1000 - failedAt < 3 * 86400) add('bad', 'update-failed', upd.result.rolled_back ? 'The last update did not work and was undone' : 'The last update did not work', `${upd.result.error || 'Open Updates to see what happened.'}`, 'updates/updates');
+    if (upd?.state === 'idle' && !upd.working && failedAt && Date.now() / 1000 - failedAt < 3 * 86400) add('bad', 'update-failed', upd.result.rolled_back ? 'The last update did not work and was undone' : 'The last update did not work', `${upd.result.error || 'Open Updates to see what happened.'}`, 'updates/updates', true);
     if (upd?.needs_reboot) add('warn', 'reboot', 'A restart is needed', 'The system was updated and needs a restart to finish.', 'updates/updates');
     else if (upd?.available && upd.state === 'idle' && !upd.working) {
       const nw = upd.nopewarden_new && upd.latest ? upd.latest.version : '';
@@ -69,8 +83,10 @@ export function AttentionProvider({ children }) {
       a.push(it);
     }
     // The security check and threat alerts both live on Protection.
-    const bad = (sec?.items || []).filter((i) => i.level === 'bad').length;
-    const warn = (sec?.items || []).filter((i) => i.level === 'warn').length;
+    // Advice the person has dismissed is left out here, so it no longer counts, shows a dot or appears in the summary.
+    const shown = (sec?.items || []).filter((i) => !advice.hidden(i));
+    const bad = shown.filter((i) => i.level === 'bad').length;
+    const warn = shown.filter((i) => i.level === 'warn').length;
     if (bad) add('bad', 'security', `Security check: ${bad} to fix now${warn ? `, ${warn} worth fixing` : ''}`, 'Open Protection to see what and how to fix it.', 'protection/overview');
     else if (warn) add('warn', 'security', `Security check: ${warn} worth fixing`, 'Open Protection to see what and how to fix it.', 'protection/overview');
     if (ov?.threat_alerts_24h > 0) add('warn', 'threat', `Threat watching raised ${ov.threat_alerts_24h} alert${ov.threat_alerts_24h === 1 ? '' : 's'} in the last day`, `${ov.threat_devices_24h || 1} device${ov.threat_devices_24h === 1 ? '' : 's'} involved. Open Threats to look.`, 'threats/alerts');
@@ -84,11 +100,11 @@ export function AttentionProvider({ children }) {
       else if (!tried || Date.now() / 1000 - tried.hand_checked > 90 * 86400) add('info', 'backup-restore-check', 'Try a restore check on a backup', 'No backup has been checked by hand in 90 days. Press Check on one to be sure it will work.', 'settings/backup');
     }
     // A drive is shown only when it reports a problem or is nearly worn out.
-    (disks?.drives || []).filter((d) => d.level).forEach((d) => add(d.level, `disk:${d.name}`, d.word === 'Worn' ? `The drive ${d.model} is wearing out` : `The drive ${d.model} reports a problem`, d.reason, 'diagnostics/services'));
+    (disks?.drives || []).filter((d) => d.level).forEach((d) => add(d.level, `disk:${d.name}`, d.word === 'Worn' ? `The drive ${d.model} is wearing out` : `The drive ${d.model} reports a problem`, d.reason, 'diagnostics/services', d.level === 'bad'));
     // Certificates: blue from 60 days out, amber from 30, red once expired.
     (certs?.certs || []).filter((c) => c.level).forEach((c) => {
       const when = c.days < 0 ? `ran out ${-c.days} day${c.days === -1 ? '' : 's'} ago` : c.days === 0 ? 'runs out today' : `has ${c.days} day${c.days === 1 ? '' : 's'} left`;
-      add(c.level, `cert:${c.id}`, `Certificate for ${c.label} ${when}`, c.advice, 'diagnostics/services');
+      add(c.level, `cert:${c.id}`, `Certificate for ${c.label} ${when}`, c.advice, 'diagnostics/services', c.level === 'bad');
     });
     const byPage = {};
     const byTab = {};
@@ -105,17 +121,18 @@ export function AttentionProvider({ children }) {
     const worst = a.reduce((m, x) => (RANK[x.level] > (RANK[m] || 0) ? x.level : m), '');
     // What the status line counts: things that need the person, not suggestions.
     const needs = a.filter((x) => x.level !== 'info');
-    return { items: a, needs, byPage, byTab, worst, loaded: !!(net && wans && fw) };
-  }, [net, wans, fw, rogue, vpn, util, dns, upd, sec, setup, ov, bk, certs, disks]);
+    return { items: a, needs, byPage, byTab, worst, advice, loaded: !!(net && wans && fw) };
+  }, [net, wans, fw, rogue, vpn, util, dns, upd, sec, setup, ov, bk, certs, disks, advice]);
   return <AttentionContext.Provider value={value}>{children}</AttentionContext.Provider>;
 }
 
-export const levelText = { bad: 'Something is broken', warn: 'Needs you', info: 'A suggestion' };
+export const levelText = { bad: 'Needs you now', warn: 'Needs you', info: 'A suggestion' };
 
 // The words for where an item's "Open" goes (the left menu's names).
 export const pageLabel = { internet: 'Internet', networks: 'Networks', firewall: 'Firewall', review: 'Review', dhcp: 'DHCP', vpn: 'VPN', dns: 'DNS', settings: 'Settings', diagnostics: 'Diagnostics', updates: 'Updates', protection: 'Protection', threats: 'Threats' };
 
 // Short fingerprint of what an item says, so a dismissed suggestion comes back when its wording changes.
+const adviceSig = (it) => { let h = 5381; const t = `${it.title}|${it.text}`; for (let i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0; return h.toString(36); };
 const sigOf = (it) => { let h = 5381; const t = it.sig || `${it.t}|${it.s}`; for (let i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0; return h.toString(36); };
 
 export const SNOOZES = { day: 24 * 3600 * 1000, week: 7 * 24 * 3600 * 1000 };
@@ -129,14 +146,17 @@ export const SNOOZES = { day: 24 * 3600 * 1000, week: 7 * 24 * 3600 * 1000 };
 export function useAttentionChoices(items) {
   const { data } = useData('/api/prefs/attention');
   const [mine, setMine] = useState(null);
-  useEffect(() => { if (data && mine === null) setMine({ open: data.open !== false, hide: data.hide || {} }); }, [data, mine]);
-  const state = mine || { open: true, hide: {} };
+  useEffect(() => { if (data && mine === null) setMine({ open: data.open !== false, hide: data.hide || {}, morning: data.morning }); }, [data, mine]);
+  const state = mine || { open: true, hide: {}, morning: undefined };
+  // The morning summary folds on its own. Before it has been chosen here it follows what this browser remembered.
+  const morningOpen = state.morning !== undefined ? state.morning !== false : (() => { try { return localStorage.getItem('nw.morning.open') !== '0'; } catch { return true; } })();
   const save = useCallback((next) => {
     const now = Date.now();
     const ids = new Set(items.map((x) => x.id));
     const hide = {};
     for (const [id, h] of Object.entries(next.hide)) if (ids.has(id) && (h.k === 'd' || h.until > now)) hide[id] = h;
     const clean = { open: next.open, hide };
+    if (next.morning !== undefined) clean.morning = next.morning;
     setMine(clean);
     put('/api/prefs/attention', clean).catch(() => {});
   }, [items]);
@@ -160,6 +180,8 @@ export function useAttentionChoices(items) {
     ...view,
     open: state.open,
     setOpen: (open) => save({ ...state, open }),
+    morningOpen,
+    setMorningOpen: (m) => save({ ...state, morning: m }),
     dismiss: (it) => save({ ...state, hide: { ...state.hide, [it.id]: { k: 'd', sig: sigOf(it) } } }),
     snooze: (it, ms) => save({ ...state, hide: { ...state.hide, [it.id]: { k: 's', until: Date.now() + ms } } }),
     bringBack: (it) => { const hide = { ...state.hide }; delete hide[it.id]; save({ ...state, hide }); },

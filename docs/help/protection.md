@@ -25,7 +25,7 @@ If a block does not seem to work, check that it is switched on and that the devi
 ## Names inside a category, and your own names per profile
 - **View names** next to a category shows the names it blocks. Search, and allow a name that should not be blocked.
 - Each profile can have its own **custom blocked names**.
-- **Security check**: each fix button opens the exact window that changes the setting.
+- **Security check**: each fix button opens the exact window that changes the setting. Advice, such as turning on two-factor sign-in or setting up alerts, also has **Dismiss** for someone who has decided to live without it. A dismissed item stops counting: it leaves the Overview list, the Morning summary and the menu dot. It stays on this page behind the link under the list (for example “Show 1 dismissed item”), marked Dismissed, with **Bring it back**, and it returns by itself only if its wording changes. A real fault, such as a guest network that can reach the console, can never be dismissed.
 
 ## Removing things a block uses
 When you remove a network, a profile or a device, it also leaves the blocks that used it. The removal question names those blocks first. A block left with no place shows **Applies nowhere** until you choose one.

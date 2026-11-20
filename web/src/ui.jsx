@@ -11,6 +11,7 @@ export const ICONS = {
   dhcp: 'M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01',
   firewall: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z',
   protection: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM8.5 12l2.5 2.5 4.5-5',
+  threats: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 15a3 3 0 100-6 3 3 0 000 6z',
   services: 'M4 6h16M4 12h16M4 18h10M18 16v4M16 18h4',
   vpn: 'M6 11V8a6 6 0 1112 0v3M5 11h14v9H5zM12 15v2',
   devices: 'M3 5h14v10H3zM8 19h4M10 15v4M19 9h2v10h-2z',

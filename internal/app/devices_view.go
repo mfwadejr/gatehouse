@@ -381,7 +381,7 @@ func (a *App) registerDeviceViewRoutes() {
 
 func prefKey(name string, c *api.Ctx) (string, bool) {
 	switch name {
-	case "devices", "logs", "attention", "overview":
+	case "devices", "logs", "attention", "overview", "advice":
 		return "prefs." + strconv.FormatInt(c.User.ID, 10) + "." + name, true
 	}
 	return "", false
