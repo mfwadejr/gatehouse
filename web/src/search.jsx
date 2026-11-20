@@ -88,7 +88,7 @@ const ROWS = [
   ['Remote login (SSH)', 'settings/account', 'Turn SSH on or off', 'ssh remote login', 'Remote login'],
   ['Logs', 'logs/log', 'What happened and when', 'events history blocked connections'],
   ['What is using the disk', 'diagnostics/services', 'The biggest places on the disk', 'disk space full storage using clear', 'What is using the disk'],
-  ['Morning summary', 'overview', 'A few plain sentences: what needs you now and what happened yesterday', 'morning summary yesterday today daily digest report what happened', 'Morning summary'],
+  ['Daily summary', 'overview', 'A few plain sentences: what needs you now and what happened yesterday', 'daily summary yesterday today daily digest report what happened morning', 'Daily summary'],
   ['Drive health', 'diagnostics/services', 'Whether the drive is healthy, worn or reporting a problem', 'disk drive smart health ssd nvme wear temperature failing smartmontools', 'Drive health'],
   ['Certificates', 'diagnostics/services', 'Days left on VPN, pairing and console certificates', 'certificate expire expiry expires days left renew ca openvpn ssl tls', 'Certificates'],
   ['Data use', 'logs/activity', 'Data used by devices, apps and sites over the last hours', 'data use activity bandwidth devices apps sites'],

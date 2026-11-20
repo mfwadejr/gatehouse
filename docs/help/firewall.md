@@ -19,7 +19,7 @@ Tabs along the top:
 - **Open ports**: **Open a port** lets something outside reach an app on one of your devices, like Plex or a game server. Each one can be paused, put on a schedule, turned off, edited or removed the same way as a rule. A paused rule or port is closed until the time runs out or you press **Resume now**; the change waits for **Review and apply** like any other.
 - **Countries**: block or allow whole countries.
 - **Discovery**: let devices on different networks find each other, such as casting and printers.
-- **Protection**: **Block encrypted DNS to other servers**, **Also block well-known encrypted-DNS websites**, **Ask for a code before changing the firewall** and **Log blocked traffic**.
+- **Protection**: forced DNS is no longer here; it is under **DNS**, **Servers**. This tab holds **Block encrypted DNS to other servers**, **Also block well-known encrypted-DNS websites**, **Ask for a code before changing the firewall** and **Log blocked traffic**.
 - **History**: **Change history**, every time the firewall was changed and whether you kept it.
 
 ## Common tasks

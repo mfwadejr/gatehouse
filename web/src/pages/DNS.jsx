@@ -3,6 +3,7 @@ import { useHashTab } from '../hashtab.js';
 import ResolverCard from './Resolver.jsx';
 import { ScheduleEditor } from '../ScheduleEditor.jsx';
 import EncryptedDns from './EncryptedDns.jsx';
+import ForcedDns from './ForcedDns.jsx';
 import React, { useState, useEffect } from 'react';
 import { del, get, patch, post, put, useData, useStream } from '../api.js';
 import { go } from '../App.jsx';
@@ -178,18 +179,17 @@ function Activity() {
 // Where names are looked up: the DNS servers NopeWarden asks, encrypted DNS, and forcing devices to use it.
 function Servers() {
   const { data: ups, reload: ru } = useData('/api/dns/upstreams', { topics: ['dns.upstreams'], every: 10000 });
-  const { data: force } = useData('/api/fw/dnsforce', { every: 60000 });
+  // Forced DNS lives here. Its settings are the firewall's, so they are read and saved the same way.
+  const { data: fwov, reload: reloadFw } = useData('/api/fw/overview', { topics: ['fw.status'] });
+  const { data: pickers } = useData('/api/fw/pickers');
+  const [runForced] = useAction();
+  const fs = fwov?.settings;
+  const saveForced = (k) => (v) => runForced(() => put('/api/fw/settings', { ...fs, [k]: v })).then(reloadFw);
   const [add, setAdd] = useState(false);
   const list = ups || [];
-  const forcedOn = (force?.networks || []).filter((n) => n.mode !== 'off').map((n) => n.name);
   return (
     <>
-      <Card title="Forced DNS" desc="Devices that use a DNS server of their own are sent to the one you chose.">
-        <div className="spread">
-          <span>{!force ? 'Loading…' : !force.master ? 'Off. Devices may use any DNS server.' : forcedOn.length ? `On for ${forcedOn.join(', ')}.${force.redirected ? ` ${fmt.n(force.redirected)} lookups redirected so far.` : ''}` : 'On, but no network is forced.'}</span>
-          <button type="button" className="link small" onClick={() => go('firewall')}>Change →</button>
-        </div>
-      </Card>
+      {fs && <ForcedDns s={fs} save={saveForced} pickers={pickers} reload={reloadFw} />}
       <EncryptedDns onChanged={ru} />
       <ResolverCard />
       {(list || []).some((u) => u.id < 0)

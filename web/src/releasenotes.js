@@ -1,6 +1,15 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.51',
+    title: 'Daily summary, Forced DNS on DNS, and two new icons',
+    items: [
+      'Morning summary is now Daily summary, because it shows at any hour. The words are clearer too: "1 thing needs you now, and 1 more is worth a look". Amber says Worth a look and red says Needs you now.',
+      'Forced DNS moved to DNS, Servers, with the other settings for where names are answered. Firewall, Protection keeps a note that points to it.',
+      'Firewall has a brick wall icon and Internet has a cloud, so Firewall, Protection and Threats no longer all look like shields and Internet no longer looks like Wi-Fi.',
+    ],
+  },
+  {
     version: '0.9.4.50',
     title: 'A calmer Overview, and advice you can dismiss',
     items: [

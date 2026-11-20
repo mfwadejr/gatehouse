@@ -510,8 +510,8 @@ function MorningCard({ items, c }) {
   const open = c.morningOpen;
   const toggle = () => c.setMorningOpen(!open);
   return (
-    <Card title="Morning summary" desc={new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
-      actions={<button type="button" className="chevbtn" onClick={toggle} aria-expanded={open} aria-label={open ? 'Collapse the morning summary' : 'Expand the morning summary'} title={open ? 'Collapse' : 'Expand'} style={{ transform: open ? 'none' : 'rotate(-90deg)' }}><Icon d="M6 9l6 6 6-6" size={16} /></button>}>
+    <Card title="Daily summary" desc={new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
+      actions={<button type="button" className="chevbtn" onClick={toggle} aria-expanded={open} aria-label={open ? 'Collapse the daily summary' : 'Expand the daily summary'} title={open ? 'Collapse' : 'Expand'} style={{ transform: open ? 'none' : 'rotate(-90deg)' }}><Icon d="M6 9l6 6 6-6" size={16} /></button>}>
       <div className="stack">
         <div className="inline"><Pill tone={m.tone}>{m.pill}</Pill><span>{m.head}</span></div>
         {open && m.top.length > 0 && (
@@ -693,7 +693,7 @@ function UpdateBanner({ c }) {
 
 // Cards a person can hide from their own Overview. The hidden list is remembered per person.
 const HIDEABLE = [
-  { id: 'morning', label: 'Morning summary' },
+  { id: 'morning', label: 'Daily summary' },
   { id: 'world', label: 'Where connections go' },
   { id: 'happened', label: 'What happened' },
   { id: 'busiest', label: 'Busiest devices' },

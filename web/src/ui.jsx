@@ -5,11 +5,11 @@ import { useAttention } from './attentionctx.js';
 
 export const ICONS = {
   overview: 'M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z',
-  internet: 'M2 9a15 15 0 0120 0M5 12.5a10 10 0 0114 0M8.5 16a5 5 0 017 0M12 19.5h.01',
+  internet: 'M6.5 19a4.5 4.5 0 01-.4-8.98 6 6 0 0111.6-1.3A4.7 4.7 0 0117.5 19z',
   networks: 'M9 3h6v5H9zM12 8v3M5 11h14M5 11v3M19 11v3M2 14h6v6H2zM16 14h6v6h-6z',
   dns: 'M12 21a9 9 0 100-18 9 9 0 000 18zM3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18',
   dhcp: 'M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01',
-  firewall: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z',
+  firewall: 'M3 5h18v14H3zM3 9.7h18M3 14.3h18M12 5v4.7M7.5 9.7v4.6M16.5 9.7v4.6M12 14.3V19',
   protection: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM8.5 12l2.5 2.5 4.5-5',
   threats: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 15a3 3 0 100-6 3 3 0 000 6z',
   services: 'M4 6h16M4 12h16M4 18h10M18 16v4M16 18h4',

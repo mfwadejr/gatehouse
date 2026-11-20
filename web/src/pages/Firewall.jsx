@@ -6,7 +6,6 @@ import { confirmRemoval } from '../removal.js';
 import AddNetwork from '../AddNetwork.jsx';
 import { go } from '../App.jsx';
 import { linkState } from '../linkstate.js';
-import ForcedDns from './ForcedDns.jsx';
 import AlwaysOn from './AlwaysOn.jsx';
 import Countries from './Countries.jsx';
 import UPnPCard from './UPnPCard.jsx';
@@ -210,16 +209,16 @@ function Protected({ reload }) {
   );
 }
 
-function Protection({ ov, reload, pickers }) {
+function Protection({ ov, reload }) {
   const s = ov?.settings;
   const [run] = useAction();
   if (!s) return null;
   const save = (k) => (v) => run(() => put('/api/fw/settings', { ...s, [k]: v })).then(reload);
   return (
     <>
-    <ForcedDns s={s} save={save} pickers={pickers} reload={reload} />
+    <Note tone="info">Forced DNS, which sends devices that use a DNS server of their own to the one you chose, is now under <a href="#/dns/servers">DNS, Servers</a>.</Note>
     <Card title="Protection" desc="Extra safeguards that apply to every network.">
-      <ToggleRow title="Block encrypted DNS to other servers" desc="Stops devices bypassing your filters with DNS-over-TLS. Follows the forced DNS settings above: a device left alone is not blocked." checked={s.block_dot} onChange={save('block_dot')} />
+      <ToggleRow title="Block encrypted DNS to other servers" desc="Stops devices bypassing your filters with DNS-over-TLS. Follows the forced DNS settings under DNS, Servers: a device left alone is not blocked." checked={s.block_dot} onChange={save('block_dot')} />
       <ToggleRow title="Also block well-known encrypted-DNS websites" desc="Stops browsers that quietly switch to Cloudflare, Google, Quad9, OpenDNS, AdGuard or CleanBrowsing over HTTPS. This cannot be complete: any website can run such a server, so it stops the common cases, not a determined person." checked={!!s.block_doh} onChange={save('block_doh')} />
       <ToggleRow title="Ask for a code before changing the firewall" desc="Requires your authenticator code to apply network changes." checked={s.step_up} onChange={save('step_up')} />
       <ToggleRow title="Log blocked traffic" desc="Useful when troubleshooting. Uses more disk space." checked={s.log_drops} onChange={save('log_drops')} />
@@ -270,7 +269,7 @@ export default function Firewall({ me }) {
       {tab === 'groups' && <GroupsAndLists pickers={pickers} reloadPickers={reloadPickers} reload={all} />}
       {tab === 'services' && <Services part goPorts={() => setTab('ports')} />}
       {tab === 'ports' && <><NatNotice compact /><Forwards reload={reload} /><UPnPCard /></>}
-      {tab === 'protection' && <><Note tone="info">The management port, the spare port kept for managing this device, is now under <a href="#/settings/general">Settings, General</a>.</Note><Protection ov={ov} reload={reload} pickers={pickers} /></>}
+      {tab === 'protection' && <><Note tone="info">The management port, the spare port kept for managing this device, is now under <a href="#/settings/general">Settings, General</a>.</Note><Protection ov={ov} reload={reload} /></>}
       {tab === 'countries' && <Countries reload={all} />}
       {tab === 'discovery' && <Discovery reload={all} />}
       {tab === 'history' && <History />}

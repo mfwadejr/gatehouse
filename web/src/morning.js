@@ -1,4 +1,4 @@
-// The morning summary, put together by fixed rules from the same list as the menu dots and from
+// The daily summary, put together by fixed rules from the same list as the menu dots and from
 // yesterday's numbers. No AI: the same inputs always give the same words.
 
 const plural = (n, one, many) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
@@ -12,14 +12,14 @@ export function morningSummary(items, y) {
   // "Broken" is only for what has actually stopped (a failed service, a link that is down, a certificate that
   // ran out). A red item that is a decision the person has not made yet says "needs you now".
   const stopped = bad.filter((i) => i.stopped);
-  const more = warn.length ? ` and ${warn.length} more need${warn.length === 1 ? 's' : ''} you` : '';
+  const more = warn.length ? `, and ${warn.length} more ${warn.length === 1 ? 'is' : 'are'} worth a look` : '';
   let head;
   let pill = 'All clear';
   if (bad.length && stopped.length === bad.length) { head = `${plural(bad.length, 'thing is', 'things are')} broken${more}.`; pill = 'Broken'; }
   else if (bad.length) {
     head = `${plural(bad.length, 'thing needs', 'things need')} you now${stopped.length ? `, ${stopped.length === 1 ? 'one of them broken' : `${stopped.length} of them broken`}` : ''}${more}.`;
     pill = stopped.length ? 'Broken' : 'Needs you now';
-  } else if (warn.length) { head = `${plural(warn.length, 'thing needs', 'things need')} you.`; pill = 'Needs you'; }
+  } else if (warn.length) { head = `${plural(warn.length, 'thing is', 'things are')} worth a look.`; pill = 'Worth a look'; }
   else head = 'Everything is running normally.';
   const tone = bad.length ? 'bad' : warn.length ? 'warn' : 'good';
   const top = [...bad, ...warn].slice(0, 3);
