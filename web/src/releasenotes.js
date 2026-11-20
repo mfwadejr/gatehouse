@@ -1,6 +1,13 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.49',
+    title: 'Search no longer blanks the page',
+    items: [
+      'Typing a letter in Search turned the page black. A stray comma in the list of search entries left a hole in it, so the search crashed on the first letter. Fixed, and the build now refuses a list with a hole in it.',
+    ],
+  },
+  {
     version: '0.9.4.48',
     title: 'Management port reachable from other subnets',
     items: [

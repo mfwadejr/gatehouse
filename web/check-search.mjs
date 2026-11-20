@@ -25,6 +25,8 @@ const src = readFileSync('src/search.jsx', 'utf8');
 const block = src.slice(src.indexOf('const ROWS = ['), src.indexOf('];', src.indexOf('const ROWS = [')));
 let bad = 0; const fail = (m) => { console.error('search: ' + m); bad++; };
 let n = 0;
+// A stray double comma leaves a hole in the list, and the first letter typed in Search then blanks the page.
+block.split('\n').forEach((l, i) => { if (/\],\s*,/.test(l) || /^\s*,/.test(l)) fail(`ROWS line ${i + 1} has a stray comma, which leaves a hole in the list`); });
 for (const m of block.matchAll(/^\s*\[('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"), '([^']*)'(?:, ('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"), ('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")(?:, ('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"))?)?\],?$/gm)) {
   n++;
   const label = m[1].slice(1, -1);

@@ -28,7 +28,7 @@ const ROWS = [
   ['Forced DNS', 'dns/servers', 'Make devices use this DNS even if they try another', 'force redirect port 53 hardcoded dns', 'Forced DNS'],
   ['DHCP', 'dhcp/overview', 'How DHCP is doing right now', 'overview status address use pool full devices lately'],
   ['How full the address pools are', 'dhcp/overview', 'Which pools are nearly out of addresses', 'pool utilisation full out of addresses range exhausted', 'Address pools'],
-  ['Devices over time', 'dhcp/overview', 'How many devices had an address, over 1 hour, 24 hours or 7 days', 'devices joining online history chart', 'Devices over time'],,
+  ['Devices over time', 'dhcp/overview', 'How many devices had an address, over 1 hour, 24 hours or 7 days', 'devices joining online history chart', 'Devices over time'],
   ['Newest devices on the network', 'dhcp/overview', 'The devices that asked for an address most lately', 'recent joined new device lease', 'Most recently active'],
   ['Address pools', 'dhcp/scopes', 'Each network gets its own pool of addresses', 'address pool lease range', 'Address pools'],
   ['Devices with an address', 'dhcp/leases', 'Every device that has been given an address', 'leases clients hostname mac ip', 'Devices with an address'],
@@ -138,7 +138,7 @@ const ROWS = [
   ['Where threat watching writes its results', 'threats/advanced', 'Where NopeWarden reads what the engine noticed', 'eve json log file path suricata output', 'Where it writes'],
   ['Ports devices opened by themselves', 'firewall/ports', 'The ports devices asked for through UPnP', 'upnp open now leases mapped ports game console', 'Open now'],
 ];
-export const STATIC = ROWS.map(([label, page, hint, words, find]) => ({ label, page, hint, words: words || '', find: find || '', kind: page.includes('/') ? 'Setting' : 'Page' }));
+export const STATIC = ROWS.filter(Boolean).map(([label, page, hint, words, find]) => ({ label, page, hint, words: words || '', find: find || '', kind: page.includes('/') ? 'Setting' : 'Page' }));
 
 // After a result opens its page, scroll to the card it named and flash it so the eye lands there.
 function flash(find) {
