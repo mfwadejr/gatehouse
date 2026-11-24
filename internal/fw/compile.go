@@ -297,7 +297,10 @@ func (c *compiler) input() {
 			c.line(2, "iifname @%s%s tcp dport 22 accept comment \"protected: management port ssh\"", MgmtIfSet, lim)
 		}
 	}
-	c.line(2, "iifname @%s icmp type echo-request limit rate 20/second accept comment \"protected: management port ping\"", MgmtIfSet)
+	// Ping follows the same limit as the console, so a device that may not manage cannot ping it either.
+	for _, lim := range limits {
+		c.line(2, "iifname @%s%s icmp type echo-request limit rate 20/second accept comment \"protected: management port ping\"", MgmtIfSet, lim)
+	}
 	c.line(2, "iifname @%s udp sport 67 udp dport 68 accept comment \"protected: management port address from dhcp\"", MgmtIfSet)
 	for _, lim := range limits {
 		c.line(2, "iifname %s%s tcp dport %s counter accept comment \"protected: management console\"", ifSet(mgmt), lim, consolePorts)

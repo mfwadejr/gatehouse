@@ -7,10 +7,10 @@
 
 ## Ports NopeWarden uses
 
-- **443**: the console (HTTPS). You can change it under **Settings, General, Console address**.
+- **443**: the console (HTTPS). You can change it under **Settings, Managing this device, Console address**.
 - **53**: DNS, on your networks only.
 - **67 and 68**: DHCP, on the networks where it is switched on.
-- **22**: remote login (SSH). Off unless you turn on **Remote login** under **Settings, Account & sign-in**. It is never reachable from the internet side.
+- **22**: remote login (SSH). Off unless you turn on **Remote login** under **Settings, Managing this device**. It is never reachable from the internet side.
 
 ## What Apply does
 

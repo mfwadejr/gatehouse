@@ -386,7 +386,9 @@ func ConsolePortsFrom(db Queryer, now time.Time) []int {
 // MgmtAllowSpec is what the administrator chose: networks by name and address ranges by hand.
 type MgmtAllowSpec struct {
 	Networks []string `json:"networks"`
-	CIDRs    []string `json:"cidrs"`
+	// VPNs are chosen by name and followed live: when a VPN's own range changes, the limit follows it.
+	VPNs  []string `json:"vpns"`
+	CIDRs []string `json:"cidrs"`
 	// Resolved is every address range the choice stands for, filled in on load.
 	Resolved []string `json:"resolved,omitempty"`
 }
@@ -429,7 +431,37 @@ func MgmtAllowFrom(db Queryer) MgmtAllowSpec {
 		}
 		rows.Close()
 	}
+	for _, n := range spec.VPNs {
+		for _, c := range VPNRange(db, n) {
+			add(c)
+		}
+	}
 	return spec
+}
+
+// VPNRange is the range a VPN server hands to its own devices, found by the name shown on the VPN page
+// (a WireGuard server's name, an OpenVPN server's label or device). It is empty for a VPN that is off,
+// is not a server, or does not exist.
+func VPNRange(db Queryer, name string) []string {
+	var out []string
+	one := func(q string) {
+		rows, err := db.Query(q, name, name)
+		if err != nil {
+			return
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var c string
+			if rows.Scan(&c) == nil {
+				if p, err := netip.ParsePrefix(strings.TrimSpace(c)); err == nil {
+					out = append(out, p.Masked().String())
+				}
+			}
+		}
+	}
+	one(`SELECT address FROM vpn_wg WHERE (name=? OR name=?) AND enabled=1 AND mode='server'`)
+	one(`SELECT subnet FROM vpn_ovpn WHERE (label=? OR name=?) AND enabled=1 AND mode='server' AND subnet<>''`)
+	return out
 }
 
 // rescueDevice returns the name traffic from the setup port arrives under. A port that has

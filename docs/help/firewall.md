@@ -42,7 +42,7 @@ NopeWarden refuses a change that would leave you no way to manage it, and always
 **Let devices open ports by themselves (UPnP)** lets a game console or media app ask for a port instead of you opening it by hand. It opens that port for that device only, and it is off until you switch it on. Turn it off if you want every open port to be your own choice.
 
 ## A port just for managing the device
-The **Management port** card moved to Settings, General, because it is a setting of the device and not of the firewall. The firewall rules it needs are still made for you and show under **Protected** at the top of this page.
+The **Management port** card, **Who may manage this device** and **Test my access** are now under Settings, **Managing this device**, because they are settings of the device and not of the firewall. The firewall rules they need are still made for you and show under **Protected** at the top of this page.
 
 ## Services (a tab of Firewall)
 **What it is for**

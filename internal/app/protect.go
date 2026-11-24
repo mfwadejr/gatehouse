@@ -173,14 +173,44 @@ func (a *App) registerProtectRoutes() {
 				nets = append(nets, nc)
 			}
 		}
+		// VPN servers the box runs, by the name shown on the VPN page, with the range each hands out.
+		type vpnChoice struct {
+			Name   string   `json:"name"`
+			Ranges []string `json:"ranges"`
+		}
+		vpns := []vpnChoice{}
+		for _, q := range []string{
+			`SELECT name FROM vpn_wg WHERE enabled=1 AND mode='server' ORDER BY name`,
+			`SELECT CASE WHEN label<>'' THEN label ELSE name END FROM vpn_ovpn WHERE enabled=1 AND mode='server' AND subnet<>'' ORDER BY name`,
+		} {
+			// Read the names first and close the query before asking about each range: the database
+			// allows one query at a time.
+			var names []string
+			if rows, err := a.Config.Query(q); err == nil {
+				for rows.Next() {
+					var n string
+					rows.Scan(&n)
+					names = append(names, n)
+				}
+				rows.Close()
+			}
+			for _, n := range names {
+				if rs := fw.VPNRange(a.Config, n); len(rs) > 0 {
+					vpns = append(vpns, vpnChoice{Name: n, Ranges: rs})
+				}
+			}
+		}
 		if spec.Networks == nil {
 			spec.Networks = []string{}
+		}
+		if spec.VPNs == nil {
+			spec.VPNs = []string{}
 		}
 		if spec.CIDRs == nil {
 			spec.CIDRs = []string{}
 		}
 		api.JSON(w, 200, map[string]any{
-			"rules": a.withProtectedHits(a.protectedRules(m)), "allow": spec, "networks": nets,
+			"rules": a.withProtectedHits(a.protectedRules(m)), "allow": spec, "networks": nets, "vpns": vpns, "port_net": a.mgmtNetwork(),
 			"you": map[string]any{"ip": c.IP, "iface": ifaceOf(c.IP)},
 		})
 	})
@@ -190,7 +220,16 @@ func (a *App) registerProtectRoutes() {
 		if !api.Decode(w, r, &in) {
 			return
 		}
-		clean := fw.MgmtAllowSpec{Networks: []string{}, CIDRs: []string{}}
+		clean := fw.MgmtAllowSpec{Networks: []string{}, VPNs: []string{}, CIDRs: []string{}}
+		for _, n := range in.VPNs {
+			if n = strings.TrimSpace(n); n != "" {
+				if len(fw.VPNRange(a.Config, n)) == 0 {
+					fail(w, fmt.Errorf("there is no VPN server called %q that is switched on, so it has no range to allow", n))
+					return
+				}
+				clean.VPNs = append(clean.VPNs, n)
+			}
+		}
 		for _, n := range in.Networks {
 			if n = strings.TrimSpace(n); n != "" {
 				clean.Networks = append(clean.Networks, n)
@@ -210,7 +249,7 @@ func (a *App) registerProtectRoutes() {
 				return
 			}
 		}
-		if len(clean.Networks)+len(clean.CIDRs) == 0 {
+		if len(clean.Networks)+len(clean.VPNs)+len(clean.CIDRs) == 0 {
 			a.Config.Exec(`DELETE FROM settings WHERE key=?`, mgmtAllowSetting)
 			a.publishFW()
 			ok(w)
@@ -306,4 +345,30 @@ func (a *App) withProtectedHits(rs []protectedRule) []protectedRule {
 		}
 	}
 	return rs
+}
+
+// mgmtNetwork is the network the management port is on, as an address range, for the picker. It is the
+// fixed address when one is set, otherwise the range the port was given by DHCP. Empty when there is none.
+func (a *App) mgmtNetwork() []string {
+	c := a.mgmtCfg()
+	if c.Iface == "" {
+		return []string{}
+	}
+	if c.Mode == "static" {
+		if p, err := netip.ParsePrefix(strings.TrimSpace(c.CIDR)); err == nil {
+			return []string{p.Masked().String()}
+		}
+	}
+	if ifi, err := net.InterfaceByName(c.Iface); err == nil {
+		if addrs, err := ifi.Addrs(); err == nil {
+			for _, ad := range addrs {
+				if n, ok := ad.(*net.IPNet); ok && n.IP.To4() != nil {
+					if p, err := netip.ParsePrefix(n.String()); err == nil {
+						return []string{p.Masked().String()}
+					}
+				}
+			}
+		}
+	}
+	return []string{}
 }

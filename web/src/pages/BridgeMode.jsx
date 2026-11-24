@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { get, post, put, useData } from '../api.js';
+import { RangeField, knownRanges } from './ManageAccess.jsx';
 import { Button, Card, Field, Input, NumberInput, Note, Pill, Problems, Segmented, Select, ToggleRow, useAction, useToast, confirmBox } from '../ui.jsx';
 
 // Bridge mode: NopeWarden sits between another router and your network and filters, instead of
@@ -61,6 +62,7 @@ export default function BridgeMode() {
   const [run, busy] = useAction();
   const [code, setCode] = useState('');
   const [subnets, setSubnets] = useState('');
+  const { data: known } = useData('/api/fw/protected');
   useEffect(() => {
     if (data && !f) {
       const c = data.config?.outside || data.config?.enabled === false ? data.config : blank;
@@ -125,7 +127,7 @@ export default function BridgeMode() {
                   <Field label="Management-only port (optional)" hint="A spare port that is never part of the bridge. Plug a laptop in here to always reach the console."><Select aria-label="Management-only port" value={f.oob} onChange={set('oob')} options={portOpts('None')} /></Field>
                   {f.oob && <Field label="Its address"><Input value={f.oob_addr} onChange={set('oob_addr')} placeholder="192.168.99.1/24" className="in mono" /></Field>}
                 </div>
-                <Field label="Networks on the other router's side that may manage NopeWarden" hint="Leave empty so only your own devices can. For example an office or VPN range: 10.8.0.0/24"><Input value={subnets} onChange={setSubnets} className="in mono" /></Field>
+                <RangeField label="Networks on the other router's side that may manage NopeWarden" hint="Leave empty so only your own devices can. Separate with commas, spaces or new lines. The same editor is used for Who may manage under Settings, Managing this device, which limits these further." value={subnets} onChange={setSubnets} picks={knownRanges(known)} placeholder="10.8.0.0/24" />
                 <div className="stack">
                   <strong>Let a service on your network be reached from outside</strong>
                   {f.allow.map((a, i) => (

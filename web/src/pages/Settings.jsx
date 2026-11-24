@@ -15,6 +15,7 @@ import GuestPortal from './GuestPortal.jsx';
 import BridgeMode from './BridgeMode.jsx';
 import DeviceMode from './DeviceMode.jsx';
 import MgmtPort from './MgmtPort.jsx';
+import ManageAccess from './ManageAccess.jsx';
 import HighAvailability from './HighAvailability.jsx';
 import RemoteLogin from './RemoteLogin.jsx';
 import Alerts from './Alerts.jsx';
@@ -254,6 +255,7 @@ function ResetCard({ me }) {
 
 const TABS = [
   { value: 'general', label: 'General' },
+  { value: 'manage', label: 'Managing this device' },
   { value: 'account', label: 'Account & sign-in' },
   { value: 'alerts', label: 'Alerts & logs' },
   { value: 'backup', label: 'Backup & recovery' },
@@ -290,10 +292,16 @@ export default function Settings({ me, reloadMe }) {
         <>
           <Guard what="Get started"><GetStarted /></Guard>
           <Guard what="Device mode"><DeviceMode /></Guard>
-          <Guard what="Management port"><MgmtPort /></Guard>
           <Guard what="PowerCard"><PowerCard me={me} /></Guard>
-          <Guard what="ConsolePort"><ConsolePort /></Guard>
           <Guard what="Map location"><MapLocation /></Guard>
+        </>
+      )}
+      {admin && tab === 'manage' && (
+        <>
+          <Guard what="Management port"><MgmtPort /></Guard>
+          <Guard what="Who may manage"><ManageAccess /></Guard>
+          <Guard what="ConsolePort"><ConsolePort /></Guard>
+          <Guard what="RemoteLogin"><RemoteLogin me={me} /></Guard>
         </>
       )}
       {(!admin || tab === 'account') && (
@@ -301,7 +309,6 @@ export default function Settings({ me, reloadMe }) {
           <TwoStep me={me} data={data} reload={reload} boot={reloadMe} />
           <Password />
           <Sessions />
-          {admin && <Guard what="RemoteLogin"><RemoteLogin me={me} /></Guard>}
         </>
       )}
       {admin && tab === 'alerts' && (

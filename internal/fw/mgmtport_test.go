@@ -20,7 +20,7 @@ func TestManagementPortRulesAreAlwaysThereAndNeverRouted(t *testing.T) {
 		"set mgmt_if { type ifname; }",
 		`iifname @mgmt_if ip saddr 10.9.0.0/24 tcp dport 443 counter accept comment "protected: management port console"`,
 		`iifname @mgmt_if ip saddr 10.9.0.0/24 tcp dport 22 accept comment "protected: management port ssh"`,
-		`iifname @mgmt_if icmp type echo-request`,
+		`iifname @mgmt_if ip saddr 10.9.0.0/24 icmp type echo-request`,
 		`iifname @mgmt_if udp sport 67 udp dport 68 accept`,
 		`iifname @mgmt_if counter drop comment "protected: the management port is not routed"`,
 		`oifname @mgmt_if counter drop comment "protected: the management port is not routed"`,
@@ -96,5 +96,26 @@ func TestManagementSetsTakeOnlyPortNamesAndPorts(t *testing.T) {
 		if _, err := BuildSetScript(bad, nil); err == nil {
 			t.Errorf("accepted %v", bad)
 		}
+	}
+}
+
+// Ping on the management port follows the same limit as the console.
+func TestManagementPortPingFollowsTheLimit(t *testing.T) {
+	m := sample()
+	m.MgmtAllow = []string{"10.9.0.0/24"}
+	out, err := Compile(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, `iifname @mgmt_if ip saddr 10.9.0.0/24 icmp type echo-request`) {
+		t.Errorf("ping should be limited to the allowed range:\n%s", out)
+	}
+	if strings.Contains(out, "iifname @mgmt_if icmp type echo-request") {
+		t.Errorf("an unlimited ping rule must not remain when a limit is set:\n%s", out)
+	}
+	m.MgmtAllow = nil
+	out, _ = Compile(m)
+	if !strings.Contains(out, "iifname @mgmt_if icmp type echo-request") {
+		t.Errorf("with no limit anyone on the port may ping:\n%s", out)
 	}
 }

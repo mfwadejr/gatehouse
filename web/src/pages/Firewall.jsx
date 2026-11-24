@@ -1,6 +1,6 @@
 import { hashQuery, setHashQuery, useHashTab } from '../hashtab.js';
 import React, { useEffect, useMemo, useState } from 'react';
-import { del, holdAnd, post, put, useData, useStream } from '../api.js';
+import { del, holdAnd, put, useData, useStream } from '../api.js';
 import { SAVED_LATER, SaveChoice } from '../changes.jsx';
 import { confirmRemoval } from '../removal.js';
 import AddNetwork from '../AddNetwork.jsx';
@@ -142,37 +142,16 @@ function Networks({ ov, presets, reload }) {
   );
 }
 
-function Protected({ reload }) {
-  const pn = usePortNames();
-  const { data, reload: again } = useData('/api/fw/protected', { topics: ['fw.status'] });
-  const [run, busy] = useAction();
-  const toast = useToast();
-  const [edit, setEdit] = useState(false);
-  const [nets, setNets] = useState([]);
-  const [cidrs, setCidrs] = useState('');
-  const [res, setRes] = useState(null);
+function Protected() {
+  const { data } = useData('/api/fw/protected', { topics: ['fw.status'] });
   if (!data) return null;
-  const startEdit = () => { setNets(data.allow.networks || []); setCidrs((data.allow.cidrs || []).join('\n')); setEdit(true); };
-  const toggle = (n) => setNets((x) => (x.includes(n) ? x.filter((y) => y !== n) : [...x, n]));
-  const save = async (later) => {
-    const list = cidrs.split(/[\s,]+/).filter(Boolean);
-    const o = data.allow, key = (x) => [...(x || [])].sort().join(',');
-    if (key(nets) === key(o.networks) && key(list) === key(o.cidrs)) { toast('No changes. These are already saved.'); setEdit(false); return; }
-    const body = { networks: nets, cidrs: list };
-    if (await run(() => (later ? holdAnd(() => put('/api/fw/management-access', body)) : put('/api/fw/management-access', body)), later ? SAVED_LATER : 'Saved.')) { setEdit(false); again(); reload(); }
-  };
-  const test = async () => { const r = await run(() => post('/api/fw/access-check', {})); if (r) setRes(r); };
-  const limited = (data.allow.resolved || []).length > 0;
   return (
     <section className="protected" aria-label="Protected rules">
       <div className="spread">
         <div className="inline"><span className="lock" aria-hidden="true">🔒</span><span className="name" style={{ fontSize: 'var(--font-size-lg)' }}>Protected: you can always get back in</span></div>
-        <div className="inline">
-          <Button small onClick={test} disabled={busy}>Test my access</Button>
-          <Button small onClick={edit ? () => setEdit(false) : startEdit}>{limited ? 'Change who may manage' : 'Limit who may manage'}</Button>
-        </div>
+        <a className="small" href="#/settings/manage">Who may manage and Test my access</a>
       </div>
-      <p className="small muted">These rules are built in. They sit above everything you can edit, and no change you make here can remove them. If you are ever locked out, press Alt+F2 on the machine itself.</p>
+      <p className="small muted">These rules are built in. They sit above everything you can edit, and no change you make here can remove them. If you are ever locked out, press Alt+F2 on the machine itself. Who may manage this device, and a check that you still can, are under Settings, Managing this device.</p>
       <div className="list">
         {<Limited items={data.rules} noun="rules" render={(r) => (
           <div className="item" key={r.title}>
@@ -181,30 +160,6 @@ function Protected({ reload }) {
           </div>
         )} />}
       </div>
-      {edit && (
-        <div className="stack mt3">
-          <Note title="Who may manage this device">Choose the networks or addresses allowed to open this console. Leave everything empty to allow every management network. If you pick something that does not include the address you are using now, NopeWarden refuses, so you cannot lock yourself out this way.</Note>
-          <Field label="Networks">
-            <div className="stack gap1">
-              {(data.networks || []).map((n) => (
-                <label key={n.name} className="inline"><input type="checkbox" checked={nets.includes(n.name)} onChange={() => toggle(n.name)} /> <span className="name">{n.name}</span> <span className="small muted mono">{n.subnets.join(', ')}</span></label>
-              ))}
-            </div>
-          </Field>
-          <Field label="Addresses or ranges" hint="One per line, like 192.168.1.0/24 or 10.8.0.5. You are connecting from the address shown below.">
-            <textarea className="in mono" rows={3} value={cidrs} onChange={(e) => setCidrs(e.target.value)} spellCheck={false} placeholder="192.168.1.0/24" />
-          </Field>
-          <span className="small muted">You are connecting from {data.you.ip}{data.you.iface ? ` (${pn(data.you.iface)})` : ''}.</span>
-          <div className="actions"><SaveChoice busy={busy} onSave={save} /><Button onClick={() => setEdit(false)}>Cancel</Button></div>
-        </div>
-      )}
-      {res && (
-        <div className="stack mt3">
-          <Note tone={res.ok ? 'good' : 'bad'} title={res.ok ? 'You can still manage this device' : 'Something needs attention'}>
-            <ul>{res.checks.map((c, i) => <li key={i}>{c.ok ? '✓' : '✗'} {c.text}</li>)}</ul>
-          </Note>
-        </div>
-      )}
     </section>
   );
 }
@@ -262,14 +217,14 @@ export default function Firewall({ me }) {
   const names = (ov?.matrix_zones || []).map((z) => z.name);
   return (
     <Page title="Firewall" sub="Decide what each network may reach. A saved change goes live in a moment, or waits on the Review page if you choose Save for later.">
-      <Protected reload={reload} />
+      <Protected />
       <Tabs value={tab} onChange={setTab} tabs={[{ value: 'networks', label: 'Networks' }, { value: 'rules', label: `Rules${(rules || []).filter((r) => !r.countries).length ? ` (${(rules || []).filter((r) => !r.countries).length})` : ''}` }, { value: 'groups', label: 'Device groups' }, { value: 'services', label: 'Services' }, { value: 'ports', label: 'Open ports' }, { value: 'countries', label: 'Countries' }, { value: 'discovery', label: 'Discovery' }, { value: 'protection', label: 'Protection' }, { value: 'history', label: 'History' }]} />
       {tab === 'networks' && <><Matrix ov={ov} rules={(rules || []).filter((r) => !r.countries)} onPick={(from, to, p) => setPair({ from, to, p })} /><Networks ov={ov} presets={presets} reload={reload} /></>}
       {tab === 'rules' && <><RulesList ov={ov} rules={(rules || []).filter((r) => !r.countries)} countryRules={countryRules} pickers={pickers} reloadPickers={reloadPickers} reload={all} filter={filter} setFilter={setFilter} startNew={(init) => setNewRule(init)} goPorts={() => setTab('ports')} goTab={setTab} /><AlwaysOn /></>}
       {tab === 'groups' && <GroupsAndLists pickers={pickers} reloadPickers={reloadPickers} reload={all} />}
       {tab === 'services' && <Services part goPorts={() => setTab('ports')} />}
       {tab === 'ports' && <><NatNotice compact /><Forwards reload={reload} /><UPnPCard /></>}
-      {tab === 'protection' && <><Note tone="info">The management port, the spare port kept for managing this device, is now under <a href="#/settings/general">Settings, General</a>.</Note><Protection ov={ov} reload={reload} /></>}
+      {tab === 'protection' && <><Note tone="info">The management port, the spare port kept for managing this device, is now under <a href="#/settings/manage">Settings, Managing this device</a>.</Note><Protection ov={ov} reload={reload} /></>}
       {tab === 'countries' && <Countries reload={all} />}
       {tab === 'discovery' && <Discovery reload={all} />}
       {tab === 'history' && <History />}

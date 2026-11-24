@@ -1,6 +1,16 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.52',
+    title: 'Managing this device',
+    items: [
+      'Settings has a new Managing this device tab. The management port, who may manage, the access test, the console address and remote login are together there instead of spread over Settings and Firewall.',
+      'Who may manage this device moved off the Firewall page to sit with the management port. You can tick your networks and your VPNs by name (a VPN is followed if its range changes), type other ranges separated by commas, spaces or new lines, and add a VPN, the management port network or your own address with one press. Empty means anyone on a management network may. Saving a list that would lock you out is refused.',
+      'Ping on the management port follows the same limit as the console, so a device that may not manage cannot ping it either.',
+      'Bridge mode uses the same range editor for the networks on the other router\'s side that may manage.',
+    ],
+  },
+  {
     version: '0.9.4.51',
     title: 'Daily summary, Forced DNS on DNS, and two new icons',
     items: [
