@@ -1,13 +1,6 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
-    version: '0.9.4.62',
-    title: 'DNS page lookups count fixed',
-    items: [
-      'DNS, Overview: the Lookups, 24 hours card showed a dash instead of the number of lookups. It now shows the real count and refreshes every 30 seconds.',
-    ],
-  },
-  {
     version: '0.9.4.61',
     title: 'More pictures in the help',
     items: [

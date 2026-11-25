@@ -18,7 +18,6 @@ function Overview() {
   const [range, setRange, rangeOptions] = usePeriod('dns', { live: true });
   const { data: h } = useData(`/api/overview/history?range=${range}`, { every: 30000, enabled: range !== 'live' });
   const { data: d24 } = useData('/api/overview/history?range=24h', { every: 60000 });
-  const { data: day } = useData('/api/dns/top?hours=24', { every: 30000 });
   const [feed, setFeed] = useState([]);
   useStream(['dns.live'], (t, p) => {
     if (!Array.isArray(p)) return;
@@ -57,7 +56,7 @@ function Overview() {
         <Note tone="warn" title="Blocking is not active yet">Your blocklists have not downloaded yet, so nothing is being blocked. NopeWarden keeps trying and starts blocking as soon as one arrives. The Blocklists tab shows how it is going.</Note>
       )}
       <section className="dns-tiles">
-        <button type="button" className="card tile tilebtn" onClick={() => { window.location.hash = '#/logs'; }}><span className="lbl">Lookups, 24 hours</span><div><span className="val">{day ? fmt.n(day.total) : '–'}</span></div><div className="tspark"><Spark values={trend('dns.qps')} fluid /></div><span className="foot">{fmt.d1(st?.qps)} a second right now</span></button>
+        <button type="button" className="card tile tilebtn" onClick={() => { window.location.hash = '#/logs'; }}><span className="lbl">Lookups, 24 hours</span><div><span className="val">{top ? fmt.n(top.total) : '–'}</span></div><div className="tspark"><Spark values={trend('dns.qps')} fluid /></div><span className="foot">{fmt.d1(st?.qps)} a second right now</span></button>
         <button type="button" className="card tile tilebtn" onClick={() => { window.location.hash = '#/logs'; }}><span className="lbl">Blocked</span><div><span className="val">{fmt.d1(st?.blocked_pct)}</span><span className="unit">%</span></div><div className="tspark"><Spark values={trend('dns.blocked')} fluid tone="bad" /></div><span className="foot">{total > 0 && !(st?.blocked_pct > 0) ? 'Nothing blocked in the last hour' : `${fmt.n(st?.outcomes?.blocked || 0)} blocked in the last hour`} · {fmt.n(data?.unique_blocked ?? data?.blocked_entries)} names on your lists</span></button>
         <div className="card tile"><span className="lbl">Answered from memory</span><div><span className="val">{fmt.d1(st?.cached_pct)}</span><span className="unit">%</span></div><div className="tspark"><Spark values={trend('dns.cached')} fluid /></div><span className="foot">{fmt.n(st?.cache_size)} saved answers</span></div>
         <div className="card tile"><span className="lbl">Response time</span><div><span className="val">{fmt.d1(st?.avg_ms)}</span><span className="unit">ms</span></div><div className="tspark"><Spark values={trend('dns.ms')} fluid /></div><span className="foot">95% under {fmt.d1(st?.p95_ms)} ms</span></div>
