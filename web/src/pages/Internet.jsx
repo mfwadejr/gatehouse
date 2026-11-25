@@ -55,7 +55,7 @@ function WanForm({ initial, ports, found, onClose, onSaved, wans }) {
   return (
     <Modal title={w.id ? `Edit ${w.name}` : 'Add an internet connection'} onClose={onClose}
       footer={<><Button onClick={onClose}>Cancel</Button><SaveChoice onSave={save} busy={busy} /></>}>
-      <Field label="Name" hint="For example the name of your provider."><Input value={w.name} onChange={set('name')} placeholder="My provider" /></Field>
+      <Field label="Name" hint="For example the name of your provider. It is also the name of the port this connection uses."><Input value={w.name} onChange={set('name')} placeholder="My provider" /></Field>
       <Field label="Which port is the internet cable plugged into?"><PortPicker value={w.iface} onChange={set('iface')} ports={ports} found={found} /></Field>
       {!w.id && (
         <Field label="Who is your provider?" hint="Optional. Fills in the usual settings; check the note.">
@@ -213,7 +213,7 @@ export default function Internet({ me }) {
                   <div className="item" key={w.id}>
                     <div>
                       <div className="name">{w.name} {!w.enabled && <Pill>Off</Pill>}</div>
-                      <div className="meta">{pn(w.iface)}{w.vlan ? ` · VLAN ${w.vlan}` : ''} · {TYPES.find((t) => t.value === w.type)?.label}{links[w.name]?.gateway ? ` · gateway ${links[w.name].gateway}` : ''}{measure ? ` · ${measure}` : ''}</div>
+                      <div className="meta">{pn(w.iface).startsWith(`${w.name} (`) ? w.iface : pn(w.iface)}{w.vlan ? ` · VLAN ${w.vlan}` : ''} · {TYPES.find((t) => t.value === w.type)?.label}{links[w.name]?.gateway ? ` · gateway ${links[w.name].gateway}` : ''}{measure ? ` · ${measure}` : ''}</div>
                       {ls.detail && ls.tone === 'bad' && <div className="small errtext">{ls.detail}</div>}
                     </div>
                     <div className="actions">

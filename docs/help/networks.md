@@ -13,7 +13,7 @@ The picture is an example from a new, empty box; yours will show your own device
 - **Your networks**: one row per network with its address, its ports and whether it hands out addresses (DHCP). **Add a network** makes another.
 - **Edit** a network to change its **Address of this router on the network**, the **Port** it is plugged into, a **VLAN number** if it shares a port, and **What it can reach**. **In use** switches it off without deleting it.
 - **Ports on this network** and **Add more ports to this network**: tick the ports that act as a switch for this network. Devices on any ticked port share its addresses.
-- **Network ports on this device**: live status and addresses of every port. **Rename** gives a port a name you will recognise, such as your internet gateway or a spare.
+- **Network ports on this device**: live status and addresses of every port. **Rename** gives a port a name you will recognise, such as your internet gateway or a spare. If the port carries an internet connection, that connection takes the same name, and renaming the connection renames the port.
 
 ## Wi-Fi and wireless
 

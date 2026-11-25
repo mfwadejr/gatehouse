@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { post, put, useData } from '../api.js';
-import { Button, Card, Field, Input, Modal, Note, Pill, Segmented, useAction, useToast, usePortNames } from '../ui.jsx';
+import { Button, Card, Field, Input, Modal, Note, Pill, Segmented, useAction, useToast, usePortNames, connLabel } from '../ui.jsx';
 import { BridgePending } from './BridgeMode.jsx';
 
 // Device mode: Router or Bridge, with plain cable instructions. Nothing is saved until the last
@@ -135,7 +135,7 @@ function Walk({ data, start, onClose, onApplied }) {
         <div className="stack">
           <p className="sec">NopeWarden goes back to routing with the settings you had before bridge mode. They were kept.</p>
           <Note title="Cables for a router">
-            {data.wan ? `Plug your modem or provider into ${pn(data.wan.iface)} (${data.wan.name}).` : 'No internet connection is saved. After this, add one on the Internet page.'}{' '}
+            {data.wan ? `Plug your modem or provider into ${connLabel(pn, data.wan)}.` : 'No internet connection is saved. After this, add one on the Internet page.'}{' '}
             {data.lans.length > 0 && `Plug your switch or devices into ${sentenceList(data.lans.map(pn))}.`}
           </Note>
           {hereNote}

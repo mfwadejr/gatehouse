@@ -25,7 +25,8 @@ func TestModeCardReadsTheCurrentSetupInWords(t *testing.T) {
 		t.Fatalf("mode: %v", m)
 	}
 	h, _ := m["headline"].(string)
-	if !strings.Contains(h, "T-Mobile gateway (eth0)") || !strings.Contains(h, "Fibre") || !strings.Contains(h, "eth1") {
+	// Naming the port names its connection, so the name is said once.
+	if !strings.Contains(h, "T-Mobile gateway (eth0)") || strings.Count(h, "T-Mobile gateway") != 1 || !strings.Contains(h, "eth1") {
 		t.Fatalf("headline: %q", h)
 	}
 	// Bridge mode reads the same way.

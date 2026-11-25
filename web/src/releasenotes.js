@@ -1,6 +1,16 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.54',
+    title: 'One name for a port and its connection',
+    items: [
+      'A port and the internet connection on it now share one name. Rename the connection T-Mobile and the port shows as T-Mobile in Networks, Firewall, the pickers and the logs. Rename the port and the connection takes the name. The latest rename wins.',
+      'After this update a port with no name takes its connection\'s name, and where the two were named differently the connection\'s name is used. One line in Admin activity says so.',
+      'A port that carries several connections, one per VLAN, keeps its own name, and so do they. A name another connection already has is refused.',
+      'The update result says "1 system package was updated" instead of "1 system packages were updated".',
+    ],
+  },
+  {
     version: '0.9.4.53',
     title: 'Sharing the load between two connections',
     items: [

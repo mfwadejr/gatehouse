@@ -527,6 +527,7 @@ func (a *App) registerNetRoutes() {
 			fail(w, err)
 			return
 		}
+		a.namePortFromConnection(in.Iface, in.Name)
 		a.publishNet()
 		a.publishFW()
 		api.JSON(w, 200, map[string]int64{"id": id})

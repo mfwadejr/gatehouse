@@ -718,6 +718,13 @@ export function usePortNames() {
   }, [data]);
 }
 
+// A connection and the port it uses share one name, so say it once: "T-Mobile (enp0s20f0)" when both
+// are the same name, and "Name (port)" when they are not (a port with several connections).
+export function connLabel(pn, w) {
+  const p = pn(w.iface);
+  return w.name && !p.startsWith(`${w.name} (`) ? `${w.name} (${p})` : p;
+}
+
 // Dots that count one, two, three, four and start again, to show something is still happening.
 // The width is fixed so the text next to them does not move. With reduced motion they stay still.
 export function Dots() {

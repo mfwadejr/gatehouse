@@ -107,7 +107,7 @@ function StatusTab({ me, data, reload, goTab }) {
           : res?.ok
             ? <Note tone="good" title={res.from === res.to ? 'System updates installed' : `Updated to ${res.to}`}>
                 {res.from === res.to ? 'NopeWarden was already the newest version.' : 'Everything is running the new version.'}
-                {res.system && res.system.packages > 0 && ` ${res.system.packages} system packages were updated.`}
+                {res.system && res.system.packages > 0 && ` ${res.system.packages} system ${res.system.packages === 1 ? 'package was' : 'packages were'} updated.`}
                 {res.system?.skipped && ` The system updates were skipped: ${res.system.skipped}`}
               </Note>
             : <Note tone="bad" title={res?.rolled_back ? 'The update did not work and was undone' : 'The update did not work'}>{res?.error}</Note>)}

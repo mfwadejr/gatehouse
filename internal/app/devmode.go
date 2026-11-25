@@ -65,7 +65,13 @@ func (a *App) modeHeadline() (mode, headline string) {
 	if ws, err := a.listWans(a.Config); err == nil {
 		for _, w := range ws {
 			if w.Enabled {
-				wan = "Router. The internet is on " + a.portName(w.Iface) + " (" + w.Name + ")"
+				// A port and its connection share one name, so say it once.
+				pn := a.portName(w.Iface)
+				if strings.HasPrefix(pn, w.Name+" (") {
+					wan = "Router. The internet is on " + pn
+				} else {
+					wan = "Router. The internet is on " + pn + " (" + w.Name + ")"
+				}
 				break
 			}
 		}

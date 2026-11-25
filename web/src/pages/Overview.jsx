@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useData, useStream, useThroughput, put, post } from '../api.js';
-import { Button, Card, Empty, Icon, Note, Page, Pill, Segmented, fmt, Bar, useAction, usePortNames } from '../ui.jsx';
+import { Button, Card, Empty, Icon, Note, Page, Pill, Segmented, fmt, Bar, useAction, usePortNames, connLabel } from '../ui.jsx';
 import { go } from '../App.jsx';
 import { COUNTRIES, MAP_H, MAP_W } from '../worldmap.js';
 import { centreOf } from '../mapgeo.js';
@@ -138,7 +138,7 @@ function Hero({ wanList, links, thr, onStamp }) {
                 <div>
                   <b>{x.w.name}</b>{' '}
                   <Pill tone={x.s.tone}>{x.s.health === 'working' ? (x.l?.active ? 'Working · in use' : 'Standing by') : x.s.text}</Pill>
-                  <div className="small muted">{[pn(x.w.iface), x.w.addr && x.w.addr !== 'dhcp' ? x.w.addr.split('/')[0] : '', m].filter(Boolean).join(' · ')}</div>
+                  <div className="small muted">{[pn(x.w.iface).startsWith(`${x.w.name} (`) ? x.w.iface : pn(x.w.iface), x.w.addr && x.w.addr !== 'dhcp' ? x.w.addr.split('/')[0] : '', m].filter(Boolean).join(' · ')}</div>
                 </div>
                 <div className="num small">{x.l?.active || thr?.links?.[x.w.name] ? <>{fmtBits(rx)} ↓<br />{fmtBits(tx)} ↑</> : '–'}</div>
               </div>
@@ -440,7 +440,7 @@ function NetworksCard({ fw, wanList, links, devs, h24 }) {
         </table></div>
       <div className="ov-net mt3">
           <div className="spread"><b>Internet</b>{enabled.length ? <Pill tone={ok ? 'good' : states.every((s) => s.health === 'unknown' || s.health === 'none') ? '' : 'bad'}>{ok ? (enabled.length > 1 ? `${ok} of ${enabled.length} working` : 'Connected') : states.every((s) => s.health === 'unknown' || s.health === 'none') ? 'Checking…' : 'Down'}</Pill> : <Pill>Not set up</Pill>}</div>
-          <div className="small muted">{enabled.map((w) => (w.name ? `${w.name} (${pn(w.iface)})` : pn(w.iface))).join(', ') || 'no port yet'} · managed automatically</div>
+          <div className="small muted">{enabled.map((w) => (w.name ? connLabel(pn, w) : pn(w.iface))).join(', ') || 'no port yet'} · managed automatically</div>
         </div>
       <button type="button" className="link small leftalign" onClick={() => go('networks')}>Open networks →</button>
     </Card>

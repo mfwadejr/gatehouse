@@ -14,7 +14,7 @@ import Discovery from './Discovery.jsx';
 import NatNotice from '../natnotice.jsx';
 import { GroupsAndLists, Matrix, PairModal, RuleForm, RulesList } from './FirewallRules.jsx';
 import Services from './Services.jsx';
-import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Problems, Select, Tabs, ToggleRow, useAction, useToast, fmt, confirmBox, Limited, usePortNames } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Problems, Select, Tabs, ToggleRow, useAction, useToast, fmt, confirmBox, Limited, usePortNames, connLabel } from '../ui.jsx';
 
 function ZoneForm({ initial, presets, ifaces, taken, onClose, onSaved }) {
   const pn = usePortNames();
@@ -79,7 +79,7 @@ function InternetRow({ ov }) {
     <div className="item">
       <div>
         <div className="name">Internet <Pill>Internet</Pill><Pill tone={tone}>{text}</Pill></div>
-        <div className="meta">{wans.length ? wans.map((w) => `${w.name} (${pn(w.iface)})`).join(', ') : 'no connection yet'} · managed automatically</div>
+        <div className="meta">{wans.length ? wans.map((w) => connLabel(pn, w)).join(', ') : 'no connection yet'} · managed automatically</div>
         <div className="meta">Devices on your networks can go out. Nothing from the internet can come in unless you open a port.</div>
       </div>
       <div className="actions"><Button small icon="edit" onClick={() => go('internet')}>Edit</Button></div>
