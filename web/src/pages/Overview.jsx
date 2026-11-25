@@ -501,31 +501,6 @@ function BusiestCard({ rows }) {
   );
 }
 
-// A short summary in plain words, from fixed rules: what needs you now (the same list as the dots in
-// the left menu) and what happened yesterday.
-function MorningCard({ items, c }) {
-  const { data: y } = useData('/api/overview/yesterday', { every: 600000 });
-  const m = useMemo(() => morningSummary(items, y), [items, y]);
-  // Folds on its own, and is remembered under the person's account like the attention list above it.
-  const open = c.morningOpen;
-  const toggle = () => c.setMorningOpen(!open);
-  return (
-    <Card title="Daily summary" desc={new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
-      actions={<button type="button" className="chevbtn" onClick={toggle} aria-expanded={open} aria-label={open ? 'Collapse the daily summary' : 'Expand the daily summary'} title={open ? 'Collapse' : 'Expand'} style={{ transform: open ? 'none' : 'rotate(-90deg)' }}><Icon d="M6 9l6 6 6-6" size={16} /></button>}>
-      <div className="stack">
-        <div className="inline"><Pill tone={m.tone}>{m.pill}</Pill><span>{m.head}</span></div>
-        {open && m.top.length > 0 && (
-          <div className="list">
-            {m.top.map((it) => <div className="item" key={it.id}><div className="fill"><div className="name">{it.t}</div></div>{it.to && <Button small onClick={() => go(it.to)}>{`Open ${pageLabel[String(it.to).split('/')[0]] || ''}`.trim()}</Button>}</div>)}
-          </div>
-        )}
-        {open && m.suggest && <p className="small muted">{m.suggest}</p>}
-        {open && m.lines.length > 0 && <ul className="plain">{m.lines.map((l) => <li key={l}>{l}</li>)}</ul>}
-      </div>
-    </Card>
-  );
-}
-
 function HappenedCard({ items }) {
   return (
     <Card title="What happened" desc="Newest first. Repeats are folded together.">
@@ -769,8 +744,7 @@ export default function Overview() {
       sub={`${devs?.online ?? 0} device${devs?.online === 1 ? '' : 's'} online`}
       actions={<LiveDot stamp={stamp} />}>
       <UpdateBanner c={choices} />
-      <AttentionArea c={choices} stamp={stamp} fold={show('morning') && !choices.needs.length} items={attention} />
-      {show('morning') && choices.needs.length > 0 && <MorningCard items={attention} c={choices} />}
+      <AttentionArea c={choices} stamp={stamp} fold={show('morning')} items={attention} />
       <WhatsNewCard current={upd?.current} />
       <Hero wanList={wanList} links={links} thr={thr} />
       <section className="ov-g4" aria-label="Status">

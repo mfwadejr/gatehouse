@@ -374,6 +374,10 @@ func (a *App) mgmtStatus() map[string]any {
 	if addr.IsValid() {
 		out["address"] = addr.String()
 	}
+	// A port's received bytes are what the devices on it sent, so the names swap here too.
+	if v, ok := a.mgmtTraffic.latest()["mgmt"]; ok && c.Iface != "" {
+		out["down"], out["up"] = v[1], v[0]
+	}
 	if p := a.mgmtPendingGet(); p != nil {
 		out["pending"] = map[string]any{"until": p.Until, "seconds": int(time.Until(time.Unix(p.Until, 0)).Seconds())}
 	}

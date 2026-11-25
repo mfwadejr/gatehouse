@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { del, holdAnd, post, put, useData } from '../api.js';
+import { go } from '../App.jsx';
 import { SAVED_LATER, SaveChoice } from '../changes.jsx';
 import WanGroups, { Traffic } from './WanGroups.jsx';
 import SpeedTest from './SpeedTest.jsx';
@@ -7,8 +8,6 @@ import SpeedControl from './SpeedControl.jsx';
 import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, Tabs, ToggleRow, useAction, useToast, fmt, usePortNames , useDelayedDelete } from '../ui.jsx';
 import { linkState, linkMeasure } from '../linkstate.js';
 import NatNotice from '../natnotice.jsx';
-import NetTools from './NetTools.jsx';
-import Why from './Why.jsx';
 import { DataUse, IspReport } from './IspReport.jsx';
 import { PROVIDERS } from '../providers.js';
 import PauseInternet from './PauseInternet.jsx';
@@ -238,7 +237,7 @@ export default function Internet({ me }) {
       {(!showTabs || tab === 'connections') && <WanGroups wans={wans} links={links} onChanged={all} />}
       {(!showTabs || tab === 'speed') && wans.some((w) => w.enabled) && <SpeedTest wans={wans} links={links} />}
       {showTabs && tab === 'control' && <SpeedControl />}
-      {showTabs && tab === 'troubleshoot' && <><NetTools /><Why /></>}
+      {showTabs && tab === 'troubleshoot' && <Card title="Troubleshooting has moved" desc="The tests for a connection that is not working now live in one place, Diagnostics."><div className="stack"><p className="small muted">Test my internet, ping, traceroute, name lookups and Why can't it reach that? are on the Tools tab of Diagnostics.</p><div className="actions"><Button kind="primary" onClick={() => go('diagnostics/tools')}>Open Diagnostics, Tools</Button></div></div></Card>}
       {showTabs && tab === 'usage' && <><DataUse /><IspReport /></>}
 
       {edit && <WanForm initial={edit} wans={wans} ports={ports} found={found} onClose={() => setEdit(null)} onSaved={all} />}

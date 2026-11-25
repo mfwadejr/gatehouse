@@ -1,7 +1,7 @@
 import React from 'react';
 import { useData, useThroughput } from './api.js';
 import { fmtBits } from './charts.jsx';
-import { Card, Pill, Empty } from './ui.jsx';
+import { Card, Pill, Empty, usePortNames } from './ui.jsx';
 import { go } from './App.jsx';
 import { linkState, linkMeasure } from './linkstate.js';
 
@@ -22,6 +22,8 @@ export function NetworkLayout({ nets, zones, scopes, onOpen }) {
   const { data: util } = useData('/api/dhcp/utilisation', { topics: ['dhcp.utilisation', 'dhcp.leases'], every: 10000 });
   const { data: vpn } = useData('/api/vpn', { topics: ['vpn.status'], every: 15000 });
   const { data: vsp } = useData('/api/vpn/speed', { every: 2000 });
+  const { data: mg } = useData('/api/mgmt/port', { topics: ['fw.status'], every: 2000 });
+  const pn = usePortNames();
 
   const links = net?.links || {};
   const enabled = (wans?.wans || []).filter((w) => w.enabled);
@@ -97,6 +99,16 @@ export function NetworkLayout({ nets, zones, scopes, onOpen }) {
                 ))}
               </div>
             </>
+          )}
+          {mg?.config?.iface && !mg.bridge && (
+            <div className="nl-mgmt">
+              <button type="button" className="nl-net" onClick={() => go('settings/manage')} aria-label="Open Managing this device">
+                <b>Management port · {pn(mg.config.iface)}{mg.address ? ` · ${mg.address}` : ''}</b>
+                <span className="nl-sn"><span className={`sdot ${mg.state === 'ok' ? 'good' : mg.state === 'quiet' ? '' : 'warn'}`} aria-hidden="true" /> {mg.status}</span>
+                {mg.state === 'ok' && <span className="nl-rate mono"><span className="nl-d">▼ {fmtBits(mg.down || 0)}</span><span className="nl-u">▲ {fmtBits(mg.up || 0)}</span></span>}
+                <span className="small muted">{mg.lan_open ? 'The console also answers on the other networks.' : 'The console is closed on the other networks.'} Nothing is routed through this port.</span>
+              </button>
+            </div>
           )}
           {tunnels.length > 0 && (
             <div className="nl-vpn">

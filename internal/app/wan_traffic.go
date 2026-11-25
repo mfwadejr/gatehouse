@@ -137,6 +137,9 @@ func (a *App) collectTraffic(ctx context.Context) {
 		case now := <-t.C:
 			a.traffic.sample(a.wanDevices(), now, readCounter)
 			a.sampleNetworks(now)
+			if c := a.mgmtCfg(); c.Iface != "" {
+				a.mgmtTraffic.sample(map[string]string{"mgmt": c.Iface}, now, readCounter)
+			}
 			a.vpnTraffic.sample(a.vpnDevices(), now, readCounter)
 		}
 	}

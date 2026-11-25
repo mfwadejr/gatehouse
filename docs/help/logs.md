@@ -38,7 +38,7 @@ The **Reports** tab turns what NopeWarden recorded into something you can read, 
 1. Internet links reports uptime, time down, delay, loss and each drop for one connection or all of them. **ISP report: last 30 days** makes the version to send your provider.
 2. Name a report and choose **Save report** to keep it under **Saved reports**. Run it again later for fresh numbers.
 3. **Print**, **PDF**, **CSV**, **Excel** and **JSON** are on the report. The PDF starts with the NopeWarden shield and name, then the title, period, filters, when and where it was made, a summary, a chart and the table, with page numbers. Excel puts the summary and the rows on separate sheets.
-4. On Events, **Make a report from this search** carries your search over. In Diagnostics, Network tools, **Report on this link** opens a link report ready to read.
+4. On Events, **Make a report from this search** carries your search over. In Diagnostics, Tools, **Report on this link** opens a link report ready to read.
 
 If NopeWarden has not been recording that far back, the report says from which date it has data and links to where **Keep chart history for** is set. Reports are never emailed; open them here when you want them.
 

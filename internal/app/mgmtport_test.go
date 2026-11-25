@@ -192,3 +192,20 @@ func TestSessionCheckNamesThePort(t *testing.T) {
 		t.Fatalf("checked=%v safe=%v via=%q", checked, safe, via)
 	}
 }
+
+func TestMgmtPortReportsItsOwnSpeed(t *testing.T) {
+	mgmtFakes(t, "10.99.0.5", true)
+	c, _, _ := siteBox(t, "192.168.1.1/24")
+	a := c.app
+	if rc, _, raw := c.call("PUT", "/api/mgmt/port", map[string]any{"iface": "tp3", "mode": "static", "cidr": "10.99.0.5/24", "gateway": "10.99.0.1"}); rc != 200 {
+		t.Fatal(raw)
+	}
+	a.mgmtTraffic.mu.Lock()
+	a.mgmtTraffic.series = map[string]*trafficSeries{"mgmt": {Rx: []float64{1000}, Tx: []float64{4000}}}
+	a.mgmtTraffic.mu.Unlock()
+	_, m, _ := c.call("GET", "/api/mgmt/port", nil)
+	// Received on the port is what devices sent, so it shows as "up".
+	if m["up"] != float64(1000) || m["down"] != float64(4000) {
+		t.Fatalf("speed %v %v", m["up"], m["down"])
+	}
+}

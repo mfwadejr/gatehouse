@@ -366,7 +366,7 @@ function Lists() {
         </div>
       </Card>
 
-      <Card title="Why is this blocked?" desc="Type a name to see which list is responsible. To find out why one device cannot reach a site, use Why can't it reach that? on the Internet page, Troubleshoot tab.">
+      <Card title="Why is this blocked?" desc="Type a name to see which list is responsible. To find out why one device cannot reach a site, use Why can't it reach that? on the Diagnostics page, Tools tab.">
         <div className="inline">
           <div style={{ flex: '1 1 14rem' }}><Input value={q} onChange={setQ} aria-label="Name to check" placeholder="ads.example.com" /></div>
           <Button disabled={!q} onClick={() => run(() => get(`/api/dns/explain?domain=${encodeURIComponent(q)}`)).then(setWhy)}>Check</Button>

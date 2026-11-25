@@ -1,6 +1,15 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.59',
+    title: 'A tidier Overview, one place for tests, and the management port on the map',
+    items: [
+      'Overview: the Daily summary no longer has a card of its own. It sits at the right end of the status line, which already says whether anything needs you, and opens yesterday\'s sentences below it. You can still hide the toggle under Hide or show cards.',
+      'Diagnostics: the Network tools tab is now Tools. It holds Test my internet, ping, traceroute, name lookups and Why can\'t it reach that?, the only copy of each. Internet, Troubleshoot now points there with one button.',
+      'Network layout: when a management port is set, a dashed box beside your networks shows its name and address, whether it answers, its live speed and whether the console is closed on the other networks. Nothing is routed through it. Select it to open Settings, Managing this device.',
+    ],
+  },
+  {
     version: '0.9.4.58',
     title: 'Power (UPS) setup looks right',
     items: [

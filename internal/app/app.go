@@ -58,69 +58,70 @@ func DefaultConfig() Config {
 
 // App is the running daemon.
 type App struct {
-	startedAt  time.Time // when this process started, for the self-health summary
-	sysout     syslogOut
-	flow       flowOut
-	snmp       snmpState
-	sqm        sqmState
-	portal     portalState
-	ddns       ddnsState
-	haActiveFn func() bool // tests replace the check for holding the shared addresses
-	haOwnsFn   func(addr string) bool
-	haListen   string // the link's listen address; empty means the usual port
-	haBound    atomic.Value
-	pairRun    pairRun
-	warmMACs   string
-	pairHooks  pairHooks
-	NDPI       *ndpi.Table
-	ov         ovState
-	ndpiOnce   sync.Once
-	haApplyMu  sync.Mutex
-	Cfg        Config
-	Config     *store.DB
-	Logs       *store.DB
-	Box        *crypt.Box
-	Auth       *auth.Service
-	Bus        *events.Bus
-	API        *api.Server
-	DNS        *dnssrv.Server
-	Lists      *dnssrv.Manager
-	QLog       *dnssrv.QueryLog
-	DHCP       *dhcp.Engine
-	DHCPSrv    *dhcp.Server
-	Devices    *devices.Directory
-	FW         fw.Controller // nil when no privileged helper is available
-	Net        NetController
-	apply      applyState
-	prog       applyProgress
-	conns      connTrack
-	vpn        vpnState
-	fwn        fwNames
-	scope      scopeCache
-	threats    threatState
-	threatW    threatWatch
-	traffic    wanTraffic
-	netTraffic wanTraffic // each network's own speed, summed over its ports
-	vpnTraffic wanTraffic // each VPN tunnel's own speed, by VPN id
-	viaNames   viaCache
-	health     healthSampler
-	hist       histState
-	speed      speedRun
-	ocache     ocache
-	power      powerRun
-	probeKick  chan struct{}
-	upnp       upnpState
-	mdns       mdns.Reflector
-	alerts     alertState
-	setupMu    sync.Mutex
-	con        consoles
-	upd        updates
-	ub         unboundCtl
-	dyn        *fwDyn
-	rogue      rogueState
-	devt       devTraffic
-	names      nameCache
-	geoIdx     geoIndex
+	startedAt   time.Time // when this process started, for the self-health summary
+	sysout      syslogOut
+	flow        flowOut
+	snmp        snmpState
+	sqm         sqmState
+	portal      portalState
+	ddns        ddnsState
+	haActiveFn  func() bool // tests replace the check for holding the shared addresses
+	haOwnsFn    func(addr string) bool
+	haListen    string // the link's listen address; empty means the usual port
+	haBound     atomic.Value
+	pairRun     pairRun
+	warmMACs    string
+	pairHooks   pairHooks
+	NDPI        *ndpi.Table
+	ov          ovState
+	ndpiOnce    sync.Once
+	haApplyMu   sync.Mutex
+	Cfg         Config
+	Config      *store.DB
+	Logs        *store.DB
+	Box         *crypt.Box
+	Auth        *auth.Service
+	Bus         *events.Bus
+	API         *api.Server
+	DNS         *dnssrv.Server
+	Lists       *dnssrv.Manager
+	QLog        *dnssrv.QueryLog
+	DHCP        *dhcp.Engine
+	DHCPSrv     *dhcp.Server
+	Devices     *devices.Directory
+	FW          fw.Controller // nil when no privileged helper is available
+	Net         NetController
+	apply       applyState
+	prog        applyProgress
+	conns       connTrack
+	vpn         vpnState
+	fwn         fwNames
+	scope       scopeCache
+	threats     threatState
+	threatW     threatWatch
+	traffic     wanTraffic
+	mgmtTraffic wanTraffic // the management port's own speed
+	netTraffic  wanTraffic // each network's own speed, summed over its ports
+	vpnTraffic  wanTraffic // each VPN tunnel's own speed, by VPN id
+	viaNames    viaCache
+	health      healthSampler
+	hist        histState
+	speed       speedRun
+	ocache      ocache
+	power       powerRun
+	probeKick   chan struct{}
+	upnp        upnpState
+	mdns        mdns.Reflector
+	alerts      alertState
+	setupMu     sync.Mutex
+	con         consoles
+	upd         updates
+	ub          unboundCtl
+	dyn         *fwDyn
+	rogue       rogueState
+	devt        devTraffic
+	names       nameCache
+	geoIdx      geoIndex
 
 	netApplyState struct {
 		mu     sync.Mutex
