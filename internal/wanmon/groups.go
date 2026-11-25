@@ -65,7 +65,7 @@ func GroupPlan(g Group, links []Link, st map[string]*State) []Nexthop {
 	for _, m := range g.Members {
 		l, ok := by[m.Link]
 		s := st[m.Link]
-		if !ok || s == nil || !s.Up || s.Gateway == "" {
+		if !ok || s == nil || !s.Up || s.Gateway == "" || s.Paused {
 			continue
 		}
 		w := m.Weight

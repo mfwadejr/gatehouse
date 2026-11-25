@@ -187,5 +187,7 @@ func seedDemoLogs(c *client) {
 	c.app.Logs.Exec(`UPDATE fw_events SET outcome='Completed',bytes_out=2600,bytes_in=1480000,dur=25 WHERE dport=443`)
 	c.app.QLog.Add(dnssrv.LogEntry{TS: now - 20, Client: "192.168.1.110", ClientName: "Living room TV", QName: "api.example.com", QType: "A", Result: "forwarded", RCode: "NOERROR", Upstream: "1.1.1.1", LatencyUS: 14200})
 	c.app.QLog.Add(dnssrv.LogEntry{TS: now - 10, Client: "192.168.1.112", ClientName: "Marvin's laptop", QName: "nothing-here.example.net", QType: "AAAA", Result: "forwarded", RCode: "NXDOMAIN", Upstream: "1.1.1.1", LatencyUS: 31800})
+	c.app.Logs.Exec(`INSERT INTO dns_queries(ts,client,client_name,qname,qtype,result,rcode,upstream,latency_us,rule,out_if) VALUES(?,?,?,?,?,?,?,?,?,?,?)`, now-5, "192.168.1.112", "Marvin's laptop", "cdn.games.example.com", "A", "blocked", "NOERROR", "", 0, "Ads and trackers: games.example.com", "")
+	c.app.Logs.Exec(`INSERT INTO dns_queries(ts,client,client_name,qname,qtype,result,rcode,upstream,latency_us,rule,out_if) VALUES(?,?,?,?,?,?,?,?,?,?,?)`, now-30, "192.168.1.112", "Marvin's laptop", "api.example.com", "A", "forwarded", "NOERROR", "1.1.1.1", 14200, "", "")
 	time.Sleep(1500 * time.Millisecond)
 }

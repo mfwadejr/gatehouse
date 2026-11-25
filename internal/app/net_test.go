@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/cookiejar"
 	"os"
@@ -28,6 +29,7 @@ type fakeNet struct {
 	wan     map[string]wanmon.State // what the demo console shows for each internet connection
 	plan    netd.Plan
 	pending bool
+	paused  []string
 	disk    netd.DiskReport // what the demo console shows for drive health
 
 	vpn      netd.VPNPlan
@@ -221,6 +223,16 @@ func (f *fakeNet) NetPending() (string, time.Time, bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return "ntok", time.Now().Add(time.Minute), f.pending
+}
+func (f *fakeNet) PauseWAN(name string, until int64) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.paused = append(f.paused, fmt.Sprintf("%s=%d", name, until))
+	if st, ok := f.wan[name]; ok {
+		st.Paused, st.PausedUntil = until > 0, until
+		f.wan[name] = st
+	}
+	return nil
 }
 func (f *fakeNet) WanStatus() (map[string]wanmon.State, error) {
 	f.mu.Lock()
@@ -506,4 +518,44 @@ func (f *fakeNet) TermWrite(id string, data []byte) error {
 func (f *fakeNet) TermResize(id string, rows, cols int) error { return nil }
 func (f *fakeNet) TermClose(id string) (netd.TermSummary, error) {
 	return netd.TermSummary{Seconds: 7}, nil
+}
+
+func TestPausingAnInternetConnection(t *testing.T) {
+	c, fn, _ := siteBox(t, "192.168.1.1/24")
+	id := wanIDByName(t, c, "Fibre")
+	fn.mu.Lock()
+	fn.wan = map[string]wanmon.State{"Fibre": {Up: true, Checked: true, Health: "working"}}
+	fn.mu.Unlock()
+
+	rc, m, raw := c.call("GET", fmt.Sprintf("/api/internet/pause-check?ids=%d", id), nil)
+	if rc != 200 || m["cuts_all"] != true {
+		t.Fatalf("pausing the only working connection must warn that the internet stops: %d %s", rc, raw)
+	}
+	if rc, _, _ := c.call("POST", "/api/internet/pause", map[string]any{"ids": []int64{id}, "minutes": 0}); rc != 400 {
+		t.Fatalf("a pause with no time was accepted: %d", rc)
+	}
+	if rc, _, _ := c.call("POST", "/api/internet/pause", map[string]any{"ids": []int64{9999}, "minutes": 30}); rc != 400 {
+		t.Fatalf("a connection that does not exist was accepted: %d", rc)
+	}
+	rc, _, raw = c.call("POST", "/api/internet/pause", map[string]any{"ids": []int64{id}, "minutes": 30})
+	if rc != 200 {
+		t.Fatalf("pause: %d %s", rc, raw)
+	}
+	if len(fn.paused) != 1 || !strings.HasPrefix(fn.paused[0], "Fibre=") || strings.HasSuffix(fn.paused[0], "=0") {
+		t.Fatalf("the helper was told: %v", fn.paused)
+	}
+	if rc, _, _ := c.call("POST", "/api/internet/pause", map[string]any{"all": true, "minutes": -1}); rc != 200 {
+		t.Fatal("pause all until resumed failed")
+	}
+	if rc, _, _ := c.call("POST", "/api/internet/resume", map[string]any{"all": true}); rc != 200 {
+		t.Fatal("resume failed")
+	}
+	if last := fn.paused[len(fn.paused)-1]; last != "Fibre=0" {
+		t.Fatalf("resume told the helper %q", last)
+	}
+	_, ev, _ := c.call("GET", "/api/logs?kind=event&limit=20", nil)
+	text := fmt.Sprint(ev)
+	if !strings.Contains(text, "Internet paused") || !strings.Contains(text, "Internet resumed") {
+		t.Fatalf("pause and resume are not in Admin activity: %s", text)
+	}
 }

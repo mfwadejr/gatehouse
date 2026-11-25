@@ -117,13 +117,14 @@ type fakeNetCtl struct {
 func (f *fakeNetCtl) Apply(netd.Plan, time.Duration) (string, time.Time, error) {
 	return "", time.Time{}, nil
 }
-func (f *fakeNetCtl) Confirm(string) error               { return nil }
-func (f *fakeNetCtl) Rollback() error                    { return nil }
-func (f *fakeNetCtl) Pending() (string, time.Time, bool) { return "", time.Time{}, false }
-func (f *fakeNetCtl) Status() map[string]wanmon.State    { return nil }
-func (f *fakeNetCtl) ResetNetwork() error                { return nil }
-func (f *fakeNetCtl) ApplyVPN(netd.VPNPlan) error        { return nil }
-func (f *fakeNetCtl) VPNStatus() netd.VPNStatus          { return netd.VPNStatus{} }
+func (f *fakeNetCtl) Confirm(string) error                    { return nil }
+func (f *fakeNetCtl) Rollback() error                         { return nil }
+func (f *fakeNetCtl) Pending() (string, time.Time, bool)      { return "", time.Time{}, false }
+func (f *fakeNetCtl) Status() map[string]wanmon.State         { return nil }
+func (f *fakeNetCtl) PauseWAN(name string, until int64) error { return nil }
+func (f *fakeNetCtl) ResetNetwork() error                     { return nil }
+func (f *fakeNetCtl) ApplyVPN(netd.VPNPlan) error             { return nil }
+func (f *fakeNetCtl) VPNStatus() netd.VPNStatus               { return netd.VPNStatus{} }
 func (f *fakeNetCtl) VPNSizeTest(name string) (netd.SizeReport, error) {
 	return netd.SizeReport{Name: name, After: 1360}, nil
 }

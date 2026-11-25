@@ -589,8 +589,23 @@ function MachineCard({ sys, upd }) {
 const UPDATE_IDS = ['updates', 'reboot', 'update-failed'];
 const notUpdate = (x) => !UPDATE_IDS.includes(x.id);
 
-function AttentionArea({ c, stamp }) {
+// When nothing needs attention the Daily summary folds into the status line: its toggle sits at the right
+// end of the line and yesterday's sentences open from there. The full card comes back when something
+// needs a look.
+function FoldedSummary({ items }) {
+  const { data: y } = useData('/api/overview/yesterday', { every: 600000 });
+  const m = useMemo(() => morningSummary(items, y), [items, y]);
+  const lines = [...m.lines, ...(m.suggest ? [m.suggest] : [])];
+  return (
+    <Card className="ov-attn calm" title="Daily summary" desc={new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}>
+      {lines.length ? <ul className="plain">{lines.map((l) => <li key={l}>{l}</li>)}</ul> : <p className="small muted">Nothing to report from yesterday yet.</p>}
+    </Card>
+  );
+}
+
+function AttentionArea({ c, stamp, fold, items }) {
   const [showDismissed, setShowDismissed] = useState(false);
+  const [sumOpen, setSumOpen] = useState(false);
   const [asking, setAsking] = useState(null);
   const needs = c.needs.filter(notUpdate);
   const snoozed = c.snoozed.filter(notUpdate);
@@ -621,7 +636,9 @@ function AttentionArea({ c, stamp }) {
         {!c.open && snoozed.length > 0 && <button type="button" className="link muted" onClick={() => c.setOpen(true)}>{snoozed.length} snoozed</button>}
         <UpdatedAgo stamp={stamp} />
         {rows > 0 && <button type="button" className="chevbtn" onClick={() => c.setOpen(!c.open)} aria-expanded={c.open} aria-label={c.open ? 'Hide the list' : 'Show the list'} title={c.open ? 'Hide the list' : 'Show the list'} style={{ transform: c.open ? 'none' : 'rotate(-90deg)' }}><Icon d="M6 9l6 6 6-6" size={16} /></button>}
+        {fold && <button type="button" className="link" style={{ marginLeft: 'auto' }} onClick={() => setSumOpen(!sumOpen)} aria-expanded={sumOpen}>Daily summary <span aria-hidden="true">{sumOpen ? '▾' : '▸'}</span></button>}
       </div>
+      {fold && sumOpen && <FoldedSummary items={items} />}
       {rows > 0 && c.open && (
         <Card className={`ov-attn ${all.length ? '' : 'calm'}`}>
           <div className="stack gap2">
@@ -752,8 +769,8 @@ export default function Overview() {
       sub={`${devs?.online ?? 0} device${devs?.online === 1 ? '' : 's'} online`}
       actions={<LiveDot stamp={stamp} />}>
       <UpdateBanner c={choices} />
-      <AttentionArea c={choices} stamp={stamp} />
-      {show('morning') && <MorningCard items={attention} c={choices} />}
+      <AttentionArea c={choices} stamp={stamp} fold={show('morning') && !choices.needs.length} items={attention} />
+      {show('morning') && choices.needs.length > 0 && <MorningCard items={attention} c={choices} />}
       <WhatsNewCard current={upd?.current} />
       <Hero wanList={wanList} links={links} thr={thr} />
       <section className="ov-g4" aria-label="Status">

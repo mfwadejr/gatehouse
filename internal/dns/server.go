@@ -52,14 +52,19 @@ type Server struct {
 	Scoped func(client string, ci ClientInfo, name string) string
 	// OnScopedFault is told when the Scoped hook crashed and the lookup was let through.
 	OnScopedFault func()
-	via           viaSet
-	rl            *RateLimiter
-	eng           engineHolder
-	local         localHolder
-	dir           Directory
-	names         Names
-	qlog          *QueryLog
-	stats         *Stats
+	// ScopedAllow answers, for one lookup that a blocklist would stop, whether an exception made for
+	// this device, profile, network or everyone lets it through. It returns the name that was allowed,
+	// or "". It is only asked about blocklist hits: a block the administrator wrote on purpose is never
+	// overridden by it. Any trouble counts as "no exception".
+	ScopedAllow func(client string, ci ClientInfo, name string) string
+	via         viaSet
+	rl          *RateLimiter
+	eng         engineHolder
+	local       localHolder
+	dir         Directory
+	names       Names
+	qlog        *QueryLog
+	stats       *Stats
 
 	// OnRateLimited is called at most once per client per minute.
 	OnRateLimited func(client string)
@@ -225,6 +230,7 @@ func (s *Server) handle(client string, r *dns.Msg, start time.Time, udp bool) *d
 	}
 
 	// 4. Filtering.
+	exempt := ""
 	if ci.Filtering || s.dir == nil {
 		e := s.eng.get()
 		if !e.nofilter[ci.GroupID] {
@@ -236,6 +242,11 @@ func (s *Server) handle(client string, r *dns.Msg, start time.Time, udp bool) *d
 			default:
 				if i, rl, ok := e.ix.Lookup(strings.TrimSuffix(q.Name, "."), e.masks[ci.GroupID]); ok {
 					blocked, rule = true, e.ix.ListName(i)+": "+rl
+					if s.ScopedAllow != nil {
+						if by := s.scopedAllowRule(client, ci, strings.TrimSuffix(q.Name, ".")); by != "" {
+							blocked, exempt = false, "allowed: "+by+" (was on "+e.ix.ListName(i)+")"
+						}
+					}
 				}
 			}
 			if blocked {
@@ -284,7 +295,7 @@ func (s *Server) handle(client string, r *dns.Msg, start time.Time, udp bool) *d
 		c.Id = r.Id
 		c.Question = r.Question
 		c.RecursionDesired = r.RecursionDesired
-		return finish(c, OutCached, "", "")
+		return finish(c, OutCached, exempt, "")
 	}
 
 	// 7. Forward.
@@ -318,7 +329,17 @@ func (s *Server) handle(client string, r *dns.Msg, start time.Time, udp bool) *d
 	}
 	resp.Id = r.Id
 	cache.Put(q, do, resp)
-	return finish(resp, OutForwarded, "", upName)
+	return finish(resp, OutForwarded, exempt, upName)
+}
+
+// scopedAllowRule calls the ScopedAllow hook and treats any panic as "no exception".
+func (s *Server) scopedAllowRule(client string, ci ClientInfo, name string) (by string) {
+	defer func() {
+		if recover() != nil {
+			by = ""
+		}
+	}()
+	return s.ScopedAllow(client, ci, name)
 }
 
 func udpSize(r *dns.Msg) int {

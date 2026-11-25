@@ -609,4 +609,8 @@ CREATE TABLE saved_reports(
   created_at INTEGER NOT NULL DEFAULT 0,
   created_by TEXT NOT NULL DEFAULT ''
 );
+`, `
+-- Where a named block or exception came from: empty when it was made on the Blocks page, "logs" when
+-- it was made from a row in Logs.
+ALTER TABLE block_sets ADD COLUMN source TEXT NOT NULL DEFAULT '';
 `}

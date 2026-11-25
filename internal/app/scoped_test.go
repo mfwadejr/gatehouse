@@ -170,3 +170,67 @@ func TestABrokenBlockSaysSoInTheLogsOnce(t *testing.T) {
 		t.Fatalf("expected one log line, got %d", n)
 	}
 }
+
+func TestAnExceptionFromLogsCoversOnlyWhoWasChosen(t *testing.T) {
+	a := newScopeApp(t)
+	kid := dnssrv.ClientInfo{MAC: "aa:aa:aa:aa:aa:01", GroupID: 2, Filtering: true}
+	dad := dnssrv.ClientInfo{MAC: "aa:aa:aa:aa:aa:02", GroupID: 3, Filtering: true}
+	if a.scopedAllow("1.1.1.1", dad, "ads.example.net") != "" {
+		t.Fatal("an exception exists with none made")
+	}
+	id, err := a.saveBlockSet(blockSet{Allow: true, Enabled: true, Source: "logs",
+		Items:   []blockItem{{Kind: "name", Value: "example.net"}},
+		Targets: []blockTarget{{Scope: "device", Target: dad.MAC}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.scopedAllow("1.1.1.1", dad, "cdn.example.net") != "example.net" {
+		t.Fatal("the chosen device and a name under the site should be let through")
+	}
+	if a.scopedAllow("1.1.1.2", kid, "cdn.example.net") != "" {
+		t.Fatal("another device must not be covered")
+	}
+	if a.scopedAllow("1.1.1.1", dad, "example.org") != "" {
+		t.Fatal("another site must not be covered")
+	}
+	sets, _ := a.loadBlockSets()
+	if len(sets) != 1 || sets[0].Source != "logs" {
+		t.Fatalf("the exception should say it came from Logs: %+v", sets)
+	}
+	// Turned off, it stops counting.
+	sets[0].Enabled = false
+	if _, err := a.saveBlockSet(sets[0]); err != nil {
+		t.Fatal(err)
+	}
+	if a.scopedAllow("1.1.1.1", dad, "cdn.example.net") != "" {
+		t.Fatal("a turned-off exception still counted")
+	}
+	_ = id
+}
+
+func TestAnExceptionDoesNotLiftAWrittenBlockOfTheSite(t *testing.T) {
+	a := newScopeApp(t)
+	kid := dnssrv.ClientInfo{MAC: "aa:aa:aa:aa:aa:01", GroupID: 2, Filtering: true}
+	if err := a.saveScopeRule(blockIn{Kind: "name", Value: "example.net", Scope: "everyone", Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.saveBlockSet(blockSet{Allow: true, Enabled: true, Source: "logs",
+		Items:   []blockItem{{Kind: "name", Value: "ads.example.net"}},
+		Targets: []blockTarget{{Scope: "everyone"}}}); err != nil {
+		t.Fatal(err)
+	}
+	if a.scopedBlock("1.1.1.1", kid, "ads.example.net") == "" {
+		t.Fatal("an exception from Logs overrode a block written on purpose")
+	}
+}
+
+func TestWholeSiteGuess(t *testing.T) {
+	for in, want := range map[string]string{
+		"www.example.com": "example.com", "music.youtube.com": "youtube.com", "example.com": "example.com",
+		"a.b.bbc.co.uk": "bbc.co.uk", "bbc.co.uk": "bbc.co.uk", "localhost": "localhost",
+	} {
+		if got := wholeSite(in); got != want {
+			t.Errorf("wholeSite(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

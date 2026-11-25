@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { del, holdAnd, put, useData } from '../api.js';
+import { del, holdAnd, post, put, useData } from '../api.js';
 import { SAVED_LATER, SaveChoice } from '../changes.jsx';
 import WanGroups, { Traffic } from './WanGroups.jsx';
 import SpeedTest from './SpeedTest.jsx';
@@ -11,6 +11,7 @@ import NetTools from './NetTools.jsx';
 import Why from './Why.jsx';
 import { DataUse, IspReport } from './IspReport.jsx';
 import { PROVIDERS } from '../providers.js';
+import PauseInternet from './PauseInternet.jsx';
 
 const TYPES = [
   { value: 'dhcp', label: 'Automatic' },
@@ -165,6 +166,7 @@ export default function Internet({ me }) {
   const { data: zones } = useData('/api/fw/zones', { topics: ['fw.status'] });
   const { data: fwo, reload: rfw } = useData('/api/fw/overview', { topics: ['fw.status'] });
   const [edit, setEdit] = useState(null);
+  const [pause, setPause] = useState(null);
   const [run] = useAction();
   const wans = wd?.wans || [];
   const isNew = wd && ifs && wans.length === 0 && ifs.length === 0;
@@ -202,7 +204,7 @@ export default function Internet({ me }) {
       {showTabs && <Tabs value={tab} onChange={choose} tabs={tabs} />}
       {(!showTabs || tab === 'connections') && wans.length > 0 && <Traffic wans={wans} links={links} />}
       {(!showTabs || tab === 'connections') && (wans.length > 0 || !isNew) ? (
-        <Card title="Internet connections" actions={<Button icon="plus" onClick={() => setEdit({})}>Add connection</Button>}
+        <Card title="Internet connections" actions={<>{admin && wans.some((w) => w.enabled) && (wans.some((w) => links[w.name]?.paused) ? <Button onClick={() => run(() => post('/api/internet/resume', { all: true }), 'Resumed.').then(all)}>Resume all connections</Button> : <Button onClick={() => setPause({ all: true, ids: [], title: 'Pause all connections' })}>Pause all connections</Button>)}<Button icon="plus" onClick={() => setEdit({})}>Add connection</Button></>}
           desc={wans.length > 1 ? 'Choose how these share the work, or send certain devices through specific ones, in Connection groups below. When they share the load, each connection goes down one link, so one big download uses one link and the split only evens out over many connections.' : 'The links that connect this firewall to the internet.'}>
           {wans.length === 0 ? <Empty>No connection yet.</Empty> : (
             <div className="list">
@@ -218,6 +220,9 @@ export default function Internet({ me }) {
                     </div>
                     <div className="actions">
                       <Pill tone={ls.tone}>{ls.text}</Pill>
+                      {admin && w.enabled && (links[w.name]?.paused
+                        ? <Button small kind="primary" onClick={() => run(() => post('/api/internet/resume', { ids: [w.id] }), 'Resumed.').then(all)}>Resume</Button>
+                        : <Button small onClick={() => setPause({ all: false, ids: [w.id], title: `Pause ${w.name}` })}>Pause</Button>)}
                       <Button small icon="edit" onClick={() => setEdit(w)}>Edit</Button>
                       <Button small kind="danger" icon="trash" onClick={() => delayedDelete(`The connection ${w.name}`, () => del(`/api/net/wans/${w.id}`), all)}>Remove</Button>
                     </div>
@@ -229,6 +234,7 @@ export default function Internet({ me }) {
         </Card>
       ) : null}
 
+      {pause && <PauseInternet {...pause} onClose={() => setPause(null)} onDone={all} />}
       {(!showTabs || tab === 'connections') && <WanGroups wans={wans} links={links} onChanged={all} />}
       {(!showTabs || tab === 'speed') && wans.some((w) => w.enabled) && <SpeedTest wans={wans} links={links} />}
       {showTabs && tab === 'control' && <SpeedControl />}

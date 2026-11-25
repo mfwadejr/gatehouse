@@ -43,6 +43,7 @@ type blockSet struct {
 	PausedUntil int64         `json:"paused_until"`
 	Items       []blockItem   `json:"items"`
 	Targets     []blockTarget `json:"targets"`
+	Source      string        `json:"source,omitempty"` // "logs" when it was made from a row in Logs
 	// Filled in for the console.
 	Title  string `json:"title,omitempty"` // the name, or one made from what it holds
 	Where  string `json:"where,omitempty"` // where it applies, in words
@@ -59,7 +60,7 @@ const (
 )
 
 func (a *App) loadBlockSets() ([]blockSet, error) {
-	rows, err := a.Config.Query(`SELECT id,name,allow,method,schedule,enabled,paused_until,items,targets FROM block_sets ORDER BY id`)
+	rows, err := a.Config.Query(`SELECT id,name,allow,method,schedule,enabled,paused_until,items,targets,source FROM block_sets ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +70,7 @@ func (a *App) loadBlockSets() ([]blockSet, error) {
 		var b blockSet
 		var al, en int
 		var it, tg string
-		if err := rows.Scan(&b.ID, &b.Name, &al, &b.Method, &b.Schedule, &en, &b.PausedUntil, &it, &tg); err != nil {
+		if err := rows.Scan(&b.ID, &b.Name, &al, &b.Method, &b.Schedule, &en, &b.PausedUntil, &it, &tg, &b.Source); err != nil {
 			return nil, err
 		}
 		b.Allow, b.Enabled = al == 1, en == 1
@@ -240,8 +241,12 @@ func (a *App) saveBlockSet(in blockSet) (int64, error) {
 	defer tx.Rollback()
 	id := in.ID
 	if id == 0 {
-		res, e := tx.Exec(`INSERT INTO block_sets(name,allow,method,schedule,enabled,items,targets,created_at) VALUES(?,?,?,?,?,?,?,?)`,
-			in.Name, al, in.Method, in.Schedule, en, string(it), string(tg), time.Now().Unix())
+		src := ""
+		if in.Source == "logs" {
+			src = "logs"
+		}
+		res, e := tx.Exec(`INSERT INTO block_sets(name,allow,method,schedule,enabled,items,targets,created_at,source) VALUES(?,?,?,?,?,?,?,?,?)`,
+			in.Name, al, in.Method, in.Schedule, en, string(it), string(tg), time.Now().Unix(), src)
 		if e != nil {
 			return 0, e
 		}

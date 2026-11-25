@@ -1,6 +1,20 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.55',
+    title: 'A Storage tab, and more control over what is kept',
+    items: [
+      'Settings has a new Storage tab. One table lists everything NopeWarden keeps on its own disk in four groups (History you look at, Charts, Safety copies and Records), with how many entries, roughly how much space, where you see it, the oldest entry and when it is removed.',
+      'The days to keep and the size limit now sit side by side on the Storage tab. Logs keeps only its on and off switches and links there.',
+      'Speed tests are kept for a time you choose: 90 days, 1 year (the default), 2, 5 or 10 years, or everything. Speed tests are outside the size limit. Choosing a shorter time tells you how many tests it would remove before you save.',
+      'Alerts & logs keeps Alerts, with Send data to other tools (logs, NetFlow, SNMP) folded under it.',
+      'Logs: open a name lookup and press Allow this site (if it was blocked) or Block this site (if it was answered). A dialog asks what, this name or the whole site, and who: everyone, that device, its network or profile, or a choice of networks, profiles and devices. It tells you what stops the site now, warns when a threat list is the reason, and does not go ahead when a block you wrote on purpose covers the site. It is saved on the Blocks page, marked as added from Logs, waits on Review like other DNS changes and can be undone from the message.',
+      'Internet, Connections: Pause a connection, or Pause all connections, for 30 minutes, an hour, two hours or until you resume. Nothing leaves through a paused connection, it shows as Paused instead of broken and raises no outage alert, and it starts again by itself. Traffic moves to another working connection; if there is none, the dialog says the internet stops and asks you to confirm, and it warns when you seem to be managing the box over the internet or a VPN. Your own networks, this console, DHCP and local names keep working. A pause is written to Admin activity.',
+      'Overview: when everything is working, the Daily summary no longer takes a card of its own at the top. Its toggle sits at the right end of the status line and yesterday\'s sentences open from there. The full card returns when something needs a look or needs you.',
+      'Exceptions for a website now work against block lists for just the devices, profiles or networks you choose. Before, an exception could only lift a block of the same kind. A block you wrote yourself is never overridden by one.',
+    ],
+  },
+  {
     version: '0.9.4.54',
     title: 'One name for a port and its connection',
     items: [

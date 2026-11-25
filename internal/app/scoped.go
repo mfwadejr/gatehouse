@@ -237,6 +237,35 @@ func (a *App) scopedBlock(client string, ci dnssrv.ClientInfo, name string) stri
 	return ""
 }
 
+// scopedAllow is the DNS hook for exceptions to blocklists. It returns the website an exception
+// names when one that covers this device lets the lookup through, or "". Only exceptions for a
+// website count here; an exception for an app or a category still only lifts a block of the same
+// app or category (see scopedBlock).
+func (a *App) scopedAllow(client string, ci dnssrv.ClientInfo, name string) string {
+	rules := a.cachedScopeRules()
+	if len(rules) == 0 {
+		return ""
+	}
+	now := time.Now()
+	var zone string
+	var zoneDone bool
+	zf := func() string {
+		if !zoneDone {
+			zone, zoneDone = a.clientZone(client), true
+		}
+		return zone
+	}
+	for _, r := range rules {
+		if !r.Allow || r.Kind != "name" || !(name == r.Value || strings.HasSuffix(name, "."+r.Value)) {
+			continue
+		}
+		if r.covers(ci, zf) && a.inForce(r, now) {
+			return r.Value
+		}
+	}
+	return ""
+}
+
 // inspectionState says whether thorough checking could be in force. It is not yet: the labelling
 // program only names connections, and acting on a label is switched on in a later version. A block
 // that asks for thorough checking is kept, and its by-name part works from the start.
@@ -355,6 +384,7 @@ func (a *App) topicKey(k string) string {
 func (a *App) registerScopeRoutes() {
 	s := a.API
 	a.DNS.Scoped = a.scopedBlock
+	a.DNS.ScopedAllow = a.scopedAllow
 	a.DNS.OnScopedFault = func() { a.scopeFault("an unexpected error") }
 	a.migrateBlockSets()
 	s.Handle("GET /api/blocks", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {

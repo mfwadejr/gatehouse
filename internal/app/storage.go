@@ -67,11 +67,18 @@ func (a *App) storTables() []storTable {
 		{"traffic", "Data used by each device", fmt.Sprintf("%d days", days), "logs", "traffic", "ts", "", true},
 		{"countries", "Data by country", fmt.Sprintf("%d days", days), "logs", "country_traffic", "ts", "", true},
 		{"history", "Overview charts", a.historyPolicy(), "logs", "metrics", "ts", "", true},
-		{"speed", "Speed tests", "365 days", "logs", "speedtests", "ts", "", true},
+		{"speed", "Speed tests", a.speedPolicy(), "logs", "speedtests", "ts", "", true},
 		{"threats", "Threat alerts", fmt.Sprintf("%d days", long), "logs", "threat_alerts", "ts", "", true},
 		{"outages", "Internet outages", fmt.Sprintf("%d days", long), "logs", "outages", "start", "", true},
 		{"revisions", "Firewall change copies", fmt.Sprintf("The newest %d, plus the one in use and any waiting to be kept", a.revKeep()), "config", "fw_revisions", "created_at", "", false},
 	}
+}
+
+func (a *App) speedPolicy() string {
+	if d := a.speedDays(); d > 0 {
+		return fmt.Sprintf("%d days", d)
+	}
+	return "Never removed. Cleared only by hand"
 }
 
 func (a *App) historyPolicy() string {
@@ -210,6 +217,7 @@ func (a *App) storageReport() map[string]any {
 		"last_prune":   usage["last_prune"],
 		"history_days": a.historyDays(), "hourly_days": a.hourlyDays(),
 		"history_choices": historyChoices, "hourly_choices": hourlyChoices,
+		"speed_days": a.speedDays(), "speed_choices": speedChoices,
 		"history_series": hs, "history_year_bytes": hy, "hourly_month_bytes": hm,
 	}
 }
@@ -235,6 +243,8 @@ func (a *App) registerStorageRoutes() {
 			RevisionsKeep int  `json:"revisions_keep"`
 			HistoryDays   *int `json:"history_days"`
 			HourlyDays    *int `json:"hourly_days"`
+			SpeedDays     *int `json:"speed_days"`
+			MaxMB         *int `json:"max_mb"`
 		}
 		if !api.Decode(w, r, &in) {
 			return
@@ -275,6 +285,26 @@ func (a *App) registerStorageRoutes() {
 				return
 			}
 		}
+		if in.SpeedDays != nil {
+			ok := false
+			for _, c := range speedChoices {
+				ok = ok || c == *in.SpeedDays
+			}
+			if !ok {
+				fail(w, fmt.Errorf("keep speed tests for 90 days, 1, 2, 5 or 10 years, or everything"))
+				return
+			}
+		}
+		if in.MaxMB != nil && (*in.MaxMB < 10 || *in.MaxMB > 20000) {
+			fail(w, fmt.Errorf("the size limit must be between 10 MB and 20000 MB"))
+			return
+		}
+		if in.SpeedDays != nil {
+			a.Config.SetSetting("logs.speed_days", strconv.Itoa(*in.SpeedDays))
+		}
+		if in.MaxMB != nil {
+			a.Config.SetSetting("logs.max_mb", strconv.Itoa(*in.MaxMB))
+		}
 		if in.HistoryDays != nil {
 			a.Config.SetSetting("logs.history_days", strconv.Itoa(*in.HistoryDays))
 		}
@@ -291,6 +321,10 @@ func (a *App) registerStorageRoutes() {
 		a.Config.SetSetting("logs.long_days", strconv.Itoa(in.LongDays))
 		a.Config.SetSetting("fw.revisions_keep", strconv.Itoa(in.RevisionsKeep))
 		a.pruneLong()
+		a.pruneSpeed()
+		if in.MaxMB != nil {
+			a.enforceLogCap()
+		}
 		api.JSON(w, 200, a.storageReport())
 	})
 }
@@ -387,6 +421,9 @@ func (a *App) cleanupPreview() map[string]int64 {
 		"countries":   n(`SELECT COUNT(*) FROM country_traffic WHERE ts<?`, cut(days)),
 		"threats":     n(`SELECT COUNT(*) FROM threat_alerts WHERE ts<?`, cut(a.longDays())),
 		"outages":     n(`SELECT COUNT(*) FROM outages WHERE start<? AND end>0`, cut(a.longDays())),
+	}
+	if d := a.speedDays(); d > 0 {
+		out["speed"] = n(`SELECT COUNT(*) FROM speedtests WHERE ts<?`, cut(d))
 	}
 	return out
 }

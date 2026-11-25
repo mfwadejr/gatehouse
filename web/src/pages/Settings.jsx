@@ -258,6 +258,7 @@ const TABS = [
   { value: 'manage', label: 'Managing this device' },
   { value: 'account', label: 'Account & sign-in' },
   { value: 'alerts', label: 'Alerts & logs' },
+  { value: 'storage', label: 'Storage' },
   { value: 'backup', label: 'Backup & recovery' },
   { value: 'advanced', label: 'Advanced' },
   { value: 'danger', label: 'Danger zone', tone: 'danger' },
@@ -314,12 +315,15 @@ export default function Settings({ me, reloadMe }) {
       {admin && tab === 'alerts' && (
         <>
           <Guard what="Alerts"><Alerts /></Guard>
-          <Guard what="Syslog"><Syslog /></Guard>
-          <Guard what="Flow export"><FlowExport /></Guard>
-          <Guard what="SNMP"><Snmp /></Guard>
-          <Guard what="Storage"><Storage /></Guard>
+          <details className="more">
+            <summary>Send data to other tools</summary>
+            <Guard what="Syslog"><Syslog /></Guard>
+            <Guard what="Flow export"><FlowExport /></Guard>
+            <Guard what="SNMP"><Snmp /></Guard>
+          </details>
         </>
       )}
+      {admin && tab === 'storage' && <Guard what="Storage"><Storage /></Guard>}
       {admin && tab === 'backup' && (
         <>
           <Guard what="Backups"><Backups me={me} /></Guard>

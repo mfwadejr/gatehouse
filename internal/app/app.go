@@ -207,6 +207,8 @@ func New(cfg Config) (*App, error) {
 	a.registerUPnPCardRoutes()
 	a.registerAppForwardRoutes()
 	a.registerScopeRoutes()
+	a.registerSiteCheckRoutes()
+	a.registerInternetPauseRoutes()
 	a.registerThreatRoutes()
 	a.registerDiscoveryRoutes()
 	a.registerAlertRoutes()

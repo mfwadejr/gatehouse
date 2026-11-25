@@ -5,6 +5,7 @@ import Reports, { REPORT_PRESET_KEY } from './Reports.jsx';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { get, getWatched, post, put, setFailing, useData, useStream } from '../api.js';
 import { RuleForm } from './FirewallRules.jsx';
+import SiteDialog from './SiteDialog.jsx';
 import { COUNTRIES, MAP_H, MAP_W } from '../worldmap.js';
 import { groupRows, rowTitle } from '../logrows.js';
 import { Button, Card, Empty, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, DateTimeField, Switch, Tabs, ToggleRow, Trend, useAction, fmt } from '../ui.jsx';
@@ -54,30 +55,19 @@ function Recording({ onClose, state, onSaved }) {
   const [f, setF] = useState({ record_allowed: state.record_allowed, record_blocked: state.record_blocked });
   const { data: u, reload } = useData('/api/logs/usage');
   const { data: ap, reload: reloadApps } = useData('/api/apps');
-  const [keep, setKeep] = useState(null);
-  useEffect(() => { if (u && !keep) setKeep({ days: u.days, max_mb: u.max_mb }); }, [u, keep]);
   return (
     <Modal title="What gets recorded" onClose={onClose}
       footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy} onClick={async () => {
-        const ok = await run(async () => { await put('/api/logs/settings', f); if (keep) await put('/api/logs/retention', keep); }, 'Saved.');
+        const ok = await run(async () => { await put('/api/logs/settings', f); }, 'Saved.');
         if (ok) { onSaved(); onClose(); }
       }}>Save</Button></>}>
       <div className="stack">
         <ToggleRow title="Allowed connections" desc="Records each new connection that the firewall let through, and the rule that allowed it. Turn off to keep the log smaller." checked={f.record_allowed} onChange={(v) => setF({ ...f, record_allowed: v })} />
         <ToggleRow title="Blocked connections" desc="Records each new connection that the firewall stopped, and why." checked={f.record_blocked} onChange={(v) => setF({ ...f, record_blocked: v })} />
         {ap && <ToggleRow title="Name the apps" desc="Shows which app a connection belongs to, like YouTube or Spotify, using the website names devices look up through NopeWarden. It never looks inside traffic. Turn off if you would rather not see which apps each person uses." checked={ap.enabled} onChange={(v) => run(() => put('/api/apps/settings', { enabled: v }), v ? 'App names are on.' : 'App names are off.').then(reloadApps)} />}
-        {keep && (
-          <div className="stack">
-            <div className="formgrid">
-              <label className="field"><span className="label">Keep logs for (days)</span><NumberInput value={keep.days} min={1} max={365} onChange={(v) => setKeep({ ...keep, days: v })} /></label>
-              <label className="field"><span className="label">Never use more than (MB)</span><NumberInput value={keep.max_mb} min={10} max={20000} onChange={(v) => setKeep({ ...keep, max_mb: v })} /></label>
-            </div>
-            {u && <p className="small muted">Using {bytes(u.used_bytes)} now: {fmt.n(u.connections)} connections, {fmt.n(u.lookups)} name lookups, {fmt.n(u.events)} events{u.oldest ? `, going back to ${fmt.dt(u.oldest)}` : ''}. The oldest entries are removed first when either limit is reached.</p>}
-            {u && <div className="inline"><span className="small muted">{u.last_prune ? `Last cleaned up ${fmt.dt(u.last_prune)}, ${fmt.n(u.last_removed)} entries removed.` : 'Cleaned up automatically once an hour.'}</span><Button small disabled={busy} onClick={async () => { if (await run(() => post('/api/logs/prune', {}), 'Cleaned up.')) { reload(); onSaved(); } }}>Clean up now</Button></div>}
-          </div>
-        )}
+        {u && <p className="small muted">Using {bytes(u.used_bytes)} now: {fmt.n(u.connections)} connections, {fmt.n(u.lookups)} name lookups, {fmt.n(u.events)} events{u.oldest ? `, going back to ${fmt.dt(u.oldest)}` : ''}. How long they are kept, and the size limit, are set in <a href="#/settings/storage" onClick={onClose}>Settings, Storage</a>.</p>}
         <p className="small muted">Only the first packet of each connection is recorded, and a flood is capped, so a busy network cannot fill the disk. Names asked for through DNS are always recorded.</p>
-        <p className="small muted">To clear logs by hand, or to change how long each kind is kept, go to Settings, Alerts & logs, Storage.</p>
+        <p className="small muted">To clear logs by hand, or to change how long each kind is kept, go to Settings, Storage.</p>
       </div>
     </Modal>
   );
@@ -160,6 +150,7 @@ export default function Logs({ me }) {
   const [open, setOpen] = useState({});
   const [pageSize, setPageSize] = useState(15);
   const [mk, setMk] = useState(null);
+  const [site, setSite] = useState(null);
   const t = useRef(null);
   const paged = useRef(false);
   const { data: ov } = useData('/api/fw/overview');
@@ -363,6 +354,7 @@ export default function Logs({ me }) {
                               {r.who && r.addr && <div className="small"><button className="link" onClick={() => pick('device', r.addr)}>Show only {r.who}</button></div>}
                               {n > 1 && <div className="small muted">{n} times: {g.items.slice(0, 20).map((x) => fmt.time(x.ts)).join(', ')}{n > 20 ? ', …' : ''}</div>}
                               {conn && r.dst && <div><Button small onClick={() => mkRule(r, r.verdict === 'blocked' ? 'accept' : 'drop')}>{r.verdict === 'blocked' ? 'Allow this' : 'Block this'}</Button></div>}
+                              {admin && r.kind === 'dns' && r.what && (r.verdict === 'blocked' || (r.verdict === 'allowed' && !(r.why || '').startsWith('One of your own'))) && <div><Button small onClick={() => setSite(r)}>{r.verdict === 'blocked' ? 'Allow this site' : 'Block this site'}</Button></div>}
                             </div>
                           </td>
                         </tr>
@@ -381,6 +373,7 @@ export default function Logs({ me }) {
       {tab === 'activity' && <Activity />}
       {tab === 'reports' && <Reports admin={admin} />}
       {rec && <Recording state={meta} onClose={() => setRec(false)} onSaved={load} />}
+      {site && <SiteDialog row={site} onClose={() => setSite(null)} />}
       {mk && <RuleForm initial={mk} zoneNames={names} pickers={pickers} reloadPickers={reloadPickers} onClose={() => setMk(null)} onSaved={() => { setMk(null); }} />}
     </Page>
   );

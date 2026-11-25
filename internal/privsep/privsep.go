@@ -31,6 +31,7 @@ type NetController interface {
 	Rollback() error
 	Pending() (string, time.Time, bool)
 	Status() map[string]wanmon.State
+	PauseWAN(name string, until int64) error
 	ApplyVPN(p netd.VPNPlan) error
 	ResetNetwork() error
 	VPNStatus() netd.VPNStatus
@@ -299,6 +300,15 @@ func (s *Server) dispatchNet(r request) (any, error) {
 		return pendingResult{ok, t, d.Unix()}, nil
 	case "wan.status":
 		return s.Net.Status(), nil
+	case "wan.pause":
+		var p struct {
+			Name  string `json:"name"`
+			Until int64  `json:"until"`
+		}
+		if err := json.Unmarshal(r.Params, &p); err != nil || p.Name == "" {
+			return nil, errors.New("bad parameters")
+		}
+		return nil, s.Net.PauseWAN(p.Name, p.Until)
 	case "vpn.apply":
 		var p netd.VPNPlan
 		if err := json.Unmarshal(r.Params, &p); err != nil {
@@ -643,6 +653,11 @@ func (c *Client) WanStatus() (map[string]wanmon.State, error) {
 	var out map[string]wanmon.State
 	err := c.call("wan.status", nil, &out)
 	return out, err
+}
+
+// PauseWAN pauses an internet connection until the given time (unix seconds); zero starts it again.
+func (c *Client) PauseWAN(name string, until int64) error {
+	return c.call("wan.pause", map[string]any{"name": name, "until": until}, nil)
 }
 
 func (c *Client) ApplyVPN(p netd.VPNPlan) error { return c.call("vpn.apply", p, nil) }

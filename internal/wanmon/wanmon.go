@@ -63,6 +63,10 @@ type State struct {
 	Loss int `json:"loss"`
 	// Last is when the connection was last probed.
 	Last time.Time `json:"last"`
+	// Paused is true while a person has paused this connection: it carries nothing, is not counted as
+	// broken, and PausedUntil says when it starts again (unix seconds).
+	Paused      bool  `json:"paused"`
+	PausedUntil int64 `json:"paused_until,omitempty"`
 	// Via names the connections a group is using right now (groups only; their key starts with "group:").
 	Via   []string `json:"via,omitempty"`
 	fails int
@@ -98,7 +102,7 @@ type Router interface {
 // A link with no known gateway cannot carry traffic. If nothing is up the best candidate is kept
 // so the route is already in place when the link comes back.
 func Plan(links []Link, st map[string]*State, mode Mode) []Nexthop {
-	usable := func(l Link) bool { s := st[l.Name]; return s != nil && s.Gateway != "" }
+	usable := func(l Link) bool { s := st[l.Name]; return s != nil && s.Gateway != "" && !s.Paused }
 	var up, any []Link
 	for _, l := range links {
 		if !usable(l) {
@@ -150,6 +154,8 @@ type Monitor struct {
 	Watch bool
 
 	mu     sync.Mutex
+	paused map[string]int64 // connection name -> when it starts again (unix seconds)
+	held   map[string]bool  // connections whose own route was taken away while the monitor only watches
 	states map[string]*State
 	active []Nexthop
 	gact   map[string][]Nexthop
@@ -184,6 +190,9 @@ func (m *Monitor) snapshotLocked() map[string]State {
 			s.Active = s.Up // the only connection carries everything
 		}
 		s.Health = healthOf(&s)
+		if s.Paused {
+			s.Health, s.Active = "paused", false
+		}
 		s.Loss = lossOf(m.states[l.Name].win)
 		out[l.Name] = s
 	}
@@ -214,6 +223,14 @@ func (m *Monitor) snapshotLocked() map[string]State {
 func (m *Monitor) Observe(l Link, rtt time.Duration, err error) {
 	m.mu.Lock()
 	s := m.states[l.Name]
+	if s.Paused || (m.paused[l.Name] > 0 && m.paused[l.Name] > m.now().Unix()) {
+		// A paused connection has no route on purpose, so an unanswered probe says nothing about it: it is
+		// not counted as broken, and nothing is recorded until it starts again.
+		s.fails, s.succ = 0, 0
+		m.mu.Unlock()
+		m.replan(false)
+		return
+	}
 	changed := false
 	if !s.Checked && m.Watch {
 		changed = true // the first answer turns "not checked yet" into a real state
@@ -253,6 +270,9 @@ func (m *Monitor) Observe(l Link, rtt time.Duration, err error) {
 
 func (m *Monitor) replan(force bool) {
 	m.mu.Lock()
+	if m.syncPausedLocked() {
+		force = true
+	}
 	plan := Plan(m.Links, m.states, m.Mode)
 	mainChanged := fmt.Sprint(plan) != fmt.Sprint(m.active)
 	if mainChanged {
@@ -276,13 +296,33 @@ func (m *Monitor) replan(force bool) {
 	}
 	snap := m.snapshotLocked()
 	watch := m.Watch
+	holds := m.holdChangesLocked()
 	m.mu.Unlock()
+	if hr, ok := m.Router.(Holder); ok {
+		for _, h := range holds {
+			if h.on {
+				hr.HoldLink(h.l, h.gw)
+			} else {
+				hr.ReleaseLink(h.l, h.gw)
+			}
+		}
+	}
 	if watch {
 		// Observe only: the route belongs to systemd-networkd. Report, never change.
 		if (force || mainChanged) && m.OnChange != nil {
 			m.OnChange(snap)
 		}
 		return
+	}
+	if mainChanged && len(plan) == 0 && m.anyPaused() {
+		// Everything that could carry traffic is paused: take the route away, so nothing leaves.
+		if hr, ok := m.Router.(Holder); ok {
+			if err := hr.ClearDefault(); err != nil {
+				m.mu.Lock()
+				m.active = []Nexthop{{}} // try again on the next observation
+				m.mu.Unlock()
+			}
+		}
 	}
 	if mainChanged && len(plan) > 0 {
 		if err := m.Router.SetDefault(plan); err != nil {
@@ -463,5 +503,117 @@ func (NetChecker) Check(ctx context.Context, l Link) (time.Duration, error) {
 		return time.Since(start), nil
 	default:
 		return icmpPing(ctx, l)
+	}
+}
+
+// Holder is implemented by routers that can take a connection's traffic away: remove the main
+// default route when every connection is paused, and (when the monitor only watches, so the system
+// owns the route) take one connection's own default route away and give it back.
+type Holder interface {
+	ClearDefault() error
+	HoldLink(l Link, gw string) error
+	ReleaseLink(l Link, gw string) error
+}
+
+type holdChange struct {
+	l  Link
+	gw string
+	on bool
+}
+
+// SetPaused pauses a connection until the given time (unix seconds), or starts it again when until is 0.
+// The change is made at the next re-plan, which this call triggers.
+func (m *Monitor) SetPaused(name string, until int64) {
+	m.mu.Lock()
+	if m.paused == nil {
+		m.paused = map[string]int64{}
+	}
+	if until <= 0 {
+		delete(m.paused, name)
+	} else {
+		m.paused[name] = until
+	}
+	m.mu.Unlock()
+	m.replan(true)
+}
+
+// PausedUntil says when a paused connection starts again; zero when it is not paused.
+func (m *Monitor) PausedUntil(name string) int64 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if u := m.paused[name]; u > m.now().Unix() {
+		return u
+	}
+	return 0
+}
+
+func (m *Monitor) anyPaused() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, s := range m.states {
+		if s.Paused {
+			return true
+		}
+	}
+	return false
+}
+
+// syncPausedLocked copies the pauses into the link states, dropping ones that have run out, and says
+// whether anything changed.
+func (m *Monitor) syncPausedLocked() bool {
+	changed := false
+	now := m.now().Unix()
+	for name, until := range m.paused {
+		if until <= now {
+			delete(m.paused, name)
+		}
+	}
+	for _, l := range m.Links {
+		s := m.states[l.Name]
+		if s == nil {
+			continue
+		}
+		until := m.paused[l.Name]
+		if s.Paused != (until > 0) || s.PausedUntil != until {
+			s.Paused, s.PausedUntil = until > 0, until
+			changed = true
+		}
+	}
+	return changed
+}
+
+// holdChangesLocked lists the connections that have just been paused or started again while the monitor
+// only watches (one connection): the system owns that route, so the monitor takes it away or gives it back.
+func (m *Monitor) holdChangesLocked() []holdChange {
+	if !m.Watch {
+		return nil
+	}
+	if m.held == nil {
+		m.held = map[string]bool{}
+	}
+	var out []holdChange
+	for _, l := range m.Links {
+		s := m.states[l.Name]
+		if s == nil || s.Paused == m.held[l.Name] {
+			continue
+		}
+		m.held[l.Name] = s.Paused
+		out = append(out, holdChange{l, s.Gateway, s.Paused})
+	}
+	return out
+}
+
+// Preload sets the pauses a new monitor starts with (after a restart or a new plan). It changes no routes;
+// the first re-plan applies them.
+func (m *Monitor) Preload(p map[string]int64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.paused == nil {
+		m.paused = map[string]int64{}
+	}
+	for n, u := range p {
+		if u > m.now().Unix() {
+			m.paused[n] = u
+		}
 	}
 }

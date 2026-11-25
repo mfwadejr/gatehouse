@@ -17,12 +17,13 @@ The picture is an example from a new, empty box; yours will show your own device
 - Click a row (or press Enter) for the rest: why, the rule, the host and address, the country, the networks, the times, and **Block this** or **Allow this**.
 - **Columns & rows** chooses columns and how many rows load at a time. **Download as spreadsheet (CSV)** exports what you see: the same search, filters and kind, lookups and connections together, one row for each entry (a run of repeats on screen is one row each in the file). The first columns are the same for every row; the rest are the details below, left empty where they do not apply, plus the rule's technical tag. The rule's match count is the total at the moment you download.
 - Open a row to see more. A DNS lookup shows **Response** (the code, with what it means), **Answer time** and **Answered by** (an upstream DNS server, or NopeWarden itself for a name from memory, one of your own names or a blocked name). A connection shows **Outcome** (Completed, Reset, Timed out, Still open or Blocked), **Sent** and **Received** (bytes each way), **Lasted** and the **Rule** that decided it with how many connections that rule has matched so far, counting live while Live is on. A blocked connection shows the outcome and the rule only.
+- Open a blocked name (the **Names (DNS)** kind) and press **Allow this site**, or an answered one and press **Block this site**. A dialog asks **What** (just that name and what is under it, or the whole site) and **Who** (**Everyone**, only that device, its network or its profile, or any networks, profiles and devices you choose). It says what stops the site now, warns when the list is about threats, and will not go ahead when a block you wrote on purpose covers it, because an exception from here never overrides that. The result is a named exception or block on the Blocks page marked as added from Logs, it waits on Review like other DNS changes, and **Undo** in the message takes it away again. An allow only lets through names that a block list stops.
 - Outcome, bytes and time are read from the router's list of live connections every few seconds, so a very short connection shows "under 10 seconds", they cover IPv4 only, and connections logged before 0.9.4.26 show "not known yet".
-- **Recording & storage** chooses what is recorded and how long it is kept.
+- **Recording & storage** chooses what is recorded. How long each kind is kept, and the size limit, are on the Storage tab in Settings.
 
 ## Common tasks
 1. Find out why something was blocked: search for the device or site, click the row, read **Why**.
-2. Block a destination: click its row, then **Block this**.
+2. Block a destination: click its row, then **Block this**. For a name, click its row and press **Block this site** or **Allow this site**.
 3. See which devices use a VPN: look at **Out through**.
 
 Each row shows the internet connection or VPN it left through. For a DNS lookup that is the connection NopeWarden itself used to ask the DNS server; a lookup answered from memory shows none.

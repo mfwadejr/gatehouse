@@ -127,3 +127,45 @@ func TestFailedSavesAreNotSilent(t *testing.T) {
 		t.Fatalf("health: %v", h)
 	}
 }
+
+func TestSpeedTestsAreKeptForTheChosenTime(t *testing.T) {
+	a := newScopeApp(t)
+	day := int64(24 * 60 * 60)
+	now := time.Now().Unix()
+	count := func() int {
+		var n int
+		a.Logs.QueryRow(`SELECT COUNT(*) FROM speedtests`).Scan(&n)
+		return n
+	}
+	for _, age := range []int64{10, 100, 400, 800, 2000, 4000} {
+		if _, err := a.Logs.Exec(`INSERT INTO speedtests(ts,link) VALUES(?,'Fibre')`, now-age*day); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if a.speedDays() != 365 {
+		t.Fatalf("default keep time is %d, want 365", a.speedDays())
+	}
+	a.pruneSpeed()
+	if n := count(); n != 2 {
+		t.Fatalf("a year kept %d tests, want 2", n)
+	}
+	a.Config.SetSetting("logs.speed_days", "90")
+	a.pruneSpeed()
+	if n := count(); n != 1 {
+		t.Fatalf("90 days kept %d tests, want 1", n)
+	}
+	a.Logs.Exec(`INSERT INTO speedtests(ts,link) VALUES(?,'Fibre')`, now-4000*day)
+	a.Config.SetSetting("logs.speed_days", "0")
+	a.pruneSpeed()
+	if n := count(); n != 2 {
+		t.Fatalf("everything removed tests: %d left, want 2", n)
+	}
+	a.Config.SetSetting("logs.speed_days", "123")
+	if a.speedDays() != 365 {
+		t.Fatalf("an unknown choice must fall back to a year, got %d", a.speedDays())
+	}
+	rep := a.storageReport()
+	if rep["speed_days"] != 365 {
+		t.Fatalf("report says %v", rep["speed_days"])
+	}
+}

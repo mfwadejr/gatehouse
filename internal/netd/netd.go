@@ -92,7 +92,8 @@ type Service struct {
 	mu      sync.Mutex
 	cancel  context.CancelFunc
 	mon     *wanmon.Monitor
-	staged  *monitorFile // monitor settings waiting for confirmation
+	paused  map[string]int64 // connections a person paused, and when each starts again (unix seconds)
+	staged  *monitorFile     // monitor settings waiting for confirmation
 	root    context.Context
 	running sync.WaitGroup
 }
@@ -162,6 +163,7 @@ func (s *Service) runLocked(mf *monitorFile) {
 	for _, g := range mf.Groups {
 		m.Groups = append(m.Groups, g.group())
 	}
+	m.Preload(s.loadPausedLocked())
 	ctx, cancel := context.WithCancel(s.root)
 	s.cancel, s.mon = cancel, m
 	s.running.Add(1)
@@ -343,4 +345,42 @@ func (s *Service) ResetNetwork() error {
 		}
 	}
 	return nil
+}
+
+// Pauses. A person can pause an internet connection for a while; it carries nothing until the time
+// is up. The pauses are kept in a file so a restart, or a new plan, does not end one early.
+
+func (s *Service) loadPausedLocked() map[string]int64 {
+	if s.paused == nil {
+		s.paused = map[string]int64{}
+		if b, err := os.ReadFile(s.path("paused.json")); err == nil {
+			json.Unmarshal(b, &s.paused)
+		}
+	}
+	now := time.Now().Unix()
+	for n, u := range s.paused {
+		if u <= now {
+			delete(s.paused, n)
+		}
+	}
+	return s.paused
+}
+
+// PauseWAN pauses the named connection until the given time (unix seconds); zero starts it again.
+func (s *Service) PauseWAN(name string, until int64) error {
+	s.mu.Lock()
+	p := s.loadPausedLocked()
+	if until <= 0 {
+		delete(p, name)
+	} else {
+		p[name] = until
+	}
+	b, _ := json.Marshal(p)
+	err := os.WriteFile(s.path("paused.json"), b, 0o600)
+	m := s.mon
+	s.mu.Unlock()
+	if m != nil {
+		m.SetPaused(name, until)
+	}
+	return err
 }

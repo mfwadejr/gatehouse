@@ -103,3 +103,35 @@ func (r *IPRouter) RemoveLink(l Link) error {
 	_, err := r.ip("route", "flush", "table", t)
 	return err
 }
+
+// ClearDefault takes the monitor's default route away, so nothing leaves while every connection is paused.
+func (r *IPRouter) ClearDefault() error {
+	for i := 0; i < 8; i++ { // one delete removes one route; a few may exist for different metrics
+		if _, err := r.ip("route", "del", "default", "metric", r.metric()); err != nil {
+			break
+		}
+	}
+	return nil
+}
+
+// HoldLink takes the only connection's default route away (the system owns it, so the monitor puts it back
+// itself when the pause ends).
+func (r *IPRouter) HoldLink(l Link, gw string) error {
+	_, err := r.ip("route", "flush", "default", "dev", l.Dev)
+	return err
+}
+
+// ReleaseLink gives the connection's default route back by asking the system to configure the port again,
+// and falls back to adding the route by hand.
+func (r *IPRouter) ReleaseLink(l Link, gw string) error {
+	if r.Netns == "" {
+		if err := exec.Command("networkctl", "reconfigure", l.Dev).Run(); err == nil {
+			return nil
+		}
+	}
+	if gw == "" {
+		return nil
+	}
+	_, err := r.ip("route", "replace", "default", "via", gw, "dev", l.Dev)
+	return err
+}

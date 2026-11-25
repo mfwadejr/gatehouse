@@ -161,7 +161,7 @@ function BlockList({ title, desc, rows, empty, allow, data, reload, setEdit, ext
             <div className="item" key={r.id}>
               <div className="fill">
                 <div className="name">{r.title} <Pill tone={tone}>{word}</Pill></div>
-                <div className="meta">{[r.what, r.where, r.when, r.method === 'thorough' ? 'thorough, waiting for it to be switched on' : r.method === 'both' ? 'by name now, thorough once it is on' : 'by name', !allow && r.recent ? `${fmt.n(r.recent)} refused in the last day` : ''].filter(Boolean).join(' · ')}</div>
+                <div className="meta">{[r.what, r.where, r.when, r.source === 'logs' ? 'added from Logs' : '', r.method === 'thorough' ? 'thorough, waiting for it to be switched on' : r.method === 'both' ? 'by name now, thorough once it is on' : 'by name', !allow && r.recent ? `${fmt.n(r.recent)} refused in the last day` : ''].filter(Boolean).join(' · ')}</div>
               </div>
               <div className="actions">
                 <PolicyControls name={r.title} enabled={r.enabled} pausedUntil={r.paused_until} busy={busy}

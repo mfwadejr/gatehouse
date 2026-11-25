@@ -227,3 +227,92 @@ func TestLossIsTheShareOfRecentProbesUnanswered(t *testing.T) {
 		t.Fatalf("1 of 10 lost should be 10 %%, got %d", got)
 	}
 }
+
+type holdRouter struct {
+	fakeRouter
+	cleared int
+	held    []string
+	freed   []string
+}
+
+func (h *holdRouter) ClearDefault() error { h.cleared++; return nil }
+func (h *holdRouter) HoldLink(l Link, gw string) error {
+	h.held = append(h.held, l.Name)
+	return nil
+}
+func (h *holdRouter) ReleaseLink(l Link, gw string) error {
+	h.freed = append(h.freed, l.Name)
+	return nil
+}
+
+func newHoldMon(mode Mode, ls []Link, watch bool) (*Monitor, *holdRouter, *time.Time) {
+	r := &holdRouter{fakeRouter: fakeRouter{gws: map[string]string{"eth0": "203.0.113.1", "wwan0": "198.51.100.1"}}}
+	m := New(ls, mode, nil, r)
+	m.Watch = watch
+	t := time.Unix(1_700_000_000, 0)
+	m.now = func() time.Time { return t }
+	m.Refresh()
+	for _, l := range ls {
+		m.Observe(l, 5*time.Millisecond, nil)
+		m.Observe(l, 5*time.Millisecond, nil)
+	}
+	return m, r, &t
+}
+
+func TestPausingOneConnectionMovesTrafficAndItStartsAgainOnTime(t *testing.T) {
+	m, r, now := newHoldMon(Failover, links(), false)
+	if lastDefault(&r.fakeRouter) != "eth0/1 " {
+		t.Fatalf("start: %s", lastDefault(&r.fakeRouter))
+	}
+	m.SetPaused("Fibre", now.Unix()+600)
+	if lastDefault(&r.fakeRouter) != "wwan0/1 " {
+		t.Fatalf("paused Fibre should move traffic to LTE: %s", lastDefault(&r.fakeRouter))
+	}
+	snap := m.Snapshot()
+	if !snap["Fibre"].Paused || snap["Fibre"].Health != "paused" || snap["Fibre"].Active || snap["Fibre"].PausedUntil != now.Unix()+600 {
+		t.Fatalf("Fibre state: %+v", snap["Fibre"])
+	}
+	// Probes that fail while paused do not make it broken.
+	for i := 0; i < 5; i++ {
+		m.Observe(links()[0], 0, errors.New("network is unreachable"))
+	}
+	if !m.Snapshot()["Fibre"].Up {
+		t.Fatal("a paused connection was marked broken by failed probes")
+	}
+	// Time passes: it starts again by itself and takes over (it has the better priority).
+	*now = now.Add(11 * time.Minute)
+	m.Observe(links()[1], 5*time.Millisecond, nil)
+	if lastDefault(&r.fakeRouter) != "eth0/1 " || m.Snapshot()["Fibre"].Paused {
+		t.Fatalf("Fibre should be back: %s %+v", lastDefault(&r.fakeRouter), m.Snapshot()["Fibre"])
+	}
+}
+
+func TestPausingEveryConnectionTakesTheRouteAway(t *testing.T) {
+	m, r, now := newHoldMon(Balance, links(), false)
+	m.SetPaused("Fibre", now.Unix()+600)
+	if r.cleared != 0 {
+		t.Fatal("route cleared while LTE can still carry traffic")
+	}
+	m.SetPaused("LTE", now.Unix()+600)
+	if r.cleared == 0 {
+		t.Fatal("every connection is paused, but the default route stayed")
+	}
+	m.SetPaused("Fibre", 0)
+	if lastDefault(&r.fakeRouter) != "eth0/3 " {
+		t.Fatalf("resuming Fibre should put the route back: %s", lastDefault(&r.fakeRouter))
+	}
+}
+
+func TestPausingTheOnlyConnectionTakesItsRouteAndGivesItBack(t *testing.T) {
+	one := links()[:1]
+	m, r, now := newHoldMon(Failover, one, true)
+	m.SetPaused("Fibre", now.Unix()+60)
+	if len(r.held) != 1 || r.held[0] != "Fibre" {
+		t.Fatalf("held: %v", r.held)
+	}
+	*now = now.Add(2 * time.Minute)
+	m.Observe(one[0], 5*time.Millisecond, nil)
+	if len(r.freed) != 1 {
+		t.Fatalf("the route was not given back: %v", r.freed)
+	}
+}

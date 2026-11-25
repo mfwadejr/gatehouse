@@ -21,7 +21,21 @@ import (
 // Every test goes out through the one connection being measured, even a standby one. Results are
 // kept for a year so a slow patch can be compared with the plan.
 
-const speedKeep = 365 * 24 * time.Hour
+// How long speed tests are kept is a setting (Settings, Storage). One year is the default and 0 means
+// they are kept until someone clears them.
+const defaultSpeedDays = 365
+
+var speedChoices = []int{90, 365, 730, 1825, 3650, 0}
+
+func (a *App) speedDays() int {
+	d := int(a.settingFloat("logs.speed_days", defaultSpeedDays))
+	for _, c := range speedChoices {
+		if c == d {
+			return d
+		}
+	}
+	return defaultSpeedDays
+}
 
 type speedLink struct {
 	DownMbps float64 `json:"down_mbps"` // what the plan promises; 0 when not set
@@ -247,7 +261,9 @@ func (a *App) setSpeedConfigForTest(c speedConfig) {
 }
 
 func (a *App) pruneSpeed() {
-	a.Logs.Exec(`DELETE FROM speedtests WHERE ts<?`, time.Now().Add(-speedKeep).Unix())
+	if d := a.speedDays(); d > 0 {
+		a.Logs.Exec(`DELETE FROM speedtests WHERE ts<?`, time.Now().Add(-time.Duration(d)*24*time.Hour).Unix())
+	}
 }
 
 func (a *App) registerSpeedRoutes() {
@@ -285,7 +301,7 @@ func (a *App) registerSpeedRoutes() {
 	})
 	s.Handle("GET /api/speedtest/history", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		days, _ := strconv.Atoi(r.URL.Query().Get("days"))
-		if days <= 0 || days > 365 {
+		if days <= 0 || days > 3650 {
 			days = 30
 		}
 		api.JSON(w, 200, a.speedHistory(r.URL.Query().Get("link"), time.Now().Add(-time.Duration(days)*24*time.Hour).Unix()))

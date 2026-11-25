@@ -3,6 +3,11 @@
 // until something has actually answered.
 export function linkState(l) {
   if (!l) return { tone: '', text: 'Not checked', detail: 'This connection is not being watched yet. Apply your settings to start checking it.', health: 'none' };
+  if (l.paused) {
+    const left = l.paused_until ? l.paused_until * 1000 - Date.now() : 0;
+    const when = left > 5 * 365 * 864e5 ? 'until you resume it' : `until ${new Date(l.paused_until * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+    return { tone: 'warn', text: 'Paused', detail: `Paused ${when}. Nothing leaves through this connection, and it is not counted as broken.`, health: 'paused' };
+  }
   if (!l.checked && l.health !== 'working') return { tone: '', text: 'Checking…', detail: 'Waiting for the first answer.', health: 'unknown' };
   if (l.health === 'no-internet') {
     const ms = l.gw_rtt ? ` (${Math.max(1, Math.round(l.gw_rtt / 1e6))} ms)` : '';

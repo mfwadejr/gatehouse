@@ -33,6 +33,7 @@ type NetController interface {
 	NetReset() error
 	NetPending() (string, time.Time, bool)
 	WanStatus() (map[string]wanmon.State, error)
+	PauseWAN(name string, until int64) error
 	ApplyVPN(p netd.VPNPlan) error
 	VPNStatus() (netd.VPNStatus, error)
 	VPNSizeTest(name string) (netd.SizeReport, error)

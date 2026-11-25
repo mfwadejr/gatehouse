@@ -268,6 +268,9 @@ func dnsItem(r dnssrv.Row) LogItem {
 	default:
 		it.Why = "Not on any block list. Answered by " + orWord(r.Upstream, "an upstream DNS server") + "."
 	}
+	if by, ok := strings.CutPrefix(r.Rule, "allowed: "); ok && r.Result != "blocked" {
+		it.Why = "On a block list, but let through by your exception " + by + "."
+	}
 	return it
 }
 
