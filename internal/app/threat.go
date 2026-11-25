@@ -17,7 +17,8 @@ import (
 
 // Threat protection. A detection engine (Suricata) writes what it notices to a log file; NopeWarden
 // reads that file, drops what the person has let through, and turns the rest into plain-language
-// alerts in the Logs. It watches and tells; it does not block traffic yet.
+// alerts in the Logs. It watches and tells; in blocking mode it also blocks the outside address of a
+// serious alert for a while (see threatblock.go).
 //
 // It fails open by construction: NopeWarden only reads the engine's log. If the engine is missing,
 // stopped or crashes, or this reader fails, traffic is not touched in any way.
@@ -161,6 +162,7 @@ func (a *App) threatIngest(line []byte, now time.Time) bool {
 		sev = "info"
 	}
 	a.Logs.Exec(`INSERT INTO events(ts,area,severity,actor,title,detail) VALUES(?,?,?,?,?,?)`, now.Unix(), "threat", sev, device, plain, e.Alert.Signature+" ("+e.SrcIP+" to "+e.DestIP+")")
+	a.threatMaybeBlock(e, local, device, now)
 	return true
 }
 
@@ -229,6 +231,7 @@ func (a *App) threatEngine() map[string]any {
 func (a *App) registerThreatRoutes() {
 	s := a.API
 	a.registerThreatEngineRoutes()
+	a.registerThreatBlockRoutes()
 	s.HandleAdmin("POST /api/threat/allow", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		var in struct {
 			SID  int64  `json:"sid"`

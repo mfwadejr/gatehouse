@@ -73,7 +73,7 @@ A service that a rule, an open port or a route uses cannot be deleted until that
 4. Allow one device to reach another network: **Rules**, add a rule, choose the device and the service.
 5. See everything the firewall does: **Rules**, **Rule lines**. The built-in rules, the rules other pages make and your open ports are listed there too. In **Plain cards**, turn on **Show system rules**.
 6. Check that a rule is working: leave **Live** on, then try the thing the rule is for. Its **Matches** count goes up and the row flashes.
-7. Watch for infected devices and break-in attempts: that is on the **Threats** page. Blocking apps and categories is on **Protection**. Threat watching only tells you in plain words and does not block anything, so if it stops, your traffic is not touched.
+7. Watch for infected devices and break-in attempts: that is on the **Threats** page. Blocking apps and categories is on **Protection**. Threat watching tells you in plain words. Only if you choose **Watch and block** does it also block outside addresses, for a short time, and if it stops, nothing is blocked and your traffic is not touched.
 
 ## Example
 Open Plex for your media server: **Open a port**, choose Plex, choose the server, optionally limit it to your own country, **Save**, **Review and apply**.

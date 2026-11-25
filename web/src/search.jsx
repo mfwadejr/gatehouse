@@ -28,6 +28,7 @@ const ROWS = [
   ['Filtering per network', 'devices/profiles', 'Choose how much each network filters', 'profiles groups filtering level'],
   ['Encrypted DNS', 'dns/servers', 'One switch for encrypted lookups', 'doh dot private dns cloudflare quad9', 'Encrypted DNS'],
   ['Upstream DNS servers', 'dns/servers', 'Where NopeWarden asks when it does not know the answer', 'upstream resolver cloudflare google quad9 provider', 'Upstream DNS servers'],
+  ['Watch and block', 'threats/settings', 'Let threat watching block the outside address of a serious alert for a while', 'ips intrusion prevention block blocking suricata drop address offender', 'Watch and block'],
   ['Encrypted DNS for your devices', 'dns/servers', 'Let phones and laptops ask this firewall over DNS-over-TLS or DNS-over-HTTPS', 'dot doh private dns android ios encrypted dns server tls https 853 8443 dns-query certificate', 'Encrypted DNS for your devices'],
   ['Names that use a different server', 'dns/servers', 'Ask a particular server for one domain, such as an office network', 'conditional forwarding forward zone domain office corporate split dns active directory', 'Names that use a different server'],
   ['Match names with a pattern', 'dns/lists', 'Block or allow many names at once with * and ?, or a regular expression', 'regex wildcard pattern glob expression match block allow', 'Always allow or always block'],

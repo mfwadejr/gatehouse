@@ -63,20 +63,55 @@ function ModeCard({ data, reload }) {
   const [pending, setPending] = useState(null);
   const p = data.program || {};
   const watching = data.mode === 'watch';
+  const current = data.block ? 'protect' : data.mode;
   return (
     <Card title="Threat watching" desc="Watches for infected devices, break-in attempts and probing, and tells you in plain words.">
       <div className="stack">
-        <Segmented value={pending || data.mode} onChange={(v) => { if (v === data.mode || busy) return; setPending(v); run(() => put('/api/threat/settings', { mode: v }), v === 'watch' ? 'Watching is on.' : 'Watching is off.').then(reload).finally(() => setPending(null)); }} options={[{ value: 'off', label: 'Off' }, { value: 'watch', label: 'Watch and tell' }, { value: 'protect', label: 'Protect (not yet)', disabled: true }]} disabled={busy || p.state === 'installing' || p.state === 'removing'} />
+        <Segmented value={pending || current} onChange={(v) => { if (v === current || busy) return; setPending(v); run(() => put('/api/threat/settings', { mode: v }), v === 'protect' ? 'Watching and blocking is on.' : v === 'watch' ? 'Watching is on.' : 'Watching is off.').then(reload).finally(() => setPending(null)); }} options={[{ value: 'off', label: 'Off' }, { value: 'watch', label: 'Watch and tell' }, { value: 'protect', label: 'Watch and block' }]} disabled={busy || p.state === 'installing' || p.state === 'removing'} />
         {pending && (
-          <div className="inline small" role="status" aria-live="polite"><span className="spinner" aria-hidden="true" /><span><b>Working on it.</b> {pending === 'watch' ? 'Starting the watching program and checking its rules' : 'Stopping the watching program'}. <span className="muted">This can take a few seconds.</span></span></div>
+          <div className="inline small" role="status" aria-live="polite"><span className="spinner" aria-hidden="true" /><span><b>Working on it.</b> {pending === 'off' ? 'Stopping the watching program' : 'Starting the watching program and checking its rules'}. <span className="muted">This can take a few seconds.</span></span></div>
         )}
         {data.paused_reason && !watching && <Note tone="warn" title="NopeWarden switched watching off">{data.paused_reason} Your traffic was never held up.</Note>}
         {watching && !p.running && <Note tone={p.failing ? 'bad' : 'warn'} title={p.failing ? 'The program keeps failing' : 'The program is not running'}>{p.why} Your traffic is not affected. See Advanced, Program log, or Diagnostics in the left menu.</Note>}
         {p.state === 'updating' && <Note>Updating the rules. {p.message}</Note>}
         {p.state === 'failed' && p.installed && <Note tone="warn">{p.message}</Note>}
         <p className="small muted">{data.blocking} {data.fail_open} {data.limits}</p>
+        {data.block && <BlockList minutes={data.block_minutes} reload={reload} />}
       </div>
     </Card>
+  );
+}
+
+// The addresses blocked right now, each with the time left and a Remove button, and how long a block lasts.
+function BlockList({ minutes, reload }) {
+  const { data, reload: again } = useData('/api/threat/blocks', { every: 10000 });
+  const [run, busy] = useAction();
+  const [mins, setMins] = useState(minutes);
+  const list = data?.blocks || [];
+  const left = (s) => (s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min` : `${Math.max(1, Math.ceil(s / 60))} min`);
+  return (
+    <div className="stack">
+      <Field label="Block for (minutes)" hint="How long an address stays blocked. It is released by itself when the time is up.">
+        <div className="row">
+          <NumberInput value={mins} min={5} max={1440} onChange={setMins} />
+          <Button disabled={busy || Number(mins) === minutes} onClick={() => run(async () => { await put('/api/threat/block-time', { minutes: Number(mins) }); reload(); }, 'Saved.')}>Save</Button>
+        </div>
+      </Field>
+      <div className="small"><b>Blocked right now</b></div>
+      <div className="list">
+        {list.map((b) => (
+          <div className="item startalign" key={b.ip}>
+            <div>
+              <div className="name mono">{b.ip}</div>
+              <div className="small muted">{b.why}{b.device ? ` · ${b.device}` : ''} · {left(b.left)} left</div>
+            </div>
+            <div className="actions"><Button small kind="danger" disabled={busy} onClick={() => run(async () => { await del(`/api/threat/blocks/${encodeURIComponent(b.ip)}`); again(); }, 'Unblocked.')}>Remove</Button></div>
+          </div>
+        ))}
+        {!list.length && <Empty>Nothing is blocked. Only serious alerts from outside addresses lead to a block.</Empty>}
+      </div>
+      {list.length > 1 && <div className="row"><Button small disabled={busy} onClick={() => run(async () => { await post('/api/threat/blocks/clear', {}); again(); }, 'Everything was unblocked.')}>Remove all</Button></div>}
+    </div>
   );
 }
 

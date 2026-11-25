@@ -1,6 +1,14 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.68',
+    title: 'Watch and block, and a tidier Management port',
+    items: [
+      'Threats, Settings: a third choice, Watch and block. When threat watching sees a serious alert from an outside address, it blocks that address for a while (60 minutes unless you change it) and releases it by itself. Blocked right now lists each address with its reason and time left, with Remove and Remove all. Your own devices, your DNS servers and this machine are never blocked, and if the engine stops nothing is blocked and traffic is untouched. It is off until you choose it.',
+      'Networks: the Management Port tile now reads like your other networks: its name, Answers on and its address, then live speeds. It only adds a line when something is wrong (not answering, or the console closed on your other networks).',
+    ],
+  },
+  {
     version: '0.9.4.67',
     title: 'A tidier Management port tile',
     items: [

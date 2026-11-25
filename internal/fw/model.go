@@ -130,6 +130,9 @@ type Model struct {
 	// EncDNSIfaces are the ports encrypted DNS was switched on for (see EncDNSNets for what really applies).
 	EncDNSIfaces []string
 
+	// ThreatBlock is on when threat watching may block the outside address of a serious alert.
+	ThreatBlock bool
+
 	// SSHEnabled is the master switch for remote login. Off, nothing listens for SSH from any
 	// network, whatever each network's own SSH switch says.
 	SSHEnabled bool
@@ -237,6 +240,8 @@ type DNSException struct {
 const (
 	// PortalSet holds the addresses of devices that have accepted the sign-in page.
 	PortalSet = "portal_ok"
+	// ThreatBlockSet holds outside addresses that threat watching is blocking for a while.
+	ThreatBlockSet = "threat_block"
 	// MgmtIfSet holds the name of the management port (if there is one). The rules for it always
 	// exist in the ruleset; the set decides whether any port is covered, so the port can be set up,
 	// moved or removed without changing the ruleset.

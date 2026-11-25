@@ -1,7 +1,7 @@
 # Threats
 
 ## What it is for
-Watching for infected devices, break-in attempts and probing, and telling you about them in plain words. It is an extra program that is installed only if you ask. It reads copies of your traffic and never holds it up.
+Watching for infected devices, break-in attempts and probing, and telling you about them in plain words. It is an extra program that is installed only if you ask. It reads copies of your traffic and never holds it up. If you choose, it can also block the address behind a serious alert (see **Watch and block** below).
 
 ![The Threats page, shown with example data](img/threats.png)
 
@@ -15,7 +15,7 @@ One row of tabs along the top: **Overview**, **Alerts**, **Settings**, **Rules**
   - Below are **What was seen** (alerts by kind), **Devices involved** and **What changed** (rule updates, switch-offs and changes).
   - Until the program is installed, the rest of the tab is the install page. **What threat watching does** says what you get, what it costs and that nothing is installed until you ask. **Install threat watching** tells you the packages, the download size, the disk space and any worry about this machine's memory or processor before you agree. While it installs, or is removed, a ticked list shows the step it is on.
 - **Alerts** show what was noticed in plain words, named after the device (the name you gave it, or its network name). The same thing happening many times is one row with a count. Harmless engine chatter is kept in a folded section at the bottom. Each row has **Allow for this device**, **Allow for all** and **Never check this device**.
-- **Settings** holds everything you set once the program is installed. It has **Threat watching** (the switch **Off** or **Watch and tell**, which moves as soon as you click and says what it is doing, with the plain explanation of what it does and does not do), **How closely to watch** (Light, Balanced, Strict or Custom), **Limits** for the processor and memory, and **The program**, where **Remove threat watching** is. **Custom** appears once you change a group under Rules; **Restore defaults** goes back to the setting's own groups.
+- **Settings** holds everything you set once the program is installed. It has **Threat watching** (the switch **Off**, **Watch and tell** or **Watch and block**, which moves as soon as you click and says what it is doing, with the plain explanation of what it does and does not do), **How closely to watch** (Light, Balanced, Strict or Custom), **Limits** for the processor and memory, and **The program**, where **Remove threat watching** is. **Custom** appears once you change a group under Rules; **Restore defaults** goes back to the setting's own groups.
 - **Rules** has **Update rules now**, **Roll back to the previous rules**, **Groups of checks**, **Single checks**, **Allowed checks** (things you let through; remove one to be told about it again) and **Devices never checked**. Each group has a plain description. Switch groups on or off, then press **Apply**; nothing changes until you do, and **Discard** drops your changes.
 - **Advanced** has **Save or load your tuning**, **Reset all threat settings**, **Program log** (the last lines the program wrote, the first place to look when it is not running) and **Where it writes**.
 
@@ -42,3 +42,12 @@ If the page says **The program keeps failing**, the program starts and stops aga
 
 ## Looking up names in alerts
 **Threat alerts** look up the name behind an address and try again if the first lookup finds nothing; **Look up again** retries now.
+
+## Watch and block
+**Watch and block** is **Watch and tell** plus one more thing. When the engine reports a serious alert and the other end is an ordinary address on the internet, NopeWarden puts that address on a block list for a while (60 minutes unless you change **Block for (minutes)**, from 5 minutes to 24 hours). While it is listed, nothing from it gets in and nothing from your network gets to it, in either direction. When the time is up it is released by itself. It is off until you choose it.
+
+Under the switch, **Blocked right now** lists each address with the check that caught it, the device involved and the time left. **Remove** releases one at once, and **Remove all** releases them all. Each block, and each removal, is written to the Logs.
+
+It is careful: your own devices and networks, addresses on your own side, the DNS servers you use and this machine's own addresses are never blocked, and only the most serious alerts count. A check you have allowed or a device you never check does not lead to a block. This works for IPv4 addresses. If the engine stops, nothing new is blocked and your traffic is not held up, because traffic does not pass through the engine. The blocks already made end when their time is up.
+
+This is not the same as inline blocking, where each packet waits for the engine. NopeWarden may let the first few packets of an attack through before the address is blocked.

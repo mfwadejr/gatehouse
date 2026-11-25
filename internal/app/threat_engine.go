@@ -354,12 +354,12 @@ func (a *App) registerThreatEngineRoutes() {
 		info := a.threatInfo()
 		gon, goff := a.threatGroupChanges()
 		api.JSON(w, 200, map[string]any{
-			"mode": a.threatMode(), "preset": a.threatPreset(), "presets": ps, "custom": len(gon)+len(goff) > 0, "changes": len(gon) + len(goff),
+			"mode": a.threatMode(), "block": a.threatBlocking(), "block_minutes": a.threatBlockMinutes(), "preset": a.threatPreset(), "presets": ps, "custom": len(gon)+len(goff) > 0, "changes": len(gon) + len(goff),
 			"cpu_percent": a.threatInt(threatCPUSetting, 50, 10, 400), "memory_mb": a.threatInt(threatMemSetting, 2048, 256, 16384),
 			"paused_reason": a.Config.Setting(threatWhySetting, ""),
 			"program":       info, "engine": a.threatEngine(), "eve_path": a.threatEvePath(), "default_eve": defaultEve,
 			"ports": a.ndpiIfaces(), "alerts": a.threatGroups(60), "allowed": al, "trusted": tr,
-			"blocking":  "Blocking is not switched on. NopeWarden watches and tells you; it never holds up your traffic.",
+			"blocking":  a.threatBlockingText(),
 			"fail_open": "If the program stops, crashes or is removed, your traffic is not touched. It only reads copies of what passes by, and NopeWarden switches it off by itself if it uses too much of the machine.",
 			"limits":    "Most traffic is encrypted, so this finds known bad servers and attack patterns, not everything.",
 		})
@@ -423,8 +423,13 @@ func (a *App) registerThreatEngineRoutes() {
 		if !api.Decode(w, r, &in) {
 			return
 		}
+		protect := in.Mode != nil && *in.Mode == "protect"
+		if protect {
+			m := "watch"
+			in.Mode = &m
+		}
 		if in.Mode != nil && *in.Mode != "off" && *in.Mode != "watch" {
-			fail(w, errors.New("choose Off or Watch and tell"))
+			fail(w, errors.New("choose Off, Watch and tell, or Watch and block"))
 			return
 		}
 		if in.Preset != nil {
@@ -470,8 +475,24 @@ func (a *App) registerThreatEngineRoutes() {
 			a.Config.SetSetting(threatEveSetting, strings.TrimSpace(*in.Eve))
 		}
 		if in.Mode != nil {
+			old := a.Config.Setting(threatBlockSetting, "")
 			a.Config.SetSetting(threatModeSetting, *in.Mode)
 			a.Config.SetSetting(threatWhySetting, "")
+			if protect {
+				a.Config.SetSetting(threatBlockSetting, "1")
+			} else {
+				a.Config.SetSetting(threatBlockSetting, "")
+			}
+			if (old == "1") != protect {
+				// the firewall gains or loses its block list and rules
+				if err := a.refreshFirewallQuiet(c.User.Username); err != nil {
+					a.Config.SetSetting(threatBlockSetting, old)
+					a.refreshFirewallQuiet(c.User.Username)
+					fail(w, errors.New("the firewall could not be updated: "+err.Error()))
+					return
+				}
+				a.fwSync()
+			}
 		}
 		if err := a.threatSync(); err != nil && a.threatInfo().Installed {
 			// It could not be started: leave it off so the page does not claim it is on.

@@ -46,10 +46,18 @@ func TestThreatInstallIsAskedForAndWatchNeedsIt(t *testing.T) {
 		t.Fatalf("the engine was handed %+v", last)
 	}
 	// Bad values are refused.
-	for _, b := range []map[string]any{{"preset": "wild"}, {"cpu_percent": 5}, {"memory_mb": 10}, {"mode": "protect"}, {"eve_path": "../x"}} {
+	for _, b := range []map[string]any{{"preset": "wild"}, {"cpu_percent": 5}, {"memory_mb": 10}, {"mode": "bogus"}, {"eve_path": "../x"}} {
 		if rc, _, _ := c.call("PUT", "/api/threat/settings", b); rc == 200 {
 			t.Fatalf("accepted %v", b)
 		}
+	}
+	// Watch and block is a real choice now: it keeps watching on and switches blocking on.
+	if rc, _, raw := c.call("PUT", "/api/threat/settings", map[string]any{"mode": "protect"}); rc != 200 || !c.app.threatBlocking() {
+		t.Fatalf("protect: %d %s", rc, raw)
+	}
+	c.call("PUT", "/api/threat/settings", map[string]any{"mode": "watch"})
+	if c.app.threatBlocking() {
+		t.Fatal("blocking stayed on after choosing Watch and tell")
 	}
 	// A failed start leaves it Off, so the page never claims it is on.
 	c.call("PUT", "/api/threat/settings", map[string]any{"mode": "off"})

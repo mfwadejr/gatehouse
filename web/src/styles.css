@@ -763,7 +763,8 @@ button.tag:hover { color: var(--color-text-primary); border-color: var(--color-b
 .nl-meta { display: flex; flex-wrap: wrap; gap: var(--space-1-5); justify-content: center; align-items: center; margin-top: var(--space-1); font-size: var(--font-size-sm); color: var(--color-text-secondary); }
 .nl-mgmt { display: flex; justify-content: center; }
 .nl-mgmt { margin-top: var(--space-4); }
-.nl-mgmt .nl-drop { width: 13rem; }
+.nl-mgmt .nl-drop { width: 17rem; }
+.nl-mgmt .pillbtn { white-space: nowrap; }
 .nl-mgmt .nl-drop::before { display: none; }
 .nl-mgmt .nl-net { border-style: dashed; }
 .nl-vpn { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; margin-top: var(--space-4); padding-top: var(--space-3); border-top: var(--border-width-thin) dashed var(--color-border-default); font-size: var(--font-size-sm); color: var(--color-text-muted); }

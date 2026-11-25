@@ -104,14 +104,11 @@ export function NetworkLayout({ nets, zones, scopes, onOpen }) {
             <div className="nl-mgmt">
               <div className="nl-drop">
                 <button type="button" className="nl-net" onClick={() => go('settings/manage')} aria-label="Open Managing this device">
-                  <b>Management port</b>
-                  <span className="nl-sn mono">{mg.address || pn(mg.config.iface)}</span>
+                  <b>Management Port</b>
+                  <span className="nl-sn mono"><span className={`sdot ${mg.state === 'ok' ? 'good' : mg.state === 'quiet' ? '' : 'warn'}`} aria-hidden="true" /> {mg.state === 'ok' || mg.state === 'quiet' ? 'Answers on' : 'Not answering on'} {mg.address || pn(mg.config.iface)}</span>
                   <span className="nl-rate mono"><span className="nl-d">▼ {fmtBits(mg.down || 0)}</span><span className="nl-u">▲ {fmtBits(mg.up || 0)}</span></span>
                 </button>
-                <div className="nl-meta">
-                  <button type="button" className="pillbtn" onClick={() => go('settings/manage')}>{mg.state === 'ok' ? 'Answering' : mg.status}</button>
-                  <button type="button" className="pillbtn" onClick={() => go('settings/manage')}>{mg.lan_open ? 'Console open on other networks' : 'Console closed on other networks'}</button>
-                </div>
+                {!mg.lan_open && <div className="nl-meta"><button type="button" className="pillbtn warn" onClick={() => go('settings/manage')}>Console closed on other networks</button></div>}
               </div>
             </div>
           )}

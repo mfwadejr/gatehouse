@@ -122,6 +122,7 @@ func Load(db Queryer) (*Model, error) {
 	m.SNMPEnabled = settingOn(db, "snmp.enabled")
 	m.PortalIfaces = portalSetting(db)
 	m.EncDNSIfaces = encDNSSetting(db)
+	m.ThreatBlock = setting(db, "threat.block", "") == "1" && setting(db, "threat.mode", "off") == "watch"
 
 	irows, err := db.Query(`SELECT name,zone_id FROM interfaces WHERE enabled=1 AND zone_id IS NOT NULL ORDER BY id`)
 	if err != nil {

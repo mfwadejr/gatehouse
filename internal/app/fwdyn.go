@@ -164,6 +164,9 @@ func (a *App) setContents(m *fw.Model, withGeo bool) map[string]fw.SetFill {
 	if len(m.PortalNets()) > 0 {
 		out[fw.PortalSet] = a.portalFill(leases)
 	}
+	if m.ThreatBlock {
+		out[fw.ThreatBlockSet] = a.threatBlockFill(now)
+	}
 	out[fw.MgmtIfSet] = fw.SetFill{Replace: true, Elems: a.mgmtIfElems()}
 	for k, v := range a.speedFills(m, leases, reserved, now) {
 		out[k] = v

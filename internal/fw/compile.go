@@ -182,6 +182,9 @@ func (c *compiler) build() string {
 	if len(m.PortalNets()) > 0 {
 		c.line(1, "set %s { type ipv4_addr; flags timeout; size 8192; }", PortalSet)
 	}
+	if m.ThreatBlock {
+		c.line(1, "set %s { type ipv4_addr; flags timeout; size 4096; }", ThreatBlockSet)
+	}
 	c.line(1, "set %s { type ifname; }", MgmtIfSet)
 	if m.CloseLAN {
 		c.line(1, "set %s { type inet_service; }", LanGateSet)
@@ -248,6 +251,9 @@ func (c *compiler) input() {
 	c.line(1, "chain input {")
 	c.line(2, "type filter hook input priority filter; policy drop;")
 	c.line(2, `ct state invalid counter drop comment "builtin:invalid"`)
+	if m.ThreatBlock {
+		c.line(2, `ip saddr @%s counter drop comment "threat: blocked address"`, ThreatBlockSet)
+	}
 	c.line(2, `ct state { established, related } counter accept comment "builtin:replies"`)
 	c.line(2, `iifname "lo" accept`)
 
@@ -401,6 +407,10 @@ func (c *compiler) forward() {
 	// The management port is never routed through, in either direction.
 	c.line(2, "iifname @%s counter drop comment \"protected: the management port is not routed\"", MgmtIfSet)
 	c.line(2, "oifname @%s counter drop comment \"protected: the management port is not routed\"", MgmtIfSet)
+	if m.ThreatBlock {
+		c.line(2, `ip saddr @%s counter drop comment "threat: blocked address"`, ThreatBlockSet)
+		c.line(2, `ip daddr @%s counter drop comment "threat: blocked address"`, ThreatBlockSet)
+	}
 	c.speedJumps()
 	// A guest who has not accepted the sign-in page gets nothing through, even on a connection that
 	// was open before the sign-in expired. Web pages fail at once so the phone shows the page.
