@@ -75,7 +75,7 @@ func TestDemoConsole(t *testing.T) {
 		fn.mu.Unlock()
 		c.app.Logs.Exec(`INSERT INTO disk_counters(ts,drive,key,value) VALUES(?,?,?,?)`, time.Now().Add(-8*24*time.Hour).Unix(), "sda", "realloc", 5)
 		pc := c.app.powerConfig()
-		pc.On = true
+		pc.On = os.Getenv("NW_UPS_OFF") == ""
 		c.app.savePowerConfig(pc)
 		now := time.Now()
 		ca, _ := vpn.NewCA(now.AddDate(-10, 0, 40))

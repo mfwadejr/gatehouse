@@ -1,6 +1,13 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.58',
+    title: 'Power (UPS) setup looks right',
+    items: [
+      'Power (UPS): the USB or network choice is now a compact switch instead of a full-width bar, the address and name boxes line up, and the low-battery boxes line up the same way.',
+    ],
+  },
+  {
     version: '0.9.4.57',
     title: 'Clearer names, and signposts between look-alike cards',
     items: [

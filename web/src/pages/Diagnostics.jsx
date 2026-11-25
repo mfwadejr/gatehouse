@@ -313,9 +313,9 @@ function PowerUPS() {
       <Card title="Power (UPS)" desc="Watch a battery backup. NopeWarden tells you when the power fails and can shut the machine down cleanly before the battery runs out.">
         <div className="stack">
           <p className="small muted">APC and most other makes work. A UPS on a USB cable is found by itself; one on the network is read from the machine it is attached to.</p>
-          <Segmented value={src.source} onChange={(v) => setSrc({ ...src, source: v })} options={[{ value: 'usb', label: 'On a USB cable' }, { value: 'network', label: 'On the network' }]} />
+          <div><Segmented value={src.source} onChange={(v) => setSrc({ ...src, source: v })} options={[{ value: 'usb', label: 'On a USB cable' }, { value: 'network', label: 'On the network' }]} /></div>
           {src.source === 'network' && (
-            <div className="row" style={{ alignItems: "center", gap: "var(--space-2)" }}>
+            <div className="grid2" style={{ alignItems: 'start' }}>
               <Field label="Address of the machine"><Input value={src.host} onChange={(v) => setSrc({ ...src, host: v })} placeholder="192.168.1.5" /></Field>
               <Field label="UPS name" hint="Usually ups."><Input value={src.name} onChange={(v) => setSrc({ ...src, name: v })} placeholder="ups" /></Field>
             </div>
@@ -360,7 +360,7 @@ function PowerUPS() {
             </div>
           ))}
         </div>
-        <div className="row">
+        <div className="grid2" style={{ alignItems: 'start' }}>
           <Field label="Battery counts as low at (% charge)"><NumberInput value={cfg.low_charge} onChange={(v) => set('low_charge', v)} /></Field>
           <Field label="or when this many minutes are left"><NumberInput value={cfg.low_minutes} onChange={(v) => set('low_minutes', v)} /></Field>
           <Field label="Wait before shutting down (seconds)" hint="Gives the power a chance to return."><NumberInput value={cfg.delay} onChange={(v) => set('delay', v)} /></Field>
