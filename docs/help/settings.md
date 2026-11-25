@@ -32,6 +32,11 @@ The Overview map draws its lines from your home. **Your place on the map** (Gene
 A green pin labelled "Your place" shows your new choice, with the words "Not saved yet" and the numbers beside it. The place you saved before stays on the map as a small grey ring so you never mix the two up. The **Save** button says exactly what it will save, for example "Save 39.6, -77.7". **Use the default** goes back to the middle of your country. The place is kept on this machine only, and it is accurate to about a degree.
 
 ## Managing this device
+
+![Managing this device, shown with example data](img/manage.png)
+
+The picture uses made-up devices and numbers. Yours will show your own.
+
 **Management port** sets one spare port aside for managing NopeWarden and nothing else. The console and remote login answer on it, and nothing is routed through it: no internet, no DHCP server, no sharing with your other networks. Once it is set, the Networks page shows it as a dashed box under your networks, with its live speed.
 
 1. Plug a cable from a management computer or switch into a spare port.
@@ -55,6 +60,11 @@ You cannot lock yourself out. NopeWarden refuses to save a limit that does not i
 - **Bridge mode** uses NopeWarden as a filter between another router and your network, without routing or changing addresses. Switch it on from **Device mode** first. The Advanced card holds the detailed settings.
 
 ## Storage
+
+![The Storage tab, shown with example data](img/storage.png)
+
+The picture uses made-up devices and numbers. Yours will show your own.
+
 Everything NopeWarden keeps is in one table, in four groups, with how many entries there are, the estimated size, where you see it, the oldest entry and the rule that removes it.
 
 - **History you look at** covers connections, DNS lookups, activity, admin activity, device traffic and data by country. **Keep traffic and events for (days)**, **Never use more than (MB)** and **Keep admin activity for (days)** sit side by side. The size limit trims the oldest connections and lookups first, so something can go sooner than the days say. Totals for each whole internet connection are kept for at least 100 days whatever you choose. Admin activity (who signed in and what they changed) is kept 365 days unless you change it and is never trimmed by size.

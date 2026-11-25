@@ -56,6 +56,11 @@ The card shows the model, **Battery charge**, **Time left on battery**, **Load**
 Only warnings and errors show until you tick **Everything**. Choose **From** (everything, or one service), **Time**, and **Search**. Every word you type must appear, the box looks through up to 5000 lines, and the words are highlighted. **Follow** refreshes every 5 seconds. Known messages get a plain explanation next to them.
 
 ## Tools
+
+![The Tools tab, shown with example data](img/diagnostics-tools.png)
+
+The picture uses made-up devices and numbers. Yours will show your own.
+
 **Test my internet**, ping, traceroute and name lookups are here, and so is **Why can't it reach that?** for one device and one site. These are the only copies, so Internet, Troubleshoot points here. Use **Report on this link** to open a report for the connection you are testing.
 
 ## The terminal

@@ -32,6 +32,11 @@ The picture uses made-up devices and numbers. Yours will show your own.
 Cards update on their own. If updates stop, a "Reconnecting" label appears at the top right.
 
 ## The daily summary
+
+![The daily summary, shown with example data](img/overview-summary.png)
+
+The picture uses made-up devices and numbers. Yours will show your own.
+
 Press **Daily summary** at the right end of the status line. It opens a short recap in plain sentences, with no AI behind it, just fixed rules. It says whether anything needs you, lists up to three things to open, and then covers yesterday: internet drops, the most devices online, how many lookups were made and how many were blocked, attempts from the internet that were blocked, threat alerts, how each drive is doing, and whether the power stayed on. If the box has only been recording for part of the day, it says so. If you would rather not see the toggle, hide it under **Hide or show cards**.
 
 ## Common tasks
