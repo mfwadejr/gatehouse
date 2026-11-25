@@ -5,7 +5,7 @@ DHCP gives every device on a network an address when it joins. NopeWarden does t
 
 ![The dhcp page, shown with example data](img/dhcp.png)
 
-The picture is an example from a new, empty box; yours will show your own devices and numbers.
+The picture uses made-up devices and numbers. Yours will show your own.
 
 ## What is on the page
 - **Overview** opens first: a sentence on how DHCP is doing right now (how many networks hand out addresses, how many devices have one, and a warning when a pool is nearly full), a row of numbers (**Addresses in use**, **Devices online**, **Reservations**, **Leases ending soon**), a **Devices over time** chart with a 1 h / 24 h / 7 d choice, **Address pools** with a bar for each pool and a warning past 80% full, and **Most recently active**, the devices that asked for an address most lately, with **Last seen**, **Lease ends** and a **Name** button for devices without a name, plus a button to **All devices**.

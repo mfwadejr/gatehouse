@@ -30,7 +30,7 @@ Sometimes an update changes how NopeWarden writes the firewall rules without cha
 If you are told other changes are waiting, open **Review** and commit or discard them first. If a commit fails, the message says which part (network or firewall) and what was wrong; the changes stay waiting.
 
 ## The DNS area
-Review now has three areas: **Networks**, **DNS** and **Firewall**. DNS changes wait here like the others. Applying sends them live; discarding restores DNS exactly as it was running.
+Review has three areas: **Networks**, **DNS** and **Firewall**. DNS changes wait here like the others. Applying sends them live; discarding restores DNS exactly as it was running.
 
 ## What waits here
 Firewall, route, VPN, DHCP, network and DNS changes wait here, and so do Forget a device, adding a network, country rules and changes to blocks. A device you chose to forget shows Forgetting… on the Devices page until the change is applied; discarding the change keeps the device.

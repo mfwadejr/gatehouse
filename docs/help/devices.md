@@ -5,11 +5,12 @@ Every device that has joined your network. Rename it, give it an icon, put it in
 
 ![The devices page, shown with example data](img/devices.png)
 
-The picture is an example from a new, empty box; yours will show your own devices and numbers.
+The picture uses made-up devices and numbers. Yours will show your own.
 
 ## What is on the page
-- **Search devices** and a **List** or **Map** view. **Columns and rows** chooses what the table shows.
-- Each row shows the device, its network, how it is connected and whether it is allowed online. A button on the row pauses or resumes it; an offline device has **Forget**.
+- **Search devices** and a **List** or **Map** view. **Columns** chooses what the table shows, and you can change how many rows appear on a page.
+- Each row shows the device, its network, how it is connected, its address and what it is doing right now. A button on the row pauses or resumes it. An offline device has **Forget**.
+- **Activity** is the live speed, download and upload, and it updates every second while the page is open. That makes it handy for tracking down a slow connection: watch which device lights up when things drag. A device that is quiet shows "idle". Very small speeds show as "<1 kb/s". Each number is the average of the last three seconds, so it moves smoothly instead of jumping. The page stops asking when you leave it or switch to another browser tab.
 - Open a device to change its **Name**, **Icon**, **Profile**, **DNS filtering**, **Notes** and **Fixed address**, or **Pause the internet** for a set time. **Allowed online** turns it off without losing its settings. For a device on a VPN there is also **Sent through** and a Check. The panel also lists **Firewall rules that mention it**.
 - **Add a device** records one that has not joined yet.
 
@@ -20,11 +21,10 @@ In a device's window, **Tags** gives it up to five labels, such as media or livi
 1. Pause a device: press its row button, or open it and choose a pause length. **Resume now** brings it back.
 2. Rename a device: click it, type the name, press Enter.
 3. Keep a device at the same address: open it, turn on **Fixed address**.
-
 4. Let the internet reach an app on a device: press **Open a port** on its row, tap the app, done. Then **Review and apply** at the bottom.
 
 ## Example
-Pause the games console for two hours at homework time: open it and choose the two-hour pause. It comes back by itself.
+Pause the games console for two hours at homework time. Open it and choose the two-hour pause. It comes back by itself.
 
 ## If something goes wrong
 A device missing from the list has not joined yet, or has not asked NopeWarden for an address. Use **Add a device** to record it. If a name is wrong, rename it; the old name is only a guess from the network.
@@ -35,7 +35,7 @@ A profile decides which blocklists apply to a device and when the internet is of
 
 ![The Profiles tab, shown with example data](img/profiles.png)
 
-The picture is an example from a new, empty box; yours will show your own devices and numbers.
+The picture uses made-up devices and numbers. Yours will show your own.
 
 **What is on the page**
 - **Profiles**: each with a **Name**, **How much to filter**, **Safe search**, and **Internet off at set hours** (**Off from** and **Back on at**). **Pause…** is one drop-down on each profile: it stops the internet for that profile's devices for a while, and **Resume now** undoes it. The device count shows only that profile's devices on the Devices tab.

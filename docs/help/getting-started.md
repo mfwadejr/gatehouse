@@ -12,7 +12,10 @@ This guide takes you from a blank machine to a working network in about ten minu
 ## Install
 
 1. Plug the USB stick into the machine and start it from the stick.
-2. Follow the installer. You always choose which port is the internet and which is your own network, and the installer says beside each connected port whether a DHCP server answers on it. For your own network it asks for NopeWarden's address and whether NopeWarden should hand out addresses (DHCP) there. If another DHCP server already answers on that network, the installer turns this off and says why, because two servers on one network give computers conflicting addresses. If a port already has an address but no server answered the check, the installer says so and also leaves DHCP off by default. You can turn it on anyway, and change it later in setup. If both ports seem to be on one network, which happens in a virtual machine when both adapters share a network, the installer warns you but lets you continue. Give the LAN port its own virtual network instead.
+2. Follow the installer. You always choose which port is the internet and which is your own network, and beside each connected port it tells you whether a DHCP server answers on it. For your own network it asks for NopeWarden's address and whether NopeWarden should hand out addresses (DHCP) there.
+   - If another DHCP server already answers on that network, the installer turns this off and says why. Two servers on one network give computers conflicting addresses.
+   - If a port already has an address but no server answered the check, the installer says so and also leaves DHCP off by default. You can turn it on anyway, and you can change it later in setup.
+   - If both ports seem to be on one network, which happens in a virtual machine when both adapters share a network, the installer warns you but lets you continue. Give the LAN port its own virtual network instead.
 3. When it finishes, remove the stick and restart.
 
 ## First sign-in
@@ -25,7 +28,8 @@ Nothing is switched on until you finish the wizard. The page then tells you the 
 
 ## After setup
 
-- Open **Overview**. A short checklist shows what is left, such as turning on two-factor sign-in and making a first backup.
+- Open **Overview**. A short checklist (also under Settings, General, **Finish setting up**) shows what is left, such as turning on two-factor sign-in and making a first backup.
+- Open Settings, General, **Your place on the map** and press **Change** so the Overview map starts from your home.
 - Open **Devices & access** to name your devices and give them profiles.
 - Make a backup under **Settings, Backup & recovery**.
 

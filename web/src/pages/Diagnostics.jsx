@@ -230,10 +230,10 @@ function DiskHealth() {
             {data.alerts?.channel ? 'The alert "A drive has a problem" is switched off, so nothing will tell you about this.' : 'No email or phone alerts are set up, so nothing will tell you about this.'} It shows here, on the Overview and on the Diagnostics menu dot. Turn the alert on under Alerts.
           </Note>
         )}
-        <div className="list">
+        <div className="stack">
           {data.drives.map((d) => (
-            <div key={d.name} className="stack gap1">
-              <div className="item">
+            <div key={d.name} className="stack gap1 driverow">
+              <div className="list"><div className="item">
                 <div className="fill">
                   <div className="name">{d.model}</div>
                   <div className="meta">{d.kind}{d.bytes ? `, ${size(d.bytes)}` : ''}, /dev/{d.name}. {d.reason}</div>
@@ -245,7 +245,7 @@ function DiskHealth() {
                   <Pill tone={DISK_TONE[d.level] || (d.word === 'Healthy' ? 'good' : '')}>{d.word}</Pill>
                   {d.word !== 'Not reported' && !d.gone && <Button small onClick={() => setOpen(open === d.name ? '' : d.name)}>{open === d.name ? 'Hide details' : 'Details'}</Button>}
                 </div>
-              </div>
+              </div></div>
               {open === d.name && (
                 <Note tone="info" title={`${d.model}: what it reported`}>
                   <div className="list">

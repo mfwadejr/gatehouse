@@ -36,7 +36,7 @@ Devices are IPv4 for now (from DHCP). Typed IPv6 addresses, websites and countri
 ## What traffic
 
 * Services by name (`https`, `ssh`, ...), ports (`tcp/8080`, `udp/1000-2000`), or **lists of ports**
-  saved once under Groups & lists and used as `list:Name`. Several can be mixed in one rule.
+  saved once under Device groups and used as `list:Name`. Several can be mixed in one rule.
 * **IP version**: both (default), IPv4 only, or IPv6 only.
 * **Connection state** (under More options): any, or only new connections.
 

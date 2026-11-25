@@ -5,16 +5,18 @@ DNS turns names into addresses. NopeWarden answers for your devices, blocks ads,
 
 ![The dns page, shown with example data](img/dns.png)
 
-The picture is an example from a new, empty box; yours will show your own devices and numbers.
+The picture uses made-up devices and numbers. Yours will show your own.
 
 ## What is on the page
 Tabs along the top:
 - **Overview**: number cards with trend lines (select one to open the page that explains it), **Lookups over time** (Live shows the last minute and the latest lookups; 1 h, 24 h and 7 d show history), **How queries were answered**, **Answer time** and **What changed**.
 - **Activity**: who asked and what was stopped, for the last hour, 24 hours or 7 days: **Busiest devices**, **What blocked it**, **Most blocked** and **Most asked**.
-- **Servers**: where names are looked up. **Upstream DNS servers** (where NopeWarden asks when it does not know), **Which server is asked first**, **Add a DNS server**, **Encrypted DNS**, **Resolve directly** and **Forced DNS**. Forced DNS used to be on the Firewall page: it sends devices that carry a DNS server of their own (smart TVs, cameras, some phones) to the one you chose. Turn **Force devices to use one DNS server** on, pick the server, then set each network and add exceptions for chosen devices or groups. It redirects ordinary DNS only: a device that hides its lookups inside normal web traffic (DNS-over-HTTPS) can still go around it.
+- **Servers**: where names are looked up (picture below). **Upstream DNS servers** (where NopeWarden asks when it does not know), **Which server is asked first**, **Add a DNS server**, **Encrypted DNS**, **Resolve directly** and **Forced DNS**. Forced DNS sends devices that carry a DNS server of their own (smart TVs, cameras, some phones) to the one you chose. Turn **Force devices to use one DNS server** on, pick the server, then set each network and add exceptions for chosen devices or groups. It redirects ordinary DNS only: a device that hides its lookups inside normal web traffic (DNS-over-HTTPS) can still go around it.
 - **Blocking**: **Ad, tracker and malware lists** you can switch on (which devices get which lists is set per profile, on the Profiles tab of Devices & access), **Always allow or block** exceptions that beat every list, and **Why is this blocked?** to find which list blocks a name.
 - **Your own names**: **Give this firewall a name**, and names that point somewhere on your network, like nas.lan to 192.168.1.10. A line under the heading says names end in your Home domain and links to **DNS, Settings** to change it.
 - **Settings**: **What to do with blocked names**, **Home domain**, **Queries per second per device**, **Remember answers (entries)**, **Keep the query history for (days)**, **Hide device addresses in the history** and **Tell browsers to use this DNS**.
+
+![The Servers tab](img/dns-servers.png)
 
 Devices sent through a VPN have their name lookups sent through it as well.
 
@@ -23,8 +25,9 @@ Devices sent through a VPN have their name lookups sent through it as well.
 2. Find out why a site is blocked: **Why is this blocked?**, type the name, **Check**.
 3. Name a device on your network: **Your own names**, enter the name and address, **Add**.
 
-4. Block an app, a category or a website for one device, a network or at set hours: this is on the Protection page now, under **Blocks**.
-5. See what a list blocks: **Blocking**, **View names** on the list. Search, and allow a name that should not be blocked.
+4. Block an app, a category or a website for one device, a network or at set hours: use **Blocks** on the Protection page.
+5. See what a list blocks: **Blocking**, **View names** on the list. Search it, and allow a name that should not be blocked.
+6. Allow or block a site straight from a lookup you can see: open Logs, find the DNS row, and use **Allow this site** or **Block this site**. You choose the name or the whole site, and who it applies to (everyone, that device, its network, its profile, or your own mix). The window names the list that blocks it and warns you before you allow something on a threat or malware list. The change waits on Review like other DNS changes, shows on the Blocks page marked "added from Logs", and the pop-up that appears afterwards has an **Undo** button.
 
 ## Example
 A shopping site does not load. Type its name under **Why is this blocked?**; it names the list. Add the name to **Always allow or block** as allowed.
@@ -42,10 +45,10 @@ Under **Servers**, **Resolve directly** turns on NopeWarden's own Unbound resolv
 - **Your own names** keep working (split-horizon): names you define, like nas.lan, are answered locally and never sent out.
 
 ## Changes wait for Review
-DNS changes (lists, groups, servers, your own names) now wait on the **Review changes** page with the firewall and network changes. Apply or discard them together. **Discard** puts DNS back exactly as it was running.
+DNS changes (lists, servers, your own names) wait on the **Review changes** page along with firewall and network changes. You apply or discard them together, and **Discard** puts DNS back exactly as it was running.
 
 ## Schedules
 Blocklist refreshes follow the one schedule editor (every N hours, daily, weekly or off). A failed refresh retries after 5 minutes, then 15, 30 and every hour.
 
 ## DNS follows the route
-A device sent through a VPN or a particular internet connection looks up names through that same path, so a website route does not leak lookups to your normal connection. The Routes tab on Policies lists the addresses learned for each website route.
+A device sent through a VPN or a particular internet connection looks up names through that same path, so a website route never leaks lookups to your normal connection. The Routes tab on Policies lists the addresses learned for each website route.

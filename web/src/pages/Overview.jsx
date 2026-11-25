@@ -183,7 +183,7 @@ function DevicesTile({ d, h }) {
   return (
     <Tile title="Devices" pill={`${online} online`} tone="good" big={<CountUp value={online} />} to="devices"
       sub={d ? `${d.wired} wired${d.vpn ? ` · ${d.vpn} VPN` : ''}` : ''}
-      chart={<Chart series={miniSeries(h, 'devices.online')} from={h?.from || 0} to={h?.to || 1} unit="devices" height={44} compact label="Devices online, last hour" />}
+      chart={<Chart series={miniSeries(h, 'devices.online')} from={h?.from || 0} to={h?.to || 1} unit="devices" height={56} compact axes label="Devices online, last hour" />}
       caption="Devices online · last hour">
       <div className="inline mt2">
         {d?.new > 0 && <button type="button" className="pillbtn warn" onClick={() => go('devices')}>{d.new} new today</button>}
@@ -205,8 +205,8 @@ function DnsTile({ dns, h }) {
   return (
     <Tile title="DNS" pill={pill} tone={tone} big={<CountUp value={st?.hour_total ?? 0} />} unit="lookups in the last hour" to="dns"
       sub={`${fmt.d1(st?.qps)}/s now · ${ups.length} server${ups.length === 1 ? '' : 's'} · ${fmt.d1(st?.blocked_pct)} % blocked · ${fmt.d1(st?.cached_pct)} % cached`}
-      chart={<Chart series={miniSeries(h, 'dns.qps')} from={h?.from || 0} to={h?.to || 1} unit="queries/s" height={44} compact label="DNS queries per second, last hour" />}
-      caption="Queries per second · last hour" />
+      chart={<Chart series={miniSeries(h, 'dns.qps')} from={h?.from || 0} to={h?.to || 1} unit="queries/s" height={56} compact axes label="DNS queries per second, last hour" />}
+      caption="Lookups per second · last hour" />
   );
 }
 
@@ -217,7 +217,7 @@ function DhcpTile({ util, h }) {
   return (
     <Tile title="DHCP" pill={!list.length ? 'No scope' : full.length ? `${full[0].name} nearly full` : 'Serving'} tone={!list.length ? 'warn' : full.length ? 'warn' : 'good'}
       big={<CountUp value={used} />} unit={size ? `of ${size} addresses` : 'leases'} to="dhcp"
-      chart={<Chart series={miniSeries(h, 'dhcp.used')} from={h?.from || 0} to={h?.to || 1} unit="addresses" height={44} compact label="Addresses in use, last hour" />}
+      chart={<Chart series={miniSeries(h, 'dhcp.used')} from={h?.from || 0} to={h?.to || 1} unit="addresses" height={56} compact axes label="Addresses in use, last hour" />}
       caption="Addresses in use · last hour">
       <div className="ov-scopes">
         {list.map((s) => {
@@ -243,7 +243,7 @@ function SecurityTile({ sec, fw, h }) {
     <Tile title="Protection" pill={!fw ? '' : !fw.zones?.length ? 'Not set up' : bad ? 'Changes waiting' : alerts ? `${alerts} alert${alerts === 1 ? '' : 's'}` : 'Protected'} tone={!fw ? '' : !fw.zones?.length ? 'warn' : bad || alerts ? 'warn' : 'good'}
       big={<CountUp value={sec?.blocked_24h ?? 0} format={fmt.n} />} unit="blocked in 24 h" to="protection"
       sub={`${sec?.open_ports ? `${sec.open_ports} port${sec.open_ports === 1 ? '' : 's'} open to the internet` : 'No ports open to the internet'}`}
-      chart={<Chart series={miniSeries(h, 'fw.blocked', 60)} from={h?.from || 0} to={h?.to || 1} unit="blocked/min" height={44} compact label="Blocked connections per minute, last hour" />}
+      chart={<Chart series={miniSeries(h, 'fw.blocked', 60)} from={h?.from || 0} to={h?.to || 1} unit="blocked/min" height={56} compact axes label="Blocked connections per minute, last hour" />}
       caption={threat || 'Blocked connections per minute · last hour'} />
   );
 }

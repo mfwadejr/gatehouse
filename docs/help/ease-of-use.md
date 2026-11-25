@@ -14,11 +14,14 @@ It shows you what to expect before you start, and it is the list the next round 
 - Rename a device: **Devices**, click the device, type the name, **Save**. 4 steps, or 3 if you press Enter instead of clicking **Save**.
 - Add a second internet connection: **Internet**, **Add connection**, choose the port, **Save**. 4 steps.
 - Add a VPN: **VPN**, **Add a VPN**, choose what kind, fill in the details, create it. 4 or more steps, depending on the kind.
-- Open a port for a game server or app: **Firewall**, the **Ports** tab, **Open a port for an app**, choose the app, choose the device, **Save**. 6 steps. A game console that asks for its own ports needs none, because UPnP opens them for that device only.
+- Open a port for a game server or app: **Devices & access**, **Open a port** on the device's row, tap the app, **Review and apply**. 4 steps. From the Firewall page it takes longer: **Firewall**, the **Open ports** tab, **Open a port**, choose the app, choose the device, **Save**. 6 steps. A game console that asks for its own ports needs none, because UPnP opens them for that device only.
+- See what one device is doing right now: **Devices & access**, then read **Activity**. 1 step. It updates every second.
+- Put your home on the map: **Settings**, **Your place on the map**, **Change**, type an address and press **Find**, pick it, **Save**. 6 steps, once.
+- Allow a site that was blocked: **Logs**, find the lookup, **Allow this site**, **Save**. 4 steps.
 
 ## Common tasks
 1. Check a job before you start: find it in the list above.
 2. Report a job that feels long: say which one, so it can be added.
 
 ## If something goes wrong
-Nothing here changes any setting. The jobs that are over three steps and not yet shortened are renaming a device by mouse (4), adding a second connection (4), adding a VPN (4 or more) and opening a port (6). Opening a port by hand is the longest, and the first thing to shorten.
+Nothing here changes any setting. The jobs that are over three steps are renaming a device by mouse (4), adding a second connection (4), adding a VPN (4 or more), opening a port from the Firewall page (6) and setting your place on the map (6, though you do it once). Opening a port from the Firewall page is the longest, so most people will find the shorter way from the Devices page.

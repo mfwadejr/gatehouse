@@ -29,15 +29,16 @@ Blocking apps and categories, and threat watching, only add protection. If they 
 
 ## Updates
 
-NopeWarden looks for updates every 12 hours unless you change **How often to check** (6 hours, 12 hours, a day, a week, or your own number of hours from 1 to 720). Under **Settings, General, Updates** you choose **Off** (only when you press Check now), **Notify** (it tells you) or **Automatic** (it installs once a day in the hour you choose). Updates are signed; NopeWarden installs only releases signed with its own key. If a new version fails to start, the previous one comes back.
+NopeWarden looks for updates every 12 hours unless you change **How often to check** (6 hours, 12 hours, a day, a week, or your own number of hours from 1 to 720). On the Updates page, under **Schedule**, you choose **Off** (only when you press Check now), **Notify** (it tells you) or **Automatic** (it installs once a day in the hour you choose). Updates are signed, and NopeWarden installs only releases signed with its own key. If a new version fails to start, the previous one comes back.
 
 ## Backups
 
-Backups are made on a schedule under **Settings, Backup & recovery**. A backup is only worth having if it restores, so each one is checked as it is made. Keep a copy on another computer or drive.
+Backups are made on a schedule under **Settings, Backup & recovery**. A backup is only worth having if it restores, so each one is checked as it is made. Backups are kept on the machine's own drive, so download one now and then and keep it on another computer or drive.
 
 ## Words used in the console
 
 - **Network:** a separate group of devices, such as Home or Guests. Each is one port, several ports, or a VLAN.
 - **Profile:** which blocklists and hours apply to a device.
 - **Kill switch:** if a VPN drops, the devices using it lose internet instead of falling back to the normal connection.
+- **Rule set and tag:** a rule set groups policies so you can pause them together. A tag is just a label for finding things. Neither changes what anything is allowed to do.
 - **Pair:** two NopeWarden machines working together; if one fails, the other takes over.

@@ -376,6 +376,8 @@ details.more > summary { cursor: pointer; color: var(--color-text-secondary); ma
 .ch2-x { display: flex; justify-content: space-between; margin-top: var(--space-1); padding-left: 3.2rem; }
 .ch2-unit { margin-bottom: var(--space-1); }
 .ch2.compact .ch2-x, .ch2.compact .ch2-y { display: none; }
+.ch2.compact.axes .ch2-y { display: flex; min-width: 1.8rem; font-size: var(--font-size-xs, .72rem); }
+.ch2.compact.axes .ch2-x { display: flex; padding-left: 2.3rem; font-size: var(--font-size-xs, .72rem); }
 
 /* ---------- Overview layout ---------- */
 .ov-hero { display: grid; grid-template-columns: 20rem minmax(0, 1fr); gap: var(--space-5); }
@@ -838,3 +840,16 @@ button.tag:hover { color: var(--color-text-primary); border-color: var(--color-b
 .report-grid .rr { display: grid; gap: var(--space-3); padding: var(--space-2) var(--space-1); border-bottom: var(--border-width-thin) solid var(--color-border-default); }
 .report-grid .rr span { overflow-wrap: anywhere; }
 .report-grid .rr-head { font-weight: var(--font-weight-semibold); color: var(--color-text-secondary); }
+
+/* Your place on the map: the saved place is a grey ring, a choice not yet saved is a green pin. */
+.mapplace-saved { fill: none; stroke: var(--color-text-muted); stroke-width: 1.6; stroke-dasharray: 2 2; }
+.mapplace-preview { fill: none; stroke: var(--color-status-good); stroke-width: 2; stroke-dasharray: 3 2; }
+.mapplace-halo { fill: var(--color-status-good); opacity: .25; }
+.mapplace-pin { fill: var(--color-status-good); stroke: var(--color-text-primary); stroke-width: 2.5; }
+.mapplace-tag { fill: var(--color-bg-surface); stroke: var(--color-status-good); }
+.mapplace-tagtext { fill: var(--color-text-primary); font-size: 11px; }
+.mapplace-new { padding: var(--space-3); border-radius: var(--radius-md); border: var(--border-width-thin) solid var(--color-status-good); background: color-mix(in srgb, var(--color-status-good) 10%, transparent); font-size: var(--font-size-sm, .9rem); }
+.btn.leftalign.on { border-color: var(--color-accent-selected-border); }
+
+.driverow { padding-top: var(--space-3); border-top: var(--border-width-thin) solid var(--color-border-subtle); }
+.driverow:first-child { padding-top: 0; border-top: 0; }

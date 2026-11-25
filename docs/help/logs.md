@@ -5,45 +5,58 @@ What happened on your network and why: connections the firewall allowed or block
 
 ![The logs page, shown with example data](img/logs.png)
 
-The picture is an example from a new, empty box; yours will show your own devices and numbers.
+The picture uses made-up devices and numbers. Yours will show your own.
 
 ## What is on the page
-- Tabs: **Events**, **Summary** (with the full map), **Data use** and, for administrators, **Admin activity**.
-- The search words are highlighted in each row, and the search is part of the address (for example #/logs/log?q=printer), so a search can be bookmarked or sent to someone.
-- **Admin activity** answers who did what to NopeWarden: sign-ins and failed attempts, and the changes people made, each with who, what, when and from which address. Search with several words (every word must match a person, an action or an address) and choose a time range; the count says how many match and how far back it searched.
-- Three places hold three kinds of log. **Logs** is what your network did. **Diagnostics** is how NopeWarden itself is running (its system log). **Admin activity** is who changed what.
-- The search box and filters: **Allowed and blocked**, a time range (1 h, 24 h, 7 d, 30 d, or custom) and **Everything**, **Connections**, **Names (DNS)** or **Events**. Live updates can be turned off.
-- Every row is at most two lines: the app or website on top, the port and service below. **Out through** shows which connection or VPN it left by. Identical neighbouring entries become one row with a count.
-- Click a row (or press Enter) for the rest: why, the rule, the host and address, the country, the networks, the times, and **Block this** or **Allow this**.
-- **Columns & rows** chooses columns and how many rows load at a time. **Download as spreadsheet (CSV)** exports what you see: the same search, filters and kind, lookups and connections together, one row for each entry (a run of repeats on screen is one row each in the file). The first columns are the same for every row; the rest are the details below, left empty where they do not apply, plus the rule's technical tag. The rule's match count is the total at the moment you download.
-- Open a row to see more. A DNS lookup shows **Response** (the code, with what it means), **Answer time** and **Answered by** (an upstream DNS server, or NopeWarden itself for a name from memory, one of your own names or a blocked name). A connection shows **Outcome** (Completed, Reset, Timed out, Still open or Blocked), **Sent** and **Received** (bytes each way), **Lasted** and the **Rule** that decided it with how many connections that rule has matched so far, counting live while Live is on. A blocked connection shows the outcome and the rule only.
-- Open a blocked name (the **Names (DNS)** kind) and press **Allow this site**, or an answered one and press **Block this site**. A dialog asks **What** (just that name and what is under it, or the whole site) and **Who** (**Everyone**, only that device, its network or its profile, or any networks, profiles and devices you choose). It says what stops the site now, warns when the list is about threats, and will not go ahead when a block you wrote on purpose covers it, because an exception from here never overrides that. The result is a named exception or block on the Blocks page marked as added from Logs, it waits on Review like other DNS changes, and **Undo** in the message takes it away again. An allow only lets through names that a block list stops.
-- Outcome, bytes and time are read from the router's list of live connections every few seconds, so a very short connection shows "under 10 seconds", they cover IPv4 only, and connections logged before 0.9.4.26 show "not known yet".
-- **Recording & storage** chooses what is recorded. How long each kind is kept, and the size limit, are on the Storage tab in Settings.
+Tabs: **Events**, **Summary** (which has the full map), **Data use**, **Reports** and, for administrators, **Admin activity**.
 
-## Common tasks
-1. Find out why something was blocked: search for the device or site, click the row, read **Why**.
-2. Block a destination: click its row, then **Block this**. For a name, click its row and press **Block this site** or **Allow this site**.
-3. See which devices use a VPN: look at **Out through**.
+Three places hold three kinds of log, so it helps to know which to open:
+- **Logs** is what your network did.
+- **Diagnostics** is how NopeWarden itself is running (its system log).
+- **Admin activity** is who changed what in NopeWarden: sign-ins and failed attempts, and the changes people made, each with who, what, when and from which address. You can search with several words (each must match a person, an action or an address) and choose a time range. The count says how many match and how far back it searched.
 
-Each row shows the internet connection or VPN it left through. For a DNS lookup that is the connection NopeWarden itself used to ask the DNS server; a lookup answered from memory shows none.
+### Events
+- The search box and filters: **Allowed and blocked**, a time range (1 h, 24 h, 7 d, 30 d, or custom), and **Everything**, **Connections**, **Names (DNS)** or **Events**. Live updates can be turned off.
+- Your search words are highlighted in each row. The search is part of the address (for example #/logs/log?q=printer), so you can bookmark it or send it to someone.
+- Every row is at most two lines: the app or website on top, the port and service below. **Out through** shows which connection or VPN it left by. Identical neighbouring entries are folded into one row with a count.
+- NopeWarden's own health checks are hidden. To see them, turn on **Show NopeWarden's own checks**.
+- **Columns & rows** chooses the columns and how many rows load at a time. **Download as spreadsheet (CSV)** exports what you see: the same search, filters and kind, with lookups and connections together and one row for each entry.
 
-4. Protection features that failed leave a line here: a block that went wrong (once an hour), threat watching that stopped, or threat watching that NopeWarden switched off for using too much of the machine. Your traffic is not held up in any of these cases.
-5. Opening and closing the terminal, switching it on or off, restarting a service and saving a support bundle are recorded here too, under Diagnostics.
-6. NopeWarden's own health checks are hidden. To see them, turn on **Show NopeWarden's own checks**.
+### Opening a row
+Click a row (or press Enter) for the rest: why, the rule, the host and address, the country, the networks and the times.
+- A DNS lookup shows **Response** (the code and what it means), **Answer time** and **Answered by**. That is an upstream DNS server, or NopeWarden itself for a name from memory, one of your own names or a blocked name.
+- A connection shows **Outcome** (Completed, Reset, Timed out, Still open or Blocked), **Sent** and **Received** (bytes each way), **Lasted**, and the **Rule** that decided it, with how many connections that rule has matched so far. A blocked connection shows only the outcome and the rule.
+- **Block this** and **Allow this** make a rule for exactly that traffic.
+- For a name, use **Allow this site** on a blocked one or **Block this site** on an answered one. A window asks **What** (just that name and what is under it, or the whole site) and **Who** (**Everyone**, only that device, its network or its profile, or any networks, profiles and devices you choose). It says what stops the site now, warns you when the list is about threats, and will not go ahead when a block you wrote on purpose already covers it. The result is a named exception or block on the Blocks page marked as added from Logs. It waits on Review like other DNS changes, and **Undo** in the message takes it away again. An allow only lets through names that a block list stops.
+
+Outcome, bytes and time are read from the router's list of live connections every few seconds, so a very short connection shows "under 10 seconds". They cover IPv4 only, and connections logged before 0.9.4.26 show "not known yet". Only the first packet of each connection is recorded, and a flood is capped.
+
+**Recording & storage** chooses what is recorded. How long each kind is kept, and the size limit, are on the Storage tab in Settings.
+
+### Protection features that failed
+These leave a line here: a block that went wrong (at most once an hour), threat watching that stopped, or threat watching that NopeWarden switched off because it was using too much of the machine. Your traffic is never held up in any of these cases. Opening and closing the terminal, switching it on or off, restarting a service and saving a support bundle are recorded here too.
 
 ## Reports
-The **Reports** tab turns what NopeWarden recorded into something you can read, print or send. Choose a subject (Internet links, DNS, Threats or Firewall connections), a period (24 h up to 1 year, or **Exact dates**), how to group the results, and any filters, then choose **Show report**. You get a summary, a chart and the rows.
+The **Reports** tab turns what NopeWarden recorded into something you can read, print or send.
+
+![The Reports tab, shown with example data](img/reports.png)
+
+Choose a subject (Internet links, DNS, Threats or Firewall connections), a period (24 h up to 1 year, or **Exact dates**), how to group the results, and any filters. Then choose **Show report**. You get a summary, a chart and the rows.
 
 1. Internet links reports uptime, time down, delay, loss and each drop for one connection or all of them. **ISP report: last 30 days** makes the version to send your provider.
 2. Name a report and choose **Save report** to keep it under **Saved reports**. Run it again later for fresh numbers.
 3. **Print**, **PDF**, **CSV**, **Excel** and **JSON** are on the report. The PDF starts with the NopeWarden shield and name, then the title, period, filters, when and where it was made, a summary, a chart and the table, with page numbers. Excel puts the summary and the rows on separate sheets.
 4. On Events, **Make a report from this search** carries your search over. In Diagnostics, Tools, **Report on this link** opens a link report ready to read.
 
-If NopeWarden has not been recording that far back, the report says from which date it has data and links to where **Keep chart history for** is set. Reports are never emailed; open them here when you want them.
+If NopeWarden has not been recording that far back, the report says from which date it has data and links to where **Keep chart history for** is set. Reports are never emailed. Open them here when you want them.
+
+## Common tasks
+1. Find out why something was blocked: search for the device or site, click the row, read **Why**.
+2. Block a destination: click its row, then **Block this**. For a name, press **Block this site** or **Allow this site**.
+3. See which devices use a VPN: look at **Out through**. For a DNS lookup that is the connection NopeWarden itself used to ask the DNS server. A lookup answered from memory shows none.
 
 ## Example
 Search for a game console, set the range to 1 h, and click a blocked row. **Allow this** makes a rule for exactly that traffic.
 
 ## If something goes wrong
-If nothing is recorded, check **Recording & storage**; allowed and blocked connections can be switched off separately. Only the first packet of each connection is recorded, and a flood is capped.
+If nothing is recorded, check **Recording & storage**. Allowed and blocked connections can be switched off separately.

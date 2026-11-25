@@ -1,6 +1,16 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.60',
+    title: 'Live device speeds, charts with scales, an easier way to set your place',
+    items: [
+      'Devices & access: the Activity column now updates every second while the page is open, so you can see what a device is really doing right now, which helps when you are tracking down a slow connection. Three readings are averaged so small numbers do not jump around. Nothing extra is read when the page is closed or the browser tab is hidden.',
+      'Overview: the small charts on the Devices, DNS, DHCP and Protection cards now show a scale on the left and the time along the bottom, so you can tell how big the numbers are and when they happened.',
+      'Settings, General: Your place on the map has four clear ways in (Search, Country, Coordinates, Click the map). After you press Find the matches show right under the box and the map shows where each one is. Pick one and a pin labelled Your place appears; the Save button tells you exactly what it will save. The place you saved earlier stays visible as a small grey ring so the two are never confused. United States is first in the country list.',
+      'Help and screenshots: every help page was read again and reworded where it was stiff or out of date, and the screenshots were retaken to match the console as it is now.',
+    ],
+  },
+  {
     version: '0.9.4.59',
     title: 'A tidier Overview, one place for tests, and the management port on the map',
     items: [

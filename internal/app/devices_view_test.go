@@ -128,3 +128,26 @@ func TestDeviceIconsAndDetails(t *testing.T) {
 		t.Fatal("unknown pref key accepted")
 	}
 }
+
+func TestDeviceSpeedIsOneSecondAndTotalsStayRight(t *testing.T) {
+	c, _, _ := siteBox(t, "192.168.1.1/24")
+	a := c.app
+	now := time.Now()
+	k := fw.AcctPrefix + "down:192.168.1.150"
+	a.sampleDevices(map[string]fw.Counter{k: {Bytes: 0}}, now)
+	// Readings one second apart give a real one-second speed (not stretched over a longer time).
+	a.sampleDevices(map[string]fw.Counter{k: {Bytes: 125000}}, now.Add(time.Second))
+	if r := a.devRates()["192.168.1.150"]; r.Down != 125000 {
+		t.Fatalf("rate %+v", r)
+	}
+	// Several quick readings still add up to the right total.
+	a.sampleDevices(map[string]fw.Counter{k: {Bytes: 175000}}, now.Add(2*time.Second))
+	if r := a.devRates()["192.168.1.150"]; r.Down != 50000 {
+		t.Fatalf("rate %+v", r)
+	}
+	// The rates-only request answers in bits per second.
+	rc, m, raw := c.call("GET", "/api/devices/rates", nil)
+	if rc != 200 || m["rates"] == nil {
+		t.Fatalf("%d %s", rc, raw)
+	}
+}

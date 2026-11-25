@@ -117,10 +117,10 @@ func (a *App) sampleDevices(cur map[string]fw.Counter, now time.Time) {
 		r := rates[ip]
 		x := deltas[a.macForIP(ip, arp)]
 		if dir == "up" {
-			r.Up += float64(d) / maxF(dt, 1)
+			r.Up += float64(d) / maxF(dt, 0.5)
 			x[0] += int64(d)
 		} else {
-			r.Down += float64(d) / maxF(dt, 1)
+			r.Down += float64(d) / maxF(dt, 0.5)
 			x[1] += int64(d)
 		}
 		rates[ip] = r

@@ -34,7 +34,7 @@ Send some traffic through a VPN by rule: everything from certain devices, or onl
 
 ![The routes tab with an example route](img/routes.png)
 
-The picture is an example; yours will show your own routes and connections.
+The picture uses a made-up route. Yours will show your own routes and connections.
 
 - **Your routes**: the first route that matches is used, so put the more specific ones at the top with **Move up** and **Move down**. Each row has **Pause…**, **Turn off**, **Edit** and **Remove**; every route also says in words what it does and whether it is working, paused or on a schedule. Every change is written to Admin activity.
 - **Add a route** takes a **Name**, **Send the traffic through** (a VPN, internet connections, or a connection group). Choosing **internet connections** lets you tick one or several in the order you want: the first one that is working is used, or choose to share across them. A connection kept only as a backup can be chosen on its own, **Kill switch** for a VPN, then **Who**, **Where to**, **What for** and **When**. These are the same pickers the firewall rules use, so a device, a network, a group, an address, a website or a country is chosen the same way everywhere.

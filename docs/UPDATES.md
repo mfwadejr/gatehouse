@@ -45,7 +45,7 @@ to the release. Ordinary pushes only publish the `nightly` test image; machines 
 
 ## On the machine
 
-Settings, Updates. One button updates NopeWarden and the operating system underneath it together.
+The Updates page. One button updates NopeWarden and the operating system underneath it together.
 Press Check now, or let it check twice a day. When something is ready the card lists it ("NopeWarden
 0.3.0" and "12 system updates"); press Update now. A step list shows where it is: download, check
 the signature, save a copy of the settings, install system updates, install NopeWarden, restart,

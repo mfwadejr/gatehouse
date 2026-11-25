@@ -23,25 +23,27 @@ It is also hard to break. Every change goes live, then NopeWarden checks that yo
 
 ## What you get
 
-**Internet.** Connect through DHCP, a fixed address or PPPoE (with a VLAN tag if needed). Use failover or load sharing across several connections, name connection groups, and keep delay low with speed control that follows what your line really delivers. USB Ethernet adapters work as ports.
+**Internet.** Connect through DHCP, a fixed address or PPPoE (with a VLAN tag if needed). Use failover or load sharing across several connections, name connection groups, and keep delay low with speed control that follows what your line really delivers. Pause a connection for a while when you need to, and see live speeds for each one. USB Ethernet adapters work as ports.
 
 **Firewall.** Give each network a type (Trusted, Private, Guest, Isolated or Custom) and NopeWarden writes the rules. A grid shows who can reach whom, rules read as lines with live counters, and a card lists everything the firewall always does before any rule of yours. A protected set of rules always lets you back in.
 
-**DNS.** A fast caching resolver with its own upstream handling, ad, tracker and malware blocking, your own names, and a "why was this blocked?" lookup.
+**DNS.** A fast caching resolver with its own upstream handling, ad, tracker and malware blocking, your own names, and a "why was this blocked?" lookup. See a lookup in the logs and allow or block that site from there with one window.
 
 **DHCP.** Addresses for each of your networks, reservations, automatic names for devices, and a warning before a pool fills up.
 
-**Profiles and devices.** Group devices by what they should be able to do (Kids, Guests, Smart home, Work) and give each profile a filtering level, safe search and off-hours. Rename devices, give them icons, pause their internet, and see everything on a map.
+**Profiles and devices.** Group devices by what they should be able to do (Kids, Guests, Smart home, Work) and give each profile a filtering level, safe search and off-hours. Rename devices, give them icons, pause their internet, see everything on a map, and watch what each device is doing right now, updated every second.
 
 **Protection and threats.** A security check that says what to fix and why, blocks for apps, categories and websites, and optional threat watching for infected devices, break-in attempts and probing, reported in plain words.
 
 **VPN.** WireGuard and OpenVPN, with UPnP when you want it.
 
-**Logs and diagnostics.** Searchable events, a map of where connections go, data use per device, and a Diagnostics page that shows how NopeWarden itself is running, with a support bundle that hides passwords and keys.
+**Logs and diagnostics.** Searchable events, a map of where connections go, data use per device, reports you can print or save as PDF, and a Diagnostics page that shows how NopeWarden itself is running, with a support bundle that hides passwords and keys.
+
+**Watching the hardware.** Drive health with early warnings, such as sectors moved to spare and failed self-tests, plus a battery backup (UPS) watcher that can shut the machine down cleanly before the battery runs out. A short daily summary sits at the end of the Overview status line.
 
 **Updates.** One schedule for every job, signed releases only, and a Review page that lists every waiting change in words before it goes live.
 
-**Sign-in.** Two-step sign-in is required for the administrator.
+**Sign-in.** Two-step sign-in is available for every account, and can be required for all of them.
 
 <table>
   <tr>
@@ -54,7 +56,7 @@ It is also hard to break. Every change goes live, then NopeWarden checks that yo
   </tr>
 </table>
 
-The pictures come from a demo console with made-up data.
+The pictures come from a demo console with made-up data. The help for every page has more.
 
 ## Try it
 

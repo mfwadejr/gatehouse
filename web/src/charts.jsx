@@ -54,7 +54,7 @@ function nearest(pts, t) {
 }
 
 // series: [{ key, name, color, pts: [[unixSeconds, value], ...] }]. kind: 'bits' | 'ms' | 'count' | 'percent'.
-export function Chart({ series, from, to, kind = 'count', unit = '', height = 200, compact = false, marks = [], filled = true, dots = false, empty = 'Collecting data. The first points appear within a minute.', label }) {
+export function Chart({ series, from, to, kind = 'count', unit = '', height = 200, compact = false, axes = false, marks = [], filled = true, dots = false, empty = 'Collecting data. The first points appear within a minute.', label }) {
   const [hover, setHover] = useState(null);
   const H = 100;
   const all = series.flatMap((s) => s.pts.map((p) => p[1]));
@@ -83,7 +83,8 @@ export function Chart({ series, from, to, kind = 'count', unit = '', height = 20
   }
   const has = rawMax > 0 || all.length > 0;
   const span = to - from;
-  const xl = [0, 1, 2, 3, 4].map((k) => (k === 4 ? 'now' : k === 0 ? `${agoText(span)} ago` : agoText(span * (1 - k / 4))));
+  const clock = (t) => new Date(t * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const xl = compact && axes ? [clock(from), clock(from + (to - from) / 2), 'now'] : [0, 1, 2, 3, 4].map((k) => (k === 4 ? 'now' : k === 0 ? `${agoText(span)} ago` : agoText(span * (1 - k / 4))));
   const move = (e) => {
     const r = e.currentTarget.getBoundingClientRect();
     setHover(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)));
@@ -93,7 +94,7 @@ export function Chart({ series, from, to, kind = 'count', unit = '', height = 20
   const showVal = (v) => (kind === 'bits' ? fmtBits(v) : kind === 'ms' ? `${round(v)} ms` : kind === 'percent' ? `${round(v)} %` : `${round(v).toLocaleString()}${unit ? ` ${unit}` : ''}`);
   const when = (p) => (span > 3 * 86400 ? new Date(p[0] * 1000).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : new Date(p[0] * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: span < 1800 ? '2-digit' : undefined }));
   return (
-    <figure className={`ch2 ${compact ? 'compact' : ''}`} style={{ margin: 0 }}>
+    <figure className={`ch2 ${compact ? 'compact' : ''} ${compact && axes ? 'axes' : ''}`} style={{ margin: 0 }}>
       {!compact && <div className="ch2-unit small muted">{u}</div>}
       {!compact && series.some((x) => x.name) && (
         <div className="ch2-legend small" aria-live="off">
@@ -109,14 +110,14 @@ export function Chart({ series, from, to, kind = 'count', unit = '', height = 20
         </div>
       )}
       <div className="ch2-body">
-        {!compact && (
+        {(!compact || axes) && (
           <div className="ch2-y small muted" aria-hidden="true" style={{ height }}>
-            {[1, 0.75, 0.5, 0.25, 0].map((f) => <span key={f}>{round(top * f).toLocaleString()}</span>)}
+            {(compact ? [1, 0.5, 0] : [1, 0.75, 0.5, 0.25, 0]).map((f) => <span key={f}>{round(top * f).toLocaleString()}</span>)}
           </div>
         )}
         <div className="ch2-plot" style={{ height }} onMouseMove={move} onMouseLeave={() => setHover(null)} role="img" aria-label={label || `Chart in ${u}`}>
           <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-            {[0, 25, 50, 75, 100].filter(() => !compact).map((y) => <line key={y} x1="0" x2={W} y1={y} y2={y} className="gl" vectorEffect="non-scaling-stroke" />)}
+            {(compact ? (axes ? [0, 50, 100] : []) : [0, 25, 50, 75, 100]).map((y) => <line key={y} x1="0" x2={W} y1={y} y2={y} className="gl" vectorEffect="non-scaling-stroke" />)}
             {holes.map(([a, b], i) => <line key={`h${i}`} x1={X(a)} x2={X(b)} y1="100" y2="100" className="hole" vectorEffect="non-scaling-stroke"><title>Not recorded</title></line>)}
             {paths.map(({ s, segs }) => segs.map((d, i) => (
               <g key={`${s.key}${i}`} style={{ '--c': s.color }}>
@@ -142,7 +143,7 @@ export function Chart({ series, from, to, kind = 'count', unit = '', height = 20
           )}
         </div>
       </div>
-      {!compact && <div className="ch2-x small muted" aria-hidden="true">{xl.map((s, i) => <span key={i}>{s}</span>)}</div>}
+      {(!compact || axes) && <div className="ch2-x small muted" aria-hidden="true">{xl.map((s, i) => <span key={i}>{s}</span>)}</div>}
     </figure>
   );
 }

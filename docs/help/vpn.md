@@ -5,7 +5,7 @@ Send some devices through a VPN provider, let your phone reach home from anywher
 
 ![The vpn page, shown with example data](img/vpn.png)
 
-The picture is an example from a new, empty box; yours will show your own devices and numbers.
+The picture uses made-up devices and numbers. Yours will show your own.
 
 ## What is on the page
 - **Add a VPN** starts a guided choice: use a provider's file, let devices reach home, or **Join two sites**.

@@ -185,6 +185,16 @@ func (a *App) registerDeviceViewRoutes() {
 		api.JSON(w, 200, map[string]any{"devices": rows, "icons": devices.Icons})
 	})
 
+	// Only the speeds, fresh to within a second, for the Activity column while the page is open.
+	s.Handle("GET /api/devices/rates", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		a.sampleHitsIfOlder(900 * time.Millisecond)
+		out := map[string][2]float64{}
+		for ip, v := range a.devRates() {
+			out[ip] = [2]float64{v.Down * 8, v.Up * 8}
+		}
+		api.JSON(w, 200, map[string]any{"rates": out})
+	})
+
 	// Uploaded icons.
 	s.HandleAdmin("POST /api/device-icons", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		var in struct {

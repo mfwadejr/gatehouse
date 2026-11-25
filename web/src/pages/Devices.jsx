@@ -200,7 +200,38 @@ export default function Devices({ me }) {
   const colIds = chosen || (hasVia ? [...DEFAULT_COLS, 'via'] : DEFAULT_COLS);
   const per = rowsPer || prefs?.rows || 15;
   const savePrefs = (c, r) => put('/api/prefs/devices', { cols: c, rows: r }).catch(() => {});
-  const all = data?.devices || [];
+  // Speeds, once a second while this page is showing: three readings are averaged so a small
+  // number does not flicker. The list itself refreshes more slowly.
+  const [live, setLive] = useState({});
+  const wantsLive = tab === 'devices' && (view === 'map' || colIds.includes('activity'));
+  useEffect(() => {
+    if (!wantsLive) return undefined;
+    const recent = {};
+    let stop = false;
+    const tick = async () => {
+      if (document.hidden) return;
+      try {
+        const r = await get('/api/devices/rates');
+        if (stop) return;
+        const next = {};
+        for (const [ip, v] of Object.entries(r.rates || {})) {
+          const h = [...(recent[ip] || []), v].slice(-3);
+          recent[ip] = h;
+          next[ip] = [h.reduce((a, x) => a + x[0], 0) / h.length, h.reduce((a, x) => a + x[1], 0) / h.length];
+        }
+        for (const ip of Object.keys(recent)) if (!r.rates?.[ip]) delete recent[ip];
+        setLive(next);
+      } catch { /* the slower refresh still runs */ }
+    };
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => { stop = true; clearInterval(t); };
+  }, [wantsLive]);
+  const all = useMemo(() => (data?.devices || []).map((d) => {
+    if (!d.online) return d;
+    const v = live[d.ip];
+    return v ? { ...d, down_bps: v[0], up_bps: v[1] } : { ...d, down_bps: wantsLive && Object.keys(live).length ? 0 : d.down_bps, up_bps: wantsLive && Object.keys(live).length ? 0 : d.up_bps };
+  }), [data, live, wantsLive]);
 
   const rows = useMemo(() => {
     const s = q.trim().toLowerCase();
