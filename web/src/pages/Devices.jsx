@@ -5,12 +5,13 @@ import { del, get, patch, post, put, useData } from '../api.js';
 import DeviceIcon, { ICON_LABELS } from '../DeviceIcon.jsx';
 import { NewDevice } from '../AddrPicker.jsx';
 import DeviceMap from './DeviceMap.jsx';
+import { Chart } from '../charts.jsx';
 import VirtualOverride from './VirtualOverride.jsx';
 import Approval from './Approval.jsx';
 import { OpenPortModal } from './Forwards.jsx';
 import Profiles, { pauseChoices, whenText } from './Profiles.jsx';
 import { WhyBody } from './Why.jsx';
-import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, Select, Spark, Tabs, ToggleRow, useAction, useToast, fmt, usePortNames } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Segmented, Select, Tabs, ToggleRow, useAction, useToast, fmt, usePortNames } from '../ui.jsx';
 
 const POLICIES = [
   { value: 'filtered', label: 'Allowed, ads and trackers filtered' },
@@ -94,7 +95,7 @@ function Details({ d, groups, sets, onClose, onSaved, onManage }) {
   const [f, setF] = useState({ name: d.name || '', group_id: d.group_id || 0, policy: d.policy || 'filtered', internet: d.internet, notes: d.notes || '' });
   const [fixIP, setFixIP] = useState('');
   const vpn = d.source === 'vpn';
-  const speed = useMemo(() => (det?.traffic?.points || []).map((p) => p.down + p.up), [det]);
+  const speed = useMemo(() => [{ key: 'speed', name: 'Speed', color: 'var(--color-chart-series-1)', pts: (det?.traffic?.points || []).map((p) => [p.t, p.down + p.up]) }], [det]);
   const save = async () => { if (await run(() => patch(`/api/devices/${d.id}`, f), 'Saved.')) { onSaved(); onClose(); } };
   const keep = (keepIt) => run(() => put(`/api/devices/${d.id}/reservation`, { keep: keepIt, ip: fixIP }), keepIt ? 'This device will always get this address.' : 'Address no longer fixed.').then(() => { reload(); onSaved(); });
   return (
@@ -143,7 +144,7 @@ function Details({ d, groups, sets, onClose, onSaved, onManage }) {
       </Field>
       {!vpn && (
         <Field label="Last 24 hours" hint={`Used today: ↓ ${bytes(d.today_down)} · ↑ ${bytes(d.today_up)}`}>
-          <Spark values={speed} width={320} height={46} fluid />
+          <Chart series={speed} from={det?.traffic?.from || 0} to={det?.traffic?.to || 1} kind="bits" height={64} compact axes label="Device speed, last 24 hours" />
         </Field>
       )}
     </Modal>

@@ -19,7 +19,12 @@ import (
 // Ensure returns paths to a certificate and key in dir, creating them if missing or if
 // the certificate expires within 30 days.
 func Ensure(dir, hostname string) (certPath, keyPath string, err error) {
-	certPath, keyPath = filepath.Join(dir, "console.crt"), filepath.Join(dir, "console.key")
+	return EnsureNamed(dir, "console", hostname)
+}
+
+// EnsureNamed is Ensure for a certificate kept under its own file name (base.crt and base.key).
+func EnsureNamed(dir, base, hostname string) (certPath, keyPath string, err error) {
+	certPath, keyPath = filepath.Join(dir, base+".crt"), filepath.Join(dir, base+".key")
 	if c, e := tls.LoadX509KeyPair(certPath, keyPath); e == nil {
 		if leaf, e := x509.ParseCertificate(c.Certificate[0]); e == nil && time.Until(leaf.NotAfter) > 30*24*time.Hour {
 			return certPath, keyPath, nil

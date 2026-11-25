@@ -1,6 +1,48 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.66',
+    title: 'Encrypted DNS for your devices',
+    items: [
+      'DNS, Servers: a new card, Encrypted DNS for your devices, lets phones and laptops ask this firewall over DNS-over-TLS (port 853) or DNS-over-HTTPS (port 8443). It is off until you turn it on, it opens only on the networks you pick and never on an internet port, and lookups still go through your lists, cache and logs. The card shows what to type on a device.',
+      'Networks: the Management port tile is smaller and says the same in fewer lines.',
+      'It makes its own certificate, which devices accept only if you install it. To use Android\u2019s Private DNS without warnings, upload a certificate your devices already trust. If a change cannot be applied the firewall puts things back.',
+    ],
+  },
+  {
+    version: '0.9.4.65',
+    title: 'Names that use a different server, and pattern rules',
+    items: [
+      'DNS, Servers: a new card, Names that use a different server, sends names ending in a domain you type (for example office.example) to a server you choose. Test says in words whether that server answers. Your own names and blocks still come first, and it waits for Review like other DNS changes.',
+      'DNS, Blocking: Always allow or always block can now take a pattern such as ads*.example.com. Try a name shows whether it would be caught, and what it would have caught in the last day. Mistakes are explained in words, a pattern that would match almost everything is refused, and each block shows how many lookups it stopped. Regular expressions are under More options for people who want them.',
+    ],
+  },
+  {
+    version: '0.9.4.64',
+    title: 'Pause blocking, Private Relay, newly registered domains',
+    items: [
+      'DNS, Overview: Pause blocking… lets every name through for 5 minutes, 30 minutes, 1 hour or until you resume, so you can tell whether blocking is why a page will not load. It starts again by itself, shows a banner and an Overview line while paused, is written to Admin activity and lasts through a restart.',
+      'DNS, Settings: you can now choose how long devices remember a blocked answer (60 seconds as before). A new section, Apps that skip your DNS, holds the browser switch and a new Block iCloud Private Relay switch, off until you turn it on.',
+      'DNS, Blocking: Add list now offers Newly registered domains (7 days) as a one-tap choice. It is off until you add it, and it says plainly that it is large and can catch honest new sites.',
+    ],
+  },
+  {
+    version: '0.9.4.63',
+    title: 'Overview cards that line up, scales on more charts',
+    items: [
+      'Overview: the Devices, DNS, DHCP and Protection cards now line up. The numbers sit at the top and the chart, caption and Open link sit along the bottom, however much text a card has. The "new today" and "without a name" buttons on Devices are now links in the line under the number, and the DHCP address bar became a plain line ("7 of 151 addresses used on Home").',
+      'DNS: the small charts on the five DNS cards now show a scale on the left and times along the bottom, and so does the 24-hour chart in a device\'s details on Devices & access.',
+      'DNS, Overview: the Lookups, 24 hours card shows the real number again. 0.9.4.61 was published after 0.9.4.62 and put the old version of this card back, so this release carries the fix forward.',
+    ],
+  },
+  {
+    version: '0.9.4.62',
+    title: 'DNS page lookups count fixed',
+    items: [
+      'DNS, Overview: the Lookups, 24 hours card showed a dash instead of the number of lookups. It now shows the real count and refreshes every 30 seconds.',
+    ],
+  },
+  {
     version: '0.9.4.61',
     title: 'More pictures in the help',
     items: [

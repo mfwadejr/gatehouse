@@ -167,11 +167,13 @@ function Tile({ title, pill, tone, big, unit, sub, children, chart, to, caption 
     <Card className="tile ov-tile">
       <div className="spread"><span className="lbl">{title}</span>{pill && <Pill tone={tone}>{pill}</Pill>}</div>
       <div><span className="val">{big}</span>{unit && <span className="unit">{unit}</span>}</div>
-      {sub && <div className="small muted">{sub}</div>}
+      {sub && <div className="small muted ov-sub">{sub}</div>}
       {children}
-      {chart}
-      {caption && <div className="small muted">{caption}</div>}
-      {to && <button type="button" className="link small leftalign" onClick={() => go(to)}>Open →</button>}
+      <div className="ov-bottom">
+        {chart}
+        {caption && <div className="small muted">{caption}</div>}
+        {to && <button type="button" className="link small leftalign" onClick={() => go(to)}>Open →</button>}
+      </div>
     </Card>
   );
 }
@@ -180,17 +182,17 @@ const miniSeries = (h, key, scale = 1) => [{ key, name: '', color: 'var(--color-
 
 function DevicesTile({ d, h }) {
   const online = d?.online ?? 0;
+  const sub = d ? (
+    <>
+      {d.wired} wired{d.vpn ? ` · ${d.vpn} VPN` : ''}
+      {d.new > 0 && <> · <button type="button" className="sublink warn" onClick={() => go('devices')}>{d.new} new today</button></>}
+      {d.unnamed > 0 && <> · <button type="button" className="sublink" onClick={() => go('devices')}>{d.unnamed} unnamed</button></>}
+    </>
+  ) : '';
   return (
-    <Tile title="Devices" pill={`${online} online`} tone="good" big={<CountUp value={online} />} to="devices"
-      sub={d ? `${d.wired} wired${d.vpn ? ` · ${d.vpn} VPN` : ''}` : ''}
+    <Tile title="Devices" pill={`${online} online`} tone="good" big={<CountUp value={online} />} to="devices" sub={sub}
       chart={<Chart series={miniSeries(h, 'devices.online')} from={h?.from || 0} to={h?.to || 1} unit="devices" height={56} compact axes label="Devices online, last hour" />}
-      caption="Devices online · last hour">
-      <div className="inline mt2">
-        {d?.new > 0 && <button type="button" className="pillbtn warn" onClick={() => go('devices')}>{d.new} new today</button>}
-        {d?.unnamed > 0 && <button type="button" className="pillbtn" onClick={() => go('devices')}>{d.unnamed} without a name</button>}
-        {d && !d.new && !d.unnamed && <span className="small muted">Everything on the list has a name.</span>}
-      </div>
-    </Tile>
+      caption="Devices online · last hour" />
   );
 }
 
@@ -214,24 +216,15 @@ function DhcpTile({ util, h }) {
   const list = util || [];
   const used = list.reduce((a, s) => a + s.active, 0), size = list.reduce((a, s) => a + s.size, 0);
   const full = list.filter((s) => s.size && s.active / s.size > 0.8);
+  const busiest = [...list].sort((x, y) => (y.size ? y.active / y.size : 0) - (x.size ? x.active / x.size : 0))[0];
+  const sub = !busiest ? '' : list.length === 1
+    ? `${busiest.active} of ${busiest.size} addresses used on ${busiest.name}`
+    : <><button type="button" className="sublink" onClick={() => go('dhcp')}>{list.length} networks hand out addresses. Busiest: {busiest.name}, {busiest.active} of {busiest.size}</button></>;
   return (
     <Tile title="DHCP" pill={!list.length ? 'No scope' : full.length ? `${full[0].name} nearly full` : 'Serving'} tone={!list.length ? 'warn' : full.length ? 'warn' : 'good'}
-      big={<CountUp value={used} />} unit={size ? `of ${size} addresses` : 'leases'} to="dhcp"
+      big={<CountUp value={used} />} unit={size ? `of ${size} addresses` : 'leases'} to="dhcp" sub={sub}
       chart={<Chart series={miniSeries(h, 'dhcp.used')} from={h?.from || 0} to={h?.to || 1} unit="addresses" height={56} compact axes label="Addresses in use, last hour" />}
-      caption="Addresses in use · last hour">
-      <div className="ov-scopes">
-        {list.map((s) => {
-          const p = s.size ? (100 * s.active) / s.size : 0;
-          return (
-            <div className="ov-sc" key={s.scope_id}>
-              <span>{s.name}</span>
-              <div className={`bar ${p > 80 ? 'warnbar' : ''}`}><i style={{ width: `${Math.min(100, p)}%` }} /></div>
-              <span className="num small">{s.active} of {s.size}</span>
-            </div>
-          );
-        })}
-      </div>
-    </Tile>
+      caption="Addresses in use · last hour" />
   );
 }
 

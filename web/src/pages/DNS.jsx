@@ -3,13 +3,42 @@ import { useHashTab } from '../hashtab.js';
 import ResolverCard from './Resolver.jsx';
 import { ScheduleEditor } from '../ScheduleEditor.jsx';
 import EncryptedDns from './EncryptedDns.jsx';
+import EncryptedDnsServer from './EncryptedDnsServer.jsx';
 import ForcedDns from './ForcedDns.jsx';
 import React, { useState, useEffect } from 'react';
 import { del, get, patch, post, put, useData, useStream } from '../api.js';
 import { go } from '../App.jsx';
 import { Chart, StackedArea } from '../charts.jsx';
 import { usePeriod } from '../period.js';
-import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, Spark, Trend, Tabs, ToggleRow, useAction, useUndoDelete, fmt, Bar, Limited , useDelayedDelete } from '../ui.jsx';
+import { PauseMenu } from '../policykit.jsx';
+import { Button, Card, Empty, Field, Input, Modal, NumberInput, Note, Page, Pill, Segmented, Select, Trend, Tabs, ToggleRow, useAction, useUndoDelete, fmt, Bar, Limited , useDelayedDelete } from '../ui.jsx';
+
+const BLOCK_PAUSES = [{ m: 5, t: '5 minutes' }, { m: 30, t: '30 minutes' }, { m: 60, t: '1 hour' }, { m: -1, t: 'Until I resume' }];
+
+// Pausing blocking is for the moment a page will not load and you want to know whether blocking is the reason.
+function PauseBar({ pause, onChange }) {
+  const [run, busy] = useAction();
+  const on = !!pause?.paused;
+  const until = on ? (pause.until || Date.now() / 1000 + 10 * 365 * 86400) : 0;
+  const act = (m) => run(async () => {
+    const r = m === 0 ? await post('/api/dns/resume', {}) : await post('/api/dns/pause', { minutes: m < 0 ? 0 : m });
+    onChange(r);
+  }, m === 0 ? 'Blocking is back on.' : 'Blocking is paused.');
+  if (on) {
+    return (
+      <Note tone="warn" title="Blocking is paused">
+        {pause.until ? `Every name is being let through until ${new Date(pause.until * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}. Blocking starts again by itself.` : 'Every name is being let through until you resume.'}
+        {' '}<Button small kind="primary" disabled={busy} onClick={() => act(0)}>Resume now</Button>
+      </Note>
+    );
+  }
+  return (
+    <div className="inline" style={{ justifyContent: 'flex-end' }}>
+      <span className="small muted">Page not loading? Switch blocking off for a few minutes to see whether blocking is the reason.</span>
+      <PauseMenu until={until} name="blocking" label="Pause blocking…" choices={BLOCK_PAUSES} disabled={busy} onPause={(m) => act(m)} />
+    </div>
+  );
+}
 
 function Overview() {
   const { data, setData } = useData('/api/dns/summary', { every: 10000 });
@@ -18,6 +47,7 @@ function Overview() {
   const [range, setRange, rangeOptions] = usePeriod('dns', { live: true });
   const { data: h } = useData(`/api/overview/history?range=${range}`, { every: 30000, enabled: range !== 'live' });
   const { data: d24 } = useData('/api/overview/history?range=24h', { every: 60000 });
+  const { data: day } = useData('/api/dns/top?hours=24', { every: 30000 });
   const [feed, setFeed] = useState([]);
   useStream(['dns.live'], (t, p) => {
     if (!Array.isArray(p)) return;
@@ -47,7 +77,8 @@ function Overview() {
     return [['answered', 'Answered', 'var(--color-chart-series-1)', rest(tot, bb, cc)], ['cached', 'From memory', 'var(--color-chart-series-3)', cc], ['blocked', 'Blocked', 'var(--color-status-bad)', bb]].map(([key, name, color, values]) => ({ key, name, color, values }));
   })();
   const SPAN = { '1h': 3600, '24h': 86400, '7d': 604800 }[range] || 60;
-  const trend = (key) => vals(d24, key).slice(-96);
+  const mini = (key, color = 'var(--color-chart-series-1)') => [{ key, name: '', color, pts: d24?.series?.[key] || [] }];
+  const miniChart = (key, unit, label, opts = {}) => <Chart series={mini(key, opts.color)} from={d24?.from || 0} to={d24?.to || 1} unit={unit} kind={opts.kind} height={56} compact axes label={label} />;
   const msSeries = [{ key: 'dns.ms', name: 'Answer time', color: 'var(--color-chart-series-4)', pts: h?.series?.['dns.ms'] || d24?.series?.['dns.ms'] || [] }];
   const msWindow = h?.series?.['dns.ms'] ? h : d24;
   return (
@@ -55,11 +86,12 @@ function Overview() {
       {data && data.lists_enabled > 0 && !data.blocking_active && (
         <Note tone="warn" title="Blocking is not active yet">Your blocklists have not downloaded yet, so nothing is being blocked. NopeWarden keeps trying and starts blocking as soon as one arrives. The Blocklists tab shows how it is going.</Note>
       )}
+      <PauseBar pause={data?.pause} onChange={(p) => setData((d) => (d ? { ...d, pause: p } : d))} />
       <section className="dns-tiles">
-        <button type="button" className="card tile tilebtn" onClick={() => { window.location.hash = '#/logs'; }}><span className="lbl">Lookups, 24 hours</span><div><span className="val">{top ? fmt.n(top.total) : '–'}</span></div><div className="tspark"><Spark values={trend('dns.qps')} fluid /></div><span className="foot">{fmt.d1(st?.qps)} a second right now</span></button>
-        <button type="button" className="card tile tilebtn" onClick={() => { window.location.hash = '#/logs'; }}><span className="lbl">Blocked</span><div><span className="val">{fmt.d1(st?.blocked_pct)}</span><span className="unit">%</span></div><div className="tspark"><Spark values={trend('dns.blocked')} fluid tone="bad" /></div><span className="foot">{total > 0 && !(st?.blocked_pct > 0) ? 'Nothing blocked in the last hour' : `${fmt.n(st?.outcomes?.blocked || 0)} blocked in the last hour`} · {fmt.n(data?.unique_blocked ?? data?.blocked_entries)} names on your lists</span></button>
-        <div className="card tile"><span className="lbl">Answered from memory</span><div><span className="val">{fmt.d1(st?.cached_pct)}</span><span className="unit">%</span></div><div className="tspark"><Spark values={trend('dns.cached')} fluid /></div><span className="foot">{fmt.n(st?.cache_size)} saved answers</span></div>
-        <div className="card tile"><span className="lbl">Response time</span><div><span className="val">{fmt.d1(st?.avg_ms)}</span><span className="unit">ms</span></div><div className="tspark"><Spark values={trend('dns.ms')} fluid /></div><span className="foot">95% under {fmt.d1(st?.p95_ms)} ms</span></div>
+        <button type="button" className="card tile tilebtn" onClick={() => { window.location.hash = '#/logs'; }}><span className="lbl">Lookups, 24 hours</span><div><span className="val">{day ? fmt.n(day.total) : '–'}</span></div><div className="tspark">{miniChart('dns.qps', 'lookups/s', 'Lookups per second, last 24 hours')}</div><span className="foot">{fmt.d1(st?.qps)} a second right now</span></button>
+        <button type="button" className="card tile tilebtn" onClick={() => { window.location.hash = '#/logs'; }}><span className="lbl">Blocked</span><div><span className="val">{fmt.d1(st?.blocked_pct)}</span><span className="unit">%</span></div><div className="tspark">{miniChart('dns.blocked', 'blocked/s', 'Blocked lookups per second, last 24 hours', { color: 'var(--color-status-bad)' })}</div><span className="foot">{total > 0 && !(st?.blocked_pct > 0) ? 'Nothing blocked in the last hour' : `${fmt.n(st?.outcomes?.blocked || 0)} blocked in the last hour`} · {fmt.n(data?.unique_blocked ?? data?.blocked_entries)} names on your lists</span></button>
+        <div className="card tile"><span className="lbl">Answered from memory</span><div><span className="val">{fmt.d1(st?.cached_pct)}</span><span className="unit">%</span></div><div className="tspark">{miniChart('dns.cached', 'from memory/s', 'Answers from memory per second, last 24 hours')}</div><span className="foot">{fmt.n(st?.cache_size)} saved answers</span></div>
+        <div className="card tile"><span className="lbl">Response time</span><div><span className="val">{fmt.d1(st?.avg_ms)}</span><span className="unit">ms</span></div><div className="tspark">{miniChart('dns.ms', 'ms', 'Response time, last 24 hours', { kind: 'ms' })}</div><span className="foot">95% under {fmt.d1(st?.p95_ms)} ms</span></div>
         <button type="button" className="card tile tilebtn" onClick={() => { window.location.hash = '#/dns/servers'; }}><span className="lbl">Upstream servers</span><div><span className="val">{working}</span><span className="unit">of {list.length} working</span></div><span className="foot"><i className={`sdot ${upTone}`} aria-hidden="true" /> {slow ? `${slow} slow` : upTone === 'bad' ? 'None answering' : 'All answering normally'}</span></button>
       </section>
       <Card title="Lookups over time" desc={range === 'live' ? 'Lookups per second, last minute, split by how each was answered' : 'Lookups per second, averaged over each period, split by how each was answered'}
@@ -176,6 +208,83 @@ function Activity() {
   );
 }
 
+// Shows, before a pattern is saved, whether it is written correctly and what it would catch.
+function PatternTry({ rule, setRule }) {
+  const [name, setName] = useState('');
+  const [res, setRes] = useState(null);
+  useEffect(() => {
+    if (!rule.domain) { setRes(null); return undefined; }
+    const h = setTimeout(() => { post('/api/dns/rules/try', { kind: rule.kind, pattern: rule.domain, name }).then(setRes).catch(() => setRes(null)); }, 350);
+    return () => clearTimeout(h);
+  }, [rule.domain, rule.kind, name]);
+  return (
+    <div className="stack gap1">
+      <p className="small muted" style={{ margin: 0 }}>
+        {rule.kind === 're'
+          ? 'A regular expression is matched against the whole name. Only use this if you know them.'
+          : 'A pattern is matched against the whole name. * stands for any run of letters, digits, dots and dashes, and ? for one of them. ads*.example.com catches ads1.example.com but not www.example.com.'}
+      </p>
+      <details>
+        <summary className="small">More options</summary>
+        <div className="small" style={{ marginTop: 'var(--space-2)' }}>
+          <ToggleRow title="Use a regular expression instead" desc="For people who already know regular expressions. They are checked for mistakes before they are saved." checked={rule.kind === 're'} onChange={(v) => setRule({ ...rule, kind: v ? 're' : 'glob' })} />
+        </div>
+      </details>
+      <div className="inline">
+        <div style={{ flex: '1 1 14rem' }}><Input value={name} onChange={setName} aria-label="Try a name" placeholder="Try a name, such as ads1.example.com" /></div>
+      </div>
+      {res?.error && <div className="small" style={{ color: 'var(--color-status-bad)' }}>{res.error}.</div>}
+      {res && !res.error && (
+        <div className="small muted">
+          {name && <div>{res.name_matches ? <b>That name would be caught.</b> : 'That name would not be caught.'}</div>}
+          {res.recent?.length > 0
+            ? <div>In the last day this would have caught: {res.recent.join(', ')}{res.more ? ` and ${res.more} more` : ''}.</div>
+            : <div>It would not have caught anything asked in the last day.</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Names that only one server knows (an office network, say) are asked of that server.
+function DifferentServers() {
+  const { data, reload } = useData('/api/dns/forwards');
+  const [f, setF] = useState({ domain: '', server: '' });
+  const [res, setRes] = useState({});
+  const [run, busy] = useAction();
+  const rules = data?.rules || [];
+  const save = (next) => run(() => put('/api/dns/forwards', { rules: next }), 'Saved.').then((ok) => { if (ok !== false) reload(); return ok; });
+  const test = async (r) => {
+    const out = await run(() => post('/api/dns/forwards/test', { domain: r.domain, servers: [r.servers[0]] }));
+    if (out) setRes((x) => ({ ...x, [r.domain]: out }));
+  };
+  return (
+    <Card title="Names that use a different server" desc="For names only one server knows, such as an office network. Names ending in the domain you type are asked of that server instead of your usual ones. Your own names and your blocks still come first.">
+      <div className="inline">
+        <div style={{ flex: '1 1 12rem' }}><Input value={f.domain} onChange={(v) => setF({ ...f, domain: v })} aria-label="Domain" placeholder="office.example" /></div>
+        <div style={{ flex: '1 1 10rem' }}><Input value={f.server} onChange={(v) => setF({ ...f, server: v })} aria-label="Address of the server" placeholder="10.0.0.2" /></div>
+        <Button kind="primary" disabled={busy || !f.domain || !f.server} onClick={() => save([...rules, { domain: f.domain, servers: [f.server] }]).then((ok) => { if (ok !== false) setF({ domain: '', server: '' }); })}>Add</Button>
+      </div>
+      <div className="list">
+        {rules.map((r) => (
+          <div className="item startalign" key={r.domain}>
+            <div>
+              <div className="name">{r.domain}</div>
+              <div className="small muted">Asked of {r.servers.join(', ')}</div>
+              {res[r.domain] && <div className="small" style={{ color: res[r.domain].ok ? 'var(--color-status-good)' : 'var(--color-status-bad)' }}>{res[r.domain].verdict}{res[r.domain].ms ? ` (${res[r.domain].ms} ms)` : ''}</div>}
+            </div>
+            <div className="actions">
+              <Button small disabled={busy} onClick={() => test(r)}>Test</Button>
+              <Button small kind="danger" icon="trash" disabled={busy} onClick={() => save(rules.filter((x) => x.domain !== r.domain))}>Remove</Button>
+            </div>
+          </div>
+        ))}
+        {!rules.length && <Empty>None. All names use your usual servers.</Empty>}
+      </div>
+    </Card>
+  );
+}
+
 // Where names are looked up: the DNS servers NopeWarden asks, encrypted DNS, and forcing devices to use it.
 function Servers() {
   const { data: ups, reload: ru } = useData('/api/dns/upstreams', { topics: ['dns.upstreams'], every: 10000 });
@@ -195,6 +304,8 @@ function Servers() {
       {(list || []).some((u) => u.id < 0)
         ? <Card title="Upstream DNS servers" desc="Not used right now."><p className="small muted" style={{ margin: 0 }}>Resolve directly is on, so NopeWarden is not asking forwarders. Your forwarders are kept and take over by themselves if Unbound stops answering. To see or change them, choose Encrypted forwarders above.</p></Card>
         : <Upstreams ups={list} reload={ru} onAdd={() => setAdd(true)} />}
+      <DifferentServers />
+      <EncryptedDnsServer />
       {add && <AddUpstream onClose={() => setAdd(false)} onSaved={ru} />}
     </>
   );
@@ -327,7 +438,7 @@ function Lists() {
   const [add, setAdd] = useState(false);
   const [run] = useAction();
   const undoDelete = useUndoDelete();
-  const [rule, setRule] = useState({ domain: '', action: 'block', note: '' });
+  const [rule, setRule] = useState({ domain: '', action: 'block', note: '', kind: '' });
   const [q, setQ] = useState('');
   const [why, setWhy] = useState(null);
   const [names, setNames] = useState(null);
@@ -357,12 +468,22 @@ function Lists() {
 
       <Card enter title="Always allow or always block" desc="Your own exceptions to names beat every list. To let something through for one device, profile or network, use Exceptions on the Protection page, Blocks tab.">
         <div className="inline">
-          <div style={{ flex: '1 1 14rem' }}><Input value={rule.domain} onChange={(v) => setRule({ ...rule, domain: v })} aria-label="Name to always allow or block" placeholder="example.com" /></div>
+          <Select aria-label="Kind of rule" value={rule.kind === 're' ? 'glob' : rule.kind} onChange={(v) => setRule({ ...rule, kind: v, domain: '' })} options={[{ value: '', label: 'A name' }, { value: 'glob', label: 'A pattern' }]} />
+          <div style={{ flex: '1 1 14rem' }}><Input value={rule.domain} onChange={(v) => setRule({ ...rule, domain: v })} aria-label={rule.kind ? 'Pattern to always allow or block' : 'Name to always allow or block'} placeholder={rule.kind === 're' ? '^track[0-9]+\\.' : rule.kind ? 'ads*.example.com' : 'example.com'} /></div>
           <Select aria-label="Allow or block" value={rule.action} onChange={(v) => setRule({ ...rule, action: v })} options={[{ value: 'block', label: 'Block' }, { value: 'allow', label: 'Allow' }]} />
-          <Button kind="primary" disabled={!rule.domain} onClick={() => run(() => post('/api/dns/rules', rule), 'Saved.').then(() => { setRule({ ...rule, domain: '' }); rr(); })}>Add</Button>
+          <Button kind="primary" disabled={!rule.domain} onClick={() => run(() => post('/api/dns/rules', rule), 'Saved.').then((ok) => { if (ok !== false) { setRule({ ...rule, domain: '' }); rr(); } })}>Add</Button>
         </div>
+        {rule.kind ? <PatternTry rule={rule} setRule={setRule} /> : <p className="small muted" style={{ margin: 0 }}>A name also covers everything under it, so youtube.com covers music.youtube.com. Choose A pattern to match many names at once.</p>}
         <div className="list">
-          {<Limited items={(rules || [])} noun="rules" render={(r) => <div className="item" key={r.id}><div className="inline"><Pill tone={r.action === 'allow' ? 'good' : 'bad'}>{r.action}</Pill><span className="name">{r.domain}</span></div><Button small kind="danger" icon="trash" onClick={() => run(() => del(`/api/dns/rules/${r.id}`)).then(rr)}>Remove</Button></div>} />}
+          {<Limited items={(rules || [])} noun="rules" render={(r) => (
+            <div className="item" key={r.id}>
+              <div>
+                <div className="inline"><Pill tone={r.action === 'allow' ? 'good' : 'bad'}>{r.action}</Pill>{r.kind !== 'name' && <Pill>{r.kind === 're' ? 'Expression' : 'Pattern'}</Pill>}<span className="name">{r.kind === 'name' ? r.domain : r.text}</span></div>
+                {r.action === 'block' && r.hits_24h > 0 && <div className="small muted">Stopped {fmt.n(r.hits_24h)} lookup{r.hits_24h === 1 ? '' : 's'} in the last day.</div>}
+              </div>
+              <Button small kind="danger" icon="trash" onClick={() => run(() => del(`/api/dns/rules/${r.id}`)).then(rr)}>Remove</Button>
+            </div>
+          )} />}
         </div>
       </Card>
 
@@ -419,15 +540,18 @@ function ListNames({ l, onClose, onAllowed }) {
 const SUGGESTED = [
   { name: 'StevenBlack unified hosts', url: 'https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts', format: 'hosts' },
   { name: 'OISD small', url: 'https://small.oisd.nl/domainswild2', format: 'domains' },
+  { name: 'Newly registered domains (7 days)', url: 'https://cdn.jsdelivr.net/gh/hagezi/nrd@latest/domains/nrd7.txt', format: 'domains', note: 'Blocks websites registered in the last 7 days, which scammers rely on. Honest new sites are caught too, so allow any you trust. It is a big list, about 3 million names and about 250 MB of memory, so check Diagnostics afterwards on a small machine.' },
 ];
 function AddList({ onClose, onSaved }) {
   const [f, setF] = useState({ name: '', url: '', text: '', format: 'domains', interval_hours: 24 });
   const [mode, setMode] = useState('url');
+  const [note, setNote] = useState('');
   const [run, busy] = useAction();
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
   return (
     <Modal title="Add a blocklist" onClose={onClose} footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy || !f.name || (mode === 'url' ? !f.url : !f.text)} onClick={async () => { if (await run(() => post('/api/dns/lists', { ...f, url: mode === 'url' ? f.url : '', text: mode === 'text' ? f.text : '' }), 'Added. Downloading now.')) { onSaved(); onClose(); } }}>Add</Button></>}>
-      <div className="inline">{SUGGESTED.map((s) => <Button small key={s.name} onClick={() => { setMode('url'); setF((x) => ({ ...x, name: s.name, url: s.url, format: s.format })); }}>{s.name}</Button>)}</div>
+      <div className="inline">{SUGGESTED.map((s) => <Button small key={s.name} onClick={() => { setMode('url'); setF((x) => ({ ...x, name: s.name, url: s.url, format: s.format })); setNote(s.note || ''); }}>{s.name}</Button>)}</div>
+      {note && <Note tone="warn" title="Before you add this one">{note}</Note>}
       <Field label="Name"><Input value={f.name} onChange={set('name')} /></Field>
       <div className="seg"><button className={mode === 'url' ? 'on' : ''} onClick={() => setMode('url')}>From a web address</button><button className={mode === 'text' ? 'on' : ''} onClick={() => setMode('text')}>Paste names</button></div>
       {mode === 'url' ? (
@@ -512,6 +636,7 @@ function SettingsTab() {
       <Field label="What to do with blocked names">
         <Select value={v.block_mode} onChange={set('block_mode')} options={[{ value: 'null', label: 'Answer with an empty address (fastest to fail)' }, { value: 'nxdomain', label: 'Say the name does not exist' }, { value: 'refused', label: 'Refuse' }]} />
       </Field>
+      <Field label="How long devices remember a blocked answer (seconds)" hint="After you allow a name, a device can take this long to try it again. Lower is quicker to notice a change. Most people never change it."><NumberInput value={v.block_ttl} onChange={set('block_ttl')} /></Field>
       <div className="formgrid">
         <Field label="Home domain" hint="Names like printer.lan are answered by NopeWarden."><Input value={v.local_domain} onChange={set('local_domain')} /></Field>
         <Field label="Queries per second per device" hint="A device asking more than this is slowed down."><NumberInput value={v.rate_limit} onChange={set('rate_limit')} /></Field>
@@ -520,7 +645,9 @@ function SettingsTab() {
         <Field label="Keep the query history for (days)"><NumberInput value={v.log_retention_days} onChange={set('log_retention_days')} /></Field>
       </div>
       <ToggleRow title="Hide device addresses in the history" desc="Stores a masked address instead of the real one." checked={v.anonymize} onChange={set('anonymize')} />
+      <h3 className="small muted" style={{ margin: 'var(--space-3) 0 0' }}>Apps that skip your DNS</h3>
       <ToggleRow title="Tell browsers to use this DNS" desc="Stops browsers from silently switching to their own encrypted DNS." checked={v.canary} onChange={set('canary')} />
+      <ToggleRow title="Block iCloud Private Relay" desc="Apple devices then tell their owner that Private Relay is off on this network, and it stops working here. Without this, Private Relay hides where those devices go from your logs and your blocks." checked={v.private_relay} onChange={set('private_relay')} />
       <div className="actions"><Button kind="primary" disabled={busy || !f} onClick={async () => { if (await run(() => put('/api/dns/settings', f), 'Saved.')) { setF(null); reload(); } }}>Save</Button></div>
     </Card>
   );

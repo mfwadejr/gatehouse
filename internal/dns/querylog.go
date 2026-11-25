@@ -260,3 +260,22 @@ func (q *QueryLog) top(query string, since int64, n int) ([]Top, error) {
 	}
 	return out, rows.Err()
 }
+
+// CustomHits counts, per rule, the lookups your own allow and block rules decided since the given time.
+// The key is the rule as the log keeps it ("custom: example.com").
+func (q *QueryLog) CustomHits(since int64) map[string]int64 {
+	out := map[string]int64{}
+	rows, err := q.db.Query(`SELECT rule, COUNT(*) FROM dns_queries WHERE ts>=? AND rule LIKE 'custom: %' GROUP BY rule`, since)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var r string
+		var n int64
+		if rows.Scan(&r, &n) == nil {
+			out[r] = n
+		}
+	}
+	return out
+}

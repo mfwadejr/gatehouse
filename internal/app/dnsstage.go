@@ -34,7 +34,7 @@ func dnsStagePath(method, path string) bool {
 	if !strings.HasPrefix(path, "/api/dns/") {
 		return false
 	}
-	for _, end := range []string{"/apply", "/preview", "/test", "/refresh", "/undo", "/cache/flush"} {
+	for _, end := range []string{"/apply", "/preview", "/test", "/refresh", "/undo", "/cache/flush", "/pause", "/resume", "/try"} {
 		if strings.HasSuffix(path, end) {
 			return false
 		}

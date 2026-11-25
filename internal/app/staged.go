@@ -265,6 +265,8 @@ func stagedWords(method, path string, body []byte) string {
 		return verb + " VPN settings."
 	case strings.HasPrefix(path, "/api/dhcp/"):
 		return verb + " DHCP settings."
+	case path == "/api/dns/forwards":
+		return verb + " the names that use a different server."
 	case strings.HasPrefix(path, "/api/dns/"):
 		return verb + " DNS settings."
 	case strings.HasPrefix(path, "/api/routes"):

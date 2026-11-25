@@ -483,6 +483,17 @@ func (m *Manager) ReloadNow() error {
 		for crow.Next() {
 			var d, a string
 			crow.Scan(&d, &a)
+			if IsPattern(d) {
+				kind, text := PatternText(d)
+				if re, err := CompilePattern(kind, text); err == nil {
+					if a == "allow" {
+						custom.allowRe = append(custom.allowRe, patRule{text: text, re: re})
+					} else {
+						custom.blockRe = append(custom.blockRe, patRule{text: text, re: re})
+					}
+				}
+				continue
+			}
 			if a == "allow" {
 				custom.allow[d] = ""
 			} else {
@@ -615,6 +626,26 @@ func (m *Manager) AddCustom(domain, action, note string) error {
 		return fmt.Errorf("action must be allow or block")
 	}
 	if _, err := m.db.Exec(`INSERT OR REPLACE INTO custom_rules(domain,action,note,created_at) VALUES(?,?,?,?)`, d, action, note, m.now().Unix()); err != nil {
+		return err
+	}
+	return m.Reload()
+}
+
+// AddPattern stores an allow or block rule that is a pattern.
+func (m *Manager) AddPattern(kind, text, action, note string) error {
+	if action != "allow" && action != "block" {
+		return fmt.Errorf("action must be allow or block")
+	}
+	stored, err := StorePattern(kind, text)
+	if err != nil {
+		return err
+	}
+	var n int
+	m.db.QueryRow(`SELECT count(*) FROM custom_rules WHERE domain LIKE 'glob:%' OR domain LIKE 're:%'`).Scan(&n)
+	if n >= maxPatternRules {
+		return fmt.Errorf("that is the most pattern rules NopeWarden will keep (%d). Remove one first", maxPatternRules)
+	}
+	if _, err := m.db.Exec(`INSERT OR REPLACE INTO custom_rules(domain,action,note,created_at) VALUES(?,?,?,?)`, stored, action, note, m.now().Unix()); err != nil {
 		return err
 	}
 	return m.Reload()

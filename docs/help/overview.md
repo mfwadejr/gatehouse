@@ -18,7 +18,7 @@ The picture uses made-up devices and numbers. Yours will show your own.
   - Whatever you hide here still shows as a small dot beside the page in the left menu. Your choices belong to your account, so they follow you to any browser.
 - The coloured dots in the left menu mark the page that needs you, and the tab inside that page that holds the reason. Hover a dot to read why. It goes away when the thing is dealt with.
 - The internet card shows speed right now and a chart over 10 minutes, an hour, 24 hours or 30 days.
-- **Devices, DNS, DHCP and Protection** are four small cards with the numbers that matter now: devices online, lookups in the last hour, addresses in use, connections blocked in a day. Each has a small chart of the last hour. The scale is on the left (top, middle and zero) and the times run along the bottom, ending in "now". **Open** takes you to the full page.
+- **Devices, DNS, DHCP and Protection** are four small cards with the numbers that matter now: devices online, lookups in the last hour, addresses in use, connections blocked in a day. Each has a small chart of the last hour. The scale is on the left (top, middle and zero) and the times run along the bottom, ending in "now". The cards line up, so the charts sit at the same height. On Devices, the line under the number also tells you when devices are new today or have no name, and each of those is a link to the Devices page. On DHCP it says how many addresses are used on your network, or which network is the busiest. **Open** takes you to the full page.
 
   ![The four number cards, each with a scale and times](img/overview-cards.png)
 

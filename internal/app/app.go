@@ -35,6 +35,8 @@ type Config struct {
 	WebAddr    string   // console listen address
 	DNSAddrs   []string // DNS listen addresses
 	SNMPAddr   string   // SNMP listen address; ":161" when empty
+	EncDoTAddr string   // encrypted DNS (DNS-over-TLS) listen address; ":853" when empty
+	EncDoHAddr string   // encrypted DNS (DNS-over-HTTPS) listen address; ":8443" when empty
 	PortalAddr string   // guest sign-in page listen address; ":8099" when empty
 	DHCPAddr   string   // DHCP listen address; empty disables the DHCP socket
 	TLSCert    string
@@ -64,6 +66,7 @@ type App struct {
 	snmp        snmpState
 	sqm         sqmState
 	portal      portalState
+	encsrv      encServerState
 	ddns        ddnsState
 	haActiveFn  func() bool // tests replace the check for holding the shared addresses
 	haOwnsFn    func(addr string) bool
@@ -162,6 +165,7 @@ func New(cfg Config) (*App, error) {
 	a.QLog = dnssrv.NewQueryLog(a.Logs, a.pushLive)
 	pool := dnssrv.NewPool([]string{"1.1.1.1:53", "9.9.9.9:53"})
 	a.DNS = dnssrv.NewServer(a.dnsOptions(), pool, a.Devices, namesAdapter{a.DHCP}, a.QLog)
+	a.loadDNSPause()
 	a.DNS.Route = a.dnsPath
 	a.DNS.RouteName = a.dnsPathForName
 	a.DNS.ExplainFail = a.explainFailure
@@ -211,6 +215,8 @@ func New(cfg Config) (*App, error) {
 	a.registerScopeRoutes()
 	a.registerSiteCheckRoutes()
 	a.registerInternetPauseRoutes()
+	a.registerDNSPauseRoutes()
+	a.registerDNSForwardRoutes()
 	a.registerThreatRoutes()
 	a.registerDiscoveryRoutes()
 	a.registerAlertRoutes()
@@ -235,6 +241,7 @@ func New(cfg Config) (*App, error) {
 	a.registerSNMPRoutes()
 	a.registerSQMRoutes()
 	a.registerPortalRoutes()
+	a.registerEncServerRoutes()
 	a.registerHAWarmRoutes()
 	a.registerDDNSRoutes()
 	a.registerNetFilterRoutes()
@@ -281,6 +288,10 @@ func (a *App) dnsOptions() dnssrv.Options {
 	o.RateBurst = a.settingFloat("dns.rate_burst", o.RateBurst)
 	o.CacheSize = int(a.settingFloat("dns.cache_size", float64(o.CacheSize)))
 	o.Canary = a.setting("dns.canary", "1") == "1"
+	o.PrivateRelay = a.setting("dns.private_relay", "0") == "1"
+	if n := int(a.settingFloat("dns.block_ttl", float64(o.BlockTTL))); n >= 0 && n <= 3600 {
+		o.BlockTTL = uint32(n)
+	}
 	return o
 }
 
@@ -306,6 +317,7 @@ func (a *App) applyDNS() error {
 	o := a.dnsOptions()
 	a.DNS.Apply(o, a.localRecords())
 	a.QLog.Anonymize.Store(a.setting("dns.anonymize", "0") == "1")
+	a.loadForwards()
 	return a.loadUpstreams()
 }
 
@@ -440,6 +452,7 @@ func (a *App) Run(ctx context.Context) error {
 	run(func() { a.sqmLoop(ctx) })
 	run(func() { a.sqmTestLoop(ctx) })
 	run(func() { a.portalLoop(ctx) })
+	run(func() { a.encServerLoop(ctx) })
 	run(func() { a.haWarmLoop(ctx) })
 	run(func() { a.overrideLoop(ctx) })
 	run(func() { a.haSyncLoop(ctx) })

@@ -136,18 +136,82 @@ func (a *App) registerRoutes() {
 			fail(w, err)
 			return
 		}
-		api.JSON(w, 200, l)
+		hits := a.QLog.CustomHits(time.Now().Add(-24 * time.Hour).Unix())
+		out := make([]map[string]any, 0, len(l))
+		for _, cr := range l {
+			kind, text := dnssrv.PatternText(cr.Domain)
+			if kind == "" {
+				kind = "name"
+			}
+			key := "custom: " + cr.Domain
+			if kind != "name" {
+				key = "custom: pattern " + text
+			}
+			out = append(out, map[string]any{"id": cr.ID, "domain": cr.Domain, "action": cr.Action, "note": cr.Note, "kind": kind, "text": text, "hits_24h": hits[key]})
+		}
+		api.JSON(w, 200, out)
 	})
 	s.HandleAdmin("POST /api/dns/rules", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-		var in struct{ Domain, Action, Note string }
+		var in struct {
+			Domain, Action, Note string
+			Kind                 string `json:"kind"` // "", "glob" or "re"
+		}
 		if !api.Decode(w, r, &in) {
 			return
 		}
-		if err := a.Lists.AddCustom(in.Domain, in.Action, in.Note); err != nil {
+		var err error
+		if in.Kind == "glob" || in.Kind == "re" {
+			err = a.Lists.AddPattern(in.Kind, in.Domain, in.Action, in.Note)
+		} else {
+			err = a.Lists.AddCustom(in.Domain, in.Action, in.Note)
+		}
+		if err != nil {
 			fail(w, err)
 			return
 		}
 		ok(w)
+	})
+	// Try shows what a pattern would catch among the names asked in the last day, before it is saved.
+	s.Handle("POST /api/dns/rules/try", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		var in struct {
+			Kind    string `json:"kind"`
+			Pattern string `json:"pattern"`
+			Name    string `json:"name"`
+		}
+		if !api.Decode(w, r, &in) {
+			return
+		}
+		res := map[string]any{}
+		names := []string{}
+		if n := strings.TrimSpace(in.Name); n != "" {
+			names = append(names, n)
+		}
+		top, _ := a.QLog.TopDomains(time.Now().Add(-24*time.Hour).Unix(), 3000)
+		seen := len(names)
+		for _, t := range top {
+			names = append(names, t.Key)
+		}
+		got, err := dnssrv.TryPattern(in.Kind, in.Pattern, names)
+		if err != nil {
+			res["error"] = err.Error()
+			api.JSON(w, 200, res)
+			return
+		}
+		res["name_matches"] = in.Name != "" && len(got) > 0 && strings.EqualFold(strings.TrimSuffix(got[0], "."), strings.TrimSuffix(strings.TrimSpace(in.Name), "."))
+		var recent []string
+		for _, g := range got {
+			if in.Name != "" && strings.EqualFold(g, strings.TrimSpace(in.Name)) {
+				continue
+			}
+			recent = append(recent, g)
+		}
+		if len(recent) > 6 {
+			res["more"] = len(recent) - 6
+			recent = recent[:6]
+		}
+		_ = seen
+		res["recent"] = recent
+		api.JSON(w, 200, res)
 	})
 	s.HandleAdmin("DELETE /api/dns/rules/{id}", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		id, good := pathID(r)
@@ -299,7 +363,7 @@ func (a *App) registerRoutes() {
 		o := a.dnsOptions()
 		api.JSON(w, 200, map[string]any{
 			"block_mode": o.BlockMode, "local_domain": o.LocalDomain, "rate_limit": o.RateLimit, "rate_burst": o.RateBurst,
-			"cache_size": o.CacheSize, "canary": o.Canary,
+			"cache_size": o.CacheSize, "canary": o.Canary, "private_relay": o.PrivateRelay, "block_ttl": o.BlockTTL,
 			"log_retention_days": a.settingFloat("dns.log_retention_days", 30), "anonymize": a.setting("dns.anonymize", "0") == "1",
 		})
 	})

@@ -32,7 +32,7 @@ func (a *App) dnsSummary(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		}
 	}
 	api.JSON(w, 200, map[string]any{
-		"stats": snap, "upstreams": a.DNS.Pool().Status(), "list_count": len(lists), "blocked_entries": entries,
+		"pause": a.dnsPauseView(), "stats": snap, "upstreams": a.DNS.Pool().Status(), "list_count": len(lists), "blocked_entries": entries,
 		"unique_blocked": a.Lists.UniqueBlocked(),
 		// Blocking only works once at least one switched-on list has been downloaded.
 		"lists_enabled": enabled, "lists_loaded": loaded, "blocking_active": enabled == 0 || loaded > 0,
@@ -154,14 +154,16 @@ func (a *App) dnsAddUpstream(w http.ResponseWriter, r *http.Request, c *api.Ctx)
 
 func (a *App) dnsSaveSettings(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 	var in struct {
-		BlockMode   string  `json:"block_mode"`
-		LocalDomain string  `json:"local_domain"`
-		RateLimit   float64 `json:"rate_limit"`
-		RateBurst   float64 `json:"rate_burst"`
-		CacheSize   int     `json:"cache_size"`
-		Canary      bool    `json:"canary"`
-		Retention   int     `json:"log_retention_days"`
-		Anonymize   bool    `json:"anonymize"`
+		BlockMode    string  `json:"block_mode"`
+		LocalDomain  string  `json:"local_domain"`
+		RateLimit    float64 `json:"rate_limit"`
+		RateBurst    float64 `json:"rate_burst"`
+		CacheSize    int     `json:"cache_size"`
+		Canary       bool    `json:"canary"`
+		PrivateRelay bool    `json:"private_relay"`
+		BlockTTL     *int    `json:"block_ttl"`
+		Retention    int     `json:"log_retention_days"`
+		Anonymize    bool    `json:"anonymize"`
 	}
 	if !api.Decode(w, r, &in) {
 		return
@@ -187,7 +189,16 @@ func (a *App) dnsSaveSettings(w http.ResponseWriter, r *http.Request, c *api.Ctx
 		}
 		return "0"
 	}
+	ttl := int(a.dnsOptions().BlockTTL)
+	if in.BlockTTL != nil {
+		ttl = *in.BlockTTL
+	}
+	if ttl < 0 || ttl > 3600 {
+		fail(w, errors.New("how long devices remember a block must be between 0 and 3600 seconds"))
+		return
+	}
 	for k, v := range map[string]string{
+		"dns.private_relay": b(in.PrivateRelay), "dns.block_ttl": strconv.Itoa(ttl),
 		"dns.block_mode": in.BlockMode, "dns.local_domain": dom,
 		"dns.rate_limit": strconv.FormatFloat(in.RateLimit, 'f', -1, 64), "dns.rate_burst": strconv.FormatFloat(in.RateBurst, 'f', -1, 64),
 		"dns.cache_size": strconv.Itoa(in.CacheSize), "dns.canary": b(in.Canary),

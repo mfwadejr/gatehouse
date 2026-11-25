@@ -121,6 +121,7 @@ func Load(db Queryer) (*Model, error) {
 	m.SSHEnabled = settingOn(db, "ssh.enabled")
 	m.SNMPEnabled = settingOn(db, "snmp.enabled")
 	m.PortalIfaces = portalSetting(db)
+	m.EncDNSIfaces = encDNSSetting(db)
 
 	irows, err := db.Query(`SELECT name,zone_id FROM interfaces WHERE enabled=1 AND zone_id IS NOT NULL ORDER BY id`)
 	if err != nil {
@@ -530,6 +531,18 @@ func portalSetting(db Queryer) []string {
 		Ifaces []string `json:"ifaces"`
 	}
 	if json.Unmarshal([]byte(v), &c) != nil || !c.On {
+		return nil
+	}
+	return c.Ifaces
+}
+
+// encDNSSetting reads which networks encrypted DNS is switched on for.
+func encDNSSetting(db Queryer) []string {
+	var c struct {
+		On     bool     `json:"on"`
+		Ifaces []string `json:"ifaces"`
+	}
+	if json.Unmarshal([]byte(setting(db, "dns.encserver", "")), &c) != nil || !c.On {
 		return nil
 	}
 	return c.Ifaces

@@ -97,8 +97,10 @@ func (b *indexBuilder) setName(bit int, name string) { b.ix.names[bit] = name }
 
 // CustomRules holds the administrator's own allow and block entries. Allow always wins.
 type CustomRules struct {
-	allow map[string]string
-	block map[string]string
+	allow   map[string]string
+	block   map[string]string
+	allowRe []patRule // pattern rules, checked after the plain names
+	blockRe []patRule
 }
 
 func newCustom() *CustomRules {
@@ -125,9 +127,19 @@ func (c *CustomRules) Check(name string) (action, rule string) {
 			return "allow", d
 		}
 	}
+	for _, p := range c.allowRe {
+		if p.re.MatchString(name) {
+			return "allow", "pattern " + p.text
+		}
+	}
 	for _, d := range suffixes(name) {
 		if _, ok := c.block[d]; ok {
 			return "block", d
+		}
+	}
+	for _, p := range c.blockRe {
+		if p.re.MatchString(name) {
+			return "block", "pattern " + p.text
 		}
 	}
 	return "", ""

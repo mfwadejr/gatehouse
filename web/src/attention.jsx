@@ -59,6 +59,7 @@ export function AttentionProvider({ children }) {
     });
     // A paused connection is on purpose, so it is not broken and raises no alert, but it stays on the list so it is not forgotten.
     wanList.filter((w) => w.enabled && links[w.name]?.paused).forEach((w) => add('warn', `wan-paused:${w.name}`, `${w.name} is paused`, linkState(links[w.name]).detail, 'internet/connections'));
+    if (dns?.pause?.paused) add('warn', 'dns-paused', 'Blocking is paused', dns.pause.until ? `Every name is let through until ${new Date(dns.pause.until * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.` : 'Every name is let through until you resume.', 'dns');
     (vpn?.vpns || []).forEach((v) => {
       if (!v.enabled) return;
       if (v.state === 'down') add('warn', `vpn:${v.label}`, `VPN ${v.label} is down`, v.message, 'vpn');

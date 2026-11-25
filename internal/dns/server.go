@@ -22,6 +22,18 @@ type Options struct {
 	RateBurst   float64
 	BlockTTL    uint32
 	Canary      bool // answer NXDOMAIN for use-application-dns.net so browsers keep using system DNS
+	// PrivateRelay answers NXDOMAIN for the names Apple devices check before using iCloud Private
+	// Relay. Apple documents this as the way for a network to say "do not use Private Relay here";
+	// the device then tells its owner that Private Relay is off for this network.
+	PrivateRelay bool
+}
+
+// privateRelayNames are the names Apple's documentation says a network can block to turn
+// Private Relay off for the devices on it.
+var privateRelayNames = map[string]bool{
+	"mask.icloud.com.":                true,
+	"mask-h2.icloud.com.":             true,
+	"mask-canary.cloudflare-dns.com.": true,
 }
 
 // DefaultOptions are used until the configuration is loaded.
@@ -58,6 +70,8 @@ type Server struct {
 	// overridden by it. Any trouble counts as "no exception".
 	ScopedAllow func(client string, ci ClientInfo, name string) string
 	via         viaSet
+	fwd         atomic.Pointer[fwdSet]
+	pausedUntil atomic.Int64 // unix seconds; blocking is switched off until then, -1 = until resumed
 	rl          *RateLimiter
 	eng         engineHolder
 	local       localHolder
@@ -83,6 +97,33 @@ func NewServer(o Options, pool *Pool, dir Directory, names Names, qlog *QueryLog
 		dir: dir, names: names, qlog: qlog, stats: NewStats()}
 	s.opts.Store(&o)
 	return s
+}
+
+// PauseBlocking switches blocking off until the given time (zero time = until it is resumed).
+func (s *Server) PauseBlocking(until time.Time) {
+	if until.IsZero() {
+		s.pausedUntil.Store(-1)
+		return
+	}
+	s.pausedUntil.Store(until.Unix())
+}
+
+// ResumeBlocking switches blocking back on.
+func (s *Server) ResumeBlocking() { s.pausedUntil.Store(0) }
+
+// BlockingPaused says whether blocking is paused right now, and until when (zero time when it was
+// paused until resumed). A pause that has run out counts as not paused.
+func (s *Server) BlockingPaused(now time.Time) (bool, time.Time) {
+	u := s.pausedUntil.Load()
+	switch {
+	case u == 0:
+		return false, time.Time{}
+	case u < 0:
+		return true, time.Time{}
+	case now.Unix() >= u:
+		return false, time.Time{}
+	}
+	return true, time.Unix(u, 0)
 }
 
 func (s *Server) Pool() *Pool                 { return s.pool }
@@ -210,6 +251,12 @@ func (s *Server) handle(client string, r *dns.Msg, start time.Time, udp bool) *d
 		return finish(m, OutLocal, "canary", "")
 	}
 
+	if o.PrivateRelay && privateRelayNames[q.Name] {
+		m := new(dns.Msg)
+		m.SetRcode(r, dns.RcodeNameError)
+		return finish(m, OutBlocked, "Private Relay is blocked", "")
+	}
+
 	// 3. Local records, leases, reverse lookups.
 	if rrs, rc, ok := s.localAnswer(q); ok {
 		m := new(dns.Msg)
@@ -223,7 +270,8 @@ func (s *Server) handle(client string, r *dns.Msg, start time.Time, udp bool) *d
 
 	// 3b. Blocks by scope (apps, topics, names for a device, network or profile). It runs inside a
 	// recover and answers "not blocked" on any trouble, so a fault here never stops lookups.
-	if s.Scoped != nil {
+	paused, _ := s.BlockingPaused(start)
+	if s.Scoped != nil && !paused {
 		if rule := s.scopedRule(client, ci, strings.TrimSuffix(q.Name, ".")); rule != "" {
 			return finish(s.blockedReply(r, q, o), OutBlocked, rule, "")
 		}
@@ -231,7 +279,7 @@ func (s *Server) handle(client string, r *dns.Msg, start time.Time, udp bool) *d
 
 	// 4. Filtering.
 	exempt := ""
-	if ci.Filtering || s.dir == nil {
+	if (ci.Filtering || s.dir == nil) && !paused {
 		e := s.eng.get()
 		if !e.nofilter[ci.GroupID] {
 			blocked, rule := false, ""
@@ -288,6 +336,10 @@ func (s *Server) handle(client string, r *dns.Msg, start time.Time, udp bool) *d
 	if path.Dev != "" {
 		cache, up = s.viaCache(path.Dev), s.viaPool(path.Dev)
 		entry.Via = path.Dev
+	}
+	// A name covered by a "different server" rule is asked of that rule's servers. The same cache is used.
+	if fp := s.forwardPool(q.Name); fp != nil {
+		up = fp
 	}
 
 	// 6. Cache.

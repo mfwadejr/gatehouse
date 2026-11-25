@@ -51,11 +51,11 @@ export function OnToggle({ checked, onChange, what = 'This' }) {
 }
 
 // PauseMenu is the same everywhere: a drop-down of durations, or Resume while paused.
-export function PauseMenu({ until, name, onPause, disabled }) {
+export function PauseMenu({ until, name, onPause, disabled, choices, label = 'Pause…' }) {
   if (until * 1000 > Date.now()) return <Button small kind="primary" disabled={disabled} onClick={() => onPause(0)}>Resume now</Button>;
   return (
     <Select value="" className="pausesel" onChange={(v) => v && onPause(Number(v))} aria-label={`Pause ${name}`} disabled={disabled}
-      options={[{ value: '', label: 'Pause…' }, ...pauseChoices().map((c) => ({ value: String(c.m), label: c.t }))]} />
+      options={[{ value: '', label }, ...(choices || pauseChoices()).map((c) => ({ value: String(c.m), label: c.t }))]} />
   );
 }
 

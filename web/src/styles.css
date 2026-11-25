@@ -425,9 +425,6 @@ details.more > summary { cursor: pointer; color: var(--color-text-secondary); ma
 .ov-map .ov-home.in .ov-ping { fill: var(--color-status-warning); }
 @keyframes ovping { 0% { transform: scale(1); opacity: .8; } 100% { transform: scale(4.5); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .ov-map .ov-ping { animation: none; opacity: .35; } .ov-map .ov-travel { display: none; } }
-.ov-scopes { display: flex; flex-direction: column; gap: var(--space-1-5); margin-top: var(--space-1); }
-.ov-sc { display: grid; grid-template-columns: 4.5rem 1fr 5rem; gap: var(--space-2); align-items: center; }
-.ov-sc .num { text-align: right; }
 .bar.warnbar > i { background: var(--color-status-warning); }
 .pillbtn { border: var(--border-width-thin) solid var(--color-border-default); background: transparent; color: var(--color-text-secondary); border-radius: var(--radius-full); padding: var(--space-0-5) var(--space-2-5); font-size: var(--font-size-sm); cursor: pointer; }
 .pillbtn.warn { color: var(--color-status-warning); }
@@ -765,7 +762,7 @@ button.tag:hover { color: var(--color-text-primary); border-color: var(--color-b
 .nl-sn { font-size: var(--font-size-xs); color: var(--color-text-muted); }
 .nl-meta { display: flex; flex-wrap: wrap; gap: var(--space-1-5); justify-content: center; align-items: center; margin-top: var(--space-1); font-size: var(--font-size-sm); color: var(--color-text-secondary); }
 .nl-mgmt { margin-top: var(--space-4); }
-.nl-mgmt .nl-net { flex: none; width: 100%; max-width: 32rem; border-style: dashed; }
+.nl-mgmt .nl-net { flex: none; width: 100%; max-width: 24rem; border-style: dashed; padding: var(--space-2) var(--space-3); gap: var(--space-1); }
 .nl-vpn { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; margin-top: var(--space-4); padding-top: var(--space-3); border-top: var(--border-width-thin) dashed var(--color-border-default); font-size: var(--font-size-sm); color: var(--color-text-muted); }
 .nl-vpnone { display: inline-flex; gap: var(--space-2); align-items: center; }
 .ch2 .stk-fill { fill: var(--c); opacity: .55; stroke: none; }
@@ -853,3 +850,18 @@ button.tag:hover { color: var(--color-text-primary); border-color: var(--color-b
 
 .driverow { padding-top: var(--space-3); border-top: var(--border-width-thin) solid var(--color-border-subtle); }
 .driverow:first-child { padding-top: 0; border-top: 0; }
+
+/* Overview cards: the chart, caption and Open link sit at the bottom, so every card lines up whatever its text says. */
+.ov-tile { height: 100%; }
+.ov-tile .ov-bottom { margin-top: auto; display: flex; flex-direction: column; gap: var(--space-2-5); }
+.sublink { background: none; border: 0; padding: 0; font: inherit; color: var(--color-text-link, inherit); cursor: pointer; text-align: left; text-decoration: underline; text-underline-offset: 2px; }
+.sublink.warn { color: var(--color-status-warning); }
+.tile .tspark { height: auto; }
+.ch2.compact.axes .ch2-x span { white-space: nowrap; }
+.dns-tiles .ch2.compact.axes .ch2-x { font-size: .66rem; padding-left: 1.8rem; }
+.dns-tiles .ch2.compact.axes .ch2-x span:nth-child(2) { display: none; }
+.ov-tile .ov-bottom > .small:not(.link) { min-height: 2.7em; }
+@supports (grid-template-rows: subgrid) {
+  .dns-tiles { row-gap: var(--space-4); }
+  .dns-tiles > .tile { display: grid; grid-template-rows: subgrid; grid-row: span 4; row-gap: var(--space-2-5); align-content: start; }
+}

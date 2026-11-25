@@ -127,6 +127,9 @@ type Model struct {
 	// MDNS lists the interfaces whose devices announce themselves to the router so that the
 	// discovery reflector can copy the announcements between paired networks.
 	MDNS []string
+	// EncDNSIfaces are the ports encrypted DNS was switched on for (see EncDNSNets for what really applies).
+	EncDNSIfaces []string
+
 	// SSHEnabled is the master switch for remote login. Off, nothing listens for SSH from any
 	// network, whatever each network's own SSH switch says.
 	SSHEnabled bool
@@ -243,6 +246,9 @@ const (
 	LanGateSet = "lan_console"
 	// PortalPort is where the sign-in page listens on this router.
 	PortalPort = 8099
+	// EncDNSDoTPort and EncDNSDoHPort are where devices reach encrypted DNS (when it is switched on).
+	EncDNSDoTPort = 853
+	EncDNSDoHPort = 8443
 )
 
 // PortalNets are the networks the sign-in page really applies to. Anything that could lock the
@@ -275,5 +281,30 @@ func (m *Model) PortalNets() []string {
 		out = append(out, d)
 	}
 	sort.Strings(out)
+	return out
+}
+
+// EncDNSNets are the networks that may reach this router's encrypted DNS. Internet-facing ports are
+// never included, whatever was chosen, and a name that is not in any network is ignored.
+func (m *Model) EncDNSNets() []string {
+	skip := map[string]bool{}
+	for _, d := range m.WanIfaces() {
+		skip[d] = true
+	}
+	inZone := map[string]bool{}
+	for _, z := range m.Zones {
+		for _, d := range z.Ifaces {
+			inZone[d] = true
+		}
+	}
+	seen := map[string]bool{}
+	var out []string
+	for _, d := range m.EncDNSIfaces {
+		if skip[d] || !inZone[d] || seen[d] {
+			continue
+		}
+		seen[d] = true
+		out = append(out, d)
+	}
 	return out
 }

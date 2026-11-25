@@ -103,10 +103,10 @@ export function NetworkLayout({ nets, zones, scopes, onOpen }) {
           {mg?.config?.iface && !mg.bridge && (
             <div className="nl-mgmt">
               <button type="button" className="nl-net" onClick={() => go('settings/manage')} aria-label="Open Managing this device">
-                <b>Management port · {pn(mg.config.iface)}{mg.address ? ` · ${mg.address}` : ''}</b>
+                <b>Management port · {mg.address || pn(mg.config.iface)}</b>
                 <span className="nl-sn"><span className={`sdot ${mg.state === 'ok' ? 'good' : mg.state === 'quiet' ? '' : 'warn'}`} aria-hidden="true" /> {mg.status}</span>
                 {mg.state === 'ok' && <span className="nl-rate mono"><span className="nl-d">▼ {fmtBits(mg.down || 0)}</span><span className="nl-u">▲ {fmtBits(mg.up || 0)}</span></span>}
-                <span className="small muted">{mg.lan_open ? 'The console also answers on the other networks.' : 'The console is closed on the other networks.'} Nothing is routed through this port.</span>
+                <span className="small muted">{mg.lan_open ? 'Console also open on your other networks.' : 'Console closed on your other networks.'}</span>
               </button>
             </div>
           )}

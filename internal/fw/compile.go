@@ -317,6 +317,10 @@ func (c *compiler) input() {
 	if pn := m.PortalNets(); len(pn) > 0 {
 		c.line(2, "iifname %s tcp dport %d accept comment \"protected: guest sign-in page\"", ifSet(pn), PortalPort)
 	}
+	// Encrypted DNS for devices (DNS-over-TLS and DNS-over-HTTPS), only from the networks it was switched on for.
+	if en := m.EncDNSNets(); len(en) > 0 {
+		c.line(2, "iifname %s tcp dport { %d, %d } accept comment \"protected: encrypted dns for devices\"", ifSet(en), EncDNSDoTPort, EncDNSDoHPort)
+	}
 	// The last resort: the port the device was set up from keeps reaching the console, whatever
 	// the networks look like. Never on an internet-facing port or one already covered above.
 	if r := m.RescueIface; r != "" && !contains(m.WanIfaces(), r) && !contains(mgmt, r) {
