@@ -1,11 +1,17 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.67',
+    title: 'A tidier Management port tile',
+    items: [
+      'Networks: the Management port tile now looks like your other networks: its name, its address, live speeds, and two small buttons for whether it is answering and whether the console is open on your other networks.',
+    ],
+  },
+  {
     version: '0.9.4.66',
     title: 'Encrypted DNS for your devices',
     items: [
       'DNS, Servers: a new card, Encrypted DNS for your devices, lets phones and laptops ask this firewall over DNS-over-TLS (port 853) or DNS-over-HTTPS (port 8443). It is off until you turn it on, it opens only on the networks you pick and never on an internet port, and lookups still go through your lists, cache and logs. The card shows what to type on a device.',
-      'Networks: the Management port tile is smaller and says the same in fewer lines.',
       'It makes its own certificate, which devices accept only if you install it. To use Android\u2019s Private DNS without warnings, upload a certificate your devices already trust. If a change cannot be applied the firewall puts things back.',
     ],
   },
