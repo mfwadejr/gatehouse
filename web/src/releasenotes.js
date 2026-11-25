@@ -1,6 +1,16 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.57',
+    title: 'Clearer names, and signposts between look-alike cards',
+    items: [
+      'The two kinds of lists now read differently. On DNS, Blocklists is now Ad, tracker and malware lists. On Protection, Lists used for blocking is now App and category lists. Each says which is which and where the other one is.',
+      'Each pair of look-alike cards points to the other: Always allow or always block (DNS) and Exceptions (Protection, Blocks); Why is this blocked? (DNS) and Why can\'t it reach that? (Internet).',
+      'The places that keep a history of changes each say what question they answer and where the others are: Change history (Firewall), Changes (Settings, Backup), Backup history, Review changes and Admin activity.',
+      'Open ports: the Policies list already links to the Firewall, Open ports tab, so nothing moved.',
+    ],
+  },
+  {
     version: '0.9.4.56',
     title: 'Closer drive watching, and a UPS',
     items: [

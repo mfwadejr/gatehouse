@@ -31,7 +31,7 @@ export default function AdminActivity({ onQ }) {
   const words = q.trim().split(/\s+/).filter(Boolean);
   const setBoth = (v) => { setQ(v); onQ?.(v); };
   return (
-    <Card title="Admin activity" desc="Who did what to NopeWarden: sign-ins and failed attempts, and the changes people made. Looking for what the network did? That is the Log tab.">
+    <Card title="Admin activity" desc="Who did what to NopeWarden: sign-ins and failed attempts, and the changes people made. Looking for what the network did? That is the Log tab. Looking for what changed in the firewall? That is Change history on the Firewall page.">
       <div className="stack">
         <div className="inline">
           <div style={{ flex: '1 1 18rem' }}><Input value={q} onChange={setBoth} placeholder="Search a person, what they did, or an address" aria-label="Search admin activity" /></div>

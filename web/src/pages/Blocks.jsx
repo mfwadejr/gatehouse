@@ -208,7 +208,7 @@ export default function Blocks() {
             {STARTERS.map((s) => <Button key={s.name} small onClick={() => start(s)}>{s.name}</Button>)}
           </div>
         </>} />
-      <BlockList title="Exceptions" desc="Things to let through for a device, profile or network even when a block says no."
+      <BlockList title="Exceptions" desc="Things to let through for a device, profile or network even when a block says no. For a name that should be allowed or blocked for everyone, use Always allow or always block on the DNS page."
         rows={exceptions} empty="No exceptions." allow data={data} reload={reload} setEdit={setEdit} />
       <p className="small muted">{data?.inspection?.note} {data?.fail_open}</p>
       {edit && <BlockForm initial={edit} allow={!!edit.allow} data={data} onClose={() => setEdit(null)} onSaved={reload} />}

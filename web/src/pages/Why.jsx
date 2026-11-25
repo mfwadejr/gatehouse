@@ -54,7 +54,7 @@ export function WhyBody({ device: fixed, target: t0 = '', onFixed }) {
 }
 
 export default function Why() {
-  return <Card title="Why can't it reach that?" desc="Pick a device and a website. NopeWarden checks pauses, filtering and the firewall, and tells you which one is in the way."><WhyBody /></Card>;
+  return <Card title="Why can't it reach that?" desc="Pick a device and a website. NopeWarden checks pauses, filtering and the firewall, and tells you which one is in the way. To see which block list holds a name, use Why is this blocked? on the DNS page."><WhyBody /></Card>;
 }
 
 export function WhyModal({ device, onClose }) {

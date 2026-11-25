@@ -186,7 +186,7 @@ function Protection({ ov, reload }) {
 function History() {
   const { data } = useData('/api/fw/history', { topics: ['fw.status'] });
   return (
-    <Card title="Change history" desc="Every time the firewall was changed, and whether you kept it.">
+    <Card title="Change history" desc="Every time the firewall was changed, and whether you kept it. To go back to how things were, use Changes under Settings, Backup. To see what is waiting to go live, open Review changes. For who made a change, see Admin activity on the Logs page.">
       <div className="scroll"><table className="table">
         <thead><tr><th>#</th><th>When</th><th>Who</th><th>What</th><th>Result</th></tr></thead>
         <tbody>{(data || []).map((h) => (

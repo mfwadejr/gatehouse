@@ -53,7 +53,7 @@ export default function Review() {
     catch (er) { toast(er.message, 'bad'); }
   };
   return (
-    <Page title="Review changes" sub="Saved for later and not in use yet. Check them here, then put them all live in one step.">
+    <Page title="Review changes" sub="Saved for later and not in use yet. Check them here, then put them all live in one step. Changes already made are under Change history on the Firewall page.">
       <ApplyPanel />
       {ch.pend && <Note tone="warn" title="A change is being tried out">Wait for it to be kept or undone first. It takes up to a minute.</Note>}
       {!dirty.length && !ch.pend && (

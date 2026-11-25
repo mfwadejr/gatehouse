@@ -13,7 +13,7 @@ export default function BlockVersions() {
   const now = () => run(() => post('/api/schedules/lists/run'), 'Lists updated.').then(() => { reload(); reloadJobs(); });
   const a = data.app_names;
   return (
-    <Card title="Lists used for blocking" desc="What NopeWarden checks when it blocks an app, a category or a website.">
+    <Card title="App and category lists" desc="What NopeWarden checks when it blocks an app, a category or a website. Ad, tracker and malware names are a different set, on the DNS page, Blocklists.">
       <div className="list">
         <div className="item"><div><div className="name">App names</div><div className="meta">{a.apps} apps, {a.domains} website names.{a.version ? ` Version ${a.version}.` : ''} {a.note}</div></div></div>
         <div className="item"><div><div className="name">App kinds</div><div className="meta">{data.app_topics} categories made from the app names (Games, Video streaming and so on). No download.</div></div></div>

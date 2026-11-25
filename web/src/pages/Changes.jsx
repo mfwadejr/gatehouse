@@ -21,7 +21,7 @@ export default function Changes({ me }) {
     if (r) { setPick(null); setCode(''); setPw(''); reload(); }
   };
   return (
-    <Card title="Changes" desc={`Before every change to the firewall or network, NopeWarden keeps a copy of how things were (the last ${data.keep}). Pick a point to go back to it.`}>
+    <Card title="Changes" desc={`Before every change to the firewall or network, NopeWarden keeps a copy of how things were (the last ${data.keep}). Pick a point to go back to it. For a list of what changed and whether it was kept, see Change history on the Firewall page.`}>
       {data.points.length === 0 ? <Empty>No changes yet. The first one you apply will appear here.</Empty> : (
         <div className="list">
           <Limited items={data.points} noun="saved copies" render={(p, i) => (

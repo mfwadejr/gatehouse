@@ -333,7 +333,7 @@ function Lists() {
   const [names, setNames] = useState(null);
   return (
     <>
-      <Card title="Blocklists" desc="Lists of ad, tracker and malware names. Blocked names get no answer." actions={<Button small icon="plus" onClick={() => setAdd(true)}>Add list</Button>}>
+      <Card title="Ad, tracker and malware lists" desc="Lists of ad, tracker and malware names. Blocked names get no answer. Blocks for an app, category or site use the App and category lists on the Protection page." actions={<Button small icon="plus" onClick={() => setAdd(true)}>Add list</Button>}>
         {sum?.unique_blocked > 0 && <p className="small muted">Different names blocked across all lists: <b>{fmt.n(sum.unique_blocked)}</b>. A name that is on two lists counts once.</p>}
         <ScheduleEditor id="lists" label="How often to refresh the lists" hideRun />
         <div className="list">
@@ -355,7 +355,7 @@ function Lists() {
         </div>
       </Card>
 
-      <Card enter title="Always allow or always block" desc="Your own exceptions beat every list.">
+      <Card enter title="Always allow or always block" desc="Your own exceptions to names beat every list. To let something through for one device, profile or network, use Exceptions on the Protection page, Blocks tab.">
         <div className="inline">
           <div style={{ flex: '1 1 14rem' }}><Input value={rule.domain} onChange={(v) => setRule({ ...rule, domain: v })} aria-label="Name to always allow or block" placeholder="example.com" /></div>
           <Select aria-label="Allow or block" value={rule.action} onChange={(v) => setRule({ ...rule, action: v })} options={[{ value: 'block', label: 'Block' }, { value: 'allow', label: 'Allow' }]} />
@@ -366,7 +366,7 @@ function Lists() {
         </div>
       </Card>
 
-      <Card title="Why is this blocked?" desc="Type a name to see which list is responsible.">
+      <Card title="Why is this blocked?" desc="Type a name to see which list is responsible. To find out why one device cannot reach a site, use Why can't it reach that? on the Internet page, Troubleshoot tab.">
         <div className="inline">
           <div style={{ flex: '1 1 14rem' }}><Input value={q} onChange={setQ} aria-label="Name to check" placeholder="ads.example.com" /></div>
           <Button disabled={!q} onClick={() => run(() => get(`/api/dns/explain?domain=${encodeURIComponent(q)}`)).then(setWhy)}>Check</Button>

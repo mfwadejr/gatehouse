@@ -129,7 +129,7 @@ function BackupHistory() {
   const [open, setOpen] = useState(false);
   return (
     <details className="more" onToggle={(e) => setOpen(e.currentTarget.open)}>
-      <summary>Backup history</summary>
+      <summary>Backup history: which backups were made, restored or downloaded, and by whom</summary>
       {open && <HistoryList />}
     </details>
   );
