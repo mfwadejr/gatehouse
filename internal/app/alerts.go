@@ -66,6 +66,8 @@ var alertKinds = []struct {
 	{"internet", "The internet goes down or comes back", "Sent after the connection has been down for a minute."},
 	{"device_offline", "A device I choose goes offline", "Pick the devices below. Sent when one has been gone for 10 minutes."},
 	{"usage", "I am close to my data limit", "Only if you set a monthly limit (Internet, Usage). Sent at the levels you choose."},
+	{"drive", "A drive has a problem", "A drive's error count goes up, a drive reports a problem or goes missing, or the system log shows disk errors."},
+	{"power", "The power fails (UPS)", "Only if a UPS is watched (Diagnostics, Power). Power cut, battery low, battery needs replacing, power back and UPS not responding, each with its own choice there."},
 	{"repaired", "NopeWarden repaired or updated something", "For example it restarted a stuck service or installed an update."},
 }
 

@@ -13,17 +13,19 @@ import (
 // the same list the left menu's dots come from, by fixed rules, with no AI involved.
 
 type yesterdayNumbers struct {
-	From        int64 `json:"from"`
-	To          int64 `json:"to"`
-	DNSTotal    int   `json:"dns_total"`
-	DNSBlocked  int   `json:"dns_blocked"`
-	BlockedIn   int   `json:"blocked_in"`
-	ProbeAddrs  int   `json:"probe_addrs"`
-	Outages     int   `json:"outages"`
-	DownSeconds int64 `json:"down_seconds"`
-	DevicesPeak int   `json:"devices_peak"`
-	Alerts      int   `json:"alerts"`
-	Since       int64 `json:"since"` // when the oldest record the box has begins; later than From means a partial day
+	From        int64    `json:"from"`
+	To          int64    `json:"to"`
+	DNSTotal    int      `json:"dns_total"`
+	DNSBlocked  int      `json:"dns_blocked"`
+	BlockedIn   int      `json:"blocked_in"`
+	ProbeAddrs  int      `json:"probe_addrs"`
+	Outages     int      `json:"outages"`
+	DownSeconds int64    `json:"down_seconds"`
+	DevicesPeak int      `json:"devices_peak"`
+	Alerts      int      `json:"alerts"`
+	Drives      []string `json:"drives"` // one plain line per drive
+	Power       []string `json:"power"`  // the power line, when a UPS is connected
+	Since       int64    `json:"since"`  // when the oldest record the box has begins; later than From means a partial day
 }
 
 func (a *App) yesterday(now time.Time) yesterdayNumbers {
@@ -33,6 +35,8 @@ func (a *App) yesterday(now time.Time) yesterdayNumbers {
 	if a.Logs == nil {
 		return y
 	}
+	y.Drives = a.driveSummaryLines()
+	y.Power = a.powerSummaryLines(from, to)
 	a.Logs.QueryRow(`SELECT COUNT(*), COALESCE(SUM(CASE WHEN result='blocked' THEN 1 ELSE 0 END),0) FROM dns_queries WHERE ts>=? AND ts<?`, from, to).Scan(&y.DNSTotal, &y.DNSBlocked)
 	var names []any
 	for n := range a.wanZoneNames() {

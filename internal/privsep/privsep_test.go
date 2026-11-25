@@ -268,10 +268,14 @@ func (f *fakeNetCtl) DiagServices() []netd.DiagService {
 func (f *fakeNetCtl) DiagLog(unit string, lines int) (string, error) {
 	return "log of " + unit, nil
 }
-func (f *fakeNetCtl) DiagRestart(unit string) error { f.restarted = unit; return nil }
-func (f *fakeNetCtl) DiagBundle() (string, error)   { return "bundle", nil }
-func (f *fakeNetCtl) DiskHealth() netd.DiskReport   { return netd.DiskReport{} }
-func (f *fakeNetCtl) DiskToolInstall() error        { return nil }
+func (f *fakeNetCtl) DiagRestart(unit string) error            { f.restarted = unit; return nil }
+func (f *fakeNetCtl) DiagBundle() (string, error)              { return "bundle", nil }
+func (f *fakeNetCtl) DiskHealth() netd.DiskReport              { return netd.DiskReport{} }
+func (f *fakeNetCtl) DiskToolInstall() error                   { return nil }
+func (f *fakeNetCtl) DiskSelfTest(name, kind string) error     { return nil }
+func (f *fakeNetCtl) UPSStatus(u netd.UPSSetup) netd.UPSStatus { return netd.UPSStatus{} }
+func (f *fakeNetCtl) UPSSetupApply(u netd.UPSSetup) error      { return nil }
+func (f *fakeNetCtl) UPSShutdown(cut bool) error               { return nil }
 func (f *fakeNetCtl) TermOpen(rows, cols int) (string, error) {
 	f.termSize = [2]int{rows, cols}
 	return "t1", nil

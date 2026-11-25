@@ -15,7 +15,7 @@ func (a *App) diskReport(maxAge time.Duration) netd.DiskReport {
 	if a.Net == nil {
 		return netd.DiskReport{}
 	}
-	return a.cached("disk-health", maxAge, func() any { return a.Net.DiskHealth() }).(netd.DiskReport)
+	return a.cached("disk-health", maxAge, func() any { return a.annotateDisks(a.Net.DiskHealth(), time.Now()) }).(netd.DiskReport)
 }
 
 func (a *App) diskHistPoints() []histPoint {
@@ -39,8 +39,9 @@ func (a *App) diskHistPoints() []histPoint {
 }
 
 func (a *App) registerDiskRoutes() {
+	a.registerDiskWatchRoutes()
 	a.API.Handle("GET /api/disk/health", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-		api.JSON(w, 200, a.diskReport(5*time.Minute))
+		api.JSON(w, 200, a.diskViewNow(5*time.Minute))
 	})
 	// Installs the small program that reads drive health, then looks again.
 	a.API.HandleAdmin("POST /api/disk/tool", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {

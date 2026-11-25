@@ -45,6 +45,7 @@ func (a *App) registerRoutes() {
 	a.registerThreatOverviewRoutes()
 	a.registerCertRoutes()
 	a.registerDiskRoutes()
+	a.registerUPSRoutes()
 	a.registerMorningRoutes()
 	a.registerReportRoutes()
 	a.registerThreatEdgeRoutes()

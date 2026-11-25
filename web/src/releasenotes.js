@@ -1,6 +1,20 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.56',
+    title: 'Closer drive watching, and a UPS',
+    items: [
+      'Drive health now reads each drive every 15 minutes and keeps its numbers: sectors moved to spare, sectors waiting, cable errors, media errors and wear. When one rises it says so in plain words, for example "3 more sectors moved to spare than a week ago", and the drive turns amber.',
+      'A drive that starts reporting a problem, a drive that was there and has gone, or disk errors in the system log now raise an alert (the new alert A drive has a problem), show on the Overview list and turn the Diagnostics menu dot. When a drive has a problem and that alert is off, Drive health says so plainly.',
+      'Drives run their own self-tests on a schedule you can change: a short test every Sunday at 03:00 and a long one on the first Sunday of the month at 03:30. The latest result shows beside the verdict, and Details can start a test now.',
+      'Drive health also says whether a backup has been downloaded to somewhere other than this machine\'s own drive, and the Daily summary gets a line for each drive, "healthy, no change" when all is well.',
+      'New card, Power (UPS), in Diagnostics: set up a UPS on USB (APC and most others) or on the network and see its model, charge, time left, load, input voltage and battery health.',
+      'For each of Power cut, Battery low, Battery needs replacing, Power is back and UPS not responding you choose what happens: log it, send an alert, show it on the Overview and menu dot, and shut down cleanly. A low battery shuts the machine down after a wait you set (60 seconds), the shutdown is cancelled if the power returns first, and the UPS is told to cut its output and start the machine again when the power returns.',
+      'Test power cut plays a power cut, a low battery and the power returning inside NopeWarden, with real alerts and log lines marked as a test. The machine is not shut down unless you tick a separate box.',
+      'The Daily summary says how many times the power failed yesterday and for how long.',
+    ],
+  },
+  {
     version: '0.9.4.55',
     title: 'A Storage tab, and more control over what is kept',
     items: [

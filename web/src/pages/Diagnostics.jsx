@@ -1,7 +1,7 @@
 import { useHashTab } from '../hashtab.js';
 import React, { useState } from 'react';
-import { get, post, useData } from '../api.js';
-import { Button, Card, Empty, Field, Input, Limited, Note, Page, Pill, Select, Tabs, useAction, fmt } from '../ui.jsx';
+import { get, post, put, useData } from '../api.js';
+import { Button, Card, Empty, Field, Input, Limited, Note, NumberInput, Page, Pill, Segmented, Select, Switch, Tabs, TimeField, ToggleRow, useAction, fmt } from '../ui.jsx';
 import { Hit } from './AdminActivity.jsx';
 import { fmtBytes } from '../charts.jsx';
 import NetTools from './NetTools.jsx';
@@ -200,16 +200,23 @@ function DiskUse() {
 // Drive health, from what each drive says about itself. One plain word for each drive; Details opens
 // a blue box with everything it reported and, in plain lines, what it did not.
 const DISK_TONE = { bad: 'bad', warn: 'warn', info: 'info' };
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((l, i) => ({ value: i, label: l }));
 function DiskHealth() {
   const { data, reload } = useData('/api/disk/health', { every: 300000 });
   const [run, busy] = useAction();
   const [open, setOpen] = useState('');
+  const [sched, setSched] = useState(null);
   if (!data) return null;
   if (!data.drives?.length) return null;
   const needsTool = !data.tool && data.drives.some((d) => d.kind !== 'Virtual disk');
   const size = (b) => (b >= 1e12 ? `${(b / 1e12).toFixed(1)} TB` : `${Math.round(b / 1e9)} GB`);
+  const problem = data.drives.some((d) => d.level === 'warn' || d.level === 'bad');
+  const alertsOff = !data.alerts?.on || !data.alerts?.channel;
+  const sc = sched || data.schedule;
+  const setWhen = (k, v) => setSched({ ...sc, [k]: { ...sc[k], ...v } });
+  const testable = (d) => d.kind !== 'Virtual disk' && d.word !== 'Not reported' && !d.gone;
   return (
-    <Card title="Drive health" desc="What each drive says about itself. A drive is only marked amber or red when it reports a problem.">
+    <Card title="Drive health" desc="What each drive says about itself, read every 15 minutes. A drive is only marked amber or red when it reports a problem or its error counts rise.">
       <div className="stack">
         {needsTool && (
           <Note tone="info" title="NopeWarden needs a small program to read drive health">
@@ -217,14 +224,25 @@ function DiskHealth() {
             {data.can_install && <div className="actions"><Button kind="primary" disabled={busy} onClick={() => run(() => post('/api/disk/tool', {}), 'Installed.').then(reload)}>Install the SMART tool</Button></div>}
           </Note>
         )}
+        {problem && alertsOff && (
+          <Note tone="warn" title="A drive has a problem and drive alerts are off">
+            {data.alerts?.channel ? 'The alert "A drive has a problem" is switched off, so nothing will tell you about this.' : 'No email or phone alerts are set up, so nothing will tell you about this.'} It shows here, on the Overview and on the Diagnostics menu dot. Turn the alert on under Alerts.
+          </Note>
+        )}
         <div className="list">
           {data.drives.map((d) => (
             <div key={d.name} className="stack gap1">
               <div className="item">
-                <div className="fill"><div className="name">{d.model}</div><div className="meta">{d.kind}{d.bytes ? `, ${size(d.bytes)}` : ''}, /dev/{d.name}. {d.reason}</div></div>
+                <div className="fill">
+                  <div className="name">{d.model}</div>
+                  <div className="meta">{d.kind}{d.bytes ? `, ${size(d.bytes)}` : ''}, /dev/{d.name}. {d.reason}</div>
+                  {d.trend?.map((t) => <div key={t} className="meta"><strong>{t}.</strong></div>)}
+                  {d.log_errors?.length > 0 && <div className="meta"><strong>The system log shows disk errors in the last day.</strong></div>}
+                  {d.test && <div className="meta">{d.test.running ? `A ${d.test.kind.toLowerCase()} self-test is running.` : `Last self-test (${d.test.kind.toLowerCase()}): ${d.test.result.toLowerCase()}.`}</div>}
+                </div>
                 <div className="actions">
                   <Pill tone={DISK_TONE[d.level] || (d.word === 'Healthy' ? 'good' : '')}>{d.word}</Pill>
-                  {d.word !== 'Not reported' && <Button small onClick={() => setOpen(open === d.name ? '' : d.name)}>{open === d.name ? 'Hide details' : 'Details'}</Button>}
+                  {d.word !== 'Not reported' && !d.gone && <Button small onClick={() => setOpen(open === d.name ? '' : d.name)}>{open === d.name ? 'Hide details' : 'Details'}</Button>}
                 </div>
               </div>
               {open === d.name && (
@@ -233,10 +251,133 @@ function DiskHealth() {
                     {d.lines.map((l) => <div className="item" key={l.label}><div className="fill">{l.label}</div><span className="num">{l.value}</span></div>)}
                   </div>
                   {d.missing?.length > 0 && <p className="small muted">Not reported by this hardware: {d.missing.join(', ')}.</p>}
+                  {d.log_errors?.length > 0 && <pre className="small">{d.log_errors.join('\n')}</pre>}
+                  {testable(d) && data.tool && (
+                    <div className="actions">
+                      <Button small disabled={busy || d.test?.running} onClick={() => run(() => post('/api/disk/test', { drive: d.name, kind: 'short' }), 'Short test started. It takes a couple of minutes.').then(reload)}>Run a short self-test</Button>
+                      <Button small disabled={busy || d.test?.running} onClick={() => run(() => post('/api/disk/test', { drive: d.name, kind: 'long' }), 'Long test started. It can take an hour or more.').then(reload)}>Run a long self-test</Button>
+                    </div>
+                  )}
                 </Note>
               )}
             </div>
           ))}
+        </div>
+        {data.power && <p className="small muted">{data.power}</p>}
+        {data.backup?.note && <p className="small muted">{data.backup.note}</p>}
+        {data.tool && (
+          <div className="stack gap1">
+            <div className="name">Self-test schedule</div>
+            <p className="small muted">Each drive tests itself in the background and keeps working. The result shows beside its verdict. A test starts within 15 minutes of the time chosen.</p>
+            <div className="row" style={{ alignItems: "center", gap: "var(--space-2)" }}>
+              <Switch checked={sc.short.on} onChange={(v) => setWhen('short', { on: v })} label="Short self-test" />
+              <span>Short test every</span>
+              <Select value={sc.short.day} onChange={(v) => setWhen('short', { day: Number(v) })} options={DAYS} style={{ width: '11rem' }} />
+              <span>at</span>
+              <span style={{ width: '9rem' }}><TimeField value={sc.short.at} onChange={(v) => setWhen('short', { at: v })} /></span>
+            </div>
+            <div className="row" style={{ alignItems: "center", gap: "var(--space-2)" }}>
+              <Switch checked={sc.long.on} onChange={(v) => setWhen('long', { on: v })} label="Long self-test" />
+              <span>Long test</span>
+              <Select value={sc.long.every} onChange={(v) => setWhen('long', { every: v })} options={[{ value: 'month', label: 'on the first' }, { value: 'week', label: 'every' }]} style={{ width: '10rem' }} />
+              <Select value={sc.long.day} onChange={(v) => setWhen('long', { day: Number(v) })} options={DAYS} style={{ width: '11rem' }} />
+              <span>at</span>
+              <span style={{ width: '9rem' }}><TimeField value={sc.long.at} onChange={(v) => setWhen('long', { at: v })} /></span>
+            </div>
+            {sched && <div className="actions"><Button kind="primary" disabled={busy} onClick={() => run(() => put('/api/disk/schedule', sched), 'Saved.').then(() => { setSched(null); reload(); })}>Save schedule</Button><Button disabled={busy} onClick={() => setSched(null)}>Discard</Button></div>}
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+// A UPS (battery backup) watched through NUT. What happens for each event is chosen here, per event.
+const POWER_ACTS = [['log', 'Write it in the log'], ['alert', 'Send an alert'], ['overview', 'Show on Overview'], ['shutdown', 'Shut down cleanly']];
+function PowerUPS() {
+  const { data, reload } = useData('/api/power', { every: 20000, topics: ['events'] });
+  const [run, busy] = useAction();
+  const [form, setForm] = useState(null);
+  const [src, setSrc] = useState({ source: 'usb', host: '', name: '' });
+  const [real, setReal] = useState(false);
+  if (!data) return null;
+  const st = data.status || {};
+  const cfg = form || data.config;
+  const set = (k, v) => setForm({ ...cfg, [k]: v });
+  const setAct = (id, k, v) => setForm({ ...cfg, events: { ...cfg.events, [id]: { ...cfg.events[id], [k]: v } } });
+  const alertsOff = !data.alerts?.on || !data.alerts?.channel;
+  const mins = (s) => (s < 0 ? 'Not reported' : s >= 5400 ? `${(s / 3600).toFixed(1)} hours` : `${Math.round(s / 60)} minutes`);
+  const pct = (n) => (n < 0 ? 'Not reported' : `${n}%`);
+  if (!data.config.on) {
+    return (
+      <Card title="Power (UPS)" desc="Watch a battery backup. NopeWarden tells you when the power fails and can shut the machine down cleanly before the battery runs out.">
+        <div className="stack">
+          <p className="small muted">APC and most other makes work. A UPS on a USB cable is found by itself; one on the network is read from the machine it is attached to.</p>
+          <Segmented value={src.source} onChange={(v) => setSrc({ ...src, source: v })} options={[{ value: 'usb', label: 'On a USB cable' }, { value: 'network', label: 'On the network' }]} />
+          {src.source === 'network' && (
+            <div className="row" style={{ alignItems: "center", gap: "var(--space-2)" }}>
+              <Field label="Address of the machine"><Input value={src.host} onChange={(v) => setSrc({ ...src, host: v })} placeholder="192.168.1.5" /></Field>
+              <Field label="UPS name" hint="Usually ups."><Input value={src.name} onChange={(v) => setSrc({ ...src, name: v })} placeholder="ups" /></Field>
+            </div>
+          )}
+          <div className="actions"><Button kind="primary" disabled={busy} onClick={() => run(() => post('/api/power/setup', src), 'UPS monitoring is on.').then(reload)}>Set up UPS monitoring</Button></div>
+          {!st.tool && st.can_install && <p className="small muted">This installs the small UPS program (NUT) from Debian first.</p>}
+        </div>
+      </Card>
+    );
+  }
+  const state = !st.answering ? ['Not answering', 'bad'] : st.on_battery ? ['On battery', 'warn'] : ['On mains power', 'good'];
+  return (
+    <Card title="Power (UPS)" desc="Watch a battery backup. NopeWarden tells you when the power fails and can shut the machine down cleanly before the battery runs out.">
+      <div className="stack">
+        {data.shutdown_at > 0 && (
+          <Note tone="bad" title="A clean shutdown is about to start">
+            {data.shutdown_why}. The machine shuts down at {new Date(data.shutdown_at * 1000).toLocaleTimeString()}.
+            <div className="actions"><Button kind="primary" disabled={busy} onClick={() => run(() => post('/api/power/cancel', {}), 'Cancelled.').then(reload)}>Cancel the shutdown</Button></div>
+          </Note>
+        )}
+        {alertsOff && <Note tone="warn" title="Power alerts are off">{data.alerts?.channel ? 'The alert "The power fails (UPS)" is switched off, so nothing will message you.' : 'No email or phone alerts are set up, so nothing will message you.'} Events still show here, in the log and on the Overview. Turn it on under Alerts.</Note>}
+        <div className="item">
+          <div className="fill"><div className="name">{[st.maker, st.model].filter(Boolean).join(' ') || 'UPS'}</div><div className="meta">{st.answering ? (st.replace ? 'The battery needs replacing.' : 'The battery is reported healthy.') : (st.error || 'The UPS did not answer.')}</div></div>
+          <Pill tone={state[1]}>{state[0]}</Pill>
+        </div>
+        {st.answering && (
+          <div className="list">
+            {[['Battery charge', pct(st.charge)], ['Time left on battery', mins(st.runtime)], ['Load', pct(st.load)], ['Input voltage', st.input_v ? `${st.input_v} V` : 'Not reported'], ['Battery health', st.replace ? 'Needs replacing' : 'Good']].map(([l, v]) => <div className="item" key={l}><div className="fill">{l}</div><span className="num">{v}</span></div>)}
+          </div>
+        )}
+        {data.past?.length > 0 && <p className="small muted">Recent power cuts: {data.past.map((p) => `${new Date(p.start * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}${p.end ? `, ${Math.max(1, Math.round((p.end - p.start) / 60))} min` : ', still out'}`).join('; ')}.</p>}
+        <div className="name">What happens when</div>
+        <div className="list">
+          {data.events.map((e) => (
+            <div key={e.ID} className="stack gap1" style={{ marginBottom: "var(--space-3)" }}>
+              <div className="fill"><div className="name">{e.Label}</div><div className="meta">{e.When}</div></div>
+              <div className="row">
+                {POWER_ACTS.filter(([k]) => k !== 'shutdown' || e.CanShutdown).map(([k, l]) => (
+                  <label key={k} className="row" style={{ alignItems: "center", gap: "var(--space-2)" }}><Switch checked={!!cfg.events[e.ID]?.[k]} onChange={(v) => setAct(e.ID, k, v)} label={`${e.Label}: ${l}`} /><span className="small">{l}</span></label>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="row">
+          <Field label="Battery counts as low at (% charge)"><NumberInput value={cfg.low_charge} onChange={(v) => set('low_charge', v)} /></Field>
+          <Field label="or when this many minutes are left"><NumberInput value={cfg.low_minutes} onChange={(v) => set('low_minutes', v)} /></Field>
+          <Field label="Wait before shutting down (seconds)" hint="Gives the power a chance to return."><NumberInput value={cfg.delay} onChange={(v) => set('delay', v)} /></Field>
+        </div>
+        <ToggleRow title="Switch the UPS off and back on with the machine" desc="After a low-battery shutdown, NopeWarden tells the UPS to cut its output and start again when the power returns, so the machine comes back by itself. The machine's firmware setting 'Restore on AC power loss' must be 'Power on'." checked={!!cfg.cut_output} onChange={(v) => set('cut_output', v)} />
+        <div className="actions">
+          {form && <Button kind="primary" disabled={busy} onClick={() => run(() => put('/api/power/config', form), 'Saved.').then(() => { setForm(null); reload(); })}>Save</Button>}
+          {form && <Button disabled={busy} onClick={() => setForm(null)}>Discard</Button>}
+        </div>
+        <div className="stack gap1">
+          <div className="name">Test power cut</div>
+          <p className="small muted">Plays a power cut, a low battery and the power coming back inside NopeWarden. The alerts and log lines are real and marked as a test. The machine is not shut down unless you tick the box.</p>
+          <label className="row" style={{ alignItems: "center", gap: "var(--space-2)" }}><Switch checked={real} onChange={setReal} label="Really shut down this machine" /><span className="small">Really shut down this machine during the test (you can cancel it)</span></label>
+          <div className="actions">
+            <Button disabled={busy || data.testing} onClick={() => run(() => post('/api/power/test', { shutdown: real }), 'The test is running.').then(reload)}>Test power cut</Button>
+            <Button disabled={busy} onClick={() => run(() => post('/api/power/off', {}), 'UPS monitoring is off.').then(reload)}>Stop watching the UPS</Button>
+          </div>
         </div>
       </div>
     </Card>
@@ -270,7 +411,7 @@ export default function Diagnostics() {
   return (
     <Page title="Diagnostics" sub="How NopeWarden itself is running: its services, its system log, and tools to test the connection. Looking for what your network did? Open Logs.">
       <Tabs value={tab} onChange={setTab} tabs={[{ value: 'services', label: 'Health & services' }, { value: 'log', label: 'System log' }, { value: 'tools', label: 'Network tools' }, { value: 'terminal', label: 'Terminal' }]} />
-      {tab === 'services' && <><Verdict /><Services /><DiskUse /><DiskHealth /><Certificates /><Connections />
+      {tab === 'services' && <><Verdict /><Services /><DiskUse /><DiskHealth /><PowerUPS /><Certificates /><Connections />
         <Card title="My network" desc="A printable summary for a handover or your records: networks, addresses, devices, open ports and how to get back in. It never contains passwords or keys.">
           <a className="btn" href="/api/summary/print" target="_blank" rel="noreferrer">Open the printable page</a>
         </Card></>}

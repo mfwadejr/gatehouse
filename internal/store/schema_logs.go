@@ -169,4 +169,22 @@ ALTER TABLE fw_events ADD COLUMN outcome TEXT NOT NULL DEFAULT '';
 ALTER TABLE fw_events ADD COLUMN bytes_out INTEGER NOT NULL DEFAULT -1;
 ALTER TABLE fw_events ADD COLUMN bytes_in INTEGER NOT NULL DEFAULT -1;
 ALTER TABLE fw_events ADD COLUMN dur INTEGER NOT NULL DEFAULT -1;
+`, `
+-- Drive counters over time (v0.9.4.56): the numbers worth watching on a drive (moved sectors, sectors
+-- waiting, cable errors, media errors, wear), noted when they change and at least every six hours.
+CREATE TABLE disk_counters(
+  ts INTEGER NOT NULL,
+  drive TEXT NOT NULL,
+  key TEXT NOT NULL,
+  value INTEGER NOT NULL
+);
+CREATE INDEX idx_disk_counters ON disk_counters(drive, key, ts);
+`, `
+-- Power cuts seen by the UPS monitor (v0.9.4.56): when the power went, when it came back (0 while it
+-- is still out), and whether it was a test played from the console.
+CREATE TABLE power_outages(
+  start INTEGER NOT NULL,
+  end INTEGER NOT NULL DEFAULT 0,
+  test INTEGER NOT NULL DEFAULT 0
+);
 `}

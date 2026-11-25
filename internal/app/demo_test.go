@@ -65,13 +65,18 @@ func TestDemoConsole(t *testing.T) {
 		// Drives and certificates, so Diagnostics and the menu dots have something to say.
 		fn.mu.Lock()
 		fn.disk = netd.DiskReport{Tool: true, CanInstall: true, At: time.Now().Unix(), Drives: []netd.Drive{
-			{Name: "nvme0n1", Model: "Samsung SSD 980 1TB", Kind: "NVMe SSD", Bytes: 1000204886016, Word: "Healthy", Reason: "The drive reports no problems.", Temp: 41, Wear: 3,
+			{Name: "nvme0n1", Model: "Samsung SSD 980 1TB", Kind: "NVMe SSD", Bytes: 1000204886016, Word: "Healthy", Reason: "The drive reports no problems.", Temp: 41, Wear: 3, Test: &netd.SelfTest{Kind: "Short", Result: "Passed"},
 				Lines: []netd.DiskLine{{Label: "Drive's own verdict", Value: "Passed"}, {Label: "Temperature", Value: "41 °C"}, {Label: "Powered on", Value: "1.2 years (437 days)"}, {Label: "Wear", Value: "3% of its rated life used"}, {Label: "Spare area left", Value: "100%"}, {Label: "Media errors", Value: "0"}}},
-			{Name: "sda", Model: "WDC WD10EZEX", Kind: "Hard disk", Bytes: 1000204886016, Word: "Warning", Level: "warn", Reason: "The drive has moved 8 sectors to its spare area. Keep an eye on it.", Temp: 38, Wear: -1,
+			{Name: "sda", Model: "WDC WD10EZEX", Kind: "Hard disk", Bytes: 1000204886016, Word: "Warning", Level: "warn", Reason: "The drive has moved 8 sectors to its spare area. Keep an eye on it.", Temp: 38, Wear: -1, Counters: map[string]int64{"realloc": 8, "pending": 0}, Test: &netd.SelfTest{Kind: "Extended", Result: "Passed"},
 				Lines: []netd.DiskLine{{Label: "Drive's own verdict", Value: "Passed"}, {Label: "Temperature", Value: "38 °C"}, {Label: "Sectors moved to spare", Value: "8"}, {Label: "Sectors waiting to be moved", Value: "0"}}, Missing: []string{"wear"}},
 			{Name: "vda", Model: "Virtual disk", Kind: "Virtual disk", Bytes: 21474836480, Word: "Not reported", Reason: "This is a virtual disk. Its health belongs to the machine that provides it."},
 		}}
+		fn.ups = netd.UPSStatus{Tool: true, Answering: true, Maker: "American Power Conversion", Model: "Back-UPS ES 700G", Raw: "OL", Charge: 100, Runtime: 38 * 60, Load: 27, InputV: 231, BatteryV: 13.6}
 		fn.mu.Unlock()
+		c.app.Logs.Exec(`INSERT INTO disk_counters(ts,drive,key,value) VALUES(?,?,?,?)`, time.Now().Add(-8*24*time.Hour).Unix(), "sda", "realloc", 5)
+		pc := c.app.powerConfig()
+		pc.On = true
+		c.app.savePowerConfig(pc)
 		now := time.Now()
 		ca, _ := vpn.NewCA(now.AddDate(-10, 0, 40))
 		srv, _ := ca.ServerCert(now.AddDate(-10, 0, 40))

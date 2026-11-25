@@ -67,6 +67,10 @@ type NetController interface {
 	DiagBundle() (string, error)
 	DiskHealth() netd.DiskReport
 	DiskToolInstall() error
+	DiskSelfTest(name, kind string) error
+	UPSStatus(u netd.UPSSetup) netd.UPSStatus
+	UPSSetupApply(u netd.UPSSetup) error
+	UPSShutdown(cut bool) error
 	TermOpen(rows, cols int) (string, error)
 	TermRead(id string, since int, wait time.Duration) ([]byte, int, bool, error)
 	TermWrite(id string, data []byte) error

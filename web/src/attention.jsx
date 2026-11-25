@@ -24,7 +24,8 @@ export function AttentionProvider({ children }) {
   const { data: setup } = useData('/api/setup/checklist', { topics: ['net.status', 'fw.status'], every: 30000 });
   const { data: ov } = useData('/api/overview/security', { every: 30000 });
   const { data: bk } = useData('/api/backups', { every: 300000 });
-  const { data: disks } = useData('/api/disk/health', { every: 3600000 });
+  const { data: disks } = useData('/api/disk/health', { every: 900000 });
+  const { data: power } = useData('/api/power', { every: 30000 });
   const { data: certs } = useData('/api/certs', { every: 3600000 });
   const { data: advData } = useData('/api/prefs/advice');
   const [advHide, setAdvHide] = useState(null);
@@ -102,7 +103,9 @@ export function AttentionProvider({ children }) {
       else if (!tried || Date.now() / 1000 - tried.hand_checked > 90 * 86400) add('info', 'backup-restore-check', 'Try a restore check on a backup', 'No backup has been checked by hand in 90 days. Press Check on one to be sure it will work.', 'settings/backup');
     }
     // A drive is shown only when it reports a problem or is nearly worn out.
-    (disks?.drives || []).filter((d) => d.level).forEach((d) => add(d.level, `disk:${d.name}`, d.word === 'Worn' ? `The drive ${d.model} is wearing out` : `The drive ${d.model} reports a problem`, d.reason, 'diagnostics/services', d.level === 'bad'));
+    (disks?.drives || []).filter((d) => d.level).forEach((d) => add(d.level, `disk:${d.name}`, d.gone ? `The drive ${d.model} has gone` : d.word === 'Worn' ? `The drive ${d.model} is wearing out` : `The drive ${d.model} reports a problem`, d.reason, 'diagnostics/services', d.level === 'bad'));
+    // The UPS: what is true right now, for the events set to show on the Overview.
+    (power?.lines || []).forEach((l) => add(l.level, `power:${l.id}`, l.title, l.detail, 'diagnostics/services', false));
     // Certificates: blue from 60 days out, amber from 30, red once expired.
     (certs?.certs || []).filter((c) => c.level).forEach((c) => {
       const when = c.days < 0 ? `ran out ${-c.days} day${c.days === -1 ? '' : 's'} ago` : c.days === 0 ? 'runs out today' : `has ${c.days} day${c.days === 1 ? '' : 's'} left`;
@@ -124,7 +127,7 @@ export function AttentionProvider({ children }) {
     // What the status line counts: things that need the person, not suggestions.
     const needs = a.filter((x) => x.level !== 'info');
     return { items: a, needs, byPage, byTab, worst, advice, loaded: !!(net && wans && fw) };
-  }, [net, wans, fw, rogue, vpn, util, dns, upd, sec, setup, ov, bk, certs, disks, advice]);
+  }, [net, wans, fw, rogue, vpn, util, dns, upd, sec, setup, ov, bk, certs, disks, power, advice]);
   return <AttentionContext.Provider value={value}>{children}</AttentionContext.Provider>;
 }
 

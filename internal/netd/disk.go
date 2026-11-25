@@ -33,6 +33,22 @@ type Drive struct {
 	Missing []string   `json:"missing"` // what this drive did not report
 	Temp    int        `json:"temp"`    // degrees C, 0 when not reported
 	Wear    int        `json:"wear"`    // percent used, -1 when not reported
+	// Counters are the numbers worth watching over time: moved sectors ("realloc"), sectors waiting
+	// ("pending"), sectors that could not be read ("uncorrectable"), cable errors ("crc"), media
+	// errors ("media") and wear. Only the ones the drive reports are present.
+	Counters  map[string]int64 `json:"counters,omitempty"`
+	Test      *SelfTest        `json:"test,omitempty"`       // the drive's latest self-test
+	Trend     []string         `json:"trend,omitempty"`      // plain lines about counters that rose, added by the app
+	Gone      bool             `json:"gone,omitempty"`       // the drive was seen before and is no longer there
+	LogErrors []string         `json:"log_errors,omitempty"` // disk errors in the system log, last 24 hours
+}
+
+// SelfTest is the result of the drive's most recent self-test.
+type SelfTest struct {
+	Kind    string `json:"kind"`   // Short or Extended
+	Result  string `json:"result"` // Passed, Failed or Interrupted
+	Hours   int    `json:"hours"`  // drive's power-on hours when it ran
+	Running bool   `json:"running"`
 }
 
 type DiskReport struct {
@@ -69,6 +85,31 @@ type smartJSON struct {
 		UnsafeShutdowns int `json:"unsafe_shutdowns"`
 		PowerOnHours    int `json:"power_on_hours"`
 	} `json:"nvme_smart_health_information_log"`
+	ATATests *struct {
+		Standard struct {
+			Table []struct {
+				Type struct {
+					String string `json:"string"`
+				} `json:"type"`
+				Status struct {
+					String string `json:"string"`
+					Passed bool   `json:"passed"`
+				} `json:"status"`
+				Hours int `json:"lifetime_hours"`
+			} `json:"table"`
+		} `json:"standard"`
+	} `json:"ata_smart_self_test_log"`
+	NVMeTests *struct {
+		Table []struct {
+			Code struct {
+				String string `json:"string"`
+			} `json:"self_test_code"`
+			Result struct {
+				String string `json:"string"`
+			} `json:"self_test_result"`
+			Hours int `json:"power_on_hours"`
+		} `json:"table"`
+	} `json:"nvme_self_test_log"`
 	ATA *struct {
 		Table []struct {
 			ID    int    `json:"id"`
@@ -138,7 +179,9 @@ func judge(d *Drive, j smartJSON, hdd bool) {
 	if j.PowerCycle != nil {
 		line("Power-ups", strconv.Itoa(*j.PowerCycle))
 	}
+	d.Counters = map[string]int64{}
 	if n := j.NVMe; n != nil {
+		d.Counters["media"] = int64(n.MediaErrors)
 		d.Wear = n.PercentageUsed
 		line("Wear", fmt.Sprintf("%d%% of its rated life used", n.PercentageUsed))
 		line("Spare area left", fmt.Sprintf("%d%%", n.AvailableSpare))
@@ -155,7 +198,7 @@ func judge(d *Drive, j smartJSON, hdd bool) {
 		}
 	}
 	if j.ATA != nil {
-		var realloc, pending, uncorr int64 = -1, -1, -1
+		var realloc, pending, uncorr, crc int64 = -1, -1, -1, -1
 		for _, a := range j.ATA.Table {
 			switch a.ID {
 			case 5:
@@ -164,6 +207,8 @@ func judge(d *Drive, j smartJSON, hdd bool) {
 				pending = a.Raw.Value
 			case 198:
 				uncorr = a.Raw.Value
+			case 199:
+				crc = a.Raw.Value
 			case 177, 202, 231, 233:
 				if d.Wear < 0 && a.Value > 0 && a.Value <= 100 {
 					d.Wear = 100 - a.Value // these report what is left
@@ -174,6 +219,11 @@ func judge(d *Drive, j smartJSON, hdd bool) {
 			line("Wear", fmt.Sprintf("%d%% of its rated life used", d.Wear))
 		} else if !hdd {
 			miss("wear")
+		}
+		for k, v := range map[string]int64{"realloc": realloc, "pending": pending, "uncorrectable": uncorr, "crc": crc} {
+			if v >= 0 {
+				d.Counters[k] = v
+			}
 		}
 		if realloc >= 0 {
 			line("Sectors moved to spare", strconv.FormatInt(realloc, 10))
@@ -193,6 +243,24 @@ func judge(d *Drive, j smartJSON, hdd bool) {
 	if j.NVMe == nil && j.ATA == nil && !hdd {
 		miss("wear")
 	}
+	if d.Wear >= 0 {
+		d.Counters["wear"] = int64(d.Wear)
+	}
+	d.Test = lastSelfTest(j)
+	if d.Test != nil {
+		when := ""
+		if d.Test.Running {
+			line("Self-test", d.Test.Kind+" test running now")
+		} else {
+			if d.Test.Hours > 0 && hours >= d.Test.Hours {
+				when = ", " + fmtHours(hours-d.Test.Hours) + " ago"
+			}
+			line("Last self-test", d.Test.Kind+": "+d.Test.Result+when)
+		}
+		if d.Test.Result == "Failed" {
+			warn("bad", "The drive's own self-test failed. Back up now and plan to replace it.")
+		}
+	}
 	if d.Word == "Healthy" && d.Wear >= 80 {
 		d.Word, d.Level = "Worn", "info"
 		d.Reason = fmt.Sprintf("%d%% of the drive's rated life is used. It still works; plan a replacement.", d.Wear)
@@ -200,6 +268,90 @@ func judge(d *Drive, j smartJSON, hdd bool) {
 			d.Level = "warn"
 		}
 	}
+}
+
+// lastSelfTest reads the newest entry of the drive's self-test log.
+func lastSelfTest(j smartJSON) *SelfTest {
+	if j.ATATests != nil && len(j.ATATests.Standard.Table) > 0 {
+		e := j.ATATests.Standard.Table[0] // newest first
+		t := &SelfTest{Hours: e.Hours}
+		low := strings.ToLower(e.Type.String)
+		t.Kind = "Short"
+		if strings.Contains(low, "extended") || strings.Contains(low, "long") {
+			t.Kind = "Extended"
+		}
+		st := strings.ToLower(e.Status.String)
+		switch {
+		case strings.Contains(st, "progress"):
+			t.Running = true
+		case e.Status.Passed || strings.Contains(st, "without error"):
+			t.Result = "Passed"
+		case strings.Contains(st, "abort") || strings.Contains(st, "interrupt") || strings.Contains(st, "host reset"):
+			t.Result = "Interrupted"
+		default:
+			t.Result = "Failed"
+		}
+		return t
+	}
+	if j.NVMeTests != nil && len(j.NVMeTests.Table) > 0 {
+		e := j.NVMeTests.Table[0]
+		t := &SelfTest{Hours: e.Hours, Kind: "Short"}
+		if strings.Contains(strings.ToLower(e.Code.String), "extended") {
+			t.Kind = "Extended"
+		}
+		r := strings.ToLower(e.Result.String)
+		switch {
+		case strings.Contains(r, "completed without"):
+			t.Result = "Passed"
+		case strings.Contains(r, "abort"):
+			t.Result = "Interrupted"
+		default:
+			t.Result = "Failed"
+		}
+		return t
+	}
+	return nil
+}
+
+// scanDiskLog picks out the lines of the kernel log that mean a drive had trouble: failed reads and
+// writes, and the link to a SATA drive being reset. Lines naming a drive go to that drive; link
+// resets name only a port, so they go to the machine's one SATA drive when there is exactly one.
+func scanDiskLog(text string, drives map[string]string) map[string][]string {
+	out := map[string][]string{}
+	sata := ""
+	n := 0
+	for name, kind := range drives {
+		if kind == "SATA SSD" || kind == "Hard disk" {
+			sata = name
+			n++
+		}
+	}
+	for _, ln := range strings.Split(text, "\n") {
+		low := strings.ToLower(ln)
+		hit := ""
+		switch {
+		case strings.Contains(low, "i/o error, dev "), strings.Contains(low, "blk_update_request"), strings.Contains(low, "buffer i/o error on dev"):
+			for name := range drives {
+				if strings.Contains(low, "dev "+strings.ToLower(name)) {
+					hit = name
+				}
+			}
+		case strings.Contains(low, "nvme") && (strings.Contains(low, "timeout") || strings.Contains(low, "controller is down") || strings.Contains(low, "resetting controller")):
+			for name := range drives {
+				if strings.HasPrefix(name, "nvme") && strings.Contains(low, name[:strings.Index(name+"n", "n")]+":") {
+					hit = name
+				}
+			}
+		case strings.Contains(low, "hard resetting link"), strings.Contains(low, "exception emask"), strings.Contains(low, "failed command: "), strings.Contains(low, "sata link down"):
+			if n == 1 {
+				hit = sata
+			}
+		}
+		if hit != "" {
+			out[hit] = append(out[hit], strings.TrimSpace(ln))
+		}
+	}
+	return out
 }
 
 func plural(n int) string {
@@ -297,7 +449,52 @@ func (s *Service) DiskHealth() DiskReport {
 		rep.Drives = append(rep.Drives, d)
 	}
 	sort.Slice(rep.Drives, func(i, k int) bool { return rep.Drives[i].Name < rep.Drives[k].Name })
+	kinds := map[string]string{}
+	for _, d := range rep.Drives {
+		kinds[d.Name] = d.Kind
+	}
+	if len(kinds) > 0 {
+		if txt, err := sysRun(15*time.Second, "journalctl", "-k", "--since", "-24h", "--no-pager", "-o", "cat"); err == nil {
+			found := scanDiskLog(txt, kinds)
+			for i := range rep.Drives {
+				if ls := found[rep.Drives[i].Name]; len(ls) > 0 {
+					if len(ls) > 5 {
+						ls = append(ls[:2:2], ls[len(ls)-3:]...)
+					}
+					rep.Drives[i].LogErrors = ls
+				}
+			}
+		}
+	}
 	return rep
+}
+
+// DiskSelfTest asks a drive to run its own short or extended self-test. The drive does the work
+// itself, in the background, and keeps working normally meanwhile.
+func (s *Service) DiskSelfTest(name, kind string) error {
+	if kind != "short" && kind != "long" {
+		return fmt.Errorf("the test is short or long")
+	}
+	if name == "" || strings.ContainsAny(name, "/.") {
+		return fmt.Errorf("that is not a drive")
+	}
+	base := filepath.Join(s.sys(), "block", name)
+	if _, err := os.Stat(base); err != nil {
+		return fmt.Errorf("that drive is not here")
+	}
+	model := readSys(filepath.Join(base, "device", "model"))
+	vendor := readSys(filepath.Join(base, "device", "vendor"))
+	if _, virtual := diskKind(name, model, vendor, false); virtual {
+		return fmt.Errorf("a virtual disk has no self-test")
+	}
+	if _, err := lookPath("smartctl"); err != nil {
+		return fmt.Errorf("NopeWarden needs the SMART tool to test a drive")
+	}
+	out, err := sysRun(30*time.Second, "smartctl", "-t", kind, "/dev/"+name)
+	if err != nil && !strings.Contains(out, "Testing has begun") && !strings.Contains(out, "Self-test has begun") {
+		return fmt.Errorf("the drive did not start the test: %s", smartLastLine(out))
+	}
+	return nil
 }
 
 // DiskToolInstall installs smartmontools, the small program that reads drive health.

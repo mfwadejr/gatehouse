@@ -36,6 +36,8 @@ export function morningSummary(items, y) {
       lines.push(y.blocked_in > 0 ? `${plural(y.blocked_in, 'attempt', 'attempts')} from the internet ${y.blocked_in === 1 ? 'was' : 'were'} blocked, from ${plural(y.probe_addrs, 'address', 'addresses')}.` : 'Nothing from the internet was blocked.');
       if (y.alerts > 0) lines.push(`Threat watching raised ${plural(y.alerts, 'alert', 'alerts')}.`);
     }
+    (y.drives || []).forEach((l) => lines.push(l));
+    (y.power || []).forEach((l) => lines.push(l));
   }
   return { head, tone, pill, top, suggest, lines };
 }

@@ -70,6 +70,10 @@ type NetController interface {
 	DiagBundle() (string, error)
 	DiskHealth() netd.DiskReport
 	DiskToolInstall() error
+	DiskSelfTest(name, kind string) error
+	UPSStatus(u netd.UPSSetup) netd.UPSStatus
+	UPSSetupApply(u netd.UPSSetup) error
+	UPSShutdown(cut bool) error
 	TermOpen(rows, cols int) (string, error)
 	TermRead(id string, since int, wait time.Duration) ([]byte, int, bool, error)
 	TermWrite(id string, data []byte) error
@@ -431,6 +435,30 @@ func (s *Server) dispatchNet(r request) (any, error) {
 		return s.Net.DiagBundle()
 	case "disk.health":
 		return s.Net.DiskHealth(), nil
+	case "disk.test":
+		var p struct{ Name, Kind string }
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return nil, s.Net.DiskSelfTest(p.Name, p.Kind)
+	case "ups.status":
+		var u netd.UPSSetup
+		if err := json.Unmarshal(r.Params, &u); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return s.Net.UPSStatus(u), nil
+	case "ups.setup":
+		var u netd.UPSSetup
+		if err := json.Unmarshal(r.Params, &u); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return nil, s.Net.UPSSetupApply(u)
+	case "ups.shutdown":
+		var p struct{ Cut bool }
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return nil, s.Net.UPSShutdown(p.Cut)
 	case "disk.install":
 		return nil, s.Net.DiskToolInstall()
 	case "term.open":
@@ -883,6 +911,29 @@ func (c *Client) DiskHealth() netd.DiskReport {
 // DiskToolInstall installs the program that reads drive health.
 func (c *Client) DiskToolInstall() error {
 	return c.callWithin(12*time.Minute, "disk.install", nil, nil)
+}
+
+// DiskSelfTest starts a drive's own self-test.
+func (c *Client) DiskSelfTest(name, kind string) error {
+	return c.call("disk.test", struct{ Name, Kind string }{name, kind}, nil)
+}
+
+// UPSStatus reads the UPS.
+func (c *Client) UPSStatus(u netd.UPSSetup) netd.UPSStatus {
+	var out netd.UPSStatus
+	c.callWithin(30*time.Second, "ups.status", u, &out)
+	return out
+}
+
+// UPSSetupApply installs the UPS software if needed and points it at the UPS.
+func (c *Client) UPSSetupApply(u netd.UPSSetup) error {
+	return c.callWithin(12*time.Minute, "ups.setup", u, nil)
+}
+
+// UPSShutdown shuts the machine down cleanly, optionally telling the UPS to cut its output and come
+// back when the power does.
+func (c *Client) UPSShutdown(cut bool) error {
+	return c.call("ups.shutdown", struct{ Cut bool }{cut}, nil)
 }
 
 // TermOpen starts a shell and returns its id.

@@ -31,6 +31,10 @@ type fakeNet struct {
 	pending bool
 	paused  []string
 	disk    netd.DiskReport // what the demo console shows for drive health
+	ups     netd.UPSStatus  // what the fake UPS reports
+	upsErr  bool            // the fake UPS does not answer
+	shut    []bool          // clean shutdowns asked for, with whether the UPS was told to cut its output
+	tests   []string        // self-tests asked for, as "drive:kind"
 
 	vpn      netd.VPNPlan
 	vpnCalls int
@@ -498,6 +502,27 @@ func (f *fakeNet) DiskHealth() netd.DiskReport {
 	return f.disk
 }
 func (f *fakeNet) DiskToolInstall() error { return nil }
+func (f *fakeNet) UPSStatus(u netd.UPSSetup) netd.UPSStatus {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.upsErr {
+		return netd.UPSStatus{Tool: true, Charge: -1, Runtime: -1, Load: -1, Error: "Connection failure"}
+	}
+	return f.ups
+}
+func (f *fakeNet) UPSSetupApply(u netd.UPSSetup) error { return nil }
+func (f *fakeNet) UPSShutdown(cut bool) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.shut = append(f.shut, cut)
+	return nil
+}
+func (f *fakeNet) DiskSelfTest(name, kind string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.tests = append(f.tests, name+":"+kind)
+	return nil
+}
 func (f *fakeNet) TermOpen(rows, cols int) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

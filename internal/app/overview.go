@@ -232,6 +232,13 @@ type ocacheEntry struct {
 
 // cached keeps an expensive answer for a while, so a page open on several screens costs one query.
 // Two callers asking for the same thing at once share one build.
+// dropCached forgets a cached reading so the next ask looks again.
+func (a *App) dropCached(key string) {
+	a.ocache.mu.Lock()
+	delete(a.ocache.m, key)
+	a.ocache.mu.Unlock()
+}
+
 func (a *App) cached(key string, ttl time.Duration, build func() any) any {
 	a.ocache.mu.Lock()
 	if a.ocache.m == nil || len(a.ocache.m) > 128 {

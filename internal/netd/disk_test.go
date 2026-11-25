@@ -109,3 +109,34 @@ func TestDiskHealthReport(t *testing.T) {
 		t.Fatalf("vda = %+v", d)
 	}
 }
+
+func TestSelfTestResultAndKernelLogScan(t *testing.T) {
+	j := parseSmart(t, `{"smart_status":{"passed":true},"power_on_time":{"hours":5000},"ata_smart_self_test_log":{"standard":{"table":[{"type":{"string":"Extended offline"},"status":{"string":"Completed without error","passed":true},"lifetime_hours":4900},{"type":{"string":"Short offline"},"status":{"string":"Completed without error","passed":true},"lifetime_hours":4000}]}}}`)
+	d := Drive{}
+	judge(&d, j, false)
+	if d.Test == nil || d.Test.Kind != "Extended" || d.Test.Result != "Passed" || d.Level != "" {
+		t.Fatalf("%+v", d.Test)
+	}
+	j = parseSmart(t, `{"smart_status":{"passed":true},"ata_smart_self_test_log":{"standard":{"table":[{"type":{"string":"Short offline"},"status":{"string":"Completed: read failure","passed":false},"lifetime_hours":10}]}}}`)
+	d = Drive{}
+	judge(&d, j, false)
+	if d.Level != "bad" || d.Test.Result != "Failed" {
+		t.Fatalf("failed test: %s %+v", d.Level, d.Test)
+	}
+	j = parseSmart(t, `{"smart_status":{"passed":true},"ata_smart_attributes":{"table":[{"id":5,"raw":{"value":8}},{"id":199,"raw":{"value":2}}]}}`)
+	d = Drive{}
+	judge(&d, j, false)
+	if d.Counters["realloc"] != 8 || d.Counters["crc"] != 2 {
+		t.Fatalf("counters %v", d.Counters)
+	}
+	log := "ata1.00: exception Emask 0x0 SAct 0x0\nata1: hard resetting link\nblk_update_request: I/O error, dev sda, sector 1234\nEXT4-fs: mounted\nnvme nvme0: I/O 12 QID 3 timeout, aborting"
+	got := scanDiskLog(log, map[string]string{"sda": "SATA SSD", "nvme0n1": "NVMe SSD"})
+	if len(got["sda"]) != 3 || len(got["nvme0n1"]) != 1 {
+		t.Fatalf("scan: %v", got)
+	}
+	// Two SATA drives: a link reset names only a port, so it is not pinned on either.
+	got = scanDiskLog("ata1: hard resetting link", map[string]string{"sda": "SATA SSD", "sdb": "Hard disk"})
+	if len(got) != 0 {
+		t.Fatalf("unattributed: %v", got)
+	}
+}

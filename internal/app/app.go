@@ -107,6 +107,7 @@ type App struct {
 	hist       histState
 	speed      speedRun
 	ocache     ocache
+	power      powerRun
 	probeKick  chan struct{}
 	upnp       upnpState
 	mdns       mdns.Reflector
@@ -447,6 +448,8 @@ func (a *App) Run(ctx context.Context) error {
 	run(func() { a.rogueLoop(ctx) })
 	run(func() { a.sshLoop(ctx) })
 	run(func() { a.mgmtLoop(ctx) })
+	run(func() { a.diskLoop(ctx) })
+	run(func() { a.powerLoop(ctx) })
 
 	a.con.begin(ctx)
 	cs, err := a.startConsole(ctx, a.consoleAddr())

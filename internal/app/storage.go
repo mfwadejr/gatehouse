@@ -124,6 +124,7 @@ func clampInt(v, lo, hi int) int {
 func (a *App) pruneLong() {
 	cut := time.Now().Add(-time.Duration(a.longDays()) * 24 * time.Hour).Unix()
 	a.Logs.Exec(`DELETE FROM threat_alerts WHERE ts<?`, cut)
+	a.Logs.Exec(`DELETE FROM disk_counters WHERE ts<?`, time.Now().Add(-400*24*time.Hour).Unix())
 	a.Logs.Exec(`DELETE FROM outages WHERE start<? AND end>0`, cut)
 	adm, aargs := a.adminCond()
 	a.Logs.Exec(`DELETE FROM events WHERE ts<? AND `+adm, append([]any{time.Now().Add(-time.Duration(a.adminDays()) * 24 * time.Hour).Unix()}, aargs...)...)
