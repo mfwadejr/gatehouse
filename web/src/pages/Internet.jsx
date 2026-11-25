@@ -91,7 +91,7 @@ function WanForm({ initial, ports, found, onClose, onSaved, wans }) {
           <Field label="Check by" hint="How NopeWarden knows this connection works."><Select value={w.check_kind} onChange={set('check_kind')} options={[{ value: 'icmp', label: 'Ping' }, { value: 'tcp', label: 'Open a connection' }]} /></Field>
           <Field label="Check against" hint={w.check_kind === 'tcp' ? 'host:port' : 'An address that is almost always up'}><Input value={w.check_target} onChange={set('check_target')} placeholder="1.1.1.1" /></Field>
           <Field label="Order" hint="1 is used first."><NumberInput value={w.priority} onChange={set('priority')} /></Field>
-          <Field label="Share of traffic" hint="Used when sharing load."><NumberInput value={w.weight} onChange={set('weight')} /></Field>
+          <Field label="Share of traffic" hint="Used when sharing load. Each connection uses one link; many together even out."><NumberInput value={w.weight} onChange={set('weight')} /></Field>
           <Field label="Packet size (MTU)" hint="0 for automatic"><NumberInput value={w.mtu} onChange={set('mtu')} /></Field>
         </div>
       )}
@@ -203,7 +203,7 @@ export default function Internet({ me }) {
       {(!showTabs || tab === 'connections') && wans.length > 0 && <Traffic wans={wans} links={links} />}
       {(!showTabs || tab === 'connections') && (wans.length > 0 || !isNew) ? (
         <Card title="Internet connections" actions={<Button icon="plus" onClick={() => setEdit({})}>Add connection</Button>}
-          desc={wans.length > 1 ? 'Choose how these share the work, or send certain devices through specific ones, in Connection groups below.' : 'The links that connect this firewall to the internet.'}>
+          desc={wans.length > 1 ? 'Choose how these share the work, or send certain devices through specific ones, in Connection groups below. When they share the load, each connection goes down one link, so one big download uses one link and the split only evens out over many connections.' : 'The links that connect this firewall to the internet.'}>
           {wans.length === 0 ? <Empty>No connection yet.</Empty> : (
             <div className="list">
               {wans.map((w) => {

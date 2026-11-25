@@ -1,6 +1,15 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.53',
+    title: 'Sharing the load between two connections',
+    items: [
+      'When two connections share the load, NopeWarden now picks a link using the ports of each connection as well as the addresses. Before, several big downloads from one computer to the same few servers all took one link and the second one stayed empty. The setting is written by NopeWarden and kept across reboots.',
+      'Networks, Network layout no longer calls the second connection standing by when you share the load. Each working connection shows as in use with its share and its own live speed. It reads what the box is really doing, so a sharing setting that is saved but not applied yet says so. Standing by stays for failover.',
+      'Internet says plainly that each connection goes down one link, so one big download uses one link and the split evens out over many connections.',
+    ],
+  },
+  {
     version: '0.9.4.52',
     title: 'Managing this device',
     items: [

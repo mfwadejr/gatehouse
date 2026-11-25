@@ -19,7 +19,7 @@ Tabs along the top: **Connections**, **Speed**, **Speed control**, **Troubleshoo
 ## Common tasks
 1. Add a second connection: **Add connection**, choose the port (NopeWarden notices a cable as you plug it in), choose how your provider connects you, **Save**, then **Review and apply**.
 2. Change provider settings: **Edit**, change the type, **Save**, **Review and apply**.
-3. Use two connections: give each an **Order** (1 is used first) or a **Share of traffic**.
+3. Use two connections: give each an **Order** (1 is used first) or a **Share of traffic**. When connections share the load, each new connection goes down one link, picked by the addresses and ports involved. One big download therefore uses one link, and the split only evens out over many connections, so it is rarely exactly the shares you set.
 
 4. Slow down a guest network: **Speed control**, **Limit speed**, choose the network under **Where it applies**, enter a **Download limit (Mb/s)**, **Save**, then **Review and apply**.
 5. Keep video calls smooth while someone downloads: turn on **Keep delay low when the line is busy**, then **Give priority** to the category you want to go first.

@@ -41,8 +41,21 @@ func TestDemoConsole(t *testing.T) {
 		"Fibre": {Up: true, Gateway: "192.0.2.1", RTT: 6200 * time.Microsecond, Since: time.Now().Add(-72 * time.Hour), Active: true, Checked: true, Health: "working", GwRTT: 2 * time.Millisecond, Last: time.Now()},
 		"Cable": {Up: true, Gateway: "198.51.100.1", RTT: 14 * time.Millisecond, Since: time.Now().Add(-72 * time.Hour), Checked: true, Health: "working", GwRTT: 4 * time.Millisecond, Last: time.Now()},
 	}
+	if os.Getenv("NW_BALANCE") == "live" { // the monitor marks every link in a balancing group as carrying traffic
+		x := fn.wan["Cable"]
+		x.Active = true
+		fn.wan["Cable"] = x
+	}
 	fn.mu.Unlock()
 	seedDemo(t, c, scene)
+	if os.Getenv("NW_BALANCE") != "" { // both connections share the load, half each
+		_, wm, _ := c.call("GET", "/api/net/wans", nil)
+		var ms []map[string]any
+		for _, x := range wm["wans"].([]any) {
+			ms = append(ms, map[string]any{"wan_id": x.(map[string]any)["id"], "weight": 50, "enabled": true})
+		}
+		c.call("PUT", "/api/net/default-group", map[string]any{"label": "Default", "mode": "balance", "members": ms})
+	}
 	if scene == "engine" {
 		fn.mu.Lock()
 		fn.threatInfo = netd.ThreatInfo{Installed: true, Version: "7.0.8", Running: true, State: "idle", DiskFreeMB: 20000, MemoryMB: 8192, CPUs: 4,

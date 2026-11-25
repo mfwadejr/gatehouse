@@ -15,6 +15,7 @@ const last = (a) => (a && a.length ? a[a.length - 1] : 0);
 
 export function NetworkLayout({ nets, zones, scopes, onOpen }) {
   const { data: wans } = useData('/api/net/wans', { topics: ['net.status'] });
+  const { data: grp } = useData('/api/net/groups', { topics: ['net.status'], every: 15000 });
   const { data: net } = useData('/api/net/status', { topics: ['net.status'], every: 4000 });
   const { data: thr } = useThroughput(1000);
   const { data: speed } = useData('/api/net/zone-speed', { every: 1000 });
@@ -26,7 +27,18 @@ export function NetworkLayout({ nets, zones, scopes, onOpen }) {
   const enabled = (wans?.wans || []).filter((w) => w.enabled);
   const states = enabled.map((w) => ({ w, l: links[w.name], s: linkState(links[w.name]) }));
   const active = states.find((x) => x.l?.active) || states.find((x) => x.s.health === 'working');
-  const standby = states.filter((x) => x !== active && x.s.health === 'working');
+  // In Balance mode every working link in the default group carries traffic, each in proportion to its
+  // share. Only in Failover does one link carry it while the others wait.
+  const balance = grp?.default?.mode === 'balance';
+  const shareOf = new Map((grp?.default?.members || []).map((m) => [m.name, Math.max(m.weight || 1, 1)]));
+  const working = states.filter((x) => x.s.health === 'working');
+  const total = working.reduce((n, x) => n + (shareOf.get(x.w.name) || 1), 0);
+  // What the box is really doing comes from the monitor (two or more links carrying traffic), not
+  // from the saved setting, which only takes effect once the change has been applied.
+  const live = working.filter((x) => x.l?.active).length > 1;
+  const notYet = balance && working.length > 1 && !live;
+  const shared = live ? working.map((x) => ({ ...x, pct: Math.round(((shareOf.get(x.w.name) || 1) / total) * 100) })) : null;
+  const standby = shared ? [] : states.filter((x) => x !== active && x.s.health === 'working');
   const down = enabled.reduce((n, w) => n + last(thr?.links?.[w.name]?.rx), 0);
   const up = enabled.reduce((n, w) => n + last(thr?.links?.[w.name]?.tx), 0);
   const tone = !enabled.length ? 'bad' : active ? (active.s.health === 'working' ? 'good' : 'warn') : states.every((x) => x.s.health === 'unknown' || x.s.health === 'none') ? '' : 'bad';
@@ -52,12 +64,15 @@ export function NetworkLayout({ nets, zones, scopes, onOpen }) {
           <div className="nl-up">
             <div className="nl-cloud">
               <span className={`sdot ${tone}`} aria-hidden="true" />
-              <b>{active ? `Internet · ${active.w.name || 'connection'}` : enabled.length ? 'Internet' : 'No internet connection set up'}</b>
-              {active && <Pill tone="good">In use</Pill>}
+              <b>{shared ? `Internet · ${grp?.default?.label || 'Default'} group sharing the load` : active ? `Internet · ${active.w.name || 'connection'}` : enabled.length ? 'Internet' : 'No internet connection set up'}</b>
+              {shared ? shared.map((x) => <Pill key={x.w.name} tone="good">{x.w.name} in use · {x.pct}%</Pill>) : active && <Pill tone="good">In use</Pill>}
+              {notYet && <button type="button" className="pillbtn warn" onClick={() => go('review')}>Sharing is saved, not applied yet</button>}
               {standby.map((x) => <Pill key={x.w.name}>{x.w.name} standing by</Pill>)}
               {enabled.length > 0 && !active && <Pill tone={tone}>{states[0]?.s.text}</Pill>}
             </div>
-            {enabled.length > 0 && <div className="nl-rate mono"><span className="nl-d">▼ {fmtBits(down)}</span><span className="nl-u">▲ {fmtBits(up)}</span>{active && linkMeasure(active.l) && <span>{linkMeasure(active.l)}</span>}</div>}
+            {shared ? shared.map((x) => (
+              <div className="nl-rate mono" key={x.w.name}><span>{x.w.name}</span><span className="nl-d">▼ {fmtBits(last(thr?.links?.[x.w.name]?.rx))}</span><span className="nl-u">▲ {fmtBits(last(thr?.links?.[x.w.name]?.tx))}</span>{linkMeasure(x.l) && <span>{linkMeasure(x.l)}</span>}</div>
+            )) : enabled.length > 0 && <div className="nl-rate mono"><span className="nl-d">▼ {fmtBits(down)}</span><span className="nl-u">▲ {fmtBits(up)}</span>{active && linkMeasure(active.l) && <span>{linkMeasure(active.l)}</span>}</div>}
           </div>
           {cards.length > 0 && (
             <>

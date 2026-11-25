@@ -244,3 +244,15 @@ func TestTunnelRoutingFiles(t *testing.T) {
 		t.Error("bad source accepted")
 	}
 }
+
+// Sharing the load between two links picks a link per connection from a hash. Without the ports in
+// that hash, many downloads between one computer and a few servers all take the same link.
+func TestSharingTheLoadHashesOnPorts(t *testing.T) {
+	o, err := Generate(cfg())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(o.Sysctl, "net.ipv4.fib_multipath_hash_policy=1\n") {
+		t.Fatalf("sysctl does not hash on ports:\n%s", o.Sysctl)
+	}
+}
