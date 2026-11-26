@@ -351,9 +351,13 @@ func (a *App) registerFWObjectRoutes() {
 		if ex == nil {
 			ex = []fw.DNSException{}
 		}
-		var redirected, exempt int64
+		var redirected, exempt, dohStopped, dotStopped int64
 		for k, h := range a.hitTable() {
 			switch {
+			case k == "rule:dns:doh":
+				dohStopped += h.Hits
+			case k == "rule:dns:dot" || k == "rule:dns:dot:device":
+				dotStopped += h.Hits
 			case strings.HasPrefix(k, "rule:dns:force:"):
 				redirected += h.Hits
 			case k == "rule:dns:exempt":
@@ -362,8 +366,9 @@ func (a *App) registerFWObjectRoutes() {
 		}
 		api.JSON(w, 200, map[string]any{
 			"master": a.Config.Setting("fw.dns_redirect", "1") == "1", "target": strings.TrimSpace(a.Config.Setting("fw.dns_target", "")),
-			"block_dot": a.Config.Setting("fw.block_dot", "1") == "1",
-			"networks":  nets, "exceptions": ex, "redirected": redirected, "exempt": exempt,
+			"block_dot": a.Config.Setting("fw.block_dot", "1") == "1", "block_doh": a.Config.Setting("fw.block_doh", "0") == "1",
+			"doh_stopped": dohStopped, "dot_stopped": dotStopped,
+			"networks": nets, "exceptions": ex, "redirected": redirected, "exempt": exempt,
 		})
 	})
 	s.HandleAdmin("PUT /api/fw/dnsforce/network", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {

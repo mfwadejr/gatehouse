@@ -33,6 +33,8 @@ const ROWS = [
   ['Names that use a different server', 'dns/servers', 'Ask a particular server for one domain, such as an office network', 'conditional forwarding forward zone domain office corporate split dns active directory', 'Names that use a different server'],
   ['Match names with a pattern', 'dns/lists', 'Block or allow many names at once with * and ?, or a regular expression', 'regex wildcard pattern glob expression match block allow', 'Always allow or always block'],
   ['Forced DNS', 'dns/servers', 'Make devices use this DNS even if they try another', 'force redirect port 53 hardcoded dns', 'Forced DNS'],
+  ['Block encrypted DNS to other servers', 'dns/servers', 'Stop devices hiding their lookups in DNS-over-TLS', 'dot dns over tls 853 bypass block encrypted dns quic', 'Forced DNS'],
+  ['Block well-known encrypted-DNS websites', 'dns/servers', 'Stop DNS-over-HTTPS to Google, Cloudflare and others', 'doh dns over https 443 bypass block 8.8.8.8 1.1.1.1 android private dns', 'Forced DNS'],
   ['DHCP', 'dhcp/overview', 'How DHCP is doing right now', 'overview status address use pool full devices lately'],
   ['How full the address pools are', 'dhcp/overview', 'Which pools are nearly out of addresses', 'pool utilisation full out of addresses range exhausted', 'Address pools'],
   ['Devices over time', 'dhcp/overview', 'How many devices had an address, over 1 hour, 24 hours or 7 days', 'devices joining online history chart', 'Devices over time'],

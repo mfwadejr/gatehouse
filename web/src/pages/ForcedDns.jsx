@@ -92,6 +92,11 @@ export default function ForcedDns({ s, save, pickers, reload }) {
           </div>
         </>
       )}
+      <div className="stack mt3">
+        <div><b>Lookups hidden inside other traffic</b></div>
+        <ToggleRow title="Block encrypted DNS to other servers" desc={`Stops devices bypassing your filters with DNS-over-TLS or DNS-over-QUIC (port 853). Follows the settings above: a device left alone is not blocked.${data?.dot_stopped > 0 ? ` ${fmt.n(data.dot_stopped)} attempts stopped so far.` : ''}`} checked={!!s.block_dot} onChange={save('block_dot')} />
+        <ToggleRow title="Also block well-known encrypted-DNS websites" desc={`Some devices send their lookups inside ordinary web traffic (DNS-over-HTTPS) to Cloudflare, Google, Quad9, OpenDNS, AdGuard or CleanBrowsing. This stops those well-known servers, and the device then falls back to ordinary DNS, which Forced DNS sends to NopeWarden. It cannot be complete: any website can run such a server, so it stops the common cases, not a determined person.${data?.doh_stopped > 0 ? ` ${fmt.n(data.doh_stopped)} attempts stopped so far.` : ''}`} checked={!!s.block_doh} onChange={save('block_doh')} />
+      </div>
       <details className="more" style={{ marginTop: 'var(--space-4)' }}>
       <summary>More: exceptions ({(data?.exceptions || []).length}) and what this cannot stop</summary>
       <div className="stack" style={{ marginTop: 'var(--space-3)' }}>
@@ -119,7 +124,7 @@ export default function ForcedDns({ s, save, pickers, reload }) {
         )}
       </div>
       <Note title="What this cannot stop">
-        Forced DNS redirects ordinary DNS. A device that sends its lookups hidden inside normal web traffic (DNS-over-HTTPS, which some browsers and phones use) can still go around it. Turn that off in the browser or device if it matters.
+        Forced DNS redirects ordinary DNS. A device that sends its lookups hidden inside normal web traffic (DNS-over-HTTPS, which some browsers and phones use) can still go around it unless you switch on Also block well-known encrypted-DNS websites above, and that list cannot be complete. Turn it off in the browser or device if it matters.
       </Note>
       </details>
     </Card>

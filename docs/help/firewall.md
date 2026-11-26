@@ -17,7 +17,7 @@ Tabs along the top:
 - **Open ports**: **Open a port** lets something outside reach an app on one of your devices, like Plex or a game server. Each one can be paused, put on a schedule, turned off, edited or removed, the same way as a rule. A paused rule or port is closed until the time runs out or you press **Resume now**. The change waits for **Review and apply** like any other.
 - **Countries** blocks or allows whole countries.
 - **Discovery** lets devices on different networks find each other, such as casting and printers.
-- **Protection** holds **Block encrypted DNS to other servers**, **Also block well-known encrypted-DNS websites**, **Ask for a code before changing the firewall** and **Log blocked traffic**. Forced DNS is on the DNS page, under Servers.
+- **Protection** holds **Ask for a code before changing the firewall** and **Log blocked traffic**. Forced DNS, and the two switches that stop devices hiding their lookups in encrypted traffic, are on the DNS page, under Servers.
 - **History** has **Change history**: every time the firewall was changed and whether you kept it.
 
 The box at the top of the page, **Protected**, lists the rules that always let you get back in. The management port and who may manage this device live under Settings, Managing this device, because they are settings of the machine, not of the firewall. The firewall rules they need are still made for you.

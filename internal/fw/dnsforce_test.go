@@ -194,7 +194,7 @@ func TestBlockDoHDropsKnownServersAndNftAcceptsIt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"th dport 443 counter drop comment \"block known public encrypted-dns servers\"", "1.1.1.1", "8.8.8.8", "2606:4700:4700::1111"} {
+	for _, want := range []string{"th dport 443 counter drop comment \"rule:dns:doh\"", "1.1.1.1", "8.8.8.8", "2606:4700:4700::1111"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q", want)
 		}

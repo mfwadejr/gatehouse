@@ -445,8 +445,8 @@ func (c *compiler) forward() {
 			keep = " ether saddr != " + setLit(offMACs)
 		}
 		if forced := plan.forced(); len(forced) > 0 {
-			c.line(2, "iifname %s oifname %s%s tcp dport 853 counter drop comment \"block dns-over-tls bypass\"", ifSet(forced), ifSet(wan), keep)
-			c.line(2, "iifname %s oifname %s%s udp dport 853 counter drop comment \"block dns-over-quic bypass\"", ifSet(forced), ifSet(wan), keep)
+			c.line(2, "iifname %s oifname %s%s tcp dport 853 counter drop comment \"rule:dns:dot\"", ifSet(forced), ifSet(wan), keep)
+			c.line(2, "iifname %s oifname %s%s udp dport 853 counter drop comment \"rule:dns:dot\"", ifSet(forced), ifSet(wan), keep)
 		}
 		forcedMACs := append([]string(nil), gateMACs...)
 		for _, k := range srvKeys {
@@ -454,8 +454,8 @@ func (c *compiler) forward() {
 		}
 		sort.Strings(forcedMACs)
 		if forcedMACs = uniq(forcedMACs); len(forcedMACs) > 0 {
-			c.line(2, "oifname %s ether saddr %s tcp dport 853 counter drop comment \"block dns-over-tls bypass (device)\"", ifSet(wan), setLit(forcedMACs))
-			c.line(2, "oifname %s ether saddr %s udp dport 853 counter drop comment \"block dns-over-quic bypass (device)\"", ifSet(wan), setLit(forcedMACs))
+			c.line(2, "oifname %s ether saddr %s tcp dport 853 counter drop comment \"rule:dns:dot:device\"", ifSet(wan), setLit(forcedMACs))
+			c.line(2, "oifname %s ether saddr %s udp dport 853 counter drop comment \"rule:dns:dot:device\"", ifSet(wan), setLit(forcedMACs))
 		}
 	}
 	if m.BlockDoH && len(wan) > 0 {
@@ -464,8 +464,8 @@ func (c *compiler) forward() {
 			if len(offMACs) > 0 {
 				keep = " ether saddr != " + setLit(offMACs)
 			}
-			c.line(2, "iifname %s oifname %s%s ip daddr %s meta l4proto { tcp, udp } th dport 443 counter drop comment \"block known public encrypted-dns servers\"", ifSet(forced), ifSet(wan), keep, setLit(DoHServers4))
-			c.line(2, "iifname %s oifname %s%s ip6 daddr %s meta l4proto { tcp, udp } th dport 443 counter drop comment \"block known public encrypted-dns servers (ipv6)\"", ifSet(forced), ifSet(wan), keep, setLit(DoHServers6))
+			c.line(2, "iifname %s oifname %s%s ip daddr %s meta l4proto { tcp, udp } th dport 443 counter drop comment \"rule:dns:doh\"", ifSet(forced), ifSet(wan), keep, setLit(DoHServers4))
+			c.line(2, "iifname %s oifname %s%s ip6 daddr %s meta l4proto { tcp, udp } th dport 443 counter drop comment \"rule:dns:doh\"", ifSet(forced), ifSet(wan), keep, setLit(DoHServers6))
 		}
 	}
 	for _, srv := range plan.servers {

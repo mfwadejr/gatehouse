@@ -41,7 +41,7 @@ The **Reports** tab turns what NopeWarden recorded into something you can read, 
 
 ![The Reports tab, shown with example data](img/reports.png)
 
-Choose a subject (Internet links, DNS, Threats or Firewall connections), a period (24 h up to 1 year, or **Exact dates**), how to group the results, and any filters. Then choose **Show report**. You get a summary, a chart and the rows.
+Choose a subject (Internet links, DNS, Threats or Firewall connections), a period (24 h up to 1 year, or **Exact dates**), how to group the results, and any filters. The report is made again by itself a moment after you change the subject, the period (24 h, 7 days or 30 days), the grouping or a filter. For longer periods, which read a lot of history, press **Update report**; until you do, the result fades and says what it shows. Filters are under **Narrow it down**, and each one in use appears as a small chip you can click to remove. You get a summary, a chart and the rows.
 
 1. Internet links reports uptime, time down, delay, loss and each drop for one connection or all of them. **ISP report: last 30 days** makes the version to send your provider.
 2. Name a report and choose **Save report** to keep it under **Saved reports**. Run it again later for fresh numbers.

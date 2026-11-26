@@ -81,6 +81,15 @@ Type a name in **Try a name** to see whether the pattern catches it. Below that 
 
 People who know regular expressions can open **More options** and turn on **Use a regular expression instead**. They are checked in the same way, and they cannot slow DNS down however they are written.
 
+## Devices that hide their lookups
+
+Forced DNS redirects ordinary DNS (port 53). Some devices hide their lookups instead. In the **Forced DNS** card, under **Lookups hidden inside other traffic**, two switches deal with that, both following the same networks and exceptions as Forced DNS:
+
+- **Block encrypted DNS to other servers** stops DNS-over-TLS and DNS-over-QUIC (port 853).
+- **Also block well-known encrypted-DNS websites** stops DNS-over-HTTPS to Cloudflare, Google, Quad9, OpenDNS, AdGuard and CleanBrowsing, which travels as ordinary web traffic on port 443. The device then falls back to ordinary DNS, which Forced DNS sends to NopeWarden, so its lookups show in your DNS log and are filtered. The list cannot be complete, because any website can run such a server.
+
+Each switch shows how many attempts it has stopped. A device that keeps connecting to 8.8.8.8 or 1.1.1.1 on port 443 every few minutes, with no lookups in your DNS Activity, is probably doing this.
+
 ## Encrypted DNS for your devices
 Away from home, or on a network you do not trust, a phone can ask this firewall for names over an encrypted connection so nobody on the way can read them, and your lists and logs still apply. On **Servers**, turn on **Encrypted DNS for your devices**, choose the networks that may use it, and **Save**. It is off until you do, and a port that faces the internet can never be chosen.
 

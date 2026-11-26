@@ -1,6 +1,15 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.70',
+    title: 'Reports that follow your choices, and DNS switches where you expect them',
+    items: [
+      'Logs, Reports: the result now always matches the form. Changing the subject, period, grouping or a filter makes the report again by itself (for 24 hours, 7 days and 30 days); longer periods show an Update report button, and an out-of-date result fades and says what it shows. Filters are under Narrow it down with removable chips, charts are drawn at a normal text size and long values in the summary tiles fit. A DNS report that had no data no longer breaks the page.',
+      'DNS, Servers, Forced DNS: Block encrypted DNS to other servers and Also block well-known encrypted-DNS websites moved here from the Firewall page, each with a count of what it has stopped. The second one matters for devices such as Android boxes that send their lookups to Google or Cloudflare inside ordinary web traffic, where Forced DNS cannot see them.',
+      'Logs: connections to well-known public DNS services such as 8.8.8.8 and 1.1.1.1 are named for what they are (Google Public DNS, Cloudflare DNS), and an address that many different names point at no longer gets a guessed name. Rows already recorded keep the name they were given.',
+    ],
+  },
+  {
     version: '0.9.4.69',
     title: 'A guest sign-in page you can see, and a block list that copes',
     items: [

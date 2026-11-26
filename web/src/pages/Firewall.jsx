@@ -171,10 +171,8 @@ function Protection({ ov, reload }) {
   const save = (k) => (v) => run(() => put('/api/fw/settings', { ...s, [k]: v })).then(reload);
   return (
     <>
-    <Note tone="info">Forced DNS, which sends devices that use a DNS server of their own to the one you chose, is now under <a href="#/dns/servers">DNS, Servers</a>.</Note>
+    <Note tone="info">Forced DNS, which sends devices that use a DNS server of their own to the one you chose, and the two switches that stop devices hiding their lookups in encrypted traffic, are under <a href="#/dns/servers">DNS, Servers</a>.</Note>
     <Card title="Protection" desc="Extra safeguards that apply to every network.">
-      <ToggleRow title="Block encrypted DNS to other servers" desc="Stops devices bypassing your filters with DNS-over-TLS. Follows the forced DNS settings under DNS, Servers: a device left alone is not blocked." checked={s.block_dot} onChange={save('block_dot')} />
-      <ToggleRow title="Also block well-known encrypted-DNS websites" desc="Stops browsers that quietly switch to Cloudflare, Google, Quad9, OpenDNS, AdGuard or CleanBrowsing over HTTPS. This cannot be complete: any website can run such a server, so it stops the common cases, not a determined person." checked={!!s.block_doh} onChange={save('block_doh')} />
       <ToggleRow title="Ask for a code before changing the firewall" desc="Requires your authenticator code to apply network changes." checked={s.step_up} onChange={save('step_up')} />
       <ToggleRow title="Log blocked traffic" desc="Useful when troubleshooting. Uses more disk space." checked={s.log_drops} onChange={save('log_drops')} />
     </Card>
