@@ -61,7 +61,17 @@ func TestDemoConsole(t *testing.T) {
 		fn.threatInfo = netd.ThreatInfo{Installed: true, Version: "7.0.8", Running: true, State: "idle", DiskFreeMB: 20000, MemoryMB: 8192, CPUs: 4,
 			RulesUpdated: time.Now().Add(-6 * time.Hour).Unix(), RulesCount: 48213, CPUNSec: 4_000_000_000, MemoryBytes: 310 << 20}
 		fn.mu.Unlock()
-		c.call("PUT", "/api/threat/settings", map[string]any{"mode": "watch"})
+		c.call("PUT", "/api/threat/settings", map[string]any{"mode": "protect"})
+		// Made-up blocks from several kinds of alert, so the Blocked right now list can be seen with many.
+		{
+			why := []string{"ET SCAN Nmap Scripting Engine User-Agent Detected", "ET SCAN Potential SSH Scan", "ET DROP Dshield Block Listed Source", "ET POLICY Possible Brute Force on RDP", "ET EXPLOIT Apache Log4j RCE Attempt"}
+			var rows []threatBlockRow
+			for i := 0; i < 64; i++ {
+				w := why[(i*7+i/5)%len(why)]
+				rows = append(rows, threatBlockRow{IP: fmt.Sprintf("203.0.113.%d", 10+i), Until: time.Now().Add(time.Duration(10+i) * time.Minute).Unix(), At: time.Now().Add(-time.Duration(2+i*3) * time.Minute).Unix(), SID: 2000000 + int64(i), Why: w, Device: "Living room TV"})
+			}
+			c.app.threatBlockSave(rows)
+		}
 		// Drives and certificates, so Diagnostics and the menu dots have something to say.
 		fn.mu.Lock()
 		fn.disk = netd.DiskReport{Tool: true, CanInstall: true, At: time.Now().Unix(), Drives: []netd.Drive{
@@ -90,6 +100,16 @@ func TestDemoConsole(t *testing.T) {
 		for i := 0; i < n; i++ {
 			c.call("POST", "/api/backups", map[string]any{})
 			time.Sleep(1100 * time.Millisecond) // a backup is named by the second
+		}
+	}
+	if os.Getenv("NW_GUEST") != "" { // a guest network, so the sign-in page card has something to pick
+		if rc, _, raw := c.call("POST", "/api/networks/add", map[string]any{"name": "Visitors", "port": "eth3", "vlan": 30, "kind": "guest", "internet": true, "intra_allow": false, "lease": "2h"}); rc != 200 {
+			t.Fatalf("guest network: %d %s", rc, raw)
+		}
+	}
+	if os.Getenv("NW_GUEST") != "" { // a few of your own names
+		for _, r := range [][2]string{{"printer.lan", "192.168.1.60"}, {"nas.lan", "192.168.1.20"}, {"firewall.lan", "192.168.1.1"}} {
+			c.call("POST", "/api/dns/records", map[string]any{"name": r[0], "type": "A", "value": r[1], "ttl": 300})
 		}
 	}
 	fmt.Println("DEMO READY", scene, c.base)

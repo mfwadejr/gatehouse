@@ -9,7 +9,9 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -24,11 +26,15 @@ import (
 // hours. It never applies to a management network, an internet port or the setup port.
 
 type portalCfg struct {
-	On     bool     `json:"on"`
-	Ifaces []string `json:"ifaces"`
-	Title  string   `json:"title"`
-	Terms  string   `json:"terms"`
-	Hours  int      `json:"hours"`
+	On      bool     `json:"on"`
+	Ifaces  []string `json:"ifaces"`
+	Title   string   `json:"title"`
+	Terms   string   `json:"terms"`
+	Hours   int      `json:"hours"`
+	Welcome string   `json:"welcome"` // one line under the title
+	Accent  string   `json:"accent"`  // button colour, #rrggbb
+	Button  string   `json:"button"`  // wording on the button
+	Logo    string   `json:"logo"`    // a small picture as a data: address
 }
 
 type portalState struct {
@@ -37,16 +43,17 @@ type portalState struct {
 	ln       net.Listener
 	sessions map[string]int64 // "mac:aa:bb:.." or "ip:1.2.3.4" -> unix expiry
 	loaded   bool
+	drafts   map[string][2]string // preview pages, by key
 	last     string
 }
 
 func (a *App) portalConfig() portalCfg {
-	c := portalCfg{Title: "Welcome", Hours: 8}
+	c := portalCfg{Title: "Welcome", Hours: 4}
 	if raw := a.setting("portal.config", ""); raw != "" {
 		json.Unmarshal([]byte(raw), &c)
 	}
 	if c.Hours < 1 || c.Hours > 720 {
-		c.Hours = 8
+		c.Hours = 4
 	}
 	return c
 }
@@ -174,34 +181,78 @@ func (a *App) portalFill(leases map[string][]string) fw.SetFill {
 	return f
 }
 
-const portalPage = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>%s</title>
-<style>body{font:17px/1.5 -apple-system,system-ui,Segoe UI,Roboto,sans-serif;margin:0;background:#f4f5f7;color:#1c1f23}
+const portalCSS = `body{font:17px/1.5 -apple-system,system-ui,Segoe UI,Roboto,sans-serif;margin:0;background:#f4f5f7;color:#1c1f23}
 main{max-width:30rem;margin:8vh auto;padding:0 1.25rem}.card{background:#fff;border-radius:14px;padding:1.5rem;box-shadow:0 2px 12px rgba(0,0,0,.08)}
-h1{font-size:1.5rem;margin:.2rem 0 1rem}.terms{max-height:14rem;overflow:auto;font-size:.9rem;color:#4a5058;border:1px solid #e1e4e8;border-radius:8px;padding:.6rem .8rem;margin:0 0 1rem}
-button{width:100%%;font:inherit;font-weight:600;padding:.8rem;border:0;border-radius:10px;background:#1f6feb;color:#fff}p{margin:.5rem 0}</style></head>
-<body><main><div class="card"><h1>%s</h1>%s<form method="post" action="/accept"><button type="submit">%s</button></form></div></main></body></html>`
+h1{font-size:1.5rem;margin:.2rem 0 .4rem}.lead{color:#4a5058;margin:0 0 1rem}.logo{display:block;max-height:4rem;max-width:100%%;margin:0 0 .8rem}
+.terms{max-height:14rem;overflow:auto;font-size:.9rem;color:#4a5058;border:1px solid #e1e4e8;border-radius:8px;padding:.6rem .8rem;margin:0 0 1rem}
+.agree{display:flex;gap:.6rem;align-items:flex-start;margin:0 0 1rem;font-size:.95rem}.agree input{width:1.3rem;height:1.3rem;margin-top:.15rem}
+button{width:100%%;font:inherit;font-weight:600;padding:.8rem;border:0;border-radius:10px;background:%s;color:#fff}button:disabled{opacity:.45}p{margin:.5rem 0}`
 
-const portalDone = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connected</title>
-<style>body{font:17px/1.5 -apple-system,system-ui,sans-serif;margin:0;background:#f4f5f7;color:#1c1f23}main{max-width:30rem;margin:8vh auto;padding:0 1.25rem}.card{background:#fff;border-radius:14px;padding:1.5rem;box-shadow:0 2px 12px rgba(0,0,0,.08)}</style></head>
-<body><main><div class="card"><h1>You are connected</h1><p>You can close this page and use the internet.</p></div></main></body></html>`
+var portalLogoRE = regexp.MustCompile(`^data:image/(png|jpeg|gif|webp);base64,[A-Za-z0-9+/=]+$`)
+
+var portalAccentRE = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
+
+func portalAccent(c portalCfg) string {
+	if portalAccentRE.MatchString(c.Accent) {
+		return c.Accent
+	}
+	return "#1f6feb"
+}
+
+// portalHoursText says how long a sign-in lasts, in words a guest understands.
+func portalHoursText(h int) string {
+	switch {
+	case h%24 == 0 && h >= 24:
+		d := h / 24
+		if d == 1 {
+			return "1 day"
+		}
+		return fmt.Sprintf("%d days", d)
+	case h == 1:
+		return "1 hour"
+	}
+	return fmt.Sprintf("%d hours", h)
+}
+
+func portalHead(c portalCfg, title string) string {
+	return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>` + title + `</title><style>` + fmt.Sprintf(portalCSS, portalAccent(c)) + `</style></head>`
+}
+
+func portalLogo(c portalCfg) string {
+	if strings.HasPrefix(c.Logo, "data:image/") && len(c.Logo) < 200000 && !strings.ContainsAny(c.Logo, "\"'<> ") {
+		return `<img class="logo" alt="" src="` + c.Logo + `">`
+	}
+	return ""
+}
+
+func portalDone(c portalCfg) string {
+	return portalHead(c, "Connected") + `<body><main><div class="card">` + portalLogo(c) + `<h1>You are connected</h1><p>You are connected for ` + portalHoursText(c.Hours) + `. You can close this page and use the internet.</p></div></main></body></html>`
+}
 
 func portalBody(c portalCfg) string {
 	title := html.EscapeString(strings.TrimSpace(c.Title))
 	if title == "" {
 		title = "Welcome"
 	}
-	var terms, btn string
+	btn := html.EscapeString(strings.TrimSpace(c.Button))
+	if btn == "" {
+		btn = "Connect"
+	}
+	lead := ""
+	if w := strings.TrimSpace(c.Welcome); w != "" {
+		lead = `<p class="lead">` + html.EscapeString(w) + `</p>`
+	}
+	var terms, attr string
 	if t := strings.TrimSpace(c.Terms); t != "" {
 		var b strings.Builder
 		for _, para := range strings.Split(strings.ReplaceAll(t, "\r", ""), "\n\n") {
 			b.WriteString("<p>" + strings.ReplaceAll(html.EscapeString(strings.TrimSpace(para)), "\n", "<br>") + "</p>")
 		}
-		terms = `<div class="terms">` + b.String() + `</div>`
-		btn = "I agree and connect"
-	} else {
-		btn = "Connect"
+		terms = `<div class="terms">` + b.String() + `</div><label class="agree"><input type="checkbox" name="agree" value="1" id="ag" onchange="document.getElementById('go').disabled=!this.checked"><span>I agree to these terms</span></label>`
+		attr = " disabled"
 	}
-	return fmt.Sprintf(portalPage, title, title, terms, btn)
+	return portalHead(c, title) + `<body><main><div class="card">` + portalLogo(c) + `<h1>` + title + `</h1>` + lead + `<form method="post" action="/accept">` + terms +
+		`<button type="submit" id="go"` + attr + `>` + btn + `</button></form></div></main></body></html>`
 }
 
 func (a *App) portalHandler() http.Handler {
@@ -210,12 +261,19 @@ func (a *App) portalHandler() http.Handler {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		host, _, _ := net.SplitHostPort(r.RemoteAddr)
 		if r.Method == http.MethodPost && r.URL.Path == "/accept" {
+			c := a.portalConfig()
+			r.ParseForm()
+			if strings.TrimSpace(c.Terms) != "" && r.PostForm.Get("agree") != "1" {
+				w.WriteHeader(http.StatusForbidden)
+				fmt.Fprint(w, "<!doctype html><meta charset=utf-8><p>Please tick the box to agree to the terms, then connect.")
+				return
+			}
 			if err := a.portalAccept(host); err != nil {
 				w.WriteHeader(http.StatusForbidden)
 				fmt.Fprint(w, "<!doctype html><meta charset=utf-8><p>"+html.EscapeString(err.Error()))
 				return
 			}
-			fmt.Fprint(w, portalDone)
+			fmt.Fprint(w, portalDone(c))
 			return
 		}
 		// Every other address gets the page itself, which is what phones look for.
@@ -326,6 +384,50 @@ func (a *App) registerPortalRoutes() {
 		a.portal.mu.Unlock()
 		api.JSON(w, 200, map[string]any{"config": a.portalConfig(), "networks": a.portalChoices(), "signed_in": signed, "listening": listening, "error": last})
 	})
+	// What a guest would see for the settings on screen now, saved or not. Nothing is saved. The
+	// pages are kept in memory for a moment and shown in a frame, which needs its own page headers
+	// (the console's own are stricter than the guest page needs).
+	s.HandleAdmin("POST /api/portal/preview", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		var in portalCfg
+		if !api.Decode(w, r, &in) {
+			return
+		}
+		if in.Hours < 1 || in.Hours > 720 {
+			in.Hours = 4
+		}
+		if in.Logo != "" && (len(in.Logo) > 150000 || !portalLogoRE.MatchString(in.Logo)) {
+			in.Logo = ""
+		}
+		a.portal.mu.Lock()
+		if a.portal.drafts == nil || len(a.portal.drafts) > 20 {
+			a.portal.drafts = map[string][2]string{}
+		}
+		key := strconv.FormatInt(time.Now().UnixNano(), 36)
+		a.portal.drafts[key] = [2]string{portalBody(in), portalDone(in)}
+		a.portal.mu.Unlock()
+		api.JSON(w, 200, map[string]any{"key": key})
+	})
+	s.HandleAdmin("GET /api/portal/preview/{key}/{which}", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		a.portal.mu.Lock()
+		d, ok := a.portal.drafts[r.PathValue("key")]
+		a.portal.mu.Unlock()
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		page := d[0]
+		if r.PathValue("which") == "done" {
+			page = d[1]
+		}
+		h := w.Header()
+		h.Set("Content-Type", "text/html; charset=utf-8")
+		h.Set("Cache-Control", "no-store")
+		h.Set("Content-Security-Policy", "default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-ancestors 'self'; form-action 'none'")
+		h.Set("X-Frame-Options", "SAMEORIGIN")
+		// A preview never signs anyone in.
+		page = strings.Replace(page, `action="/accept"`, `action="#" onsubmit="return false"`, 1)
+		fmt.Fprint(w, page)
+	})
 	s.HandleAdmin("PUT /api/portal", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		var in portalCfg
 		if !api.Decode(w, r, &in) {
@@ -334,6 +436,19 @@ func (a *App) registerPortalRoutes() {
 		in.Title, in.Terms = strings.TrimSpace(in.Title), strings.TrimSpace(in.Terms)
 		if len(in.Title) > 80 || len(in.Terms) > 8000 {
 			fail(w, errors.New("the title can be up to 80 letters and the terms up to 8000"))
+			return
+		}
+		in.Welcome, in.Button, in.Accent = strings.TrimSpace(in.Welcome), strings.TrimSpace(in.Button), strings.TrimSpace(in.Accent)
+		if len(in.Welcome) > 200 || len(in.Button) > 30 {
+			fail(w, errors.New("the welcome line can be up to 200 letters and the button wording up to 30"))
+			return
+		}
+		if in.Accent != "" && !portalAccentRE.MatchString(in.Accent) {
+			fail(w, errors.New("the button colour must look like #1f6feb"))
+			return
+		}
+		if in.Logo != "" && (len(in.Logo) > 150000 || !portalLogoRE.MatchString(in.Logo)) {
+			fail(w, errors.New("the logo must be a small PNG, JPEG, GIF or WebP picture (up to about 100 KB)"))
 			return
 		}
 		if in.Hours < 1 || in.Hours > 720 {

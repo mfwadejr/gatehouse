@@ -206,8 +206,19 @@ func (a *App) buildPlanFrom(q querier, bridge *bridgemode.Config) (*netd.Plan, e
 		rows.Close()
 	}
 	for _, i := range ifs {
+		// A bridge whose network does not let its devices talk to each other keeps its ports apart.
+		isolate := false
+		if i.Kind == "bridge" && i.ZoneID > 0 {
+			if rows, err := q.Query(`SELECT intra_allow FROM zones WHERE id=?`, i.ZoneID); err == nil {
+				var intra int
+				if rows.Next() && rows.Scan(&intra) == nil && intra == 0 {
+					isolate = true
+				}
+				rows.Close()
+			}
+		}
 		p.Config.Interfaces = append(p.Config.Interfaces, netcfg.Interface{Name: i.Name, Kind: i.Kind, Parent: i.Parent,
-			VLAN: i.VLAN, IPv4: i.IPv4, DHCP: i.DHCP, Gateway: i.Gateway, DNS: i.DNS, Members: i.Members, IPv6: i.IPv6, PD: i.PD, MTU: i.MTU, Enabled: i.Enabled})
+			VLAN: i.VLAN, IPv4: i.IPv4, DHCP: i.DHCP, Gateway: i.Gateway, DNS: i.DNS, Members: i.Members, IPv6: i.IPv6, PD: i.PD, MTU: i.MTU, Enabled: i.Enabled, Isolate: isolate})
 	}
 	n := 0
 	for _, w := range wans {

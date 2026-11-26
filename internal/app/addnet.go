@@ -19,7 +19,7 @@ import (
 // Adding a network used to mean three pages: a port or VLAN with an address, a DHCP scope, and a
 // firewall network. This does all three in one step, with plain choices and safe defaults.
 
-var leaseChoices = map[string]int{"1h": 3600, "1d": 86400, "1w": 7 * 86400}
+var leaseChoices = map[string]int{"1h": 3600, "2h": 7200, "1d": 86400, "1w": 7 * 86400}
 
 type addNetIn struct {
 	Name     string `json:"name"`
@@ -200,7 +200,7 @@ func (in *addNetIn) clean() error {
 		in.Lease = "1d"
 	}
 	if _, ok := leaseChoices[in.Lease]; !ok {
-		return errors.New("choose a lease time of 1 hour, 1 day or 1 week")
+		return errors.New("choose a lease time of 1 hour, 2 hours, 1 day or 1 week")
 	}
 	switch in.IPv6 {
 	case "", "off", "auto":

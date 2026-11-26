@@ -75,7 +75,7 @@ function ModeCard({ data, reload }) {
         {watching && !p.running && <Note tone={p.failing ? 'bad' : 'warn'} title={p.failing ? 'The program keeps failing' : 'The program is not running'}>{p.why} Your traffic is not affected. See Advanced, Program log, or Diagnostics in the left menu.</Note>}
         {p.state === 'updating' && <Note>Updating the rules. {p.message}</Note>}
         {p.state === 'failed' && p.installed && <Note tone="warn">{p.message}</Note>}
-        <p className="small muted">{data.blocking} {data.fail_open} {data.limits}</p>
+        <p className="small muted">{data.blocking} {!data.block && data.fail_open} {data.limits}</p>
         {data.block && <BlockList minutes={data.block_minutes} reload={reload} />}
       </div>
     </Card>
@@ -87,30 +87,70 @@ function BlockList({ minutes, reload }) {
   const { data, reload: again } = useData('/api/threat/blocks', { every: 10000 });
   const [run, busy] = useAction();
   const [mins, setMins] = useState(minutes);
+  const [q, setQ] = useState('');
+  const [openKey, setOpenKey] = useState('');
+  const [all, setAll] = useState(false);
   const list = data?.blocks || [];
   const left = (s) => (s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min` : `${Math.max(1, Math.ceil(s / 60))} min`);
+  const ago = (t) => { const m = Math.max(0, Math.round((Date.now() / 1000 - t) / 60)); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`; };
+  const term = q.trim().toLowerCase();
+  const shown = term ? list.filter((b) => b.ip.includes(term) || (b.why || '').toLowerCase().includes(term) || (b.device || '').toLowerCase().includes(term)) : list;
+  const groups = [];
+  const byWhy = {};
+  shown.forEach((b) => {
+    const k = b.why || 'Serious alert';
+    if (!byWhy[k]) { byWhy[k] = { key: k, rows: [], newest: 0 }; groups.push(byWhy[k]); }
+    byWhy[k].rows.push(b);
+    byWhy[k].newest = Math.max(byWhy[k].newest, b.at);
+  });
+  groups.sort((x, y) => y.newest - x.newest);
+  const allGroups = new Set(list.map((b) => b.why || 'Serious alert')).size;
+  const visible = all || term ? groups : groups.slice(0, 10);
+  const removeOne = (ip) => run(async () => { await del(`/api/threat/blocks/${encodeURIComponent(ip)}`); again(); }, 'Unblocked.');
   return (
     <div className="stack">
-      <Field label="Block for (minutes)" hint="How long an address stays blocked. It is released by itself when the time is up.">
+      <Field label="Block for" hint="How long an address stays blocked. It is released by itself when the time is up.">
         <div className="row">
-          <NumberInput value={mins} min={5} max={1440} onChange={setMins} />
-          <Button disabled={busy || Number(mins) === minutes} onClick={() => run(async () => { await put('/api/threat/block-time', { minutes: Number(mins) }); reload(); }, 'Saved.')}>Save</Button>
+          <NumberInput value={mins} min={5} max={1440} onChange={setMins} style={{ width: '6rem' }} />
+          <span className="muted">minutes</span>
+          <Button small disabled={busy || Number(mins) === minutes} onClick={() => run(async () => { await put('/api/threat/block-time', { minutes: Number(mins) }); reload(); }, 'Saved.')}>Save</Button>
         </div>
       </Field>
-      <div className="small"><b>Blocked right now</b></div>
+      {data?.full && <Note tone="warn">The block list is full ({data.max?.toLocaleString()} addresses), so new addresses are not being blocked. Remove some below, or wait for them to be released.</Note>}
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <div><b>Blocked right now</b>{list.length > 0 && <span className="muted"> · {list.length.toLocaleString()} {list.length === 1 ? 'address' : 'addresses'}, {allGroups} {allGroups === 1 ? 'group' : 'groups'}</span>}</div>
+        {list.length > 1 && <Button small disabled={busy} onClick={() => run(async () => { await post('/api/threat/blocks/clear', {}); again(); }, 'Everything was unblocked.')}>Remove all</Button>}
+      </div>
+      {list.length > 10 && <Input placeholder="Find an address or a reason" value={q} onChange={setQ} />}
       <div className="list">
-        {list.map((b) => (
-          <div className="item startalign" key={b.ip}>
-            <div>
-              <div className="name mono">{b.ip}</div>
-              <div className="small muted">{b.why}{b.device ? ` · ${b.device}` : ''} · {left(b.left)} left</div>
+        {visible.map((g) => (
+          <div className="item startalign" key={g.key} style={{ display: 'block' }}>
+            <div className="row" style={{ justifyContent: 'space-between', cursor: 'pointer' }} onClick={() => setOpenKey(openKey === g.key ? '' : g.key)}>
+              <div>
+                <div className="name">{g.key}</div>
+                <div className="small muted">the newest {ago(g.newest)}</div>
+              </div>
+              <Pill>{g.rows.length} {g.rows.length === 1 ? 'address' : 'addresses'}</Pill>
             </div>
-            <div className="actions"><Button small kind="danger" disabled={busy} onClick={() => run(async () => { await del(`/api/threat/blocks/${encodeURIComponent(b.ip)}`); again(); }, 'Unblocked.')}>Remove</Button></div>
+            {(openKey === g.key || term) && (
+              <div className="list" style={{ marginTop: '.5rem' }}>
+                {g.rows.map((b) => (
+                  <div className="item startalign" key={b.ip}>
+                    <div>
+                      <div className="name mono">{b.ip}</div>
+                      <div className="small muted">{b.device ? `${b.device} · ` : ''}{left(b.left)} left</div>
+                    </div>
+                    <div className="actions"><Button small kind="danger" disabled={busy} onClick={() => removeOne(b.ip)}>Remove</Button></div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ))}
         {!list.length && <Empty>Nothing is blocked. Only serious alerts from outside addresses lead to a block.</Empty>}
+        {list.length > 0 && !shown.length && <Empty>Nothing matches that.</Empty>}
       </div>
-      {list.length > 1 && <div className="row"><Button small disabled={busy} onClick={() => run(async () => { await post('/api/threat/blocks/clear', {}); again(); }, 'Everything was unblocked.')}>Remove all</Button></div>}
+      {!all && !term && groups.length > 10 && <div className="row"><Button small onClick={() => setAll(true)}>Show all {groups.length} groups</Button></div>}
     </div>
   );
 }

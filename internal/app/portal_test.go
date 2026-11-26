@@ -44,16 +44,29 @@ func TestGuestSignInPage(t *testing.T) {
 		b, _ := io.ReadAll(rr.Result().Body)
 		return rr.Code, string(b)
 	}
+	agree := func(remote string) (int, string) {
+		req := httptest.NewRequest("POST", "/accept", strings.NewReader("agree=1"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.RemoteAddr = remote
+		rr := httptest.NewRecorder()
+		h.ServeHTTP(rr, req)
+		b, _ := io.ReadAll(rr.Result().Body)
+		return rr.Code, string(b)
+	}
 	// A phone's connectivity check, whatever the address, gets the page (escaped), with the terms.
 	code, body := get("GET", "/generate_204", "192.168.20.50:4000")
-	if code != 200 || !strings.Contains(body, "Cabin &lt;wifi&gt;") || !strings.Contains(body, "Be kind.") || !strings.Contains(body, "I agree and connect") {
+	if code != 200 || !strings.Contains(body, "Cabin &lt;wifi&gt;") || !strings.Contains(body, "Be kind.") || !strings.Contains(body, "I agree to these terms") || !strings.Contains(body, `id="go" disabled`) {
 		t.Fatalf("page: %d %s", code, body)
 	}
 	// Someone not on a guest network cannot sign themselves in.
-	if code, _ := get("POST", "/accept", "192.168.1.50:4000"); code != http.StatusForbidden {
+	if code, _ := agree("192.168.1.50:4000"); code != http.StatusForbidden {
 		t.Fatalf("a device on the home network signed in: %d", code)
 	}
-	if code, body := get("POST", "/accept", "192.168.20.50:4000"); code != 200 || !strings.Contains(body, "connected") {
+	// Terms are written, so signing in without ticking the box is refused.
+	if code, _ := get("POST", "/accept", "192.168.20.50:4000"); code != http.StatusForbidden {
+		t.Fatalf("signed in without agreeing to the terms: %d", code)
+	}
+	if code, body := agree("192.168.20.50:4000"); code != 200 || !strings.Contains(body, "connected for 4 hours") {
 		t.Fatalf("accept: %d %s", code, body)
 	}
 	fill := a.portalFill(map[string][]string{})
@@ -99,4 +112,51 @@ func portalSetFromModel(t *testing.T, a *App) *fw.SetFill {
 		return nil
 	}
 	return &f
+}
+
+func TestPortalPageWords(t *testing.T) {
+	plain := portalBody(portalCfg{Title: "Hi", Hours: 4})
+	if strings.Contains(plain, "type=\"checkbox\"") || strings.Contains(plain, `id="go" disabled`) || !strings.Contains(plain, ">Connect<") {
+		t.Fatalf("a page with no terms must be one plain button: %s", plain)
+	}
+	own := portalBody(portalCfg{Title: "Cabin", Welcome: "Mind the <dog>", Button: "Let me in", Accent: "#1a7f37", Logo: "data:image/png;base64,AAAA", Hours: 4})
+	for _, want := range []string{"Mind the &lt;dog&gt;", "Let me in", "#1a7f37", `src="data:image/png;base64,AAAA"`} {
+		if !strings.Contains(own, want) {
+			t.Fatalf("missing %q in %s", want, own)
+		}
+	}
+	bad := portalBody(portalCfg{Title: "x", Accent: "red;}</style><script>", Logo: `data:image/png;base64,AA" onerror="x`})
+	if strings.Contains(bad, "<script>") || strings.Contains(bad, "onerror") {
+		t.Fatalf("unsafe settings reached the page: %s", bad)
+	}
+	for h, want := range map[int]string{1: "1 hour", 2: "2 hours", 24: "1 day", 168: "7 days"} {
+		if portalHoursText(h) != want {
+			t.Fatalf("%d -> %q", h, portalHoursText(h))
+		}
+	}
+}
+
+func TestPortalPreviewIsNotSavedAndNeverSignsAnyoneIn(t *testing.T) {
+	c, _, _ := siteBoxWith(t, "192.168.1.1/24", nil)
+	_, m, _ := c.call("POST", "/api/portal/preview", map[string]any{"title": "Preview <me>", "terms": "Be kind.", "hours": 2, "accent": "#cf222e"})
+	key, _ := m["key"].(string)
+	if key == "" {
+		t.Fatalf("no preview key: %v", m)
+	}
+	rc, _, rawb := c.call("GET", "/api/portal/preview/"+key+"/page", nil)
+	raw := string(rawb)
+	if rc != 200 || !strings.Contains(raw, "Preview &lt;me&gt;") || !strings.Contains(raw, "#cf222e") || strings.Contains(raw, `action="/accept"`) {
+		t.Fatalf("preview page: %d %s", rc, raw)
+	}
+	rc, _, rawb = c.call("GET", "/api/portal/preview/"+key+"/done", nil)
+	raw = string(rawb)
+	if rc != 200 || !strings.Contains(raw, "connected for 2 hours") {
+		t.Fatalf("preview done: %d %s", rc, raw)
+	}
+	if rc, _, _ := c.call("GET", "/api/portal/preview/nope/page", nil); rc != 404 {
+		t.Fatalf("an unknown preview key answered: %d", rc)
+	}
+	if got := c.app.portalConfig(); got.Title == "Preview <me>" {
+		t.Fatal("a preview was saved")
+	}
 }

@@ -869,3 +869,10 @@ button.tag:hover { color: var(--color-text-primary); border-color: var(--color-b
   .dns-tiles { row-gap: var(--space-4); }
   .dns-tiles > .tile { display: grid; grid-template-rows: subgrid; grid-row: span 4; row-gap: var(--space-2-5); align-content: start; }
 }
+
+/* Guest sign-in page: settings with a phone beside them */
+.gp-wrap{display:grid;grid-template-columns:minmax(0,1fr) 17.5rem;gap:1.5rem;align-items:start}
+.gp-side{position:sticky;top:1rem}
+.gp-phone{width:253px;height:439px;border:.6rem solid var(--color-border-strong);border-radius:1.8rem;overflow:hidden;background:var(--color-bg-surface);margin:0 auto}
+.gp-phone iframe{width:390px;height:700px;border:0;transform:scale(.6);transform-origin:0 0}
+@media (max-width:900px){.gp-wrap{grid-template-columns:1fr}.gp-side{position:static}}

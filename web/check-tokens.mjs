@@ -28,6 +28,7 @@ for (const f of css) {
 const ALLOW = [
   'src/worldmap.js', // map drawing data
   'src/providers.js',
+  'src/portalcolor.js', // the guest page's own button colour, not this console's
 ];
 const prefixOK = (v) => v === '--color-chart-series-' || v === '--c'; // built from a number or set per element
 for (const f of files) {

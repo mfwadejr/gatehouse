@@ -617,7 +617,7 @@ function Records() {
         <Button kind="primary" disabled={!f.name || !f.value} onClick={() => run(() => post('/api/dns/records', f), 'Saved.').then(() => { setF({ ...f, name: '', value: '' }); reload(); })}>Add</Button>
       </div>
       <div className="list">
-        {(data || []).map((r) => <div className="item" key={r.id}><div><span className="name">{r.name}</span> <span className="muted">{r.type} → {r.value}</span>{r.problem && <div className="small" style={{ color: 'var(--color-status-warning)' }}>{r.problem}</div>}</div><Button small kind="danger" icon="trash" onClick={() => run(() => del(`/api/dns/records/${r.id}`)).then(reload)}>Remove</Button></div>)}
+        {(data || []).map((r) => <div className="item" key={r.id}><div><span className="name">{r.name.includes('.') ? r.name : `${r.name}.${domain}`}</span> <span className="muted">{r.type} → {r.value}</span>{r.problem && <div className="small" style={{ color: 'var(--color-status-warning)' }}>{r.problem}</div>}</div><Button small kind="danger" icon="trash" onClick={() => run(() => del(`/api/dns/records/${r.id}`)).then(reload)}>Remove</Button></div>)}
         {!data?.length && <Empty>No custom names.</Empty>}
       </div>
     </Card>

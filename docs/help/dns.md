@@ -13,10 +13,12 @@ Tabs along the top:
 - **Activity**: who asked and what was stopped, for the last hour, 24 hours or 7 days: **Busiest devices**, **What blocked it**, **Most blocked** and **Most asked**.
 - **Servers**: where names are looked up (picture below). **Upstream DNS servers** (where NopeWarden asks when it does not know), **Names that use a different server** (see below), **Which server is asked first**, **Add a DNS server**, **Encrypted DNS**, **Encrypted DNS for your devices** (see below), **Resolve directly** and **Forced DNS**. Forced DNS sends devices that carry a DNS server of their own (smart TVs, cameras, some phones) to the one you chose. Turn **Force devices to use one DNS server** on, pick the server, then set each network and add exceptions for chosen devices or groups. It redirects ordinary DNS only: a device that hides its lookups inside normal web traffic (DNS-over-HTTPS) can still go around it.
 - **Blocking**: **Ad, tracker and malware lists** you can switch on (which devices get which lists is set per profile, on the Profiles tab of Devices & access), **Always allow or block** exceptions that beat every list (a name, or a pattern that matches many names), and **Why is this blocked?** to find which list blocks a name.
-- **Your own names**: **Give this firewall a name**, and names that point somewhere on your network, like nas.lan to 192.168.1.10. A line under the heading says names end in your Home domain and links to **DNS, Settings** to change it.
+- **Your own names**: **Give this firewall a name**, and names that point somewhere on your network, like nas.lan to 192.168.1.10. A line under the heading says names end in your Home domain and links to **DNS, Settings** to change it. Each name is shown in full, with the Home domain ending (for example printer.lan).
 - **Settings**: **What to do with blocked names**, **Home domain**, **How long devices remember a blocked answer (seconds)**, **Queries per second per device**, **Remember answers (entries)**, **Keep the query history for (days)**, **Hide device addresses in the history** and, under **Apps that skip your DNS**, **Tell browsers to use this DNS** and **Block iCloud Private Relay**.
 
 ![The Servers tab](img/dns-servers.png)
+
+![The Your names tab, shown with example data](img/dns-names.png)
 
 Devices sent through a VPN have their name lookups sent through it as well.
 

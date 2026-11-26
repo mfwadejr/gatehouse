@@ -1,4 +1,5 @@
 import { WhatChanged } from '../whatchanged.jsx';
+import GuestPortal from './GuestPortal.jsx';
 import React, { useState } from 'react';
 import TrafficPanel from '../TrafficPanel.jsx';
 import { del, holdAnd, post, put, useData } from '../api.js';
@@ -241,6 +242,8 @@ export default function Networks({ me }) {
       </Card>
 
       {traffic && <TrafficPanel kind="net" id={traffic} title={`${traffic} traffic`} sub="What the devices on this network are downloading and uploading, all its ports together." />}
+
+      <GuestPortal />
 
       <Card title="Network ports on this device" desc="Live status and addresses. Give a port a name you will recognise, such as your internet gateway or a spare.">
         <div className="list">

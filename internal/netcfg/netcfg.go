@@ -32,6 +32,9 @@ type Interface struct {
 	PD      bool   `json:"pd"` // receive a delegated IPv6 prefix from the internet link
 	MTU     int    `json:"mtu"`
 	Enabled bool   `json:"enabled"`
+	// Isolate stops the ports of a bridge from talking to each other directly (guests on one switch
+	// cannot see each other). Each port can still reach the bridge itself, which is this device.
+	Isolate bool `json:"isolate"`
 }
 
 // WAN is one internet connection.
@@ -460,6 +463,9 @@ func Generate(c *Config) (*Output, error) {
 			}
 			f := netFile(m)
 			f.l("[Network]\nBridge=%s\nConfigureWithoutCarrier=yes\nLinkLocalAddressing=no\nIPv6AcceptRA=no", i.Name)
+			if i.Isolate {
+				f.l("\n[Bridge]\nIsolated=yes")
+			}
 			finish(m, f)
 		}
 	}

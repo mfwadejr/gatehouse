@@ -16,7 +16,7 @@ Administrators see every tab. Other accounts see only their own sign-in settings
 - **Alerts & logs** holds **Alerts** (a phone message through ntfy, or email, with **More: quiet hours** folded under it) and a folded **Send data to other tools**. That folded part has **Send logs elsewhere**, **Send traffic records (NetFlow / IPFIX)** and SNMP. These only send data out. They keep nothing here.
 - **Storage** shows everything NopeWarden keeps on its own disk and for how long. See below.
 - **Backup & recovery** holds **Backups** and **Changes**. See below.
-- **Advanced** holds **High availability**, **Bridge mode** and **Guest sign-in page**. Updates have their own page, and **Traffic labels** and the app and category lists are on Protection, under Lists and labels.
+- **Advanced** holds **High availability** and **Bridge mode**. The **Guest sign-in page** is on the Networks page, next to your guest network. Updates have their own page, and **Traffic labels** and the app and category lists are on Protection, under Lists and labels.
 - **Danger zone** is a red tab for administrators with the three resets.
 
 ## Your place on the map

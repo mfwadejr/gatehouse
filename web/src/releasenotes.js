@@ -1,6 +1,16 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.69',
+    title: 'A guest sign-in page you can see, and a block list that copes',
+    items: [
+      'Networks: the Guest sign-in page moved here from Settings, next to your guest network, with a phone beside the settings that shows the real page as you type. You can set a title, a welcome line, the button wording and colour, and a small logo. If you write terms, guests must tick I agree before Connect works.',
+      'Stay signed in for is now a list (1, 2, 4, 8, 12, 24 hours or 7 days, 4 hours to start) and the page tells the guest how long it lasts. A guest whose address changes is not asked again, because the sign-in is remembered by the device. Guest networks you add start with a 2 hour address lease so addresses come back by themselves, and a guest network made from several of this device\u2019s own ports keeps its ports apart.',
+      'Threats, Settings: the Blocked right now list groups addresses by the alert that caused them, shows the newest ten groups, has a search box and a count with Remove all, and the limit is now 4,096 with a note on the page and in the Logs if it ever fills.',
+      'DNS, Your names: each name is shown in full, for example test.lan.',
+    ],
+  },
+  {
     version: '0.9.4.68',
     title: 'Watch and block, and a tidier Management port',
     items: [

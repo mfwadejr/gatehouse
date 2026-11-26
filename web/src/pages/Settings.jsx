@@ -11,7 +11,6 @@ import Syslog from './Syslog.jsx';
 import FlowExport from './FlowExport.jsx';
 import Snmp from './Snmp.jsx';
 import Storage from './Storage.jsx';
-import GuestPortal from './GuestPortal.jsx';
 import BridgeMode from './BridgeMode.jsx';
 import DeviceMode from './DeviceMode.jsx';
 import MgmtPort from './MgmtPort.jsx';
@@ -335,7 +334,6 @@ export default function Settings({ me, reloadMe }) {
         <>
           <div id="set-ha"><Guard what="High availability"><HighAvailability me={me} /></Guard></div>
           <Guard what="Bridge mode"><BridgeMode /></Guard>
-          <Guard what="Guest sign-in page"><GuestPortal /></Guard>
         </>
       )}
       {(!admin || tab === 'general') && <Appearance />}

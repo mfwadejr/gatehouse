@@ -71,7 +71,7 @@ const ROWS = [
   ['Device mode', 'settings/general', 'Choose Router or Bridge and see which cable goes where', 'router bridge mode ports cables internet port change walkthrough', 'Device mode'],
   ['Bridge mode', 'settings/advanced', 'Filter between another router and your network without routing', 'bridge transparent filtering inline passthrough', 'Bridge mode'],
   ['App and category lists', 'protection/lists', 'Which version of each blocklist is in use, and going back', 'blocklist version rollback settings advanced moved', 'Lists used for blocking'],
-  ['Guest sign-in page', 'settings/advanced', 'Make guests tap Connect before they get internet', 'captive portal guest terms splash sign in hotspot', 'Guest sign-in page'],
+  ['Guest sign-in page', 'networks', 'Make guests tap Connect before they get internet', 'captive portal guest terms splash sign in hotspot', 'Guest sign-in page'],
   ['Admin activity', 'logs/admin', 'Who signed in and who changed what', 'admin activity audit sign in failed login who changed', 'Admin activity'],
   ['System log', 'diagnostics/log', 'Messages from NopeWarden and the machine it runs on', 'system log journal errors warnings messages follow', 'System log'],
   ['Is NopeWarden itself working?', 'diagnostics/services', 'One sentence on whether NopeWarden is healthy, with problems first', 'health verdict self health uptime restart disk clock', 'Is NopeWarden itself working?'],

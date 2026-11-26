@@ -44,7 +44,8 @@ export default function AddNetwork({ onClose, onCreated }) {
     { value: 'custom', label: 'Custom', internet: true, intra: true, hint: 'Starts with nothing allowed between networks. Set the switches below, then write your own rules.' },
   ];
   const kind = KINDS.find((k) => k.value === f.kind) || KINDS[1];
-  const chooseKind = (v) => { const k = KINDS.find((x) => x.value === v); setF((x) => ({ ...x, kind: v, internet: k.internet, intra_allow: k.intra })); };
+  // A guest network starts with a 2 hour lease so its addresses come back by themselves; the choice below can change it.
+  const chooseKind = (v) => { const k = KINDS.find((x) => x.value === v); setF((x) => ({ ...x, kind: v, internet: k.internet, intra_allow: k.intra, lease: v === 'guest' ? '2h' : x.lease === '2h' ? '1d' : x.lease })); };
   const port = sug?.ports?.find((p) => p.name === f.port);
   const shared = !!port?.use; // the port already has something on it, so this network has to ride on a VLAN
   const vlanOn = asVlan || shared;
@@ -106,7 +107,7 @@ export default function AddNetwork({ onClose, onCreated }) {
         )}
         {!f.no_address && f.dhcp === 'server' && (
           <Field label="How long a device keeps its address">
-            <Segmented value={f.lease} onChange={set('lease')} options={[{ value: '1h', label: '1 hour' }, { value: '1d', label: '1 day' }, { value: '1w', label: '1 week' }]} />
+            <Segmented value={f.lease} onChange={set('lease')} options={[{ value: '1h', label: '1 hour' }, { value: '2h', label: '2 hours' }, { value: '1d', label: '1 day' }, { value: '1w', label: '1 week' }]} />
           </Field>
         )}
 

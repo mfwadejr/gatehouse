@@ -34,3 +34,21 @@ Make a Cameras network on its own port with the address 192.168.30.1/24, and on 
 
 ## If something goes wrong
 NopeWarden refuses a port that already belongs to another network or the internet, and says which. Nothing changes until you apply, and the 60-second way back covers it.
+
+## Guest sign-in page
+
+Under your networks is the **Guest sign-in page** card. It is off until you switch on **Use a sign-in page** and choose your guest network. A guest device then sees your page first and reaches the internet only after it taps the button. A network that manages NopeWarden or faces the internet can never be chosen, so you cannot lock yourself out.
+
+![The Guest sign-in page card with its phone preview, shown with example data](img/networks-guest.png)
+
+Make the page your own with **Title**, **Welcome line**, **Button wording**, **Button colour** and a small **Logo**. The phone beside the settings shows the real page as you type; **Sign-in page** and **After Connect** switch between the two pages. Nothing is saved until you press **Save**.
+
+If you write **Terms**, the page shows them with a box, **I agree to these terms**, and the button stays grey until it is ticked. With no terms the page is a single button.
+
+**Stay signed in for** is a list: 1, 2, 4, 8, 12 or 24 hours, or 7 days (4 hours to start). The guest is told how long it lasts, for example “You are connected for 4 hours”. Signing in is separate from the address lease: when a guest's address runs out and they get a new one, they are not asked again, because the sign-in is remembered by the device's hardware address. A phone that uses a private Wi-Fi address may count as a new device and sign in again, and a device whose hardware address cannot be read is remembered by its address instead.
+
+Guest networks you add start with a **2 hour** address lease, so addresses come back by themselves. A guest whose lease ended simply gets an address again; whether they sign in again depends only on the time above.
+
+The page is plain http on port 8099 and works for IPv4. Guests who open a secure (https) site first may not be sent to it, though phones and laptops usually notice it by themselves. Do not use the page to collect secrets.
+
+Guests cannot reach each other through NopeWarden, but two guests on the same Wi-Fi or switch talk directly and the firewall never sees it. Turn on **client isolation** (also called AP isolation or guest mode) on your access point. A network built from several of this device's own ports keeps its ports apart by itself when it is a Guest network.

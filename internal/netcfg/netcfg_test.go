@@ -256,3 +256,20 @@ func TestSharingTheLoadHashesOnPorts(t *testing.T) {
 		t.Fatalf("sysctl does not hash on ports:\n%s", o.Sysctl)
 	}
 }
+
+func TestBridgePortsAreIsolatedOnlyWhenAsked(t *testing.T) {
+	mk := func(iso bool) map[string]string {
+		c := Config{Interfaces: []Interface{{Name: "br-guest", Kind: "bridge", Members: []string{"eth2", "eth3"}, IPv4: "192.168.30.1/24", Enabled: true, Isolate: iso}}}
+		o, err := Generate(&c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return o.Networkd
+	}
+	if f := mk(true)["nopewarden-eth2.network"]; !strings.Contains(f, "[Bridge]\nIsolated=yes") {
+		t.Fatalf("a guest bridge port was not isolated:\n%s", f)
+	}
+	if f := mk(false)["nopewarden-eth2.network"]; strings.Contains(f, "Isolated") {
+		t.Fatalf("an ordinary bridge port was isolated:\n%s", f)
+	}
+}

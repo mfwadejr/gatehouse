@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"nopewarden/internal/api"
@@ -25,7 +26,7 @@ const (
 	threatBlockSetting    = "threat.block"         // "1" when blocking is switched on
 	threatBlockMinSetting = "threat.block_minutes" // how long an address stays blocked
 	threatBlocksSetting   = "threat.blocks"        // the list, as JSON
-	threatBlockMax        = 500
+	threatBlockMax        = 4096                   // the same size as the firewall's block list
 )
 
 type threatBlockRow struct {
@@ -38,6 +39,9 @@ type threatBlockRow struct {
 }
 
 var threatBlockMu sync.Mutex
+
+// threatBlockFullSaid is when the full-list note was last written to the Logs.
+var threatBlockFullSaid int64
 
 func (a *App) threatBlocking() bool {
 	return a.threatMode() == "watch" && a.Config.Setting(threatBlockSetting, "") == "1"
@@ -127,6 +131,12 @@ func (a *App) threatMaybeBlock(e evePacket, local, device string, now time.Time)
 	if !found {
 		if len(rows) >= threatBlockMax {
 			threatBlockMu.Unlock()
+			// Say so, once an hour at most, so a full list is never silent.
+			if now.Unix()-atomic.LoadInt64(&threatBlockFullSaid) > 3600 {
+				atomic.StoreInt64(&threatBlockFullSaid, now.Unix())
+				a.Logs.Exec(`INSERT INTO events(ts,area,severity,actor,title,detail) VALUES(?,?,?,?,?,?)`, now.Unix(), "threat", "warning", "system",
+					"The block list is full", "New addresses are not being blocked until some are released or removed.")
+			}
 			return
 		}
 		rows = append(rows, threatBlockRow{IP: remote, Until: until, At: now.Unix(), SID: e.Alert.SID, Why: e.Alert.Signature, Device: device})
@@ -174,7 +184,7 @@ func (a *App) registerThreatBlockRoutes() {
 		for _, x := range rows {
 			list = append(list, out{x, x.Until - now.Unix()})
 		}
-		api.JSON(w, 200, map[string]any{"on": a.threatBlocking(), "minutes": a.threatBlockMinutes(), "blocks": list})
+		api.JSON(w, 200, map[string]any{"on": a.threatBlocking(), "minutes": a.threatBlockMinutes(), "blocks": list, "full": len(rows) >= threatBlockMax, "max": threatBlockMax})
 	})
 	s.HandleAdmin("DELETE /api/threat/blocks/{ip}", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		ip := r.PathValue("ip")
@@ -218,7 +228,7 @@ func (a *App) registerThreatBlockRoutes() {
 
 func (a *App) threatBlockingText() string {
 	if a.threatBlocking() {
-		return fmt.Sprintf("Blocking is on. When a serious alert comes from an outside address, that address is blocked for %d minutes and then released by itself. Your own devices and your DNS servers are never blocked.", a.threatBlockMinutes())
+		return fmt.Sprintf("Blocking is on. When a serious alert comes from an outside address, that address is blocked for %d minutes and then released by itself. Your own devices and your DNS servers are never blocked. If the program stops, nothing new is blocked and your traffic is not touched.", a.threatBlockMinutes())
 	}
 	return "Blocking is not switched on. NopeWarden watches and tells you; it never holds up your traffic."
 }
