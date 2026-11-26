@@ -73,7 +73,7 @@ function lastOf(arr, n = 2) {
 
 function Hero({ wanList, links, thr, onStamp }) {
   const pn = usePortNames();
-  const [dir, setDir] = useState('rx');
+  const [dir, setDir] = useState('both');
   const [range, setRange] = useState('1h');
   const { data: hist } = useData(`/api/overview/history?range=${LIVE[range] ? '1h' : range}`, { every: EVERY[LIVE[range] ? '1h' : range], enabled: !LIVE[range] });
   const enabled = wanList.filter((w) => w.enabled);
@@ -138,7 +138,14 @@ function Hero({ wanList, links, thr, onStamp }) {
         <div className="small muted" style={{ marginBottom: 'var(--space-3)' }}>{head.sub}</div>
         <div className="ov-big">{fmtBits(sum('rx')).split(' ')[0]}<span className="unit">{fmtBits(sum('rx')).split(' ')[1]} download · now</span></div>
         <div className="ov-big">{fmtBits(sum('tx')).split(' ')[0]}<span className="unit">{fmtBits(sum('tx')).split(' ')[1]} upload · now</span></div>
-        <div className="small muted mt2">Average over {RANGE_WORDS[range]}: <span className="dl">▼ {fmtBits(avgOf('rx'))} down</span>, <span className="ul">▲ {fmtBits(avgOf('tx'))} up</span> · busiest {dir === 'both' ? <><span className="dl">▼ {fmtBits(peakOf('rx'))} down</span>, <span className="ul">▲ {fmtBits(peakOf('tx'))} up</span></> : <span className={dir === 'rx' ? 'dl' : 'ul'}>{dir === 'rx' ? '▼' : '▲'} {fmtBits(peakOf(dir))} {dir === 'rx' ? 'down' : 'up'}</span>}</div>
+        <div className="ov-avg small">
+          <span className="muted ov-avg-h">Over {RANGE_WORDS[range]}</span>
+          <span className="muted">Average</span>
+          <span className="dl">▼ {fmtBits(avgOf('rx'))} down</span>
+          <span className="ul">▲ {fmtBits(avgOf('tx'))} up</span>
+          <span className="muted">Busiest</span>
+          {dir === 'both' ? <><span className="dl">▼ {fmtBits(peakOf('rx'))} down</span><span className="ul">▲ {fmtBits(peakOf('tx'))} up</span></> : <span className={dir === 'rx' ? 'dl' : 'ul'}>{dir === 'rx' ? '▼' : '▲'} {fmtBits(peakOf(dir))} {dir === 'rx' ? 'down' : 'up'}</span>}
+        </div>
         <div className="ov-wans">
           {states.map((x, i) => {
             const m = linkMeasure(x.l);

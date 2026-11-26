@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -76,6 +77,8 @@ type fakeNet struct {
 	flowAcct     []bool
 	ended        []string
 	flowDump     string
+	usbDisks     []netd.UsbDisk
+	usbCopies    []string
 	sqmPlans     []netd.SQMPlan
 	mgmtPlans    []netd.MgmtPlan
 	mgmtErr      error
@@ -197,6 +200,21 @@ func (f *fakeNet) ConntrackEnd(proto, src string, sport int, dst string, dport i
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.ended = append(f.ended, fmt.Sprintf("%s %s:%d>%s:%d", proto, src, sport, dst, dport))
+	return nil
+}
+func (f *fakeNet) UsbList() ([]netd.UsbDisk, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.usbDisks, nil
+}
+func (f *fakeNet) UsbCopy(uuid, src, name string, keep int) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	b, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	f.usbCopies = append(f.usbCopies, uuid+" "+name+" "+strconv.Itoa(len(b)))
 	return nil
 }
 func (f *fakeNet) NDPIInstalled() bool {

@@ -12,6 +12,7 @@ import (
 	"net/mail"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -20,6 +21,7 @@ import (
 	"time"
 
 	"nopewarden/internal/api"
+	"nopewarden/internal/netd"
 	"nopewarden/internal/offsite"
 )
 
@@ -69,6 +71,28 @@ type offCloud struct {
 	SignedIn  bool   `json:"signed_in"`
 }
 
+type offSFTP struct {
+	Host string `json:"host"`
+	Port string `json:"port"`
+	User string `json:"user"`
+	Dir  string `json:"dir"`
+}
+
+type offSMB struct {
+	Host    string `json:"host"`
+	Share   string `json:"share"`
+	Dir     string `json:"dir"`
+	User    string `json:"user"`
+	Domain  string `json:"domain"`
+	Pass    string `json:"pass,omitempty"` // sealed when stored
+	PassSet bool   `json:"pass_set"`
+}
+
+type offUSB struct {
+	UUID  string `json:"uuid"`
+	Label string `json:"label"`
+}
+
 type offDest struct {
 	ID      string    `json:"id"`
 	Kind    string    `json:"kind"` // s3, webdav, email
@@ -78,6 +102,9 @@ type offDest struct {
 	DAV     *offDAV   `json:"dav,omitempty"`
 	Mail    *offMail  `json:"mail,omitempty"`
 	Cloud   *offCloud `json:"cloud,omitempty"`
+	SFTP    *offSFTP  `json:"sftp,omitempty"`
+	SMB     *offSMB   `json:"smb,omitempty"`
+	USB     *offUSB   `json:"usb,omitempty"`
 }
 
 type offCfg struct {
@@ -167,6 +194,11 @@ func (a *App) offsiteView(c offCfg) offCfg {
 			v.PassSet, v.Pass = v.Pass != "", ""
 			d.DAV = &v
 		}
+		if d.SMB != nil {
+			v := *d.SMB
+			v.PassSet, v.Pass = v.Pass != "", ""
+			d.SMB = &v
+		}
 		if d.Cloud != nil {
 			v := *d.Cloud
 			v.SecretSet, v.SignedIn, v.Secret, v.Refresh = v.Secret != "", v.Refresh != "", "", ""
@@ -200,6 +232,18 @@ func (a *App) storeFor(d offDest) (offsite.Store, error) {
 			return nil, errors.New("this place is not filled in")
 		}
 		return &offsite.WebDAV{URL: d.DAV.URL, Dir: d.DAV.Dir, User: d.DAV.User, Pass: a.openSecret(d.DAV.Pass)}, nil
+	case "sftp":
+		if d.SFTP == nil {
+			return nil, errors.New("this place is not filled in")
+		}
+		dir := a.offsiteDir()
+		return &offsite.SFTP{Host: d.SFTP.Host, Port: d.SFTP.Port, User: d.SFTP.User, Dir: d.SFTP.Dir,
+			KeyFile: filepath.Join(dir, "sftp_ed25519"), KnownHosts: filepath.Join(dir, "known_hosts")}, nil
+	case "smb":
+		if d.SMB == nil {
+			return nil, errors.New("this place is not filled in")
+		}
+		return &offsite.SMB{Host: d.SMB.Host, Share: d.SMB.Share, Dir: d.SMB.Dir, User: d.SMB.User, Domain: d.SMB.Domain, Pass: a.openSecret(d.SMB.Pass)}, nil
 	case "dropbox", "onedrive", "google":
 		if d.Cloud == nil || d.Cloud.Refresh == "" {
 			return nil, errors.New("sign in to this place first")
@@ -268,9 +312,35 @@ func (a *App) offsiteSend(path string) map[string]offState {
 	return states
 }
 
+func (a *App) offsiteDir() string {
+	d := filepath.Join(a.Cfg.DataDir, "offsite")
+	os.MkdirAll(d, 0o700)
+	return d
+}
+
+// offsiteUSB writes the copy to a file for the privileged helper, which puts it on the drive.
+func (a *App) offsiteUSB(cfg offCfg, d offDest, name string, data []byte) error {
+	if d.USB == nil || d.USB.UUID == "" {
+		return errors.New("choose a drive first")
+	}
+	dir := filepath.Join(a.Cfg.DataDir, "offsite-out")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	p := filepath.Join(dir, name)
+	if err := os.WriteFile(p, data, 0o600); err != nil {
+		return err
+	}
+	defer os.Remove(p)
+	return a.Net.UsbCopy(d.USB.UUID, p, name, cfg.Keep)
+}
+
 func (a *App) offsitePut(cfg offCfg, d offDest, name string, data []byte) error {
 	if d.Kind == "email" {
 		return a.offsiteEmail(d, name, data)
+	}
+	if d.Kind == "usb" {
+		return a.offsiteUSB(cfg, d, name, data)
 	}
 	st, err := a.storeFor(d)
 	if err != nil {
@@ -408,6 +478,7 @@ func offCleanID(id string) string {
 }
 
 func (a *App) registerOffsiteRoutes() {
+	a.registerOffsiteDeviceRoutes()
 	s := a.API
 	s.HandleAdmin("GET /api/backups/offsite", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		api.JSON(w, 200, map[string]any{"config": a.offsiteView(a.offsiteConfig()), "status": a.offsiteStates(), "summary": a.offsiteSummary()})
@@ -529,6 +600,45 @@ func (a *App) registerOffsiteRoutes() {
 					return
 				}
 				d.Cloud, d.S3, d.DAV, d.Mail = &v, nil, nil, nil
+			case "sftp":
+				if d.SFTP == nil || strings.TrimSpace(d.SFTP.Host) == "" || strings.TrimSpace(d.SFTP.User) == "" {
+					fail(w, errors.New(d.Label+": fill in the server and the user name"))
+					return
+				}
+				v := *d.SFTP
+				v.Host, v.User, v.Dir = strings.TrimSpace(v.Host), strings.TrimSpace(v.User), strings.Trim(strings.TrimSpace(v.Dir), "/")
+				if v.Dir == "" {
+					v.Dir = "NopeWarden"
+				}
+				if err := (&offsite.SFTP{Host: v.Host, User: v.User, Dir: v.Dir}).Check(); err != nil {
+					fail(w, errors.New(d.Label+": the server, user or folder has a character that is not allowed"))
+					return
+				}
+				d.SFTP, d.S3, d.DAV, d.Mail, d.Cloud, d.SMB, d.USB = &v, nil, nil, nil, nil, nil, nil
+			case "smb":
+				if d.SMB == nil || strings.TrimSpace(d.SMB.Host) == "" || strings.TrimSpace(d.SMB.Share) == "" {
+					fail(w, errors.New(d.Label+": fill in the server and the share name"))
+					return
+				}
+				v := *d.SMB
+				v.PassSet = false
+				if v.Pass == "" && p.SMB != nil {
+					v.Pass = p.SMB.Pass
+				} else if v.Pass != "" {
+					v.Pass = a.Box.Seal(v.Pass)
+				}
+				v.Host, v.Share, v.Dir = strings.TrimSpace(v.Host), strings.TrimSpace(v.Share), strings.Trim(strings.TrimSpace(v.Dir), "/")
+				if v.Dir == "" {
+					v.Dir = "NopeWarden"
+				}
+				d.SMB, d.S3, d.DAV, d.Mail, d.Cloud, d.SFTP, d.USB = &v, nil, nil, nil, nil, nil, nil
+			case "usb":
+				if d.USB == nil || d.USB.UUID == "" {
+					fail(w, errors.New(d.Label+": choose a drive"))
+					return
+				}
+				v := *d.USB
+				d.USB, d.S3, d.DAV, d.Mail, d.Cloud, d.SFTP, d.SMB = &v, nil, nil, nil, nil, nil, nil
 			case "email":
 				if d.Mail == nil {
 					d.Mail = &offMail{}
@@ -568,6 +678,21 @@ func (a *App) registerOffsiteRoutes() {
 		}
 		if d == nil {
 			fail(w, errors.New("save this place first, then test it"))
+			return
+		}
+		if d.Kind == "usb" {
+			disks, err := a.Net.UsbList()
+			if err != nil {
+				fail(w, err)
+				return
+			}
+			for _, x := range disks {
+				if d.USB != nil && x.UUID == d.USB.UUID {
+					api.JSON(w, 200, map[string]any{"status": "ok", "message": "The drive is plugged in. Nothing was written."})
+					return
+				}
+			}
+			fail(w, errors.New("the USB drive is not plugged in"))
 			return
 		}
 		if d.Kind == "email" {
@@ -687,4 +812,58 @@ func (a *App) offsiteDest(id string) *offDest {
 		}
 	}
 	return nil
+}
+
+// USB drives that are plugged in, and the key that SFTP places use.
+func (a *App) registerOffsiteDeviceRoutes() {
+	s := a.API
+	s.HandleAdmin("GET /api/backups/offsite/usb", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		d, err := a.Net.UsbList()
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		if d == nil {
+			d = []netd.UsbDisk{}
+		}
+		api.JSON(w, 200, map[string]any{"drives": d})
+	})
+	s.HandleAdmin("GET /api/backups/offsite/sftp-key", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		api.JSON(w, 200, map[string]any{"public": a.sftpPublicKey()})
+	})
+	s.HandleAdmin("POST /api/backups/offsite/sftp-key", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		if k := a.sftpPublicKey(); k != "" {
+			api.JSON(w, 200, map[string]any{"public": k})
+			return
+		}
+		key := filepath.Join(a.offsiteDir(), "sftp_ed25519")
+		if out, err := exec.Command("ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", "nopewarden-backup", "-f", key).CombinedOutput(); err != nil {
+			if _, e := exec.LookPath("ssh-keygen"); e != nil {
+				fail(w, errors.New("the ssh tools are not installed on this machine (apt install openssh-client)"))
+				return
+			}
+			fail(w, errors.New("the key could not be made: "+strings.TrimSpace(string(out))))
+			return
+		}
+		api.JSON(w, 200, map[string]any{"public": a.sftpPublicKey()})
+	})
+	// Trust a new key from a server whose key changed on purpose (a new server, a reinstall).
+	s.HandleAdmin("POST /api/backups/offsite/{id}/forget-key", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		d := a.offsiteDest(r.PathValue("id"))
+		if d == nil || d.SFTP == nil {
+			fail(w, errors.New("that place was not found"))
+			return
+		}
+		exec.Command("ssh-keygen", "-q", "-R", d.SFTP.Host, "-f", filepath.Join(a.offsiteDir(), "known_hosts")).Run()
+		a.event(c.User.Username, "info", "Trusted a new server key for a backup copy place", d.Label)
+		ok(w)
+	})
+}
+
+func (a *App) sftpPublicKey() string {
+	b, err := os.ReadFile(filepath.Join(a.offsiteDir(), "sftp_ed25519.pub"))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(b))
 }

@@ -11,3 +11,5 @@ iputils-arping
 unbound
 dns-root-data
 conntrack
+openssh-client
+smbclient

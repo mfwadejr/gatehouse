@@ -6,6 +6,9 @@ import { Button, Empty, Field, Input, Note, Pill, Select, ToggleRow, useAction, 
 // person's own. Passwords and keys typed here are sent once and never shown again.
 
 const KINDS = {
+  usb: 'A USB drive plugged into this machine',
+  sftp: 'A server over SFTP (SSH)',
+  smb: 'A Windows or Samba file share (SMB)',
   dropbox: 'Dropbox',
   onedrive: 'Microsoft OneDrive',
   google: 'Google Drive',
@@ -19,6 +22,9 @@ function blank(kind) {
   const base = { id, kind, label: '', enabled: false };
   if (kind === 's3') return { ...base, s3: { endpoint: '', region: '', bucket: '', prefix: 'nopewarden', access_key: '', secret: '', path_style: false } };
   if (kind === 'webdav') return { ...base, dav: { url: '', dir: 'NopeWarden', user: '', pass: '' } };
+  if (kind === 'sftp') return { ...base, sftp: { host: '', port: '22', user: '', dir: 'NopeWarden' } };
+  if (kind === 'smb') return { ...base, smb: { host: '', share: '', dir: 'NopeWarden', user: '', domain: '', pass: '' } };
+  if (kind === 'usb') return { ...base, usb: { uuid: '', label: '' } };
   if (kind === 'email') return { ...base, mail: { to: '' } };
   return { ...base, cloud: { client_id: '', secret: '' } };
 }
@@ -65,13 +71,40 @@ function SignIn({ d, busy, run, onDone }) {
   );
 }
 
+function SftpKey({ run }) {
+  const [key, setKey] = useState(null);
+  const { data } = useData('/api/backups/offsite/sftp-key');
+  const k = key ?? data?.public ?? '';
+  return (
+    <div className="stack">
+      <p className="small muted">NopeWarden signs in with a key made for this machine. Add the public key below to the user's authorized keys on the server (the file ~/.ssh/authorized_keys). The server's own key is trusted the first time NopeWarden connects, and a later change is refused until you press Trust a new key.</p>
+      {k ? <textarea className="mono small" readOnly rows={3} value={k} onFocus={(e) => e.target.select()} /> : <Button small onClick={async () => { const r = await run(() => post('/api/backups/offsite/sftp-key', {})); if (r?.public) setKey(r.public); }}>Make this machine's key</Button>}
+    </div>
+  );
+}
+
+function UsbPick({ d, set }) {
+  const { data, reload } = useData('/api/backups/offsite/usb', { every: 15000 });
+  const drives = data?.drives || [];
+  const name = (x) => `${x.label || x.model || 'USB drive'} (${x.fstype}, ${(x.size / 1e9).toFixed(1)} GB)`;
+  return (
+    <div className="stack">
+      <Field label="Drive" hint="Plug the drive in and it appears here. It is opened only for the moment a copy is written, then closed, so you can unplug it at any other time. Only a folder called NopeWarden on it is used.">
+        <Select value={d.usb.uuid} onChange={(v) => { const x = drives.find((y) => y.uuid === v); set({ ...d, usb: { uuid: v, label: x ? name(x) : d.usb.label } }); }}
+          options={[{ value: '', label: drives.length ? 'Choose…' : 'No USB drive found' }, ...(d.usb.uuid && !drives.some((x) => x.uuid === d.usb.uuid) ? [{ value: d.usb.uuid, label: `${d.usb.label || d.usb.uuid} (not plugged in)` }] : []), ...drives.map((x) => ({ value: x.uuid, label: name(x) }))]} />
+      </Field>
+      <div><Button small onClick={reload}>Look again</Button></div>
+    </div>
+  );
+}
+
 function Dest({ d, saved, st, set, remove, test, busy, run, reload }) {
   const s3 = (k) => (v) => set({ ...d, s3: { ...d.s3, [k]: v } });
   const dav = (k) => (v) => set({ ...d, dav: { ...d.dav, [k]: v } });
   return (
     <div className="item" style={{ alignItems: 'flex-start', display: 'block' }}>
       <div className="stack">
-        <div className="name">{d.label || 'New place'} <Pill tone="">{{ s3: 'Cloud storage', webdav: 'WebDAV', email: 'Email', dropbox: 'Dropbox', onedrive: 'OneDrive', google: 'Google Drive' }[d.kind]}</Pill></div>
+        <div className="name">{d.label || 'New place'} <Pill tone="">{{ s3: 'Cloud storage', webdav: 'WebDAV', email: 'Email', dropbox: 'Dropbox', onedrive: 'OneDrive', google: 'Google Drive', sftp: 'SFTP', smb: 'SMB', usb: 'USB drive' }[d.kind]}</Pill></div>
         <Field label="A name for this place"><Input value={d.label} onChange={(v) => set({ ...d, label: v })} placeholder="For example, Backblaze or Home NAS" /></Field>
         {d.kind === 's3' && (
           <div className="inline" style={{ alignItems: 'flex-start' }}>
@@ -102,6 +135,29 @@ function Dest({ d, saved, st, set, remove, test, busy, run, reload }) {
             {saved ? <SignIn d={d} busy={busy} run={run} onDone={reload} /> : <p className="small muted">Press Save and test once to save the app ID, then sign in.</p>}
           </>
         )}
+        {d.sftp && (
+          <>
+            <div className="inline" style={{ alignItems: 'flex-start' }}>
+              <Field label="Server"><Input value={d.sftp.host} onChange={(v) => set({ ...d, sftp: { ...d.sftp, host: v } })} placeholder="nas.example.com" /></Field>
+              <Field label="Port"><div style={{ width: '6rem' }}><Input value={d.sftp.port} onChange={(v) => set({ ...d, sftp: { ...d.sftp, port: v } })} /></div></Field>
+              <Field label="User name"><Input value={d.sftp.user} onChange={(v) => set({ ...d, sftp: { ...d.sftp, user: v } })} autoComplete="off" /></Field>
+              <Field label="Folder" hint="Made for you if it is missing."><Input value={d.sftp.dir} onChange={(v) => set({ ...d, sftp: { ...d.sftp, dir: v } })} /></Field>
+            </div>
+            <SftpKey run={run} />
+            {saved && <div><Button small disabled={busy} onClick={() => run(() => post(`/api/backups/offsite/${d.id}/forget-key`, {}), 'The next connection will trust the server\'s current key.')}>Trust a new key</Button></div>}
+          </>
+        )}
+        {d.smb && (
+          <div className="inline" style={{ alignItems: 'flex-start' }}>
+            <Field label="Server"><Input value={d.smb.host} onChange={(v) => set({ ...d, smb: { ...d.smb, host: v } })} placeholder="nas.local" /></Field>
+            <Field label="Share name"><Input value={d.smb.share} onChange={(v) => set({ ...d, smb: { ...d.smb, share: v } })} /></Field>
+            <Field label="Folder in the share" hint="Made for you if it is missing."><Input value={d.smb.dir} onChange={(v) => set({ ...d, smb: { ...d.smb, dir: v } })} /></Field>
+            <Field label="User name"><Input value={d.smb.user} onChange={(v) => set({ ...d, smb: { ...d.smb, user: v } })} autoComplete="off" /></Field>
+            <Field label="Password" hint={d.smb.pass_set ? 'Already saved. Type a new one only to change it.' : ''}><Input type="password" value={d.smb.pass} onChange={(v) => set({ ...d, smb: { ...d.smb, pass: v } })} autoComplete="new-password" /></Field>
+            <Field label="Domain" hint="Usually empty at home."><Input value={d.smb.domain} onChange={(v) => set({ ...d, smb: { ...d.smb, domain: v } })} /></Field>
+          </div>
+        )}
+        {d.usb && <UsbPick d={d} set={set} />}
         {d.kind === 'email' && (
           <Field label="Send to" hint="Leave empty to use your alerts address. Uses the mail server from Alerts. Backups over 15 MB are too big to send this way.">
             <Input value={d.mail.to} onChange={(v) => set({ ...d, mail: { to: v } })} placeholder="you@example.com" />

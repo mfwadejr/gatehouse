@@ -250,9 +250,11 @@ func (f *fakeNetCtl) ConntrackDump() (string, error)        { return "", nil }
 func (f *fakeNetCtl) ConntrackEnd(proto, src string, sport int, dst string, dport int) error {
 	return nil
 }
-func (f *fakeNetCtl) SQMApply(p netd.SQMPlan) (string, error) { return "cake", nil }
-func (f *fakeNetCtl) OverrideApply(p netd.OverridePlan) error { return nil }
-func (f *fakeNetCtl) MgmtApply(p netd.MgmtPlan) error         { return nil }
+func (f *fakeNetCtl) UsbList() ([]netd.UsbDisk, error)               { return nil, nil }
+func (f *fakeNetCtl) UsbCopy(uuid, src, name string, keep int) error { return nil }
+func (f *fakeNetCtl) SQMApply(p netd.SQMPlan) (string, error)        { return "cake", nil }
+func (f *fakeNetCtl) OverrideApply(p netd.OverridePlan) error        { return nil }
+func (f *fakeNetCtl) MgmtApply(p netd.MgmtPlan) error                { return nil }
 func (f *fakeNetCtl) ThreatStatus() netd.ThreatInfo {
 	return netd.ThreatInfo{Installed: true, State: "idle"}
 }

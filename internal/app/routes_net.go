@@ -79,6 +79,8 @@ type NetController interface {
 	FlowAcct(on bool) error
 	ConntrackDump() (string, error)
 	ConntrackEnd(proto, src string, sport int, dst string, dport int) error
+	UsbList() ([]netd.UsbDisk, error)
+	UsbCopy(uuid, src, name string, keep int) error
 	SQMApply(p netd.SQMPlan) (string, error)
 	OverrideApply(p netd.OverridePlan) error
 }

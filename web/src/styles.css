@@ -390,6 +390,9 @@ details.more > summary { cursor: pointer; color: var(--color-text-secondary); ma
 @keyframes ovpulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-status-good) 50%, transparent); } 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
 @media (prefers-reduced-motion: reduce) { .ov-state .dot { animation: none !important; } }
 .ov-big { font-size: 2.4rem; font-weight: var(--font-weight-semibold); letter-spacing: var(--font-tracking-tighter); line-height: 1.1; font-variant-numeric: tabular-nums; }
+.ov-avg { display: grid; grid-template-columns: auto auto auto; justify-content: start; column-gap: var(--space-4); row-gap: var(--space-1); margin-top: var(--space-3); font-variant-numeric: tabular-nums; }
+.ov-avg > span { white-space: nowrap; }
+.ov-avg-h { grid-column: 1 / -1; }
 .ov-big .unit { font-size: var(--font-size-base); color: var(--color-text-muted); font-weight: var(--font-weight-regular); margin-left: var(--space-1-5); letter-spacing: 0; }
 .ov-wans { margin-top: var(--space-4); }
 .ov-wan { display: grid; grid-template-columns: .65rem 1fr auto; gap: var(--space-2-5); align-items: start; padding: var(--space-2-5) 0; border-top: var(--border-width-thin) solid var(--color-border-subtle); }

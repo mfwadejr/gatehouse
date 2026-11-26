@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/mail"
+	"nopewarden/internal/netd"
 	"nopewarden/internal/offsite"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -191,5 +193,36 @@ func TestOffsiteDropboxSignIn(t *testing.T) {
 	}
 	if code, _, raw := c.call("POST", "/api/backups/offsite/dbx/test", nil); code != 200 {
 		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestOffsiteUSB(t *testing.T) {
+	c, fn, _ := siteBox(t, "192.168.1.1/24")
+	fn.mu.Lock()
+	fn.usbDisks = []netd.UsbDisk{{UUID: "ABCD-1234", Label: "BACKUP", FSType: "vfat", Size: 8e9}}
+	fn.mu.Unlock()
+	code, m, raw := c.call("GET", "/api/backups/offsite/usb", nil)
+	if code != 200 || len(m["drives"].([]any)) != 1 {
+		t.Fatalf("%d %s", code, raw)
+	}
+	cfg := map[string]any{"password": "a long password", "keep": 3, "remind_on": true, "remind_days": 30,
+		"dests": []map[string]any{{"id": "u1", "kind": "usb", "label": "Stick", "enabled": true, "usb": map[string]any{"uuid": "ABCD-1234"}}}}
+	if code, _, raw := c.call("PUT", "/api/backups/offsite", cfg); code != 200 {
+		t.Fatalf("%d %s", code, raw)
+	}
+	if code, _, raw := c.call("POST", "/api/backups/offsite/u1/test", nil); code != 200 {
+		t.Fatalf("%d %s", code, raw)
+	}
+	if code, _, raw := c.call("POST", "/api/backups/offsite/send", nil); code != 200 {
+		t.Fatalf("%d %s", code, raw)
+	}
+	fn.mu.Lock()
+	defer fn.mu.Unlock()
+	if len(fn.usbCopies) != 1 || !strings.HasPrefix(fn.usbCopies[0], "ABCD-1234 manual-") {
+		t.Fatalf("%v", fn.usbCopies)
+	}
+	left, _ := os.ReadDir(c.app.Cfg.DataDir + "/offsite-out")
+	if len(left) != 0 {
+		t.Fatalf("the staged copy is removed afterwards: %v", left)
 	}
 }

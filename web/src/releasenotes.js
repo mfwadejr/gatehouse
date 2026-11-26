@@ -1,6 +1,14 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.75',
+    title: 'Backup copies to a USB drive, SFTP and SMB, and Both by default',
+    items: [
+      'Settings, Backup & recovery, Copies off this machine: a USB drive, an SFTP server and an SMB (Windows or Samba) share can now keep your encrypted backup copies. A USB drive is opened only while a copy is written. SFTP uses a key NopeWarden makes for this machine, shown for you to copy to the server.',
+      'Overview, internet card: the chart now opens on Both (download and upload together), and the average and busiest numbers sit in a tidy two-row table instead of one long line.',
+    ],
+  },
+  {
     version: '0.9.4.74',
     title: 'Backup copies to Dropbox, OneDrive and Google Drive',
     items: [

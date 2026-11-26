@@ -57,6 +57,8 @@ type NetController interface {
 	FlowAcct(on bool) error
 	ConntrackDump() (string, error)
 	ConntrackEnd(proto, src string, sport int, dst string, dport int) error
+	UsbList() ([]netd.UsbDisk, error)
+	UsbCopy(uuid, src, name string, keep int) error
 	SQMApply(p netd.SQMPlan) (string, error)
 	ThreatStatus() netd.ThreatInfo
 	ThreatInstallPreview() (netd.ThreatPreview, error)
@@ -405,6 +407,19 @@ func (s *Server) dispatchNet(r request) (any, error) {
 			return nil, errors.New("bad parameters")
 		}
 		return nil, s.Net.ConntrackEnd(p.Proto, p.Src, p.SPort, p.Dst, p.DPort)
+	case "usb.list":
+		return s.Net.UsbList()
+	case "usb.copy":
+		var p struct {
+			UUID string `json:"uuid"`
+			Src  string `json:"src"`
+			Name string `json:"name"`
+			Keep int    `json:"keep"`
+		}
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return nil, s.Net.UsbCopy(p.UUID, p.Src, p.Name, p.Keep)
 	case "ndpi.installed":
 		return s.Net.NDPIInstalled(), nil
 	case "threat.status":
@@ -789,6 +804,18 @@ func (c *Client) ConntrackDump() (string, error) {
 // ConntrackEnd ends one live connection.
 func (c *Client) ConntrackEnd(proto, src string, sport int, dst string, dport int) error {
 	return c.call("flow.end", map[string]any{"proto": proto, "src": src, "sport": sport, "dst": dst, "dport": dport}, nil)
+}
+
+// UsbList lists the USB drives that are plugged in.
+func (c *Client) UsbList() ([]netd.UsbDisk, error) {
+	var out []netd.UsbDisk
+	err := c.callWithin(time.Minute, "usb.list", nil, &out)
+	return out, err
+}
+
+// UsbCopy copies a backup file onto a USB drive.
+func (c *Client) UsbCopy(uuid, src, name string, keep int) error {
+	return c.callWithin(5*time.Minute, "usb.copy", map[string]any{"uuid": uuid, "src": src, "name": name, "keep": keep}, nil)
 }
 
 // ThreatStatus describes the optional threat-watching engine.
