@@ -1,6 +1,13 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.74',
+    title: 'Backup copies to Dropbox, OneDrive and Google Drive',
+    items: [
+      'Settings, Backup & recovery, Copies off this machine: Dropbox, Microsoft OneDrive and Google Drive can now keep your encrypted backup copies. Each needs a small app of your own (the page shows the steps), and you sign in with a link and code. The app can only reach its own folder. Older copies there are removed beyond the number you keep.',
+    ],
+  },
+  {
     version: '0.9.4.73',
     title: 'Download and upload on one chart',
     items: [

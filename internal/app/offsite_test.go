@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/mail"
+	"nopewarden/internal/offsite"
 	"strconv"
 	"strings"
 	"sync"
@@ -132,3 +133,63 @@ func TestAttachmentMessage(t *testing.T) {
 }
 
 func timeSleepSecond() { time.Sleep(1100 * time.Millisecond) }
+
+func TestOffsiteDropboxSignIn(t *testing.T) {
+	c, _, _ := siteBox(t, "192.168.1.1/24")
+	files := map[string][]byte{}
+	var mu sync.Mutex
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		b, _ := io.ReadAll(r.Body)
+		switch r.URL.Path {
+		case "/token":
+			if strings.Contains(string(b), "authorization_code") && !strings.Contains(string(b), "PASTED") {
+				w.WriteHeader(400)
+				w.Write([]byte(`{"error":"invalid_grant"}`))
+				return
+			}
+			w.Write([]byte(`{"access_token":"a","expires_in":3600,"refresh_token":"r1"}`))
+		case "/up/2/files/upload":
+			files[r.Header.Get("Dropbox-API-Arg")] = b
+		case "/api/2/files/delete_v2":
+			files = map[string][]byte{}
+		case "/api/2/files/list_folder":
+			w.Write([]byte(`{"entries":[],"has_more":false}`))
+		}
+	}))
+	defer srv.Close()
+	oldT, oldA, oldC := offsite.DropboxTokenURL, offsite.DropboxAPI, offsite.DropboxContent
+	offsite.DropboxTokenURL, offsite.DropboxAPI, offsite.DropboxContent = srv.URL+"/token", srv.URL+"/api", srv.URL+"/up"
+	defer func() { offsite.DropboxTokenURL, offsite.DropboxAPI, offsite.DropboxContent = oldT, oldA, oldC }()
+	cfg := func(enabled bool) map[string]any {
+		return map[string]any{"password": "a long password", "keep": 3, "remind_on": true, "remind_days": 30,
+			"dests": []map[string]any{{"id": "dbx", "kind": "dropbox", "label": "My Dropbox", "enabled": enabled, "cloud": map[string]any{"client_id": "appkey"}}}}
+	}
+	if code, _, _ := c.call("PUT", "/api/backups/offsite", cfg(true)); code != 400 {
+		t.Fatalf("cannot be turned on before signing in: %d", code)
+	}
+	if code, _, raw := c.call("PUT", "/api/backups/offsite", cfg(false)); code != 200 {
+		t.Fatalf("%d %s", code, raw)
+	}
+	code, m, raw := c.call("POST", "/api/backups/offsite/dbx/signin/start", nil)
+	if code != 200 || !strings.Contains(m["url"].(string), "client_id=appkey") {
+		t.Fatalf("%d %s", code, raw)
+	}
+	if code, _, _ := c.call("POST", "/api/backups/offsite/dbx/signin/finish", map[string]string{"code": "wrong"}); code == 200 {
+		t.Fatal("a wrong code is refused")
+	}
+	if code, _, raw := c.call("POST", "/api/backups/offsite/dbx/signin/finish", map[string]string{"code": "PASTED"}); code != 200 {
+		t.Fatalf("%d %s", code, raw)
+	}
+	_, _, raw = c.call("GET", "/api/backups/offsite", nil)
+	if !strings.Contains(string(raw), `"signed_in":true`) || strings.Contains(string(raw), `"refresh":"`) {
+		t.Fatalf("signed in, and the token stays hidden: %s", raw)
+	}
+	if code, _, raw := c.call("PUT", "/api/backups/offsite", cfg(true)); code != 200 {
+		t.Fatalf("sign-in survives a save: %d %s", code, raw)
+	}
+	if code, _, raw := c.call("POST", "/api/backups/offsite/dbx/test", nil); code != 200 {
+		t.Fatalf("%d %s", code, raw)
+	}
+}

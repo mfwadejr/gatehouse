@@ -59,14 +59,25 @@ type offMail struct {
 	To string `json:"to"`
 }
 
+// offCloud is a Dropbox, OneDrive or Google Drive place: the person's own app ID, and the lasting
+// sign-in the provider gave back (sealed, never sent to the console).
+type offCloud struct {
+	ClientID  string `json:"client_id"`
+	Secret    string `json:"secret,omitempty"` // Google only; sealed when stored
+	SecretSet bool   `json:"secret_set"`
+	Refresh   string `json:"refresh,omitempty"` // sealed; never sent to the console
+	SignedIn  bool   `json:"signed_in"`
+}
+
 type offDest struct {
-	ID      string   `json:"id"`
-	Kind    string   `json:"kind"` // s3, webdav, email
-	Label   string   `json:"label"`
-	Enabled bool     `json:"enabled"`
-	S3      *offS3   `json:"s3,omitempty"`
-	DAV     *offDAV  `json:"dav,omitempty"`
-	Mail    *offMail `json:"mail,omitempty"`
+	ID      string    `json:"id"`
+	Kind    string    `json:"kind"` // s3, webdav, email
+	Label   string    `json:"label"`
+	Enabled bool      `json:"enabled"`
+	S3      *offS3    `json:"s3,omitempty"`
+	DAV     *offDAV   `json:"dav,omitempty"`
+	Mail    *offMail  `json:"mail,omitempty"`
+	Cloud   *offCloud `json:"cloud,omitempty"`
 }
 
 type offCfg struct {
@@ -87,6 +98,28 @@ type offState struct {
 }
 
 var offMu sync.Mutex
+
+// offCfgMu guards changes to the saved places, so a new sign-in token cannot be lost to a save.
+var offCfgMu sync.Mutex
+
+// saveRefresh keeps a new sign-in token the provider handed out during a copy.
+func (a *App) saveRefresh(id, refresh string) {
+	offCfgMu.Lock()
+	defer offCfgMu.Unlock()
+	c := a.offsiteConfig()
+	for i := range c.Dests {
+		if c.Dests[i].ID == id && c.Dests[i].Cloud != nil {
+			c.Dests[i].Cloud.Refresh = a.Box.Seal(refresh)
+		}
+	}
+	b, _ := json.Marshal(c)
+	a.Config.SetSetting("backup.offsite", string(b))
+}
+
+var (
+	offFlowMu sync.Mutex
+	offFlows  = map[string]*offsite.Flow{}
+)
 
 func (a *App) offsiteConfig() offCfg {
 	c := offCfg{Keep: 14, RemindOn: true, RemindDays: 30, Dests: []offDest{}}
@@ -134,6 +167,11 @@ func (a *App) offsiteView(c offCfg) offCfg {
 			v.PassSet, v.Pass = v.Pass != "", ""
 			d.DAV = &v
 		}
+		if d.Cloud != nil {
+			v := *d.Cloud
+			v.SecretSet, v.SignedIn, v.Secret, v.Refresh = v.Secret != "", v.Refresh != "", "", ""
+			d.Cloud = &v
+		}
 		out[i] = d
 	}
 	c.Dests = out
@@ -162,6 +200,22 @@ func (a *App) storeFor(d offDest) (offsite.Store, error) {
 			return nil, errors.New("this place is not filled in")
 		}
 		return &offsite.WebDAV{URL: d.DAV.URL, Dir: d.DAV.Dir, User: d.DAV.User, Pass: a.openSecret(d.DAV.Pass)}, nil
+	case "dropbox", "onedrive", "google":
+		if d.Cloud == nil || d.Cloud.Refresh == "" {
+			return nil, errors.New("sign in to this place first")
+		}
+		t := &offsite.Token{ClientID: d.Cloud.ClientID, Refresh: a.openSecret(d.Cloud.Refresh),
+			Saved: func(r string) { a.saveRefresh(d.ID, r) }}
+		switch d.Kind {
+		case "dropbox":
+			t.TokenURL = offsite.DropboxTokenURL
+			return &offsite.Dropbox{Tok: t}, nil
+		case "onedrive":
+			t.TokenURL = offsite.MSTokenURL
+			return &offsite.OneDrive{Tok: t}, nil
+		}
+		t.TokenURL, t.ClientSecret = offsite.GoogleTokenURL, a.openSecret(d.Cloud.Secret)
+		return &offsite.GDrive{Tok: t}, nil
 	}
 	return nil, errors.New("this kind of place cannot store files")
 }
@@ -431,7 +485,7 @@ func (a *App) registerOffsiteRoutes() {
 						return
 					}
 				}
-				d.S3, d.DAV, d.Mail = &v, nil, nil
+				d.S3, d.DAV, d.Mail, d.Cloud = &v, nil, nil, nil
 			case "webdav":
 				if d.DAV == nil || strings.TrimSpace(d.DAV.URL) == "" {
 					fail(w, errors.New(d.Label+": fill in the address"))
@@ -448,7 +502,33 @@ func (a *App) registerOffsiteRoutes() {
 					fail(w, errors.New(d.Label+": the address must start with https://"))
 					return
 				}
-				d.DAV, d.S3, d.Mail = &v, nil, nil
+				d.DAV, d.S3, d.Mail, d.Cloud = &v, nil, nil, nil
+			case "dropbox", "onedrive", "google":
+				if d.Cloud == nil || strings.TrimSpace(d.Cloud.ClientID) == "" {
+					fail(w, errors.New(d.Label+": fill in the app ID from the provider"))
+					return
+				}
+				v := *d.Cloud
+				v.ClientID = strings.TrimSpace(v.ClientID)
+				v.SecretSet, v.SignedIn, v.Refresh = false, false, ""
+				if v.Secret != "" {
+					v.Secret = a.Box.Seal(v.Secret)
+				} else if p.Cloud != nil {
+					v.Secret = p.Cloud.Secret
+				}
+				if d.Kind == "google" && v.Secret == "" {
+					fail(w, errors.New(d.Label+": fill in the client secret"))
+					return
+				}
+				// Keep the sign-in unless the app ID changed, which needs a new one.
+				if p.Cloud != nil && p.Cloud.ClientID == v.ClientID {
+					v.Refresh = p.Cloud.Refresh
+				}
+				if d.Enabled && v.Refresh == "" {
+					fail(w, errors.New(d.Label+": sign in first, then turn it on"))
+					return
+				}
+				d.Cloud, d.S3, d.DAV, d.Mail = &v, nil, nil, nil
 			case "email":
 				if d.Mail == nil {
 					d.Mail = &offMail{}
@@ -459,7 +539,7 @@ func (a *App) registerOffsiteRoutes() {
 						return
 					}
 				}
-				d.S3, d.DAV = nil, nil
+				d.S3, d.DAV, d.Cloud = nil, nil, nil
 			default:
 				fail(w, errors.New("choose what kind of place "+d.Label+" is"))
 				return
@@ -471,8 +551,10 @@ func (a *App) registerOffsiteRoutes() {
 			fail(w, errors.New("choose a password for the copies first; it is the only thing that opens them"))
 			return
 		}
+		offCfgMu.Lock()
 		b, _ := json.Marshal(out)
 		a.Config.SetSetting("backup.offsite", string(b))
+		offCfgMu.Unlock()
 		a.event(c.User.Username, "info", "Changed where backup copies are sent", fmt.Sprintf("%d place(s) in use", len(out.Dests)))
 		api.JSON(w, 200, map[string]any{"config": a.offsiteView(out)})
 	})
@@ -531,4 +613,78 @@ func (a *App) registerOffsiteRoutes() {
 		st := a.offsiteSend(p)
 		api.JSON(w, 200, map[string]any{"name": filepath.Base(p), "status": st})
 	})
+	// Sign in to Dropbox, OneDrive or Google Drive. Save the place first, so the app ID is stored.
+	s.HandleAdmin("POST /api/backups/offsite/{id}/signin/start", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		d := a.offsiteDest(r.PathValue("id"))
+		if d == nil || d.Cloud == nil {
+			fail(w, errors.New("save this place first, then sign in"))
+			return
+		}
+		var f *offsite.Flow
+		var err error
+		switch d.Kind {
+		case "dropbox":
+			f = offsite.DropboxStart(d.Cloud.ClientID)
+		case "onedrive":
+			f, err = offsite.DeviceStart("onedrive", d.Cloud.ClientID, "")
+		default:
+			f, err = offsite.DeviceStart("google", d.Cloud.ClientID, a.openSecret(d.Cloud.Secret))
+		}
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		offFlowMu.Lock()
+		offFlows[d.ID] = f
+		offFlowMu.Unlock()
+		api.JSON(w, 200, f)
+	})
+	s.HandleAdmin("POST /api/backups/offsite/{id}/signin/finish", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		var in struct {
+			Code string `json:"code"`
+		}
+		if !api.Decode(w, r, &in) {
+			return
+		}
+		id := r.PathValue("id")
+		offFlowMu.Lock()
+		f := offFlows[id]
+		offFlowMu.Unlock()
+		if f == nil {
+			fail(w, errors.New("start the sign-in first"))
+			return
+		}
+		var refresh string
+		var err error
+		if f.Kind == "dropbox" {
+			refresh, err = offsite.DropboxFinish(f, in.Code)
+		} else {
+			var done bool
+			refresh, done, err = offsite.DevicePoll(f)
+			if err == nil && !done {
+				api.JSON(w, 200, map[string]any{"status": "pending"})
+				return
+			}
+		}
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		offFlowMu.Lock()
+		delete(offFlows, id)
+		offFlowMu.Unlock()
+		a.saveRefresh(id, refresh)
+		a.event(c.User.Username, "info", "Signed in to a backup copy place", "")
+		api.JSON(w, 200, map[string]any{"status": "ok"})
+	})
+}
+
+func (a *App) offsiteDest(id string) *offDest {
+	for _, x := range a.offsiteConfig().Dests {
+		if x.ID == id {
+			x := x
+			return &x
+		}
+	}
+	return nil
 }
