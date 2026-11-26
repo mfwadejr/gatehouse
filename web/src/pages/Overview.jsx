@@ -93,7 +93,18 @@ function Hero({ wanList, links, thr, onStamp }) {
 
   const now = Math.floor(Date.now() / 1000);
   const key = dir;
+  const DOWN = 'var(--color-chart-traffic-down)', UP = 'var(--color-chart-traffic-up)';
+  // Both: one green Download line and one blue Upload line, each the total of every connection.
+  const sumPts = (lists) => { const m = new Map(); lists.forEach((l) => l.forEach(([t, v]) => m.set(t, (m.get(t) || 0) + v))); return [...m.entries()].sort((a, b) => a[0] - b[0]); };
   const build = () => {
+    if (dir === 'both') {
+      const per = (k) => (LIVE[range]
+        ? enabled.map((w) => { const iv = thr?.interval || 1; const arr = (thr?.links?.[w.name]?.[k] || []).slice(-LIVE[range] / iv); return arr.map((v, j) => [Math.round(now - (arr.length - 1 - j) * iv), v]); })
+        : enabled.map((w) => (hist?.series?.[`wan.${w.name}.${k}`] || [])));
+      const from = LIVE[range] ? now - LIVE[range] : (hist || { from: now - 3600 }).from;
+      const to = LIVE[range] ? now : (hist || { to: now }).to;
+      return { from, to, series: [{ key: 'rx', name: 'Download', color: DOWN, pts: sumPts(per('rx')) }, { key: 'tx', name: 'Upload', color: UP, pts: sumPts(per('tx')) }] };
+    }
     if (LIVE[range]) {
       const iv = thr?.interval || 1;
       return { from: now - LIVE[range], to: now, series: enabled.map((w, i) => {
@@ -127,7 +138,7 @@ function Hero({ wanList, links, thr, onStamp }) {
         <div className="small muted" style={{ marginBottom: 'var(--space-3)' }}>{head.sub}</div>
         <div className="ov-big">{fmtBits(sum('rx')).split(' ')[0]}<span className="unit">{fmtBits(sum('rx')).split(' ')[1]} download · now</span></div>
         <div className="ov-big">{fmtBits(sum('tx')).split(' ')[0]}<span className="unit">{fmtBits(sum('tx')).split(' ')[1]} upload · now</span></div>
-        <div className="small muted mt2">Average over {RANGE_WORDS[range]}: <span className="dl">▼ {fmtBits(avgOf('rx'))} down</span>, <span className="ul">▲ {fmtBits(avgOf('tx'))} up</span> · busiest <span className={dir === 'rx' ? 'dl' : 'ul'}>{dir === 'rx' ? '▼' : '▲'} {fmtBits(peakOf(dir))} {dir === 'rx' ? 'down' : 'up'}</span></div>
+        <div className="small muted mt2">Average over {RANGE_WORDS[range]}: <span className="dl">▼ {fmtBits(avgOf('rx'))} down</span>, <span className="ul">▲ {fmtBits(avgOf('tx'))} up</span> · busiest {dir === 'both' ? <><span className="dl">▼ {fmtBits(peakOf('rx'))} down</span>, <span className="ul">▲ {fmtBits(peakOf('tx'))} up</span></> : <span className={dir === 'rx' ? 'dl' : 'ul'}>{dir === 'rx' ? '▼' : '▲'} {fmtBits(peakOf(dir))} {dir === 'rx' ? 'down' : 'up'}</span>}</div>
         <div className="ov-wans">
           {states.map((x, i) => {
             const m = linkMeasure(x.l);
@@ -149,12 +160,12 @@ function Hero({ wanList, links, thr, onStamp }) {
       <div style={{ minWidth: 0 }}>
         <div className="spread" style={{ flexWrap: 'wrap' }}>
           <div className="inline">
-            <Segmented value={dir} onChange={setDir} options={[{ value: 'rx', label: 'Download' }, { value: 'tx', label: 'Upload' }]} />
-            <span className="small sec inline">{enabled.map((w, i) => <span key={w.name}><i className="sw" style={{ background: SERIES[i % 4], display: 'inline-block', width: '.65rem', height: '.65rem', borderRadius: 'var(--radius-xs)', marginRight: 'var(--space-1)' }} />{w.name}</span>)}</span>
+            <Segmented value={dir} onChange={setDir} options={[{ value: 'rx', label: 'Download' }, { value: 'tx', label: 'Upload' }, { value: 'both', label: 'Both' }]} />
+            <span className="small sec inline">{dir === 'both' ? <><span className="dl">▼ Download</span> <span className="ul">▲ Upload</span></> : enabled.map((w, i) => <span key={w.name}><i className="sw" style={{ background: SERIES[i % 4], display: 'inline-block', width: '.65rem', height: '.65rem', borderRadius: 'var(--radius-xs)', marginRight: 'var(--space-1)' }} />{w.name}</span>)}</span>
           </div>
           <Segmented value={range} onChange={setRange} options={[{ value: '5m', label: '5 min' }, { value: '15m', label: '15 min' }, { value: '1h', label: '1 hour' }, { value: '24h', label: '24 hours' }, { value: '7d', label: '7 days' }, { value: '30d', label: '30 days' }]} />
         </div>
-        <Chart series={ch.series} from={ch.from} to={ch.to} kind="bits" height={220} marks={marks} label={`${dir === 'rx' ? 'Download' : 'Upload'} speed of each internet connection`} />
+        <Chart series={ch.series} from={ch.from} to={ch.to} kind="bits" height={220} marks={marks} label={dir === 'both' ? 'Download and upload speed of all internet connections' : `${dir === 'rx' ? 'Download' : 'Upload'} speed of each internet connection`} />
       </div>
     </Card>
   );

@@ -119,6 +119,7 @@ const ROWS = [
   ['Your place on the map', 'settings/general', 'Set where the lines on the Overview map start', 'map location home pin country zip postal code city address find lookup', 'Your place on the map'],
   ['Dark or light', 'settings/general', 'Choose the look of the console', 'appearance theme dark light', 'Appearance'],
   ['Backups', 'settings/backup', 'Save and restore your settings', 'backup restore export import', 'Backups'],
+  ['Copies off this machine', 'settings/backup', 'Send each backup to cloud storage, a file server or email, scrambled with your own password', 'offsite off-site backup copy cloud s3 backblaze wasabi webdav nextcloud synology email remote', 'Copies off this machine'],
   ['Danger zone', 'settings/danger', 'Restore default settings, reset the network, or erase everything', 'reset default restore factory wipe erase start over', 'Danger zone'],
   ['Restart or shut down', 'settings/general', 'Power controls', 'reboot power off shutdown', 'Power'],
   ['Diagnostics', 'diagnostics/services', 'How each service is doing, its log, and a terminal', 'logs services status restart support bundle troubleshoot failing', 'Services'],

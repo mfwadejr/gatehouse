@@ -79,7 +79,9 @@ Everything NopeWarden keeps is in one table, in four groups, with how many entri
 
 ![The backups card with its history](img/backups.png)
 
-Backups are kept on this machine's own drive. If that drive fails, they go with it, so download one now and then and keep it somewhere else.
+Backups are kept on this machine's own drive. If that drive fails, they go with it, so send copies somewhere else (below) or download one now and then and keep it somewhere else.
+
+**Copies off this machine** sends a copy of every scheduled or hand-made backup to a place you choose: cloud storage that speaks the S3 standard (Amazon S3, Backblaze B2, Wasabi, Cloudflare R2 and others), a WebDAV server (Nextcloud, ownCloud, Synology), or email as an attachment. Choose **Password for the copies** first. Every copy is scrambled with it before it leaves, because a backup holds the key to every password saved on this machine; the place that keeps it only ever sees scrambled data. Write the password down: it is the only thing that opens a copy. Press **Save and test** on a place to save it and try it; a small file is saved there and removed again. **Send a copy here after every backup** turns a place on. **Keep this many copies in each place** removes older ones there. A copy that fails is tried again every hour, and a warning appears on the Overview until it works. **Back up and send now** makes a backup and sends it straight away. Email uses the mail server from Alerts and cannot carry a backup over 15 MB. To restore a copy, download it from where it is kept and use **Use a backup from somewhere else**, with the copy password. **Remind me to download a backup** shows a reminder on the Overview when no copy has left this machine for a while.
 
 ## The Danger zone
 ![The Danger zone tab](img/danger-zone.png)

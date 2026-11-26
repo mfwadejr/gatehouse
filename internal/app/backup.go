@@ -139,6 +139,7 @@ func (a *App) saveBackupBy(prefix, actor string) (string, error) {
 	}
 	a.backupLog(actor, "created", prefix, name, "")
 	a.pruneBackups(prefix)
+	a.offsiteAfterBackup(prefix, name)
 	return name, nil
 }
 
@@ -684,6 +685,7 @@ func (a *App) afterRestore(actor string) {
 
 // backupTick makes a scheduled backup when one is due. It is called every hour.
 func (a *App) backupTick(now time.Time) {
+	defer a.offsiteRetry()
 	c := a.backupConfig()
 	if c.Schedule == "off" || now.Hour() < c.Hour {
 		return
@@ -788,9 +790,10 @@ func (a *App) listBackups() []backupItem {
 }
 
 func (a *App) registerBackupRoutes() {
+	a.registerOffsiteRoutes()
 	s := a.API
 	s.Handle("GET /api/backups", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
-		api.JSON(w, 200, map[string]any{"backups": a.listBackups(), "config": a.backupConfig(), "now": contents(a.Config)})
+		api.JSON(w, 200, map[string]any{"backups": a.listBackups(), "config": a.backupConfig(), "now": contents(a.Config), "offsite": a.offsiteSummary()})
 	})
 	s.HandleAdmin("GET /api/backups/history", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		api.JSON(w, 200, map[string]any{"events": a.backupHistory()})

@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { del, post, put, saveFile, sendFile, useData } from '../api.js';
+import OffsiteCopies from './OffsiteCopies.jsx';
 import { Button, Card, Empty, Field, Input, Modal, Note, Pill, Select, ToggleRow, useAction, fmt, useStepUp, stepReady, StepUp, Limited , useDelayedDelete } from '../ui.jsx';
 
 // Backups of the settings: made on a schedule, checked when they are made, and checkable again by
@@ -218,7 +219,8 @@ export default function Backups({ me }) {
             if (await run(() => sendFile('/api/backups/upload', f, upPw ? { 'X-Backup-Password': upPw } : {}), 'Added to the list.')) { file.current.value = ''; setUpPw(''); reload(); }
           }}>Add it</Button>
         </div>
-        <p className="small muted">To keep a copy somewhere else use Download and save the file on another computer or drive. Backups made on this machine are lost with it.</p>
+        <OffsiteCopies />
+        <p className="small muted">To keep a copy somewhere else by hand, use Download and save the file on another computer or drive. Backups made on this machine are lost with it.</p>
       </div>
       {check && <CheckModal b={check} now={data.now} onClose={() => setCheck(null)} onChanged={reload} />}
       {restore && <RestoreModal b={restore} me={me} onClose={() => setRestore(null)} onDone={reload} />}

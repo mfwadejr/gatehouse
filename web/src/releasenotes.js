@@ -1,6 +1,22 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.73',
+    title: 'Download and upload on one chart',
+    items: [
+      'Overview, internet card: a new Both choice next to Download and Upload draws the green download line and the blue upload line together on the same chart, each the total of all your connections. The average and busiest lines under the big numbers show both as well.',
+    ],
+  },
+  {
+    version: '0.9.4.72',
+    title: 'Backup copies that leave this machine',
+    items: [
+      'Settings, Backup & recovery, Copies off this machine: after every scheduled or hand-made backup, an encrypted copy is sent to cloud storage (Amazon S3, Backblaze B2, Wasabi, Cloudflare R2 and other S3-style services), a WebDAV server (Nextcloud, ownCloud, Synology) or by email as an attachment. You choose the copy password, so the place that keeps the copy cannot read it.',
+      'Save and test tries a place with a small file. A copy that fails is tried again every hour and shows on the Overview. Older copies in each place are removed beyond the number you choose. Back up and send now does it on request.',
+      'The Overview reminds you when no backup has left this machine for 30 days (you can change that or turn it off).',
+    ],
+  },
+  {
     version: '0.9.4.71',
     title: 'One colour for download and upload, a better live DNS list, and Find traffic',
     items: [

@@ -103,6 +103,12 @@ export function AttentionProvider({ children }) {
       if (!good) add('warn', 'backup-none-good', 'No backup has passed its check', 'Open Backup & recovery and make a new one.', 'settings/backup');
       else if (!tried || Date.now() / 1000 - tried.hand_checked > 90 * 86400) add('info', 'backup-restore-check', 'Try a restore check on a backup', 'No backup has been checked by hand in 90 days. Press Check on one to be sure it will work.', 'settings/backup');
     }
+    // Copies off this machine: tell the person when none is set up, when one is failing, or when it is time to download one by hand.
+    if (copies.length && bk?.offsite) {
+      const o = bk.offsite;
+      if (o.failing?.length) add('warn', 'offsite-failing', `A backup copy could not be sent to ${o.failing.join(' and ')}`, 'Open Backup & recovery to see why. It tries again every hour.', 'settings/backup');
+      else if (!o.enabled && o.remind_on && (!o.last_download || Date.now() / 1000 - o.last_download > o.remind_days * 86400)) add('info', 'offsite-reminder', o.last_download ? `No backup has been downloaded in ${o.remind_days} days` : 'No backup is kept anywhere but this machine', 'A backup on this machine is lost with it. Send copies to a cloud or file server, or download one to another computer.', 'settings/backup');
+    }
     // A drive is shown only when it reports a problem or is nearly worn out.
     (disks?.drives || []).filter((d) => d.level).forEach((d) => add(d.level, `disk:${d.name}`, d.gone ? `The drive ${d.model} has gone` : d.word === 'Worn' ? `The drive ${d.model} is wearing out` : `The drive ${d.model} reports a problem`, d.reason, 'diagnostics/services', d.level === 'bad'));
     // The UPS: what is true right now, for the events set to show on the Overview.
