@@ -510,6 +510,7 @@ func (a *App) retimeIfNeeded() {
 // dynLoop runs the live firewall work.
 func (a *App) dynLoop(ctx context.Context) {
 	a.DNS.OnAnswer = a.onDNSAnswer
+	a.DNS.OnAnswerFrom = a.names.rememberFrom
 	fast := time.NewTicker(2 * time.Second)
 	hits := time.NewTicker(20 * time.Second)
 	slow := time.NewTicker(time.Hour)

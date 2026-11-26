@@ -6,6 +6,8 @@ import { Hit } from './AdminActivity.jsx';
 import { fmtBytes } from '../charts.jsx';
 import NetTools from './NetTools.jsx';
 import Why from './Why.jsx';
+import FindTraffic from './FindTraffic.jsx';
+import DnsCheck from './DnsCheck.jsx';
 import Terminal from './Terminal.jsx';
 
 // What each service is doing, its log, and the way in when something has gone wrong. It only looks
@@ -408,16 +410,17 @@ function Certificates() {
 }
 
 export default function Diagnostics() {
-  const [tab, setTab] = useHashTab('diagnostics', ['services','log','tools','terminal'], 'services');
+  const [tab, setTab] = useHashTab('diagnostics', ['services','find','log','tools','terminal'], 'services');
   return (
     <Page title="Diagnostics" sub="How NopeWarden itself is running: its services, its system log, and tools to test the connection. Looking for what your network did? Open Logs.">
-      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'services', label: 'Health & services' }, { value: 'log', label: 'System log' }, { value: 'tools', label: 'Tools' }, { value: 'terminal', label: 'Terminal' }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ value: 'services', label: 'Health & services' }, { value: 'find', label: 'Find traffic' }, { value: 'log', label: 'System log' }, { value: 'tools', label: 'Tools' }, { value: 'terminal', label: 'Terminal' }]} />
       {tab === 'services' && <><Verdict /><Services /><DiskUse /><DiskHealth /><PowerUPS /><Certificates /><Connections />
         <Card title="My network" desc="A printable summary for a handover or your records: networks, addresses, devices, open ports and how to get back in. It never contains passwords or keys.">
           <a className="btn" href="/api/summary/print" target="_blank" rel="noreferrer">Open the printable page</a>
         </Card></>}
+      {tab === 'find' && <FindTraffic />}
       {tab === 'log' && <SystemLog />}
-      {tab === 'tools' && <><NetTools /><Why /></>}
+      {tab === 'tools' && <><NetTools /><DnsCheck /><Why /></>}
       {tab === 'terminal' && <Terminal />}
     </Page>
   );

@@ -13,6 +13,17 @@ func ruleLabel(tag string) string {
 	kind, rest, _ := strings.Cut(tag, ":")
 	switch kind {
 	case "rule":
+		if d, ok := strings.CutPrefix(rest, "dns:"); ok {
+			switch {
+			case strings.HasPrefix(d, "dot"):
+				return "Forced DNS: encrypted DNS stopped"
+			case strings.HasPrefix(d, "doh"):
+				return "Forced DNS: encrypted-DNS websites stopped"
+			case strings.HasPrefix(d, "exempt"):
+				return "Forced DNS: this device is let off"
+			}
+			return "Forced DNS"
+		}
 		if p := strings.SplitN(rest, ":", 3); len(p) == 3 {
 			return p[2]
 		}

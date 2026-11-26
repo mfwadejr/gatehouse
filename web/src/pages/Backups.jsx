@@ -218,7 +218,7 @@ export default function Backups({ me }) {
             if (await run(() => sendFile('/api/backups/upload', f, upPw ? { 'X-Backup-Password': upPw } : {}), 'Added to the list.')) { file.current.value = ''; setUpPw(''); reload(); }
           }}>Add it</Button>
         </div>
-        <p className="small muted">To keep a copy somewhere else, use Download and save the file on another computer or drive. Backups made on this machine are lost with it.</p>
+        <p className="small muted">To keep a copy somewhere else use Download and save the file on another computer or drive. Backups made on this machine are lost with it.</p>
       </div>
       {check && <CheckModal b={check} now={data.now} onClose={() => setCheck(null)} onChanged={reload} />}
       {restore && <RestoreModal b={restore} me={me} onClose={() => setRestore(null)} onDone={reload} />}

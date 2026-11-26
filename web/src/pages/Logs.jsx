@@ -333,6 +333,7 @@ export default function Logs({ me }) {
                           <td colSpan={cols.length + 1}>
                             <div className="stack">
                               {r.why && <div><b>Why:</b> {r.why}{conn && r.rule && <> <button className="link" onClick={() => pick('rule', r.rule)}>Same rule</button></>}</div>}
+                              {conn && r.src && <div className="small"><a className="link" href={`#/diagnostics/find?src=${encodeURIComponent(r.src)}&dst=${encodeURIComponent(r.dst || '')}&port=${r.port || ''}&when=60`}>Trace this</a> <span className="muted">to see what became of every connection like it, or watch it live.</span></div>}
                               {conn && <div className="small">{r.dst_name && <>Host <span className="mono">{r.dst_name}</span> · </>}Address <span className="mono">{r.dst}</span>{r.port ? <> · port <button className="link" title="Show only this port" onClick={() => pick('port', r.port)}>{r.port}</button></> : null}{r.country && <> · <button className="link" onClick={() => pick('country', r.country)}>{regionName(r.country)}</button></>}</div>}
                               {conn && <div className="small">{r.from_zone && <button className="link" onClick={() => pick('network', r.from_zone)}>{r.from_zone}</button>} → {r.to_zone && <button className="link" onClick={() => pick('network', r.to_zone)}>{r.to_zone}</button>}{r.service && <> · <button className="link" onClick={() => pick('service', r.service)}>{r.service}</button></>}{r.app && <> · <button className="link" title="Show only this app" onClick={() => pick('app', r.app)}>{r.app}</button></>}</div>}
                               {r.kind === 'dns' && (
@@ -436,8 +437,8 @@ function Activity() {
     <div className="stack">
       <Segmented value={range} onChange={setRange} options={[{ value: '30m', label: '30 min' }, { value: '1h', label: '1 h' }, { value: '1d', label: '24 h' }, { value: '1w', label: '7 d' }, { value: '1m', label: '30 d' }]} />
       <div className="grid2">
-        <Card title="Download speed" desc={`Highest ${bits(peak('down'))}`}><Trend values={pts.map((p) => p.down / per)} unit={speedUnit} seconds={span} series="Internet download" empty="No traffic recorded yet" /></Card>
-        <Card title="Upload speed" desc={`Highest ${bits(peak('up'))}`}><Trend values={pts.map((p) => p.up / per)} unit={speedUnit} seconds={span} series="Internet upload" empty="No traffic recorded yet" /></Card>
+        <Card title="Download speed" desc={`Highest ${bits(peak('down'))}`}><Trend dir="down" values={pts.map((p) => p.down / per)} unit={speedUnit} seconds={span} series="Internet download" empty="No traffic recorded yet" /></Card>
+        <Card title="Upload speed" desc={`Highest ${bits(peak('up'))}`}><Trend dir="up" values={pts.map((p) => p.up / per)} unit={speedUnit} seconds={span} series="Internet upload" empty="No traffic recorded yet" /></Card>
       </div>
       <Card title="Data used by each device" desc="Counted at the internet connection, including VPN tunnels.">
         {!usage.length ? <Empty>Nothing recorded in this time yet.</Empty> : (

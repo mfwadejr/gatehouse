@@ -369,12 +369,12 @@ export function Spark({ values = [], width = 88, height = 30, area = true, tone 
 // A span of seconds in the words people use ("30 min", "2 h").
 const agoShort = (sec) => (sec < 90 ? `${Math.max(1, Math.round(sec))} s` : sec < 5400 ? `${Math.round(sec / 60)} min` : sec < 86400 * 2 ? `${Math.round(sec / 3600)} h` : `${Math.round(sec / 86400)} days`);
 
-export function Trend({ values = [], unit = '', series = '', seconds = 60, height = 90, empty = 'Nothing in this period' }) {
+export function Trend({ values = [], unit = '', series = '', seconds = 60, height = 90, empty = 'Nothing in this period', dir = '' }) {
   const peak = Math.max(0, ...values);
   const top = peak === 0 ? 1 : peak < 10 ? Math.ceil(peak * 10) / 10 : Math.ceil(peak);
   const label = (n) => `${n % 1 ? n.toFixed(n < 1 ? 2 : 1) : n}${unit}`;
   return (
-    <figure className="trend-chart">
+    <figure className={`trend-chart${dir ? ` tc-${dir}` : ''}`}>
       <div className="tc-body">
         <div className="tc-y" aria-hidden="true"><span>{label(top)}</span><span>{label(top / 2)}</span><span>0</span></div>
         <div className="tc-plot" style={{ height }}>
@@ -384,7 +384,7 @@ export function Trend({ values = [], unit = '', series = '', seconds = 60, heigh
         </div>
       </div>
       <div className="tc-x small muted" aria-hidden="true"><span>{agoShort(seconds)} ago</span><span>{agoShort(seconds / 2)}</span><span>now</span></div>
-      {series && <figcaption className="tc-legend small muted"><span className="swatch" />{series}</figcaption>}
+      {series && <figcaption className="tc-legend small muted"><span className="swatch" />{dir === 'down' ? '▼ ' : dir === 'up' ? '▲ ' : ''}{series}</figcaption>}
     </figure>
   );
 }

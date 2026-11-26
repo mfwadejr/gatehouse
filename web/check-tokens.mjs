@@ -36,6 +36,8 @@ for (const f of files) {
   readFileSync(f, 'utf8').split('\n').forEach((line, i) => {
     for (const m of line.matchAll(/var\((--[a-z0-9-]+)/g)) if (!defined.has(m[1]) && !prefixOK(m[1])) { console.log(`${f}:${i + 1}: ${m[1]} is not defined anywhere`); bad++; }
     const code = line.replace(/\/\/.*$/, '');
+    // Download is green and upload is blue everywhere (26 Nov 2026): a download or upload line may not take a generic series colour.
+    if (!f.endsWith('.css') && /(name: *['"](download|upload)|key: *['"](down|up)['"])/i.test(code) && /chart-series-/.test(code)) { console.log(`${f}:${i + 1}: download is --color-chart-traffic-down and upload is --color-chart-traffic-up, not a generic series colour`); bad++; }
     if (!f.endsWith('.css') && /\b(?:padding|margin|gap|rowGap|columnGap)(?:Top|Bottom|Left|Right|Inline|Block)?: *[1-9]\d*(?=[,\s}])|\bborderRadius: *[1-9]\d*(?=[,\s}])/.test(code)) { console.log(`${f}:${i + 1}: a spacing or radius number is written inline; use a var(--space-*) or var(--radius-*) token`); bad++; }
     if (/#[0-9a-fA-F]{3,8}\b/.test(code.replace(/&#\d+;/g, '')) && !/^\s*(\*|\/\*)/.test(line)) { console.log(`${f}:${i + 1}: a colour is written out; use a token`); bad++; }
     else if (/\brgba?\(|\bhsla?\(/.test(code)) { console.log(`${f}:${i + 1}: a colour is written out; use a token`); bad++; }

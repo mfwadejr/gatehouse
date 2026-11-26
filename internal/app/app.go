@@ -133,8 +133,9 @@ type App struct {
 		base   string
 	}
 
-	liveMu  sync.Mutex
-	liveBuf []dnssrv.LogEntry
+	fwLoaded atomic.Int64 // when rules were last loaded by a change being tried
+	liveMu   sync.Mutex
+	liveBuf  []dnssrv.LogEntry
 }
 
 type namesAdapter struct{ e *dhcp.Engine }
@@ -204,7 +205,9 @@ func New(cfg Config) (*App, error) {
 	a.Lists.Hold = a.dnsHeld
 	a.API.Secure = cfg.TLSCert != ""
 	a.API.Topic("dns.stats", "dns.live", "dns.upstreams", "dns.lists", "dhcp.leases", "dhcp.utilisation", "fw.status", "net.status", "vpn.status", "logs.live", "upnp.maps", "dhcp.alerts", "speedtest", "events", "threat")
-	a.FW = cfg.FW
+	if cfg.FW != nil {
+		a.FW = &loadTracker{Controller: cfg.FW, at: &a.fwLoaded}
+	}
 	a.Net = cfg.Net
 	a.registerRoutes()
 	a.registerSetupRoutes()
@@ -372,6 +375,7 @@ func (a *App) loadUpstreams() error {
 // live events ------------------------------------------------------------
 
 func (a *App) pushLive(e dnssrv.LogEntry) {
+	e.Why = dnsItem(dnssrv.Row{LogEntry: e}).Why
 	a.liveMu.Lock()
 	a.liveBuf = append(a.liveBuf, e)
 	if len(a.liveBuf) > 50 {

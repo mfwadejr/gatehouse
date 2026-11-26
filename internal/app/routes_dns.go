@@ -54,6 +54,24 @@ func (a *App) dnsTop(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 	api.JSON(w, 200, map[string]any{"clients": clients, "blocked": nz(blocked), "blocked_by": nz(blockedBy), "domains": nz(domains), "total": a.QLog.Count(since), "hours": hours})
 }
 
+// dnsRecent gives the live lookups list its starting rows, so it matches the chart the moment the page
+// opens: the newest lookups (default 50, at most 200), each with the plain reason, and how many
+// lookups there were in the last minute for the list's honest header.
+func (a *App) dnsRecent(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	rows, _ := a.QLog.Search(dnssrv.Filter{Limit: limit, HideHealth: true})
+	out := make([]dnssrv.LogEntry, 0, len(rows))
+	for _, row := range rows {
+		e := row.LogEntry
+		e.Why = dnsItem(row).Why
+		out = append(out, e)
+	}
+	api.JSON(w, 200, map[string]any{"items": out, "last_minute": a.QLog.CountVisible(time.Now().Add(-time.Minute).Unix())})
+}
+
 func nz(t []dnssrv.Top) []dnssrv.Top {
 	if t == nil {
 		return []dnssrv.Top{}

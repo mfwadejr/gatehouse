@@ -59,12 +59,12 @@ export default function TrafficPanel({ kind, id, histName, title = 'Traffic', su
         <div style={{ minWidth: 0 }}>
           <div className="spread" style={{ flexWrap: 'wrap' }}>
             <span className="small sec inline">
-              <span><i className="sw" style={{ background: 'var(--color-chart-series-1)', display: 'inline-block', width: '.65rem', height: '.65rem', borderRadius: 'var(--radius-xs)', marginRight: 'var(--space-1)' }} />{downWord}</span>
-              <span><i className="sw" style={{ background: 'var(--color-chart-series-3)', display: 'inline-block', width: '.65rem', height: '.65rem', borderRadius: 'var(--radius-xs)', margin: '0 var(--space-1) 0 var(--space-3)' }} />{upWord}</span>
+              <span><i className="sw" style={{ background: 'var(--color-chart-traffic-down)', display: 'inline-block', width: '.65rem', height: '.65rem', borderRadius: 'var(--radius-xs)', marginRight: 'var(--space-1)' }} />{downWord}</span>
+              <span><i className="sw" style={{ background: 'var(--color-chart-traffic-up)', display: 'inline-block', width: '.65rem', height: '.65rem', borderRadius: 'var(--radius-xs)', margin: '0 var(--space-1) 0 var(--space-3)' }} />{upWord}</span>
             </span>
             <Segmented value={range} onChange={setRange} options={RANGES.map(([value, label]) => ({ value, label }))} />
           </div>
-          <Chart series={[{ key: 'down', name: downWord, color: 'var(--color-chart-series-1)', pts: view.dp }, { key: 'up', name: upWord, color: 'var(--color-chart-series-3)', pts: view.up }]} from={view.from} to={view.to} kind="bits" height={200} label={`${title}: ${downWord.toLowerCase()} and ${upWord.toLowerCase()} speed`} />
+          <Chart series={[{ key: 'down', name: downWord, color: 'var(--color-chart-traffic-down)', pts: view.dp }, { key: 'up', name: upWord, color: 'var(--color-chart-traffic-up)', pts: view.up }]} from={view.from} to={view.to} kind="bits" height={200} label={`${title}: ${downWord.toLowerCase()} and ${upWord.toLowerCase()} speed`} />
         </div>
       </div>
     </Card>

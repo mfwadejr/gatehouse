@@ -102,7 +102,7 @@ function Hero({ wanList, links, thr, onStamp }) {
       }) };
     }
     const h = hist || { from: now - 3600, to: now, series: {} };
-    return { from: h.from, to: h.to, series: enabled.map((w, i) => ({ key: w.name, name: w.name, color: SERIES[i % 4], pts: h.series?.[`wan.${w.name}.${key}`] || [] })) };
+    return { from: h.from, to: h.to, series: enabled.map((w, i) => ({ key: w.name, name: w.name, color: enabled.length === 1 ? (dir === 'rx' ? 'var(--color-chart-traffic-down)' : 'var(--color-chart-traffic-up)') : SERIES[i % 4], pts: h.series?.[`wan.${w.name}.${key}`] || [] })) };
   };
   const ch = build();
   // A connection that was up and went down in this range gets a marker.
@@ -127,7 +127,7 @@ function Hero({ wanList, links, thr, onStamp }) {
         <div className="small muted" style={{ marginBottom: 'var(--space-3)' }}>{head.sub}</div>
         <div className="ov-big">{fmtBits(sum('rx')).split(' ')[0]}<span className="unit">{fmtBits(sum('rx')).split(' ')[1]} download · now</span></div>
         <div className="ov-big">{fmtBits(sum('tx')).split(' ')[0]}<span className="unit">{fmtBits(sum('tx')).split(' ')[1]} upload · now</span></div>
-        <div className="small muted mt2">Average over {RANGE_WORDS[range]}: {fmtBits(avgOf('rx'))} down, {fmtBits(avgOf('tx'))} up · busiest {fmtBits(peakOf(dir))} {dir === 'rx' ? 'down' : 'up'}</div>
+        <div className="small muted mt2">Average over {RANGE_WORDS[range]}: <span className="dl">▼ {fmtBits(avgOf('rx'))} down</span>, <span className="ul">▲ {fmtBits(avgOf('tx'))} up</span> · busiest <span className={dir === 'rx' ? 'dl' : 'ul'}>{dir === 'rx' ? '▼' : '▲'} {fmtBits(peakOf(dir))} {dir === 'rx' ? 'down' : 'up'}</span></div>
         <div className="ov-wans">
           {states.map((x, i) => {
             const m = linkMeasure(x.l);
@@ -178,7 +178,7 @@ function Tile({ title, pill, tone, big, unit, sub, children, chart, to, caption 
   );
 }
 
-const miniSeries = (h, key, scale = 1) => [{ key, name: '', color: 'var(--color-chart-series-1)', pts: (h?.series?.[key] || []).map((p) => [p[0], p[1] * scale]) }];
+const miniSeries = (h, key, scale = 1) => [{ key, name: '', color: /\.down$/.test(key) ? 'var(--color-chart-traffic-down)' : /\.up$/.test(key) ? 'var(--color-chart-traffic-up)' : 'var(--color-chart-series-1)', pts: (h?.series?.[key] || []).map((p) => [p[0], p[1] * scale]) }];
 
 function DevicesTile({ d, h }) {
   const online = d?.online ?? 0;
@@ -411,7 +411,7 @@ function NetworksCard({ fw, wanList, links, devs, h24 }) {
   return (
     <Card title="Your networks" desc="Same order as Who can reach whom. Speeds update every second. How to read the chart: each line is that network’s download speed over the last hour, oldest on the left and now on the right, scaled to its own busiest moment, which is printed underneath.">
       <div className="scroll"><table className="table">
-          <thead><tr><th>Network</th><th>Ports</th><th className="num">Devices</th><th className="num">Download now</th><th className="num">Upload now</th><th>Last hour</th></tr></thead>
+          <thead><tr><th>Network</th><th>Ports</th><th className="num">Devices</th><th className="num dl">▼ Download now</th><th className="num ul">▲ Upload now</th><th>Last hour</th></tr></thead>
           <tbody>
             {zones.map((z) => {
               const sp = speed?.zones?.[z.name];
@@ -455,7 +455,7 @@ function VpnsCard({ h24 }) {
   return (
     <Card title="Your VPNs" desc={`${all.filter((v) => v.enabled && v.state === 'up').length} of ${all.length} connected. Speeds update every couple of seconds; the line is the last hour.`}>
       <div className="scroll"><table className="table">
-        <thead><tr><th>VPN</th><th className="num">Download now</th><th className="num">Upload now</th><th>Last hour</th></tr></thead>
+        <thead><tr><th>VPN</th><th className="num dl">▼ Download now</th><th className="num ul">▲ Upload now</th><th>Last hour</th></tr></thead>
         <tbody>
           {shown.map((v) => {
             const r = rate(v);

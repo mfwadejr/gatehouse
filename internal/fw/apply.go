@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -36,8 +37,12 @@ type Applier struct {
 	Watchdog func(dir string, deadline time.Time, token string) error
 	Now      func() time.Time
 
-	mu sync.Mutex
+	mu     sync.Mutex
+	loaded atomic.Int64 // when rules were last loaded by this process
 }
+
+// LastLoaded is when this process last loaded rules (a change being tried), or zero.
+func (a *Applier) LastLoaded() int64 { return a.loaded.Load() }
 
 type pendingState struct {
 	Token    string `json:"token"`
@@ -309,6 +314,7 @@ func (a *Applier) Apply(script string, window time.Duration, author string) (tok
 		os.Remove(a.path("pending.json"))
 		return "", time.Time{}, err
 	}
+	a.loaded.Store(a.Now().Unix())
 	return token, deadline, nil
 }
 

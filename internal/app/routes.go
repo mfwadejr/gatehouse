@@ -80,6 +80,12 @@ func (a *App) registerRoutes() {
 	// DNS
 	s.Handle("GET /api/dns/summary", a.dnsSummary)
 	s.Handle("GET /api/dns/top", a.dnsTop)
+	s.Handle("GET /api/dns/recent", a.dnsRecent)
+	s.HandleAdmin("GET /api/diag/find", a.findTraffic)
+	s.HandleAdmin("GET /api/diag/open", a.openConnections)
+	s.HandleAdmin("POST /api/diag/open/end", a.endConnection)
+	s.HandleAdmin("GET /api/diag/dnscheck", a.dnsCheck)
+	s.HandleAdmin("POST /api/diag/dnscheck/probe", a.dnsProbeAddr)
 	s.Handle("GET /api/dns/lists", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		l, err := a.Lists.Lists()
 		if err != nil {

@@ -56,6 +56,7 @@ type NetController interface {
 	OverrideApply(p netd.OverridePlan) error
 	FlowAcct(on bool) error
 	ConntrackDump() (string, error)
+	ConntrackEnd(proto, src string, sport int, dst string, dport int) error
 	SQMApply(p netd.SQMPlan) (string, error)
 	ThreatStatus() netd.ThreatInfo
 	ThreatInstallPreview() (netd.ThreatPreview, error)
@@ -392,6 +393,18 @@ func (s *Server) dispatchNet(r request) (any, error) {
 		return nil, s.Net.FlowAcct(p.On)
 	case "flow.dump":
 		return s.Net.ConntrackDump()
+	case "flow.end":
+		var p struct {
+			Proto string `json:"proto"`
+			Src   string `json:"src"`
+			SPort int    `json:"sport"`
+			Dst   string `json:"dst"`
+			DPort int    `json:"dport"`
+		}
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return nil, s.Net.ConntrackEnd(p.Proto, p.Src, p.SPort, p.Dst, p.DPort)
 	case "ndpi.installed":
 		return s.Net.NDPIInstalled(), nil
 	case "threat.status":
@@ -771,6 +784,11 @@ func (c *Client) ConntrackDump() (string, error) {
 	var out string
 	err := c.callWithin(time.Minute, "flow.dump", nil, &out)
 	return out, err
+}
+
+// ConntrackEnd ends one live connection.
+func (c *Client) ConntrackEnd(proto, src string, sport int, dst string, dport int) error {
+	return c.call("flow.end", map[string]any{"proto": proto, "src": src, "sport": sport, "dst": dst, "dport": dport}, nil)
 }
 
 // ThreatStatus describes the optional threat-watching engine.

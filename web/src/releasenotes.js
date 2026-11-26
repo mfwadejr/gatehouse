@@ -1,6 +1,16 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.71',
+    title: 'One colour for download and upload, a better live DNS list, and Find traffic',
+    items: [
+      'Download is green with a down arrow and upload is blue with an up arrow, on every chart and number: Internet, Networks, Devices, Overview, the speed test and Logs. The build now stops a new chart from using any other colour for them.',
+      'DNS, Overview, Live: the lookups list opens with the latest 50 so it matches the chart, scrolls about 15 rows and keeps 200, can be paused, folds repeats into one row with a count, shows the record type, and says how many lookups there were in the last minute. Select a row to see why it was blocked or allowed and to allow or block the site.',
+      'Diagnostics, Find traffic: enter where a connection came from and where it went, choose a time (or Live) and a result, and see what became of each connection: allowed or blocked, which rule decided, whether the other side answered, the bytes each way and how long it lasted. Live shows new connections as they happen and updates them in place. Open now lists the connections the firewall is following and can end one. Trace this in Logs and on a device, and Test it live after applying a change, open it filled in.',
+      'Diagnostics, Tools, DNS check: pick a device to see whether it also talks to a DNS server on its own. Each server is named by how it was recognised (known list, probably, confirmed), and Check this address asks it a real DNS question, only when you press it. A device that skips your DNS gets a Skipping your DNS line on its panel.',
+    ],
+  },
+  {
     version: '0.9.4.70',
     title: 'Reports that follow your choices, and DNS switches where you expect them',
     items: [

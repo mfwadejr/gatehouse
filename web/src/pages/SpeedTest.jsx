@@ -111,7 +111,7 @@ function History({ links }) {
   const now = Math.floor(Date.now() / 1000);
   const asc = [...list].reverse();
   const series = link
-    ? [{ key: 'down', name: 'Download', color: 'var(--color-chart-series-1)', pts: asc.map((r) => [r.ts, r.down_bps]) }, { key: 'up', name: 'Upload', color: 'var(--color-chart-series-2)', pts: asc.map((r) => [r.ts, r.up_bps]) }]
+    ? [{ key: 'down', name: 'Download', color: 'var(--color-chart-traffic-down)', pts: asc.map((r) => [r.ts, r.down_bps]) }, { key: 'up', name: 'Upload', color: 'var(--color-chart-traffic-up)', pts: asc.map((r) => [r.ts, r.up_bps]) }]
     : links.map((l, i) => ({ key: l.name, name: `${l.name} download`, color: `var(--color-chart-series-${(i % 4) + 1})`, pts: asc.filter((r) => r.link === l.name).map((r) => [r.ts, r.down_bps]) }));
   return (
     <Card title="Speed test history" desc="Kept for one year. Each dot is one test."

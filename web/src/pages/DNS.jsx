@@ -5,6 +5,7 @@ import { ScheduleEditor } from '../ScheduleEditor.jsx';
 import EncryptedDns from './EncryptedDns.jsx';
 import EncryptedDnsServer from './EncryptedDnsServer.jsx';
 import ForcedDns from './ForcedDns.jsx';
+import LiveLookups from './LiveLookups.jsx';
 import React, { useState, useEffect } from 'react';
 import { del, get, patch, post, put, useData, useStream } from '../api.js';
 import { go } from '../App.jsx';
@@ -40,7 +41,7 @@ function PauseBar({ pause, onChange }) {
   );
 }
 
-function Overview() {
+function Overview({ admin }) {
   const { data, setData } = useData('/api/dns/summary', { every: 10000 });
   useStream(['dns.stats'], (t, p) => p && setData((d) => (d ? { ...d, stats: p } : d)));
   const { data: ups } = useData('/api/dns/upstreams', { topics: ['dns.upstreams'], every: 10000 });
@@ -48,12 +49,6 @@ function Overview() {
   const { data: h } = useData(`/api/overview/history?range=${range}`, { every: 30000, enabled: range !== 'live' });
   const { data: d24 } = useData('/api/overview/history?range=24h', { every: 60000 });
   const { data: day } = useData('/api/dns/top?hours=24', { every: 30000 });
-  const [feed, setFeed] = useState([]);
-  useStream(['dns.live'], (t, p) => {
-    if (!Array.isArray(p)) return;
-    const fresh = p.filter((e) => !(e.qname === 'health.nopewarden.invalid')).reverse();
-    if (fresh.length) setFeed((f) => [...fresh, ...f].slice(0, 8));
-  });
   const st = data?.stats;
   const total = st?.hour_total || 0;
   const outcomes = st ? [['Forwarded', st.outcomes?.forwarded], ['Blocked', st.outcomes?.blocked], ['Cached', st.outcomes?.cached], ['Local', st.outcomes?.local]] : [];
@@ -100,17 +95,7 @@ function Overview() {
           <>
             <div className="small muted" style={{ textAlign: 'right' }}>{peak > 0 ? `peak ${fmt.d1(peak)} a second` : ''}</div>
             <StackedArea layers={liveLayers} span={60} height={120} unit="/s" xLabels={['60 s ago', '30 s', 'now']} empty="No lookups in the last minute" label="Lookups per second, last minute, by how they were answered" />
-            <div className="livefeed" aria-live="off">
-              <div className="small muted">Latest lookups: the newest 8, starting from when you opened this page. Older ones are in <button type="button" className="link" onClick={() => { window.location.hash = '#/logs'; }}>Logs</button>.</div>
-              {!feed.length ? <div className="small muted">Waiting for the next lookup.</div> : feed.map((e, i) => (
-                <div className="lf-row" key={`${e.ts}-${e.qname}-${i}`}>
-                  <span>{new Date(e.ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-                  <span className="lf-who">{e.client_name || e.client}</span>
-                  <span className="lf-name">{e.qname}</span>
-                  <Pill tone={e.result === 'blocked' ? 'bad' : e.result === 'failed' ? 'warn' : ''}>{{ forwarded: 'Answered', cached: 'From memory', blocked: 'Blocked', local: 'Your names', rate_limited: 'Slowed', failed: 'Failed' }[e.result] || e.result}</Pill>
-                </div>
-              ))}
-            </div>
+            <LiveLookups minuteTotal={(hist || []).reduce((x, y) => x + y, 0)} admin={admin} onLogs={() => { window.location.hash = '#/logs'; }} />
           </>
         ) : (
           <StackedArea layers={histLayers} span={SPAN} height={150} unit="/s" xLabels={[`${{ '1h': '60 min', '24h': '24 h', '7d': '7 days' }[range]} ago`, '', 'now']} empty="Nothing recorded for this period yet" label={`Lookups per second, ${range}, by how they were answered`} />
@@ -653,12 +638,12 @@ function SettingsTab() {
   );
 }
 
-export default function DNS() {
+export default function DNS({ me }) {
   const [tab, setTab] = useHashTab('dns', ['overview','activity','servers','lists','records','settings'], 'overview');
   return (
     <Page title="DNS" sub="Translates names to addresses for every device, and blocks the ones you do not want.">
       <Tabs value={tab} onChange={setTab} tabs={[{ value: 'overview', label: 'Overview' }, { value: 'activity', label: 'Activity' }, { value: 'servers', label: 'Servers' }, { value: 'lists', label: 'Blocking' }, { value: 'records', label: 'Your names' }, { value: 'settings', label: 'Settings' }]} />
-      {tab === 'overview' && <Overview />}
+      {tab === 'overview' && <Overview admin={me?.user?.role === 'admin'} />}
       {tab === 'activity' && <Activity />}
       {tab === 'servers' && <Servers />}
       {tab === 'lists' && <><Lists /><p className="small muted">Which devices get which lists is set per profile, on the <a href="#/devices/profiles">Profiles</a> tab of Devices & access. Blocking an app or a category for one device or at set hours is under <a href="#/protection">Protection</a>.</p></>}

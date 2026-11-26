@@ -295,7 +295,7 @@ export function ApplyPanel() {
   return (
     <Card title={head.title} desc={head.text}>
       <ApplyList run={run} />
-      {run.outcome && <div className="actions"><Button onClick={ch.closeRun}>Close</Button></div>}
+      {run.outcome && <div className="actions">{run.outcome === 'kept' && <a className="btn" href="#/diagnostics/find?when=live" onClick={ch.closeRun}>Test it live</a>}<Button onClick={ch.closeRun}>Close</Button></div>}
     </Card>
   );
 }

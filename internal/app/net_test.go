@@ -74,6 +74,7 @@ type fakeNet struct {
 	ovPlans      []netd.OverridePlan
 	ovErr        error
 	flowAcct     []bool
+	ended        []string
 	flowDump     string
 	sqmPlans     []netd.SQMPlan
 	mgmtPlans    []netd.MgmtPlan
@@ -191,6 +192,12 @@ func (f *fakeNet) ConntrackDump() (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.flowDump, nil
+}
+func (f *fakeNet) ConntrackEnd(proto, src string, sport int, dst string, dport int) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.ended = append(f.ended, fmt.Sprintf("%s %s:%d>%s:%d", proto, src, sport, dst, dport))
+	return nil
 }
 func (f *fakeNet) NDPIInstalled() bool {
 	f.mu.Lock()

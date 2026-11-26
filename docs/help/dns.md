@@ -9,7 +9,7 @@ The picture uses made-up devices and numbers. Yours will show your own.
 
 ## What is on the page
 Tabs along the top:
-- **Overview**: **Pause blocking…** at the top (see below), then number cards, each with a small 24-hour chart that has a scale on the left and times along the bottom (select one to open the page that explains it), **Lookups over time** (Live shows the last minute and the latest lookups; 1 h, 24 h and 7 d show history), **How queries were answered**, **Answer time** and **What changed**.
+- **Overview**: **Pause blocking…** at the top (see below), then number cards, each with a small 24-hour chart that has a scale on the left and times along the bottom (select one to open the page that explains it), **Lookups over time** (Live shows the last minute and a list of lookups as they happen; 1 h, 24 h and 7 d show history), **How queries were answered**, **Answer time** and **What changed**.
 - **Activity**: who asked and what was stopped, for the last hour, 24 hours or 7 days: **Busiest devices**, **What blocked it**, **Most blocked** and **Most asked**.
 - **Servers**: where names are looked up (picture below). **Upstream DNS servers** (where NopeWarden asks when it does not know), **Names that use a different server** (see below), **Which server is asked first**, **Add a DNS server**, **Encrypted DNS**, **Encrypted DNS for your devices** (see below), **Resolve directly** and **Forced DNS**. Forced DNS sends devices that carry a DNS server of their own (smart TVs, cameras, some phones) to the one you chose. Turn **Force devices to use one DNS server** on, pick the server, then set each network and add exceptions for chosen devices or groups. It redirects ordinary DNS only: a device that hides its lookups inside normal web traffic (DNS-over-HTTPS) can still go around it.
 - **Blocking**: **Ad, tracker and malware lists** you can switch on (which devices get which lists is set per profile, on the Profiles tab of Devices & access), **Always allow or block** exceptions that beat every list (a name, or a pattern that matches many names), and **Why is this blocked?** to find which list blocks a name.
@@ -21,6 +21,12 @@ Tabs along the top:
 ![The Your names tab, shown with example data](img/dns-names.png)
 
 Devices sent through a VPN have their name lookups sent through it as well.
+
+
+## The live lookups list
+On **Overview**, with **Live** chosen, the list under **Lookups over time** opens with the latest 50 lookups already in it, so it matches the chart straight away. New ones appear at the top. About 15 rows show at a time and the list scrolls; it keeps the latest 200. The line above it says how many are listed and how many lookups there were in the last minute. **Pause** freezes the list so you can read it, and **Resume** brings the new ones in. A device asking for the same name the same way in the same second is folded into one row with a count, such as ×2, and the record types (A, AAAA) are shown beside the name.
+
+Select a row to see why it was answered the way it was: which list blocked it, whether it came from memory, or which server answered. If you are an administrator, **Allow this site** or **Block this site** is there too. Older lookups are in Logs.
 
 ## Common tasks
 1. Allow a blocked site: **Always allow or block**, type the name, choose allow, **Add**.

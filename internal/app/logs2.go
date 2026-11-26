@@ -32,7 +32,13 @@ type fwFilter struct {
 	Rule      string
 	Dest      string // an address or name
 	Country   string
-	App       string // an application name from the catalogue
+	App       string                     // an application name from the catalogue
+	Outcome   string                     // how the connection ended: Completed, Still open, Timed out, Reset
+	SrcZone   string                     // the network the connection came from (exact)
+	DstZone   string                     // the network it went to (exact)
+	SrcAddr   string                     // exact address
+	DstAddr   string                     // exact address
+	Match     func(from, to string) bool // a test run on each row's two addresses (networks given as a range)
 }
 
 // serviceNames are the usual names of well-known ports.
@@ -116,6 +122,21 @@ func (f fwFilter) where(a *App) (string, []any) {
 	if f.Network != "" {
 		add("(from_zone=? OR to_zone=?)", f.Network, f.Network)
 	}
+	if f.SrcZone != "" {
+		add("from_zone=?", f.SrcZone)
+	}
+	if f.DstZone != "" {
+		add("to_zone=?", f.DstZone)
+	}
+	if f.SrcAddr != "" {
+		add("from_addr=?", f.SrcAddr)
+	}
+	if f.DstAddr != "" {
+		add("to_addr=?", f.DstAddr)
+	}
+	if f.Outcome != "" {
+		add("outcome=?", f.Outcome)
+	}
 	if f.Port > 0 {
 		add("dport=?", f.Port)
 	}
@@ -198,7 +219,7 @@ func (a *App) searchFWf(f fwFilter) []LogItem {
 		limit = 100
 	}
 	fetch := limit
-	if f.Country != "" {
+	if f.Country != "" || f.Match != nil {
 		fetch = 5000 // country is worked out per row, so look at more rows and keep the matches
 	}
 	args = append(args, fetch)
@@ -223,6 +244,9 @@ func (a *App) searchFWf(f fwFilter) []LogItem {
 			cc = a.country(fa)
 		}
 		if f.Country != "" && !strings.EqualFold(cc, f.Country) {
+			continue
+		}
+		if f.Match != nil && !f.Match(fa, ta) {
 			continue
 		}
 		it := LogItem{Key: "f" + strconv.FormatInt(id, 10), TS: ts, Kind: "firewall", Verdict: "allowed", Who: sn, Addr: fa, Why: reason,

@@ -55,12 +55,13 @@ type LogItem struct {
 	Server   string `json:"server,omitempty"`
 	// Connections: how it ended, bytes each way and how long it lasted (nil when not known), and the
 	// rule that decided it with how many connections that rule has matched so far.
-	Outcome  string `json:"outcome,omitempty"`
-	BytesOut *int64 `json:"bytes_out,omitempty"`
-	BytesIn  *int64 `json:"bytes_in,omitempty"`
-	DurS     *int64 `json:"dur_s,omitempty"`
-	RuleName string `json:"rule_name,omitempty"`
-	RuleHits *int64 `json:"rule_hits,omitempty"`
+	Outcome      string `json:"outcome,omitempty"`
+	BeforeChange bool   `json:"before_change,omitempty"` // already open when the rules last changed
+	BytesOut     *int64 `json:"bytes_out,omitempty"`
+	BytesIn      *int64 `json:"bytes_in,omitempty"`
+	DurS         *int64 `json:"dur_s,omitempty"`
+	RuleName     string `json:"rule_name,omitempty"`
+	RuleHits     *int64 `json:"rule_hits,omitempty"`
 }
 
 // fwReason turns the comment of the rule that decided a connection into a sentence.

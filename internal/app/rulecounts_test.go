@@ -10,7 +10,7 @@ import (
 // service's own count and the built-in console rules, and nothing that belongs to device meters.
 func TestRuleCountsEndpoint(t *testing.T) {
 	c, _, _ := siteBox(t, "192.168.1.1/24")
-	f := c.app.FW.(*fakeFW)
+	f := c.app.FW.(*loadTracker).Controller.(*fakeFW)
 	f.mu.Lock()
 	f.counters = map[string]fw.Counter{
 		"rule:Home:wan:Web":              {Packets: 5, Bytes: 500},

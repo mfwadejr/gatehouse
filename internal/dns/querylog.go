@@ -22,6 +22,7 @@ type LogEntry struct {
 	LatencyUS  int64  `json:"latency_us"`
 	Rule       string `json:"rule"`
 	Via        string `json:"via,omitempty"` // the tunnel device the lookup went out through, if any
+	Why        string `json:"why,omitempty"` // plain reason, set for the live list (not stored)
 }
 
 // QueryLog batches inserts into logs.db so the resolver never waits on the disk.
@@ -224,6 +225,13 @@ func (q *QueryLog) TopClients(since int64, n int, includeSelf bool) ([]Top, erro
 func (q *QueryLog) Count(since int64) int64 {
 	var n int64
 	q.db.QueryRow(`SELECT COUNT(*) FROM dns_queries WHERE ts>=?`, since).Scan(&n)
+	return n
+}
+
+// CountVisible counts lookups since a time, leaving out NopeWarden's own health check.
+func (q *QueryLog) CountVisible(since int64) int64 {
+	var n int64
+	q.db.QueryRow(`SELECT COUNT(*) FROM dns_queries WHERE ts>=? AND `+notHealth, since).Scan(&n)
 	return n
 }
 

@@ -1,3 +1,4 @@
+import { SkippingDns } from './DnsCheck.jsx';
 import { TagChips, TagEditor, useSets } from '../sets.jsx';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { hashQuery, useHashTab } from '../hashtab.js';
@@ -95,7 +96,7 @@ function Details({ d, groups, sets, onClose, onSaved, onManage }) {
   const [f, setF] = useState({ name: d.name || '', group_id: d.group_id || 0, policy: d.policy || 'filtered', internet: d.internet, notes: d.notes || '' });
   const [fixIP, setFixIP] = useState('');
   const vpn = d.source === 'vpn';
-  const speed = useMemo(() => [{ key: 'speed', name: 'Speed', color: 'var(--color-chart-series-1)', pts: (det?.traffic?.points || []).map((p) => [p.t, p.down + p.up]) }], [det]);
+  const speed = useMemo(() => [{ key: 'down', name: 'Download', color: 'var(--color-chart-traffic-down)', pts: (det?.traffic?.points || []).map((p) => [p.t, p.down]) }, { key: 'up', name: 'Upload', color: 'var(--color-chart-traffic-up)', pts: (det?.traffic?.points || []).map((p) => [p.t, p.up]) }], [det]);
   const save = async () => { if (await run(() => patch(`/api/devices/${d.id}`, f), 'Saved.')) { onSaved(); onClose(); } };
   const keep = (keepIt) => run(() => put(`/api/devices/${d.id}/reservation`, { keep: keepIt, ip: fixIP }), keepIt ? 'This device will always get this address.' : 'Address no longer fixed.').then(() => { reload(); onSaved(); });
   return (
@@ -139,12 +140,15 @@ function Details({ d, groups, sets, onClose, onSaved, onManage }) {
       {!vpn && (
         <details className="more"><summary>Why can't it reach something?</summary><WhyBody device={d.id} /></details>
       )}
+      {!vpn && d.ip && <SkippingDns ip={d.ip} />}
+      {!vpn && d.ip && <div className="small"><a className="link" href={`#/diagnostics/find?src=${encodeURIComponent(d.ip)}&when=60`}>Trace this device's connections</a></div>}
       <Field label="Firewall rules that mention it">
         {det?.rules?.length ? <ul className="stack" style={{ margin: 0, paddingLeft: '1.2rem' }}>{det.rules.map((r) => <li key={r}>{r}</li>)}</ul> : <span className="muted small">None.</span>}
       </Field>
       {!vpn && (
         <Field label="Last 24 hours" hint={`Used today: ↓ ${bytes(d.today_down)} · ↑ ${bytes(d.today_up)}`}>
-          <Chart series={speed} from={det?.traffic?.from || 0} to={det?.traffic?.to || 1} kind="bits" height={64} compact axes label="Device speed, last 24 hours" />
+          <Chart series={speed} from={det?.traffic?.from || 0} to={det?.traffic?.to || 1} kind="bits" height={64} compact axes label="Device download and upload speed, last 24 hours" />
+          <div className="small muted"><span className="dl">▼ Download</span> · <span className="ul">▲ Upload</span></div>
         </Field>
       )}
     </Modal>

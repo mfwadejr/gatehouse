@@ -275,6 +275,17 @@ func emailMessage(from, to, title, body string) []byte {
 }
 
 func (a *App) sendEmail(e alertEmail, title, body string) error {
+	return a.sendMail(e, "", func(from, to *mail.Address) []byte {
+		return emailMessage(from.String(), to.String(), title, body)
+	})
+}
+
+// sendMail connects to the mail server in e and sends the message build makes. toOverride, when it is
+// not empty, is used instead of the alert address.
+func (a *App) sendMail(e alertEmail, toOverride string, build func(from, to *mail.Address) []byte) error {
+	if toOverride != "" {
+		e.To = toOverride
+	}
 	if e.Host == "" || e.From == "" || e.To == "" {
 		return errors.New("fill in the mail server, your address and where to send alerts")
 	}
@@ -331,7 +342,7 @@ func (a *App) sendEmail(e alertEmail, title, body string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := w.Write(emailMessage(from.String(), to.String(), title, body)); err != nil {
+	if _, err := w.Write(build(from, to)); err != nil {
 		return err
 	}
 	if err := w.Close(); err != nil {

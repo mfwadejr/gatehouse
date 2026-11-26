@@ -15,10 +15,10 @@ export function rate(bps) {
   return `${v >= 100 ? Math.round(v) : Math.round(v * 10) / 10} ${u}`;
 }
 
-function RateChart({ values, label }) {
+function RateChart({ values, label, dir }) {
   const recent = (values || []).slice(-100);
   const [d, unit] = unitFor(Math.max(0, ...recent));
-  return <Trend values={recent.map((v) => v / d)} unit={` ${unit}`} series={label} seconds={300} height={70} empty="No traffic" />;
+  return <Trend values={recent.map((v) => v / d)} unit={` ${unit}`} series={label} dir={dir} seconds={300} height={70} empty="No traffic" />;
 }
 
 // ---------------------------------------------------------------- traffic
@@ -43,8 +43,8 @@ export function Traffic({ wans, links }) {
                 <span className="small muted">Download <strong>{rate(rx[rx.length - 1])}</strong> · Upload <strong>{rate(tx[tx.length - 1])}</strong></span>
               </div>
               <div className="wg-charts">
-                <RateChart values={rx} label="Download" />
-                <RateChart values={tx} label="Upload" />
+                <RateChart values={rx} label="Download" dir="down" />
+                <RateChart values={tx} label="Upload" dir="up" />
               </div>
             </div>
           );

@@ -17,6 +17,12 @@ type nameCache struct {
 	order []netip.Addr // oldest first, a ring
 	next  int
 	seen  map[netip.Addr][]nameAt // the few different names lately given for an address
+	dev   map[devName]string      // what each device itself last looked up for an address
+}
+
+type devName struct {
+	dev string
+	ip  netip.Addr
 }
 
 type nameAt struct {
@@ -132,4 +138,39 @@ func (c *nameCache) remember(qname string, answers []dns.RR) {
 			c.put(ip, qname)
 		}
 	}
+}
+
+// rememberFrom notes, per device, the names that device asked for and the addresses they gave. A
+// device that connects to an address it earlier looked up the name of is the one that named it, so
+// this is a surer label than the shared one, and it is what the DNS check uses to name a destination.
+func (c *nameCache) rememberFrom(client, qname string, answers []dns.RR) {
+	for _, rr := range answers {
+		var ip netip.Addr
+		switch v := rr.(type) {
+		case *dns.A:
+			ip, _ = netip.AddrFromSlice(v.A.To4())
+		case *dns.AAAA:
+			ip, _ = netip.AddrFromSlice(v.AAAA)
+		}
+		if !ip.IsValid() {
+			continue
+		}
+		c.mu.Lock()
+		if c.dev == nil || len(c.dev) > nameCacheSize*2 {
+			c.dev = make(map[devName]string, 1024)
+		}
+		c.dev[devName{client, ip.Unmap()}] = qname
+		c.mu.Unlock()
+	}
+}
+
+// getFor is the name this device itself looked up for the address, if it did.
+func (c *nameCache) getFor(client, ip string) string {
+	a, err := netip.ParseAddr(ip)
+	if err != nil {
+		return ""
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.dev[devName{client, a.Unmap()}]
 }

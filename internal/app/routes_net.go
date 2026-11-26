@@ -78,6 +78,7 @@ type NetController interface {
 	TermClose(id string) (netd.TermSummary, error)
 	FlowAcct(on bool) error
 	ConntrackDump() (string, error)
+	ConntrackEnd(proto, src string, sport int, dst string, dport int) error
 	SQMApply(p netd.SQMPlan) (string, error)
 	OverrideApply(p netd.OverridePlan) error
 }

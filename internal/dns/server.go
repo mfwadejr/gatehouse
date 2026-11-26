@@ -84,8 +84,10 @@ type Server struct {
 	OnRateLimited func(client string)
 	// OnAnswer is told about every successful answer that came from an upstream server or the
 	// cache, so the firewall can follow the addresses of domains that rules refer to.
-	OnAnswer  func(qname string, answers []dns.RR)
-	limitedAt sync.Map // client -> unix minute
+	OnAnswer func(qname string, answers []dns.RR)
+	// OnAnswerFrom is the same, and also says which device asked, so a name can be remembered per device.
+	OnAnswerFrom func(client, qname string, answers []dns.RR)
+	limitedAt    sync.Map // client -> unix minute
 
 	mu      sync.Mutex
 	servers []*dns.Server
@@ -223,6 +225,9 @@ func (s *Server) handle(client string, r *dns.Msg, start time.Time, udp bool) *d
 		}
 		if s.OnAnswer != nil && resp != nil && rc == dns.RcodeSuccess && len(resp.Answer) > 0 && (out == OutForwarded || out == OutCached) {
 			s.OnAnswer(strings.TrimSuffix(q.Name, "."), resp.Answer)
+		}
+		if s.OnAnswerFrom != nil && resp != nil && rc == dns.RcodeSuccess && len(resp.Answer) > 0 && (out == OutForwarded || out == OutCached) {
+			s.OnAnswerFrom(client, strings.TrimSuffix(q.Name, "."), resp.Answer)
 		}
 		if resp != nil && udp {
 			resp.Truncate(udpSize(r))

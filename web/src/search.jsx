@@ -9,6 +9,8 @@ const ROWS = [
   ['Overview', 'overview', 'The state of everything at a glance', 'home dashboard status map what happened'],
   ['Internet connection', 'internet/connections', 'Your internet connections', 'wan isp modem failover port pppoe dhcp fixed address', 'Internet connections'],
   ['Test my internet', 'diagnostics/tools', 'Check the cable, modem, provider and DNS', 'diagnose troubleshoot not working down slow ping traceroute dns lookup tools', 'Test my internet'],
+  ['Find traffic', 'diagnostics/find', 'See what became of the connections between two places, live or from the log', 'find traffic trace connection search source destination allowed blocked no reply response live test rule splunk traffic log session', 'Find traffic'],
+  ['DNS check', 'diagnostics/tools', 'See whether a device uses NopeWarden DNS or talks to a DNS server on its own', 'dns check skipping bypass circumvent google 8.8.8.8 doh dot encrypted dns direct device', 'DNS check'],
   ["Why can't it reach that?", 'diagnostics/tools', 'Find out what is blocking a device from a website', 'blocked cannot reach not working why tester troubleshoot', "Why can't it reach that?"],
   ['Speed test', 'internet/speed', 'Measure the speed of each connection', 'speed test download upload mbps', 'Speed test'],
   ['Keep delay low when the line is busy', 'internet/speed', 'Smart queues: hold the connection just under its speed', 'bufferbloat sqm cake fq_codel lag latency speed limit', 'Keep delay low'],

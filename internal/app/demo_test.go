@@ -214,5 +214,40 @@ func seedDemoLogs(c *client) {
 	c.app.QLog.Add(dnssrv.LogEntry{TS: now - 10, Client: "192.168.1.112", ClientName: "Marvin's laptop", QName: "nothing-here.example.net", QType: "AAAA", Result: "forwarded", RCode: "NXDOMAIN", Upstream: "1.1.1.1", LatencyUS: 31800})
 	c.app.Logs.Exec(`INSERT INTO dns_queries(ts,client,client_name,qname,qtype,result,rcode,upstream,latency_us,rule,out_if) VALUES(?,?,?,?,?,?,?,?,?,?,?)`, now-5, "192.168.1.112", "Marvin's laptop", "cdn.games.example.com", "A", "blocked", "NOERROR", "", 0, "Ads and trackers: games.example.com", "")
 	c.app.Logs.Exec(`INSERT INTO dns_queries(ts,client,client_name,qname,qtype,result,rcode,upstream,latency_us,rule,out_if) VALUES(?,?,?,?,?,?,?,?,?,?,?)`, now-30, "192.168.1.112", "Marvin's laptop", "api.example.com", "A", "forwarded", "NOERROR", "1.1.1.1", 14200, "", "")
+	// A busy minute of lookups for the live list, with a repeated name, and a laptop that also talks to
+	// Google's DNS directly and tries encrypted DNS, for Find traffic and the DNS check.
+	names := []string{"api.example.com", "cdn.example.com", "mail.example.org", "time.apple.com", "ocsp.digicert.com", "tracker.ads.example", "update.example.net", "video.example.tv"}
+	for i := 0; i < 70; i++ {
+		who, ip := "Living room TV", "192.168.1.110"
+		if i%3 == 0 {
+			who, ip = "Marvin's laptop", "192.168.1.112"
+		}
+		res, rule := "forwarded", ""
+		if names[i%len(names)] == "tracker.ads.example" {
+			res, rule = "blocked", "Ads and trackers: ads.example"
+		} else if i%5 == 0 {
+			res = "cached"
+		}
+		for _, qt := range []string{"A", "AAAA"} {
+			if qt == "AAAA" && i%4 != 0 {
+				continue
+			}
+			c.app.Logs.Exec(`INSERT INTO dns_queries(ts,client,client_name,qname,qtype,result,rcode,upstream,latency_us,rule) VALUES(?,?,?,?,?,?,?,?,?,?)`,
+				now-int64(i)*55/10, ip, who, names[i%len(names)], qt, res, "NOERROR", "1.1.1.1", 12000+i*300, rule)
+		}
+	}
+	var direct []netd.FWEvent
+	for i := 0; i < 9; i++ {
+		direct = append(direct, netd.FWEvent{TS: now - int64(i)*1500, Verdict: "allow", Tag: "internet:Home", In: "eth1", Out: "eth0", Src: "192.168.1.112", Dst: "8.8.8.8", Proto: "tcp", SPort: 52000 + i, DPort: 443})
+	}
+	direct = append(direct,
+		netd.FWEvent{TS: now - 700, Verdict: "drop", Tag: "rule:dns:dot", In: "eth1", Out: "eth0", Src: "192.168.1.112", Dst: "1.1.1.1", Proto: "tcp", SPort: 53000, DPort: 853},
+		netd.FWEvent{TS: now - 50, Verdict: "allow", Tag: "rule:Home:Internet:Web", In: "eth1", Out: "eth0", Src: "192.168.1.112", Dst: "198.51.100.200", Proto: "tcp", SPort: 53001, DPort: 443},
+		netd.FWEvent{TS: now - 15, Verdict: "allow", Tag: "rule:Home:Internet:Web", In: "eth1", Out: "eth0", Src: "192.168.1.112", Dst: "198.51.100.201", Proto: "tcp", SPort: 53002, DPort: 8443},
+	)
+	c.app.storeFW(direct)
+	c.app.Logs.Exec(`UPDATE fw_events SET outcome='Completed',bytes_out=900,bytes_in=4300,dur=2 WHERE to_addr='8.8.8.8'`)
+	c.app.Logs.Exec(`UPDATE fw_events SET outcome='Timed out',bytes_out=60,bytes_in=0,dur=0 WHERE to_addr='198.51.100.200'`)
+	c.app.Logs.Exec(`UPDATE fw_events SET outcome='Still open',bytes_out=5100,bytes_in=88000,dur=14 WHERE to_addr='198.51.100.201'`)
 	time.Sleep(1500 * time.Millisecond)
 }
