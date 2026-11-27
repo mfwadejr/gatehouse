@@ -1,6 +1,13 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.79',
+    title: 'Each network counts only its own traffic',
+    items: [
+      'Networks, Overview and the graphs: a network on a port that also carries VLAN networks used to show that VLAN traffic as its own, so Home looked as busy as Streaming. A port\'s speed now leaves out the VLANs riding on it, so every network shows only its own traffic. This applies to the speeds on the Networks map, the network graphs and history on the Overview, the management port, and the internet connection counters when a connection shares a port with VLAN networks.',
+    ],
+  },
+  {
     version: '0.9.4.78',
     title: 'Moving a device onto a VLAN network, and removing a network completely',
     items: [

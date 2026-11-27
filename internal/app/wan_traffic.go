@@ -37,7 +37,58 @@ type wanTraffic struct {
 }
 
 // readCounter reads one kernel interface counter. A variable so a test can supply the numbers.
-var readCounter = readCounterReal
+var readCounter = readCounterOwn
+
+// vlanChildren lists the VLAN sub-interfaces that ride on each port, from the kernel's VLAN table.
+// A variable so a test can supply it.
+var vlanChildren = vlanChildrenReal
+
+// readCounterRaw is the plain kernel counter; a variable so a test can supply the numbers.
+var readCounterRaw = readCounterReal
+
+func vlanChildrenReal() map[string][]string {
+	b, err := os.ReadFile("/proc/net/vlan/config")
+	if err != nil {
+		return nil
+	}
+	return parseVlanConfig(string(b))
+}
+
+// parseVlanConfig reads lines like "enp2s0.3 | 3 | enp2s0" into parent -> sub-interfaces.
+func parseVlanConfig(text string) map[string][]string {
+	out := map[string][]string{}
+	for _, ln := range strings.Split(text, "\n") {
+		f := strings.Split(ln, "|")
+		if len(f) != 3 {
+			continue
+		}
+		child, parent := strings.TrimSpace(f[0]), strings.TrimSpace(f[2])
+		if child == "" || parent == "" || child == "Name-Type" || strings.HasPrefix(child, "VLAN Dev") {
+			continue
+		}
+		out[parent] = append(out[parent], child)
+	}
+	return out
+}
+
+// readCounterOwn is a port's own counter: the kernel's count for a physical port includes every
+// tagged frame of the VLANs riding on it, so those are taken off, leaving only what the port's own
+// (untagged) network carried. A VLAN network's sub-interface already counts only itself.
+func readCounterOwn(dev, name string) (uint64, bool) {
+	n, ok := readCounterRaw(dev, name)
+	if !ok {
+		return 0, false
+	}
+	for _, c := range vlanChildren()[dev] {
+		if m, good := readCounterRaw(c, name); good {
+			if m >= n {
+				return 0, true
+			}
+			n -= m
+		}
+	}
+	return n, true
+}
 
 func readCounterReal(dev, name string) (uint64, bool) {
 	b, err := os.ReadFile(filepath.Join("/sys/class/net", dev, "statistics", name))
