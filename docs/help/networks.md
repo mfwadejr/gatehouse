@@ -29,6 +29,8 @@ For Wi-Fi, plug a separate access point or Wi-Fi router into a port or VLAN on N
 3. Name a port: **Rename**, type a name, **Save**. **Use the original name** puts it back.
 4. Give a network more ports: **Edit**, **Add more ports to this network**, tick them, **Save**.
 
+5. Remove a network: **Remove** on its row. Its address range and its firewall network go with it. The only network that can manage NopeWarden is not removed until another one can, and the message says so.
+
 ## Example
 Make a Cameras network on its own port with the address 192.168.30.1/24, and on the Firewall page let it reach nothing but itself.
 

@@ -121,7 +121,7 @@ func (m *Model) Validate() error {
 				add("the internet side cannot be a management network")
 			}
 			if len(z.Ifaces) == 0 {
-				add("management network %q has no ports", z.Name)
+				add("the network %q can manage this device but has no port. Open Firewall, Networks and either choose a port for it or remove it", z.Name)
 			}
 			mgmt++
 		}

@@ -24,7 +24,7 @@ function ZoneForm({ initial, presets, ifaces, taken, onClose, onSaved }) {
   const pick = (p) => setZ((x) => ({ ...x, kind: p.kind, internet: p.internet, intra_allow: p.intra_allow, management: p.management }));
   return (
     <Modal title={z.id ? `Edit ${z.name}` : 'Add a network'} onClose={onClose}
-      footer={<><Button onClick={onClose}>Cancel</Button><SaveChoice busy={busy} disabled={!z.name} onSave={async (later) => { if (await run(() => (later ? holdAnd(() => put('/api/fw/zones', z)) : put('/api/fw/zones', z)), later ? SAVED_LATER : 'Saved.')) { onSaved(); onClose(); } }} /></>}>
+      footer={<><Button onClick={onClose}>Cancel</Button><SaveChoice busy={busy} disabled={!z.name || (z.management && !z.ifaces.length && z.kind !== 'wan' && z.kind !== 'vpn')} onSave={async (later) => { if (await run(() => (later ? holdAnd(() => put('/api/fw/zones', z)) : put('/api/fw/zones', z)), later ? SAVED_LATER : 'Saved.')) { onSaved(); onClose(); } }} /></>}>
       <Field label="Name"><Input value={z.name} onChange={set('name')} placeholder="Guests" /></Field>
       <div className="field"><span className="lab">What kind of network is it?</span>
         <div className="stack">
@@ -48,6 +48,7 @@ function ZoneForm({ initial, presets, ifaces, taken, onClose, onSaved }) {
           );
         })}
       </div>
+      {z.management && !z.ifaces.length && z.kind !== 'wan' && z.kind !== 'vpn' && <p className="small errtext">Choose at least one port above, or turn off Can manage NopeWarden below. A network that can manage NopeWarden needs a port.</p>}
       <ToggleRow title="Can reach the internet" checked={z.internet} onChange={set('internet')} />
       <ToggleRow title="Devices here can talk to each other" checked={z.intra_allow} onChange={set('intra_allow')} />
       <ToggleRow title="Can manage NopeWarden" desc="Allows the console from this network. Keep at least one network on, so you can always get back in; NopeWarden refuses a change that would leave none." checked={z.management} onChange={set('management')} />

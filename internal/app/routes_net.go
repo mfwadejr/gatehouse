@@ -475,6 +475,9 @@ func (a *App) registerNetRoutes() {
 			if imp, e = ifaceImpact(tx, id); e != nil {
 				return e
 			}
+			if imp.Refuse != "" {
+				return errors.New(imp.Refuse)
+			}
 			if _, e = tx.Exec(`DELETE FROM interfaces WHERE id=?`, id); e != nil {
 				return e
 			}

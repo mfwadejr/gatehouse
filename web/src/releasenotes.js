@@ -1,6 +1,15 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.78',
+    title: 'Moving a device onto a VLAN network, and removing a network completely',
+    items: [
+      'Devices, Virtual Network Override (Move it): moving a device onto a VLAN network failed on a real machine with "Filter with specified priority/protocol not found". The kernel allows one kind of traffic for each rule priority, and the IPv4, IPv6 and ARP rules shared one. Each kind now has its own, and the move should go through. If it ever fails, the message now names the exact command that failed.',
+      'Networks, Remove: removing a network that could manage NopeWarden used to leave its firewall network behind with no port, and then every new network failed with "management network 1 has no ports". Now the firewall network goes with it when another network can manage this device. If it is the only one, nothing is removed and the message says to make another network able to manage NopeWarden first.',
+      'Firewall, Networks: a network that can manage NopeWarden now needs a port when you save it, and the message about a network with no port says what to do. A leftover network of that kind from an earlier version shows on the Overview, so you can remove it.',
+    ],
+  },
+  {
     version: '0.9.4.77',
     title: 'Port names in Add a network',
     items: [

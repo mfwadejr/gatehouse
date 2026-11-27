@@ -221,36 +221,71 @@ func TestRemovingANetworkTakesItsLeftoversWithIt(t *testing.T) {
 	}
 }
 
-// A network that can manage NopeWarden keeps its firewall network when its port goes.
-func TestRemovingTheManagementPortKeepsItsFirewallNetwork(t *testing.T) {
+// The only network that can manage NopeWarden is not removed, and nothing is left half-done: the
+// person is told why, in words, and the port and the firewall network are both still there.
+func TestRemovingTheOnlyManagementNetworkIsRefused(t *testing.T) {
 	c, _, _ := siteBox(t, "192.168.1.1/24")
-	_, _, raw := c.call("GET", "/api/fw/zones", nil)
-	var zs []map[string]any
-	json.Unmarshal(raw, &zs)
-	var mgmt string
-	for _, z := range zs {
-		if z["management"] == true {
-			mgmt = z["name"].(string)
-		}
-	}
-	if mgmt == "" {
-		t.Skip("the test box has no network that can manage it")
-	}
-	_, _, raw = c.call("GET", "/api/net/interfaces", nil)
+	_, _, raw := c.call("GET", "/api/net/interfaces", nil)
 	var ifs []map[string]any
 	json.Unmarshal(raw, &ifs)
+	var id float64
 	for _, i := range ifs {
-		_, _, zraw := c.call("GET", "/api/fw/zones", nil)
-		if i["zone_id"] == nil || !strings.Contains(string(zraw), mgmt) {
-			continue
+		var n int
+		c.app.Config.QueryRow(`SELECT count(*) FROM zones z JOIN interfaces x ON x.zone_id=z.id WHERE z.management=1 AND x.name=?`, i["name"]).Scan(&n)
+		if n > 0 {
+			id = i["id"].(float64)
 		}
-		rc, m, raw := c.call("GET", "/api/net/interfaces/"+fmtID(i["id"].(float64))+"/removal", nil)
-		if rc != 200 {
-			t.Fatalf("impact: %d %s", rc, raw)
-		}
-		if m["management"] == true && m["remove_zone"] != false {
-			t.Fatalf("a management network would lose its firewall network: %s", raw)
-		}
+	}
+	if id == 0 {
+		t.Skip("the test box has no network that can manage it")
+	}
+	rc, m, raw := c.call("GET", "/api/net/interfaces/"+fmtID(id)+"/removal", nil)
+	if rc != 200 || m["refuse"] == nil || !strings.Contains(m["refuse"].(string), "only network that can manage") {
+		t.Fatalf("the person must be told why: %d %s", rc, raw)
+	}
+	if rc, _, raw := c.call("DELETE", "/api/net/interfaces/"+fmtID(id), nil); rc == 200 {
+		t.Fatalf("the only way in was removed: %s", raw)
+	}
+	var n int
+	c.app.Config.QueryRow(`SELECT count(*) FROM interfaces WHERE id=?`, int64(id)).Scan(&n)
+	if n != 1 {
+		t.Fatal("the port went even though the removal was refused")
+	}
+}
+
+// Removing a network that could manage NopeWarden takes its firewall network with it when another
+// one can, and a new network can be added afterwards. A leftover network with no port used to
+// make every later "Add a network" fail with a message about a network that was already deleted.
+func TestRemovingAManagementNetworkLeavesNothingBehind(t *testing.T) {
+	c, _, _ := siteBox(t, "192.168.1.1/24")
+	if rc, _, raw := c.call("POST", "/api/networks/add", map[string]any{"name": "Office", "port": "eth2", "kind": "trusted", "internet": true}); rc != 200 {
+		t.Fatalf("add Office: %d %s", rc, raw)
+	}
+	var id int64
+	c.app.Config.QueryRow(`SELECT id FROM interfaces WHERE name='eth2'`).Scan(&id)
+	rc, m, raw := c.call("GET", "/api/net/interfaces/"+strconv.FormatInt(id, 10)+"/removal", nil)
+	if rc != 200 || m["refuse"] != nil || m["remove_zone"] != true {
+		t.Fatalf("another network can manage, so this one goes completely: %d %s", rc, raw)
+	}
+	if rc, _, raw := c.call("DELETE", "/api/net/interfaces/"+strconv.FormatInt(id, 10), nil); rc != 200 {
+		t.Fatalf("remove: %d %s", rc, raw)
+	}
+	var n int
+	c.app.Config.QueryRow(`SELECT count(*) FROM zones WHERE name='Office'`).Scan(&n)
+	if n != 0 {
+		t.Fatal("the firewall network Office is still there with no port")
+	}
+	if rc, _, raw := c.call("POST", "/api/networks/add", map[string]any{"name": "Streaming", "port": "eth2", "kind": "private", "internet": true}); rc != 200 {
+		t.Fatalf("a new network after a removal: %d %s", rc, raw)
+	}
+}
+
+// A network that can manage NopeWarden must have a port when it is saved from the Firewall page.
+func TestFirewallNetworkThatManagesNeedsAPort(t *testing.T) {
+	c, _, _ := siteBox(t, "192.168.1.1/24")
+	rc, _, raw := c.call("PUT", "/api/fw/zones", map[string]any{"name": "1", "kind": "trusted", "ifaces": []string{}, "internet": true, "management": true, "gateway": true, "intra_allow": true})
+	if rc == 200 || !strings.Contains(string(raw), "has no port") {
+		t.Fatalf("a manage-capable network with no port must be refused: %d %s", rc, raw)
 	}
 }
 

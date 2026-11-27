@@ -56,6 +56,11 @@ func (a *App) registerFWRoutes() {
 		if !api.Decode(w, r, &z) {
 			return
 		}
+		if z.Management && z.Kind != fw.KindWan && z.Kind != fw.KindVpn && len(z.Ifaces) == 0 {
+			// Such a network passes no traffic and would fail the check on every later change.
+			api.Error(w, 400, fmt.Sprintf("%s is set to manage NopeWarden but has no port. Choose a port for it, or turn Can manage NopeWarden off.", z.Name))
+			return
+		}
 		var id int64
 		err := fw.Mutate(a.Config, func(tx *sql.Tx) (e error) { id, e = fw.SaveZone(tx, z); return })
 		if err != nil {

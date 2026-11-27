@@ -35,7 +35,8 @@ type removalImpact struct {
 	Rules      int            `json:"rules"`
 	Scopes     []removalScope `json:"scopes"`
 	OtherPorts []string       `json:"other_ports,omitempty"`
-	Kept       string         `json:"kept,omitempty"` // why the firewall network stays, in plain words
+	Kept       string         `json:"kept,omitempty"`   // why the firewall network stays, in plain words
+	Refuse     string         `json:"refuse,omitempty"` // why this cannot be removed yet, in plain words (nothing is changed)
 	Blocks     []string       `json:"blocks,omitempty"` // blocks that apply to this network and will lose it
 }
 
@@ -95,13 +96,23 @@ func ifaceImpact(q sqlq, id int64) (*removalImpact, error) {
 	switch {
 	case len(imp.OtherPorts) > 0:
 		imp.Kept = fmt.Sprintf("%s stays, because %s is still part of it.", zname, strings.Join(imp.OtherPorts, ", "))
-	case mgmt == 1:
-		imp.Kept = fmt.Sprintf("%s can manage NopeWarden, so its firewall network stays until you have another one that can. Remove it from Firewall > Networks when you do.", zname)
+	case mgmt == 1 && !otherManager(q, zid.Int64):
+		// The only way back into the console. Nothing is removed and nothing is left half-done.
+		imp.Refuse = fmt.Sprintf("%s is the only network that can manage NopeWarden. Make another network able to manage it first (Firewall, Networks, Edit, Can manage NopeWarden), then remove this one.", zname)
 	default:
 		imp.RemoveZone = true
 		imp.Rules = zoneRules(q, zname)
 	}
 	return imp, nil
+}
+
+// otherManager says whether some other firewall network that can manage NopeWarden still has a
+// port, so taking this one away cannot lock the person out.
+func otherManager(q sqlq, zoneID int64) bool {
+	var n int
+	q.QueryRow(`SELECT count(*) FROM zones z WHERE z.id<>? AND z.management=1 AND z.kind NOT IN ('wan')
+		AND EXISTS (SELECT 1 FROM interfaces i WHERE i.zone_id=z.id AND i.enabled=1)`, zoneID).Scan(&n)
+	return n > 0
 }
 
 // zoneImpact is what removing a firewall network takes with it. The ports stay (with their

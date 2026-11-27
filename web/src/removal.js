@@ -1,5 +1,5 @@
 import { get } from './api.js';
-import { confirmBox } from './ui.jsx';
+import { confirmBox, noticeBox } from './ui.jsx';
 
 // Asks before a network is removed, and says in plain words everything that goes with it, so
 // nothing is left behind and nothing disappears without the person knowing.
@@ -7,6 +7,7 @@ import { confirmBox } from './ui.jsx';
 export async function confirmRemoval(url, lead, { zoneRemoval = false } = {}) {
   let imp = null;
   try { imp = await get(url); } catch { /* the summary is a courtesy; the question is still asked */ }
+  if (imp?.refuse) { await noticeBox(imp.refuse, { title: 'This network cannot be removed yet' }); return false; }
   const lines = [lead];
   if (imp) {
     const goes = [];

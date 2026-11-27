@@ -48,6 +48,8 @@ export function AttentionProvider({ children }) {
     const links = net?.links || {};
     if (net && !wanList.length) add('bad', 'no-wan', 'No internet connection is set up yet', 'Devices cannot reach the internet until you add one.', 'internet/connections', true);
     if (fw && !fw.zones?.length) add('warn', 'no-zones', 'No networks defined in the firewall', 'Create your first network so devices are protected.', 'networks');
+    // A network that can manage this device but has no port: nothing can use it, and it makes every later change to the networks fail the check.
+    (fw?.zones || []).filter((z) => z.management && z.kind !== 'wan' && z.kind !== 'vpn' && !(z.ifaces || []).length).forEach((z) => add('bad', `zone-noport:${z.name}`, `The network ${z.name} can manage this device but has no port`, 'Nothing can use it, and it stops new networks from being added. Remove it, or give it a port.', 'firewall/networks'));
     if (fw?.status?.last_error) add('bad', 'fw-error', 'The last firewall change did not apply', `${fw.status.last_error} Open Diagnostics to see what else is wrong.`, 'firewall/rules', true);
     if (fw?.status?.dirty && fw.status.refresh_only) add('info', 'fw-refresh', 'The firewall rules were refreshed by an update', 'NopeWarden writes its rules a little differently now. What is allowed has not changed. It puts them live by itself; you can also commit them on the Review page.', 'review');
     else if (fw?.status?.dirty) add('warn', 'fw-dirty', 'Firewall changes are waiting to be applied', 'Open the Review page and commit them.', 'review');

@@ -32,10 +32,20 @@ type OverridePlan struct {
 	Parents []string `json:"parents"`
 }
 
+// The kernel keeps one traffic type for each priority number on a port, so every kind of rule has
+// a number of its own. A second type at the same number is refused ("Filter with specified
+// priority/protocol not found"). Every number is cleared on every port before a plan is applied.
 const (
-	overridePrio  = "4100"
-	overrideBcast = "4101"
+	overridePrio     = "4100" // untagged IPv4 in, tagged frames out (ingress and egress are separate lists)
+	overrideBcast    = "4101" // broadcasts and multicasts, tag removed
+	overridePrioIPv6 = "4102"
+	overridePrioARP  = "4103"
+	overrideRedirIn  = "4104" // a device on another port: its frames moved into the VLAN network
+	overrideRedirOut = "4105" // and what the VLAN network sends to it, back out of its own port
+	overrideRedirBc  = "4106" // broadcasts copied to that port
 )
+
+var overrideAllPrios = []string{overridePrio, overrideBcast, overridePrioIPv6, overridePrioARP, overrideRedirIn, overrideRedirOut, overrideRedirBc}
 
 // OverrideCommands returns the tc commands for a plan (without running anything), in order. It is
 // separate from OverrideApply so it can be tested everywhere.
@@ -79,10 +89,12 @@ func OverrideCommands(p OverridePlan) ([][]string, error) {
 	sort.Strings(names)
 	for _, d := range names {
 		cmds = append(cmds,
-			[]string{"qdisc", "replace", "dev", d, "clsact"},
-			[]string{"filter", "del", "dev", d, "ingress", "prio", overridePrio},
-			[]string{"filter", "del", "dev", d, "egress", "prio", overridePrio},
-			[]string{"filter", "del", "dev", d, "egress", "prio", overrideBcast})
+			[]string{"qdisc", "replace", "dev", d, "clsact"})
+		for _, pr := range overrideAllPrios {
+			cmds = append(cmds,
+				[]string{"filter", "del", "dev", d, "ingress", "prio", pr},
+				[]string{"filter", "del", "dev", d, "egress", "prio", pr})
+		}
 	}
 	for _, r := range p.Rules {
 		hw, _ := net.ParseMAC(r.MAC)
@@ -92,20 +104,21 @@ func OverrideCommands(p OverridePlan) ([][]string, error) {
 			// A device on another port: its frames are moved into the VLAN network as if they had
 			// arrived there, and what the VLAN network sends to it goes back out of its own port.
 			cmds = append(cmds,
-				[]string{"filter", "add", "dev", r.Home, "ingress", "protocol", "all", "prio", overridePrio,
+				[]string{"filter", "add", "dev", r.Home, "ingress", "protocol", "all", "prio", overrideRedirIn,
 					"flower", "src_mac", mac, "action", "mirred", "ingress", "redirect", "dev", r.Iface},
-				[]string{"filter", "add", "dev", r.Iface, "egress", "protocol", "all", "prio", overridePrio,
+				[]string{"filter", "add", "dev", r.Iface, "egress", "protocol", "all", "prio", overrideRedirOut,
 					"flower", "dst_mac", mac, "action", "mirred", "egress", "redirect", "dev", r.Home})
 			k := pv{r.Iface + ">" + r.Home, 0}
 			if !bc[k] {
 				bc[k] = true
-				cmds = append(cmds, []string{"filter", "add", "dev", r.Iface, "egress", "protocol", "all", "prio", overrideBcast,
+				cmds = append(cmds, []string{"filter", "add", "dev", r.Iface, "egress", "protocol", "all", "prio", overrideRedirBc,
 					"flower", "dst_mac", "01:00:00:00:00:00/01:00:00:00:00:00", "action", "mirred", "egress", "mirror", "dev", r.Home})
 			}
 			continue
 		}
-		for _, proto := range []string{"ip", "ipv6", "arp"} {
-			cmds = append(cmds, []string{"filter", "add", "dev", r.Parent, "ingress", "protocol", proto, "prio", overridePrio,
+		for _, pp := range [][2]string{{"ip", overridePrio}, {"ipv6", overridePrioIPv6}, {"arp", overridePrioARP}} {
+			proto, prio := pp[0], pp[1]
+			cmds = append(cmds, []string{"filter", "add", "dev", r.Parent, "ingress", "protocol", proto, "prio", prio,
 				"flower", "src_mac", mac, "action", "vlan", "push", "id", vid})
 		}
 		cmds = append(cmds, []string{"filter", "add", "dev", r.Parent, "egress", "protocol", "802.1q", "prio", overridePrio,
@@ -147,7 +160,7 @@ func (s *Service) OverrideApply(p OverridePlan) error {
 		if strings.Contains(msg, "Unknown qdisc") || strings.Contains(msg, "Error: Specified qdisc kind is unknown") || strings.Contains(msg, "unknown filter") {
 			msg = "this system's kernel cannot tag traffic by device address"
 		}
-		return fmt.Errorf("could not move a device onto its VLAN: %s", msg)
+		return fmt.Errorf("could not move a device onto its VLAN: %s (the command that failed: tc %s)", msg, strings.Join(c, " "))
 	}
 	return nil
 }
