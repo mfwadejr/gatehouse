@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { get, post, put, useData } from '../api.js';
 import { RangeField, knownRanges } from './ManageAccess.jsx';
-import { Button, Card, Field, Input, NumberInput, Note, Pill, Problems, Segmented, Select, ToggleRow, useAction, useToast, confirmBox } from '../ui.jsx';
+import { Button, Card, Field, Input, NumberInput, Note, Pill, Problems, Segmented, Select, ToggleRow, useAction, useToast, confirmBox, usePortNames } from '../ui.jsx';
 
 // Bridge mode: NopeWarden sits between another router and your network and filters, instead of
 // routing. Saving only stages the setup. Applying starts a 60-second countdown; unless it is kept,
@@ -60,6 +60,7 @@ export default function BridgeMode() {
   const { data, reload } = useData('/api/bridge', { topics: ['fw.status', 'net.status'], every: 4000 });
   const [f, setF] = useState(null);
   const [run, busy] = useAction();
+  const pn = usePortNames();
   const [code, setCode] = useState('');
   const [subnets, setSubnets] = useState('');
   const { data: known } = useData('/api/fw/protected');
@@ -75,7 +76,7 @@ export default function BridgeMode() {
 
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
   const wired = (data.ports || []);
-  const portOpts = (blankLabel) => [{ value: '', label: blankLabel }, ...wired.map((p) => ({ value: p.Name, label: `${p.Name}${p.UsedFor ? ` (used for ${p.UsedFor === 'internet' ? 'the internet' : 'a network'} now)` : ''}` }))];
+  const portOpts = (blankLabel) => [{ value: '', label: blankLabel }, ...wired.map((p) => ({ value: p.Name, label: `${pn(p.Name)}${p.UsedFor ? ` (used for ${p.UsedFor === 'internet' ? 'the internet' : 'a network'} now)` : ''}` }))];
   const payload = () => ({ ...f, subnets: subnets.split(/[,\s]+/).filter(Boolean), allow: f.allow.map((a) => ({ ...a, port: Number(a.port) })) });
   const save = () => run(async () => { const r = await put('/api/bridge', payload()); reload(); return r; }, 'Saved. Nothing has changed on the machine yet.');
   const apply = () => run(async () => {
@@ -107,7 +108,7 @@ export default function BridgeMode() {
               <Field label="Ports to your devices" hint="Tick every port your own network plugs into.">
                 <div className="stack gap1">
                   {wired.filter((p) => p.Name !== f.outside && p.Name !== f.oob).map((p) => (
-                    <label key={p.Name} className="inline"><input type="checkbox" checked={f.inside.includes(p.Name)} onChange={(e) => set('inside')(e.target.checked ? [...f.inside, p.Name] : f.inside.filter((n) => n !== p.Name))} /> {p.Name}{(data.current || []).includes(p.Name) ? ' (you are connected here)' : ''}</label>
+                    <label key={p.Name} className="inline"><input type="checkbox" checked={f.inside.includes(p.Name)} onChange={(e) => set('inside')(e.target.checked ? [...f.inside, p.Name] : f.inside.filter((n) => n !== p.Name))} /> {pn(p.Name)}{(data.current || []).includes(p.Name) ? ' (you are connected here)' : ''}</label>
                   ))}
                 </div>
               </Field>

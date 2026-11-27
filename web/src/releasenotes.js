@@ -1,6 +1,14 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.77',
+    title: 'Port names in Add a network',
+    items: [
+      'Networks, Add a network: the Port list now shows the names you gave your ports (LAN, T-Mobile, Management) with the port name beside them, the same as the Networks page. Bridge mode\'s port lists do too.',
+      'The build now stops any screen that lists the box\'s ports from skipping the names again.',
+    ],
+  },
+  {
     version: '0.9.4.76',
     title: 'Block as it happens',
     items: [

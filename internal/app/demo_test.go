@@ -15,7 +15,7 @@ import (
 
 // TestDemoConsole is a picture-taking tool, not a test: with NW_DEMO set it starts the real console on
 // 127.0.0.1:8099 with made-up data and waits, so screenshots of the website and the help can be taken
-// from the real screens. NW_SCENE picks the state: main, review, setup, engine (main, with the threat
+// from the real screens. NW_SCENE picks the state: main, review, setup, wizard (nothing set up, the first-run steps show), engine (main, with the threat
 // engine installed and watching, so the screens that only exist then can be seen).
 func TestDemoConsole(t *testing.T) {
 	if os.Getenv("NW_DEMO") == "" {
@@ -47,7 +47,12 @@ func TestDemoConsole(t *testing.T) {
 		fn.wan["Cable"] = x
 	}
 	fn.mu.Unlock()
-	seedDemo(t, c, scene)
+	if scene == "wizard" { // nothing set up yet, so the first-run steps show
+		c.app.Config.Exec(`DELETE FROM zones`)
+		c.app.Config.Exec(`DELETE FROM wan_links`)
+	} else {
+		seedDemo(t, c, scene)
+	}
 	if os.Getenv("NW_BALANCE") != "" { // both connections share the load, half each
 		_, wm, _ := c.call("GET", "/api/net/wans", nil)
 		var ms []map[string]any

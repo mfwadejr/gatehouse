@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { get, holdAnd, post } from './api.js';
 import { SaveChoice } from './changes.jsx';
-import { Button, Field, Input, Modal, Note, Segmented, Select, ToggleRow, useAction } from './ui.jsx';
+import { Button, Field, Input, Modal, Note, Segmented, Select, ToggleRow, useAction, usePortNames } from './ui.jsx';
 
 // One form for a new network: the port, its address, DHCP and what it may reach. Everything has a
 // safe default, so the usual case is a name and a port.
 export default function AddNetwork({ onClose, onCreated }) {
   const [run, busy] = useAction();
+  const pn = usePortNames();
   const [sug, setSug] = useState(null);
   const [f, setF] = useState({ name: '', port: '', vlan: 0, address: '', dhcp: 'server', relay: '', kind: 'private', internet: true, intra_allow: true, no_address: false, lease: '1d', ipv6: 'off' });
   const [asVlan, setAsVlan] = useState(false);
@@ -62,7 +63,7 @@ export default function AddNetwork({ onClose, onCreated }) {
 
   const portOptions = (sug?.ports || []).map((p) => ({
     value: p.name,
-    label: `${p.name}${p.link ? ' · cable connected' : ''}${p.use === 'internet' ? ' · used for the internet' : p.use === 'network' ? ' · already has a network' : p.use === 'bridge' ? ' · part of a bridge' : ''}`,
+    label: `${pn(p.name)}${p.link ? ' · cable connected' : ''}${p.use === 'internet' ? ' · used for the internet' : p.use === 'network' ? ' · already has a network' : p.use === 'bridge' ? ' · part of a bridge' : ''}`,
   }));
 
   return (
