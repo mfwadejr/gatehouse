@@ -84,3 +84,88 @@ func TestUnitAsksForNoPidFile(t *testing.T) {
 		t.Fatalf("the unit must not ask the engine for a pid file:\n%s", u)
 	}
 }
+
+func inlinePlan() Plan {
+	return Plan{Enabled: true, Inline: true, InlineIfaces: []string{"eth1", "eth2"}, WANIfaces: []string{"eth0"},
+		BlockGroups: []string{"malware", "exploit"}, AlertOnlySIDs: []int{2019401}, NeverCheck: []string{"192.168.1.50", "10.0.0.0/24", "fd00::1"}}
+}
+
+func TestInlineScriptQueuesOnlyAcceptedTrafficBetweenChosenPortsAndTheInternet(t *testing.T) {
+	p := inlinePlan()
+	if err := p.Check(); err != nil {
+		t.Fatal(err)
+	}
+	s := NftScript(p)
+	for _, want := range []string{
+		"hook forward priority 10; policy accept",
+		`iifname { "eth1", "eth2" } oifname { "eth0" } queue flags bypass to 100`,
+		`iifname { "eth0" } oifname { "eth1", "eth2" } queue flags bypass to 100`,
+		"ip saddr { 10.0.0.0/24, 192.168.1.50/32 } return",
+		"ip6 daddr { fd00::1/128 } return",
+	} {
+		if !strings.Contains(s, want) {
+			t.Fatalf("missing %q in\n%s", want, s)
+		}
+	}
+	if strings.Contains(s, "input") {
+		t.Fatal("traffic to the box itself is never queued")
+	}
+	// A never-check line must come before the queue lines, or it would not skip anything.
+	if strings.Index(s, "return") > strings.Index(s, "queue") {
+		t.Fatal("never-check rules come first")
+	}
+}
+
+func TestInlineFailsOpenEverywhere(t *testing.T) {
+	p := inlinePlan()
+	u := Unit(p)
+	if !strings.Contains(u, " -q 100") || !strings.Contains(u, "nft -f /etc/nopewarden/ips.nft") || !strings.Contains(u, "nft delete table inet nopewarden_ips") {
+		t.Fatalf("the queue rules live and die with the engine:\n%s", u)
+	}
+	if !strings.Contains(u, "gro off lro off") || !strings.Contains(u, "eth0") {
+		t.Fatalf("card offloading is switched off on every checked port:\n%s", u)
+	}
+	if !strings.Contains(IncludeFor(p), "fail-open: yes") || !strings.Contains(NftScript(p), "bypass") {
+		t.Fatal("fail open on both sides")
+	}
+	if strings.Contains(Unit(Plan{Enabled: true, Ifaces: []string{"eth1"}}), "-q ") {
+		t.Fatal("watch only never queues")
+	}
+}
+
+func TestDropAndAlertOnlyFiles(t *testing.T) {
+	p := inlinePlan()
+	d := DropConfFor(p)
+	if !strings.Contains(d, "group:emerging-malware.rules") || !strings.Contains(d, "group:emerging-exploit.rules") || strings.Contains(d, "scan") {
+		t.Fatal(d)
+	}
+	if !strings.Contains(ModifyConfFor(p), `2019401 "^drop" "alert"`) {
+		t.Fatal(ModifyConfFor(p))
+	}
+	w := p
+	w.Inline = false
+	if strings.Contains(DropConfFor(w), "group:") || strings.Contains(ModifyConfFor(w), "drop") || LocalRulesFor(w) != "" {
+		t.Fatal("outside inline mode every rule stays alert")
+	}
+	if !strings.Contains(LocalRulesFor(p), "sid:9900001") {
+		t.Fatal("test rule")
+	}
+}
+
+func TestInlineChecks(t *testing.T) {
+	p := inlinePlan()
+	p.NeverCheck = []string{"not an address"}
+	if p.Check() == nil {
+		t.Fatal("bad address refused")
+	}
+	p = inlinePlan()
+	p.InlineIfaces = nil
+	if p.Check() == nil {
+		t.Fatal("needs a network to check")
+	}
+	p = inlinePlan()
+	p.Enabled = false
+	if p.Check() == nil {
+		t.Fatal("needs watching on")
+	}
+}

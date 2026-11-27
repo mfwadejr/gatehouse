@@ -43,7 +43,7 @@ export function AttentionProvider({ children }) {
   const value = useMemo(() => {
     const a = [];
     // stopped: something has actually stopped working (as opposed to a setting that needs a decision).
-    const add = (level, id, t, s, to, stopped = false) => a.push({ level, id, t, s, to, stopped });
+    const add = (level, id, t, s, to, stopped = false, act = '') => a.push({ level, id, t, s, to, stopped, act });
     const wanList = wans?.wans || [];
     const links = net?.links || {};
     if (net && !wanList.length) add('bad', 'no-wan', 'No internet connection is set up yet', 'Devices cannot reach the internet until you add one.', 'internet/connections', true);
@@ -93,6 +93,8 @@ export function AttentionProvider({ children }) {
     const warn = shown.filter((i) => i.level === 'warn').length;
     if (bad) add('bad', 'security', `Security check: ${bad} to fix now${warn ? `, ${warn} worth fixing` : ''}`, 'Open Protection to see what and how to fix it.', 'protection/overview');
     else if (warn) add('warn', 'security', `Security check: ${warn} worth fixing`, 'Open Protection to see what and how to fix it.', 'protection/overview');
+    if (ov?.inline?.on && ov.inline.state === 'stopped') add('bad', 'inline-stopped', 'Blocking as it happens is not checking right now', ov.inline.text, 'threats/settings', true, 'inline-off');
+    else if (ov?.inline?.on && ov.inline.state === 'falling_behind') add('warn', 'inline-behind', 'Blocking as it happens is falling behind', ov.inline.text, 'threats/settings', false, 'inline-off');
     if (ov?.threat_alerts_24h > 0) add('warn', 'threat', `Threat watching raised ${ov.threat_alerts_24h} alert${ov.threat_alerts_24h === 1 ? '' : 's'} in the last day`, `${ov.threat_devices_24h || 1} device${ov.threat_devices_24h === 1 ? '' : 's'} involved. Open Threats to look.`, 'threats/alerts');
     if (setup?.items?.length && setup.left > 0) add('info', 'setup', `Finish setting up: ${setup.items.length - setup.left} of ${setup.items.length} done`, 'You can do these in any order.', 'settings/general');
     // A backup is only worth having if it restores: say so when none has been tried in 90 days.

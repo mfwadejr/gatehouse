@@ -187,4 +187,8 @@ CREATE TABLE power_outages(
   end INTEGER NOT NULL DEFAULT 0,
   test INTEGER NOT NULL DEFAULT 0
 );
+`, `
+-- What the engine did with the packet an alert is about (v0.9.4.76): allowed, or blocked when it ran
+-- inline and dropped it.
+ALTER TABLE threat_alerts ADD COLUMN action TEXT NOT NULL DEFAULT '';
 `}

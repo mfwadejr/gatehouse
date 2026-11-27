@@ -83,6 +83,7 @@ type evePacket struct {
 		Signature string `json:"signature"`
 		Category  string `json:"category"`
 		Severity  int    `json:"severity"`
+		Action    string `json:"action"` // allowed, or blocked when the engine dropped the packet
 	} `json:"alert"`
 }
 
@@ -155,8 +156,8 @@ func (a *App) threatIngest(line []byte, now time.Time) bool {
 			dir = "out"
 		}
 	}
-	a.Logs.Exec(`INSERT INTO threat_alerts(ts,sid,signature,plain,category,severity,src,dst,dport,proto,mac,device,dir) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		now.Unix(), e.Alert.SID, e.Alert.Signature, plain, e.Alert.Category, e.Alert.Severity, e.SrcIP, e.DestIP, e.DestPort, strings.ToLower(e.Proto), mac, device, dir)
+	a.Logs.Exec(`INSERT INTO threat_alerts(ts,sid,signature,plain,category,severity,src,dst,dport,proto,mac,device,dir,action) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		now.Unix(), e.Alert.SID, e.Alert.Signature, plain, e.Alert.Category, e.Alert.Severity, e.SrcIP, e.DestIP, e.DestPort, strings.ToLower(e.Proto), mac, device, dir, e.Alert.Action)
 	sev := "warning"
 	if e.Alert.Severity >= 3 {
 		sev = "info"
@@ -231,6 +232,7 @@ func (a *App) threatEngine() map[string]any {
 func (a *App) registerThreatRoutes() {
 	s := a.API
 	a.registerThreatEngineRoutes()
+	a.registerInlineRoutes()
 	a.registerThreatBlockRoutes()
 	s.HandleAdmin("POST /api/threat/allow", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
 		var in struct {

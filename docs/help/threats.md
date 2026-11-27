@@ -57,3 +57,15 @@ The picture uses made-up addresses.
 It is careful: your own devices and networks, addresses on your own side, the DNS servers you use and this machine's own addresses are never blocked, and only the most serious alerts count. A check you have allowed or a device you never check does not lead to a block. This works for IPv4 addresses. If the engine stops, nothing new is blocked and your traffic is not held up, because traffic does not pass through the engine. The blocks already made end when their time is up.
 
 This is not the same as inline blocking, where each packet waits for the engine. NopeWarden may let the first few packets of an attack through before the address is blocked.
+
+## Block as it happens
+**Block as it happens** goes one step further than **Watch and block**. Watch and block reacts after the first packets of an attack have already gone through, by blocking the address. Block as it happens holds each packet for a moment while the engine checks it, and drops the ones that match a check set to **Block**, so the attack never arrives. It works like the inline mode in pfSense, OPNsense and IPFire, and it is off until you choose it.
+
+What is checked: traffic the firewall has already allowed, between a checked network and the internet, in both directions. Traffic the firewall drops is never checked, traffic between your own networks is not checked, and traffic to this firewall itself (the console, SSH) is not checked. Under **Networks to check** you can leave a network out. All networks that reach the internet are checked to start with.
+
+**What each group of checks does** gives every group a setting: **Off** (not looked for), **Alert** (noted in the alerts, nothing is stopped) or **Block** (matching traffic is dropped). To start with, only known malware and its servers, exploit attempts and exploit kits are set to Block. Scans, policy, peer-to-peer, games, chat, DNS and user-agent checks start on Alert. Lists of bad addresses are never used to block, because they are noisy. Turn blocking on one group at a time and watch the alerts for a few days before adding the next.
+
+On an alert, **Stop blocking this** keeps alerting about that one check but stops dropping its traffic, and **Never check this address** skips that device when checking. Both appear under **Changes you made**, each with **Undo**. You can also type an address or network to never check.
+
+It is built so it cannot cut your internet. The checks wait in a queue that is set to let packets through if the engine is not listening or is too busy to keep up, a watchdog restarts the engine if it stops, and **Keeping up** or **Falling behind** on the page tells you which it is. A red notice appears on the Overview if checking stops, with **Back to Watch only** beside it to turn blocking off at once. Checking every packet needs a processor with at least two cores and about 4 GB of memory, and is slow on virtual machines; the page warns you when this machine looks too small. To prove blocking works, open the **Try it** address from a device on a checked network: the page should not load, and a blocked alert appears.
+

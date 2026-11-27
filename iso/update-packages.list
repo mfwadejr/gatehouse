@@ -13,3 +13,4 @@ dns-root-data
 conntrack
 openssh-client
 smbclient
+ethtool

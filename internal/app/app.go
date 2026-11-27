@@ -102,6 +102,7 @@ type App struct {
 	scope       scopeCache
 	threats     threatState
 	threatW     threatWatch
+	inlineH     inlineHealth
 	traffic     wanTraffic
 	mgmtTraffic wanTraffic // the management port's own speed
 	netTraffic  wanTraffic // each network's own speed, summed over its ports

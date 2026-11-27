@@ -46,6 +46,44 @@ type ThreatInfo struct {
 	HasPrevious  bool         `json:"has_previous"`
 	CPUNSec      uint64       `json:"cpu_nsec"` // processor time used so far
 	MemoryBytes  uint64       `json:"memory_bytes"`
+	// Queue is what the kernel says about the inline queue (zero when not blocking as it happens).
+	Queue QueueStats `json:"queue"`
+	Virt  string     `json:"virt"` // the kind of virtual machine this is, or empty on real hardware
+}
+
+// QueueStats is one line of /proc/net/netfilter/nfnetlink_queue.
+type QueueStats struct {
+	Listening    bool  `json:"listening"`     // the engine has the queue open
+	Waiting      int64 `json:"waiting"`       // packets held right now
+	QueueDropped int64 `json:"queue_dropped"` // let through unchecked because the queue was full
+	UserDropped  int64 `json:"user_dropped"`  // lost between the kernel and the engine
+	Handled      int64 `json:"handled"`       // sequence number: packets handled so far
+}
+
+const queueProc = "proc/net/netfilter/nfnetlink_queue"
+
+// readQueue reads the kernel's counters for the engine's queue.
+func (s *Service) readQueue() QueueStats {
+	b, err := os.ReadFile(s.rootPath(queueProc))
+	if err != nil {
+		return QueueStats{}
+	}
+	return parseQueue(string(b), threatcfg.QueueNum)
+}
+
+func parseQueue(txt string, num int) QueueStats {
+	for _, l := range strings.Split(txt, "\n") {
+		f := strings.Fields(l)
+		if len(f) < 8 {
+			continue
+		}
+		if n, err := strconv.Atoi(f[0]); err != nil || n != num {
+			continue
+		}
+		v := func(i int) int64 { x, _ := strconv.ParseInt(f[i], 10, 64); return x }
+		return QueueStats{Listening: true, Waiting: v(2), QueueDropped: v(5), UserDropped: v(6), Handled: v(7)}
+	}
+	return QueueStats{}
 }
 
 // ThreatPreview is what installing would do, shown before anything happens.
@@ -160,6 +198,11 @@ func (s *Service) ThreatStatus() ThreatInfo {
 			info.MemoryMB = kb / 1024
 		}
 	}
+	if out, err := sysRun(5*time.Second, "systemd-detect-virt"); err == nil || strings.TrimSpace(out) != "" {
+		if v := strings.TrimSpace(out); v != "none" && !strings.Contains(v, " ") {
+			info.Virt = v
+		}
+	}
 	info.Installed = s.threatInstalled()
 	if !info.Installed {
 		return info
@@ -187,6 +230,7 @@ func (s *Service) ThreatStatus() ThreatInfo {
 	if !info.Running {
 		info.Why, info.Failing = s.threatWhy()
 	}
+	info.Queue = s.readQueue()
 	if st, err := os.Stat(s.rootPath(threatRules)); err == nil {
 		info.RulesUpdated = st.ModTime().Unix()
 		threatState.Lock()
@@ -396,12 +440,13 @@ func (s *Service) ThreatApply(p threatcfg.Plan) error {
 	}
 	if !p.Enabled {
 		sysRun(30*time.Second, "systemctl", "disable", "--now", threatcfg.UnitName)
+		sysRun(15*time.Second, "nft", "delete", "table", "inet", threatcfg.IPSTable)
 		return nil
 	}
 	if !s.threatInstalled() {
 		return errors.New("the threat-watching program is not installed yet")
 	}
-	for _, f := range []string{threatcfg.IncludeFile, threatcfg.UnitFile, threatcfg.DisableConf} {
+	for _, f := range []string{threatcfg.IncludeFile, threatcfg.UnitFile, threatcfg.DisableConf, threatcfg.IPSFile, threatcfg.LocalRules, threatcfg.DropConf, threatcfg.ModifyConf} {
 		if err := os.MkdirAll(filepath.Dir(s.rootPath(f)), 0o755); err != nil {
 			return err
 		}
@@ -409,18 +454,26 @@ func (s *Service) ThreatApply(p threatcfg.Plan) error {
 	oldUnit := readOrEmpty(s.rootPath(threatcfg.UnitFile))
 	oldDisable := readOrEmpty(s.rootPath(threatcfg.DisableConf))
 	oldInc := readOrEmpty(s.rootPath(threatcfg.IncludeFile))
-	unit, dis, inc := threatcfg.Unit(p), threatcfg.DisableList(p), threatcfg.Include()
-	for path, body := range map[string]string{threatcfg.IncludeFile: inc, threatcfg.UnitFile: unit, threatcfg.DisableConf: dis} {
+	oldRules := readOrEmpty(s.rootPath(threatcfg.DropConf)) + readOrEmpty(s.rootPath(threatcfg.ModifyConf)) + readOrEmpty(s.rootPath(threatcfg.LocalRules))
+	oldIPS := readOrEmpty(s.rootPath(threatcfg.IPSFile))
+	unit, dis, inc := threatcfg.Unit(p), threatcfg.DisableList(p), threatcfg.IncludeFor(p)
+	drop, mod, local := threatcfg.DropConfFor(p), threatcfg.ModifyConfFor(p), threatcfg.LocalRulesFor(p)
+	ips := ""
+	if p.Inline {
+		ips = threatcfg.NftScript(p)
+	}
+	for path, body := range map[string]string{threatcfg.IncludeFile: inc, threatcfg.UnitFile: unit, threatcfg.DisableConf: dis,
+		threatcfg.IPSFile: ips, threatcfg.LocalRules: local, threatcfg.DropConf: drop, threatcfg.ModifyConf: mod} {
 		if err := writeFileAtomic(s.rootPath(path), []byte(body), 0o644); err != nil {
 			return err
 		}
 	}
-	changed := unit != oldUnit || inc != oldInc
+	changed := unit != oldUnit || inc != oldInc || ips != oldIPS
 	if changed {
 		sysRun(30*time.Second, "systemctl", "daemon-reload")
 	}
-	if dis != oldDisable {
-		// Which groups are on changed, so the rules are rebuilt from the groups the person chose.
+	if dis != oldDisable || drop+mod+local != oldRules {
+		// Which groups are on, or which are set to block, changed, so the rules are rebuilt from the groups the person chose.
 		if err := s.ThreatUpdateRules(); err != nil {
 			// Without new rules the engine still runs on the ones it has, if it has any.
 			if _, e := os.Stat(s.rootPath(threatRules)); e != nil {
@@ -484,7 +537,12 @@ func (s *Service) ThreatUpdateRules() error {
 	if b, err := os.ReadFile(rules); err == nil {
 		os.WriteFile(rules+".prev", b, 0o644)
 	}
-	out, err := sysRun(10*time.Minute, "suricata-update", "--no-reload", "--disable-conf", s.rootPath(threatcfg.DisableConf))
+	args := []string{"--no-reload", "--disable-conf", s.rootPath(threatcfg.DisableConf),
+		"--drop-conf", s.rootPath(threatcfg.DropConf), "--modify-conf", s.rootPath(threatcfg.ModifyConf)}
+	if st, e := os.Stat(s.rootPath(threatcfg.LocalRules)); e == nil && st.Size() > 0 {
+		args = append(args, "--local", s.rootPath(threatcfg.LocalRules))
+	}
+	out, err := sysRun(10*time.Minute, "suricata-update", args...)
 	if err != nil {
 		// put the old rules back
 		if b, e := os.ReadFile(rules + ".prev"); e == nil {

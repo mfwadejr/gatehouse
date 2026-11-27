@@ -102,11 +102,16 @@ func (a *App) setThreatGroupChanges(on, off []string) {
 
 func (a *App) threatPlan() threatcfg.Plan {
 	on, off := a.threatGroupChanges()
-	return threatcfg.Plan{
+	p := threatcfg.Plan{
 		Enabled: a.threatMode() == "watch", Ifaces: a.ndpiIfaces(), Preset: a.threatPreset(),
 		CPUPercent: a.threatInt(threatCPUSetting, 50, 10, 400), MemoryMB: a.threatInt(threatMemSetting, 2048, 256, 16384),
 		OffSIDs: a.threatOffSIDs(), GroupsOn: on, GroupsOff: off,
 	}
+	if a.threatInline() {
+		p.Inline, p.InlineIfaces, p.WANIfaces = true, a.inlineIfaces(), a.wanIfaces()
+		p.BlockGroups, p.AlertOnlySIDs, p.NeverCheck = a.inlineBlockGroups(p), a.inlineAlertOnly(), a.inlineNever()
+	}
+	return p
 }
 
 // threatSync makes the engine match the settings.
@@ -120,6 +125,7 @@ func (a *App) threatSync() error {
 // threatPause switches watching off by itself, and says why.
 func (a *App) threatPause(why string) {
 	a.Config.SetSetting(threatModeSetting, "off")
+	a.Config.SetSetting(threatInlineSetting, "")
 	a.Config.SetSetting(threatWhySetting, why)
 	if a.Net != nil {
 		a.Net.ThreatApply(threatcfg.Plan{Enabled: false})
@@ -143,6 +149,7 @@ type threatWatch struct {
 // minutes running, watching is switched off and the Logs say why. If it was meant to be running and
 // is not, the Logs say so once. Neither touches traffic.
 func (a *App) threatWatchTick(info netdThreat, now time.Time) {
+	a.inlineTick(info, now)
 	w := &a.threatW
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -156,7 +163,11 @@ func (a *App) threatWatchTick(info netdThreat, now time.Time) {
 		w.runningSince, w.cpuPct, w.memMB = time.Time{}, 0, 0
 		w.stopped++
 		if w.stopped == 3 {
-			a.event("system", "warning", "Threat watching is not running", "The engine stopped. Your traffic is not affected, because it only watches. NopeWarden keeps trying to start it.")
+			if a.threatInline() {
+				a.event("system", "warning", "Blocking as it happens is not running", "The engine stopped, so traffic is passing through unchecked. Your internet keeps working. NopeWarden keeps trying to start it.")
+			} else {
+				a.event("system", "warning", "Threat watching is not running", "The engine stopped. Your traffic is not affected, because it only watches. NopeWarden keeps trying to start it.")
+			}
 		}
 		return
 	}
@@ -277,30 +288,13 @@ func (a *App) threatSearchRules(q string, limit int) ([]threatRule, int) {
 	return out, total
 }
 
-type netdThreat = struct {
-	Installed    bool              `json:"installed"`
-	Version      string            `json:"version"`
-	Running      bool              `json:"running"`
-	State        string            `json:"state"`
-	Message      string            `json:"message"`
-	Steps        []netd.ThreatStep `json:"steps,omitempty"`
-	DiskFreeMB   int64             `json:"disk_free_mb"`
-	MemoryMB     int64             `json:"memory_mb"`
-	CPUs         int               `json:"cpus"`
-	RulesUpdated int64             `json:"rules_updated"`
-	RulesCount   int               `json:"rules_count"`
-	Why          string            `json:"why"`
-	Failing      bool              `json:"failing"`
-	HasPrevious  bool              `json:"has_previous"`
-	CPUNSec      uint64            `json:"cpu_nsec"`
-	MemoryBytes  uint64            `json:"memory_bytes"`
-}
+type netdThreat = netd.ThreatInfo
 
 func (a *App) threatInfo() netdThreat {
 	if a.Net == nil {
 		return netdThreat{State: "idle"}
 	}
-	return netdThreat(a.Net.ThreatStatus())
+	return a.Net.ThreatStatus()
 }
 
 func (a *App) registerThreatEngineRoutes() {
@@ -354,7 +348,7 @@ func (a *App) registerThreatEngineRoutes() {
 		info := a.threatInfo()
 		gon, goff := a.threatGroupChanges()
 		api.JSON(w, 200, map[string]any{
-			"mode": a.threatMode(), "block": a.threatBlocking(), "block_minutes": a.threatBlockMinutes(), "preset": a.threatPreset(), "presets": ps, "custom": len(gon)+len(goff) > 0, "changes": len(gon) + len(goff),
+			"mode": a.threatMode(), "inline": a.threatInline(), "block": a.threatBlocking(), "block_minutes": a.threatBlockMinutes(), "preset": a.threatPreset(), "presets": ps, "custom": len(gon)+len(goff) > 0, "changes": len(gon) + len(goff),
 			"cpu_percent": a.threatInt(threatCPUSetting, 50, 10, 400), "memory_mb": a.threatInt(threatMemSetting, 2048, 256, 16384),
 			"paused_reason": a.Config.Setting(threatWhySetting, ""),
 			"program":       info, "engine": a.threatEngine(), "eve_path": a.threatEvePath(), "default_eve": defaultEve,
@@ -424,12 +418,13 @@ func (a *App) registerThreatEngineRoutes() {
 			return
 		}
 		protect := in.Mode != nil && *in.Mode == "protect"
-		if protect {
+		inline := in.Mode != nil && *in.Mode == "inline"
+		if protect || inline {
 			m := "watch"
 			in.Mode = &m
 		}
 		if in.Mode != nil && *in.Mode != "off" && *in.Mode != "watch" {
-			fail(w, errors.New("choose Off, Watch and tell, or Watch and block"))
+			fail(w, errors.New("choose Off, Watch and tell, Watch and block, or Block as it happens"))
 			return
 		}
 		if in.Preset != nil {
@@ -478,6 +473,11 @@ func (a *App) registerThreatEngineRoutes() {
 			old := a.Config.Setting(threatBlockSetting, "")
 			a.Config.SetSetting(threatModeSetting, *in.Mode)
 			a.Config.SetSetting(threatWhySetting, "")
+			if inline {
+				a.Config.SetSetting(threatInlineSetting, "1")
+			} else {
+				a.Config.SetSetting(threatInlineSetting, "")
+			}
 			if protect {
 				a.Config.SetSetting(threatBlockSetting, "1")
 			} else {

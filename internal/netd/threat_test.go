@@ -324,3 +324,17 @@ func TestNeedToGetReadsTheTotalAfterTheSlash(t *testing.T) {
 		}
 	}
 }
+
+func TestParseQueue(t *testing.T) {
+	txt := "  100  -4401   3     2 65535     7     2   123456  1\n    0   -1   0     2 65535     0     0        0  1\n"
+	q := parseQueue(txt, 100)
+	if !q.Listening || q.Waiting != 3 || q.QueueDropped != 7 || q.UserDropped != 2 || q.Handled != 123456 {
+		t.Fatalf("%+v", q)
+	}
+	if parseQueue(txt, 55).Listening {
+		t.Fatal("a queue nobody has open is not listening")
+	}
+	if parseQueue("", 100).Listening {
+		t.Fatal("empty file")
+	}
+}

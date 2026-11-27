@@ -26,6 +26,15 @@ type Plan struct {
 	// preset has them off, and groups switched off although the preset has them on.
 	GroupsOn  []string `json:"groups_on"`
 	GroupsOff []string `json:"groups_off"`
+
+	// Inline ("Block as it happens"): packets the firewall has accepted between the chosen inside
+	// ports and the internet are held in a queue until the engine says pass or drop.
+	Inline        bool     `json:"inline"`
+	InlineIfaces  []string `json:"inline_ifaces"` // inside ports that are checked
+	WANIfaces     []string `json:"wan_ifaces"`    // internet ports
+	BlockGroups   []string `json:"block_groups"`  // groups whose rules drop instead of alert
+	AlertOnlySIDs []int    `json:"alert_only"`    // single rules kept at alert only
+	NeverCheck    []string `json:"never_check"`   // addresses and networks that are never queued
 }
 
 const (
@@ -69,8 +78,31 @@ func (p *Plan) Check() error {
 			return errors.New("a rule number is not valid")
 		}
 	}
-	if p.Enabled && len(p.Ifaces) == 0 {
+	if p.Enabled && !p.Inline && len(p.Ifaces) == 0 {
 		return errors.New("there is no inside port to watch")
+	}
+	if p.Inline {
+		if !p.Enabled {
+			return errors.New("inline blocking needs threat watching to be on")
+		}
+		if len(p.InlineIfaces) == 0 || len(p.WANIfaces) == 0 {
+			return errors.New("choose at least one network to check, and an internet connection must be set up")
+		}
+		for _, g := range p.BlockGroups {
+			if !KnownGroup(g) {
+				return errors.New("a group of checks is not known")
+			}
+		}
+		for _, a := range p.NeverCheck {
+			if _, err := parseNet(a); err != nil {
+				return fmt.Errorf("%q is not an address or network", a)
+			}
+		}
+		for _, i := range append(append([]string{}, p.InlineIfaces...), p.WANIfaces...) {
+			if !reIface.MatchString(i) {
+				return fmt.Errorf("%q is not a usable port name", i)
+			}
+		}
 	}
 	for _, i := range p.Ifaces {
 		if !reIface.MatchString(i) {
@@ -110,6 +142,9 @@ detect:
 // the engine then refuses every later start with "pid file exists but appears stale". systemd already
 // knows the process, so no pid file is needed.
 func Unit(p Plan) string {
+	if p.Inline {
+		return inlineUnit(p)
+	}
 	var args strings.Builder
 	for _, i := range p.Ifaces {
 		args.WriteString(" -i " + i)

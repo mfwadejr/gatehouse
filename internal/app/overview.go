@@ -788,8 +788,13 @@ func (a *App) registerOverviewRoutes() {
 			a.Logs.QueryRow(`SELECT COUNT(*) FROM fw_events WHERE action='drop' AND ts>=?`, time.Now().Add(-24*time.Hour).Unix()).Scan(&blocked)
 			a.Config.QueryRow(`SELECT COUNT(*) FROM nat_forwards WHERE enabled=1`).Scan(&forwards)
 			loud, odd, loudDevs := a.threatToday()
+			inline := map[string]any{"on": false}
+			if a.threatInline() {
+				st, txt := a.inlineState(time.Now())
+				inline = map[string]any{"on": true, "state": st, "text": txt}
+			}
 			return map[string]any{"blocked_24h": blocked, "open_ports": forwards, "threat_on": a.threatMode() == "watch",
-				"threat_alerts_24h": loud, "threat_odd_24h": odd, "threat_devices_24h": loudDevs}
+				"threat_alerts_24h": loud, "threat_odd_24h": odd, "threat_devices_24h": loudDevs, "inline": inline}
 		}))
 	})
 	a.registerHomeAndHappened()

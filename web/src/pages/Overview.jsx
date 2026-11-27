@@ -631,6 +631,7 @@ function AttentionArea({ c, stamp, fold, items }) {
             {needs.length > 0 && <div className="attnlabel">Needs your attention</div>}
             {needs.map((a) => row(a, <>
               {open(a)}
+              {a.act === 'inline-off' && <button className="btn small" onClick={() => put('/api/threat/settings', { mode: 'watch' }).catch(() => {})}>Back to Watch only</button>}
               {a.level === 'warn' && (asking === a.id
                 ? <><button className="btn small" onClick={() => { c.snooze(a, SNOOZES.day); setAsking(null); }}>In a day</button><button className="btn small" onClick={() => { c.snooze(a, SNOOZES.week); setAsking(null); }}>In a week</button></>
                 : <button className="btn small" onClick={() => setAsking(a.id)}>Remind me later</button>)}

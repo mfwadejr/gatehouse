@@ -162,12 +162,14 @@ type threatGroup struct {
 	First     int64  `json:"first"`
 	Last      int64  `json:"last"`
 	Severity  int    `json:"severity"`
+	Local     string `json:"local,omitempty"` // the address on your own network
+	Blocked   int    `json:"blocked"` // how many of the alerts were dropped by the engine (inline)
 }
 
 // threatGroups folds the recent alerts into one row per device, rule and remote address.
 func (a *App) threatGroups(limit int) []threatGroup {
 	label := a.deviceLabeler()
-	rows, err := a.Logs.Query(`SELECT ts,sid,signature,category,severity,src,dst,dport,proto,mac,dir FROM threat_alerts ORDER BY id DESC LIMIT 1000`)
+	rows, err := a.Logs.Query(`SELECT ts,sid,signature,category,severity,src,dst,dport,proto,mac,dir,action FROM threat_alerts ORDER BY id DESC LIMIT 1000`)
 	if err != nil {
 		return []threatGroup{}
 	}
@@ -176,9 +178,9 @@ func (a *App) threatGroups(limit int) []threatGroup {
 	var order []*threatGroup
 	for rows.Next() {
 		var ts, sid int64
-		var sig, cat, src, dst, proto, mac, dir string
+		var sig, cat, src, dst, proto, mac, dir, act string
 		var sev, port int
-		if rows.Scan(&ts, &sid, &sig, &cat, &sev, &src, &dst, &port, &proto, &mac, &dir) != nil {
+		if rows.Scan(&ts, &sid, &sig, &cat, &sev, &src, &dst, &port, &proto, &mac, &dir, &act) != nil {
 			continue
 		}
 		local, remote := src, dst
@@ -195,7 +197,7 @@ func (a *App) threatGroups(limit int) []threatGroup {
 			dev := label(mac, local)
 			g = &threatGroup{Key: key, SID: sid, Kind: kind, Quiet: kind == threatKindOdd || kind == threatKindPolicy,
 				Title: threatTitle(kind, sig, dev, dir), Explain: threatExplain(kind), Signature: sig, Device: dev, MAC: strings.ToLower(mac),
-				Remote: remote, Port: port, Proto: proto, Last: ts, First: ts, Severity: sev}
+				Remote: remote, Local: local, Port: port, Proto: proto, Last: ts, First: ts, Severity: sev}
 			switch dir {
 			case "out":
 				g.Started = "device"
@@ -208,6 +210,9 @@ func (a *App) threatGroups(limit int) []threatGroup {
 			order = append(order, g)
 		}
 		g.Count++
+		if act == "blocked" {
+			g.Blocked++
+		}
 		if ts < g.First {
 			g.First = ts
 		}

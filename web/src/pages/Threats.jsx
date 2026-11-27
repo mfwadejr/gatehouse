@@ -1,6 +1,7 @@
 import { useHashTab } from '../hashtab.js';
 import React, { useEffect, useState } from 'react';
 import { del, post, put, get, useData } from '../api.js';
+import ThreatInline from './ThreatInline.jsx';
 import { ScheduleEditor } from '../ScheduleEditor.jsx';
 import { Chart, fmtBits } from '../charts.jsx';
 import { usePeriod } from '../period.js';
@@ -63,11 +64,11 @@ function ModeCard({ data, reload }) {
   const [pending, setPending] = useState(null);
   const p = data.program || {};
   const watching = data.mode === 'watch';
-  const current = data.block ? 'protect' : data.mode;
+  const current = data.inline ? 'inline' : data.block ? 'protect' : data.mode;
   return (
     <Card title="Threat watching" desc="Watches for infected devices, break-in attempts and probing, and tells you in plain words.">
       <div className="stack">
-        <Segmented value={pending || current} onChange={(v) => { if (v === current || busy) return; setPending(v); run(() => put('/api/threat/settings', { mode: v }), v === 'protect' ? 'Watching and blocking is on.' : v === 'watch' ? 'Watching is on.' : 'Watching is off.').then(reload).finally(() => setPending(null)); }} options={[{ value: 'off', label: 'Off' }, { value: 'watch', label: 'Watch and tell' }, { value: 'protect', label: 'Watch and block' }]} disabled={busy || p.state === 'installing' || p.state === 'removing'} />
+        <Segmented value={pending || current} onChange={(v) => { if (v === current || busy) return; setPending(v); run(() => put('/api/threat/settings', { mode: v }), v === 'inline' ? 'Blocking as it happens is on.' : v === 'protect' ? 'Watching and blocking is on.' : v === 'watch' ? 'Watching is on.' : 'Watching is off.').then(reload).finally(() => setPending(null)); }} options={[{ value: 'off', label: 'Off' }, { value: 'watch', label: 'Watch and tell' }, { value: 'protect', label: 'Watch and block' }, { value: 'inline', label: 'Block as it happens' }]} disabled={busy || p.state === 'installing' || p.state === 'removing'} />
         {pending && (
           <div className="inline small" role="status" aria-live="polite"><span className="spinner" aria-hidden="true" /><span><b>Working on it.</b> {pending === 'off' ? 'Stopping the watching program' : 'Starting the watching program and checking its rules'}. <span className="muted">This can take a few seconds.</span></span></div>
         )}
@@ -75,7 +76,7 @@ function ModeCard({ data, reload }) {
         {watching && !p.running && <Note tone={p.failing ? 'bad' : 'warn'} title={p.failing ? 'The program keeps failing' : 'The program is not running'}>{p.why} Your traffic is not affected. See Advanced, Program log, or Diagnostics in the left menu.</Note>}
         {p.state === 'updating' && <Note>Updating the rules. {p.message}</Note>}
         {p.state === 'failed' && p.installed && <Note tone="warn">{p.message}</Note>}
-        <p className="small muted">{data.blocking} {!data.block && data.fail_open} {data.limits}</p>
+        <p className="small muted">{data.inline ? 'Block as it happens checks traffic the firewall lets through and drops what matches a rule set to Block. If the checks stop or cannot keep up, traffic passes unchecked and your internet keeps working.' : data.blocking} {!data.block && !data.inline && data.fail_open} {data.limits}</p>
         {data.block && <BlockList minutes={data.block_minutes} reload={reload} />}
       </div>
     </Card>
@@ -157,7 +158,7 @@ function BlockList({ minutes, reload }) {
 
 // One card for each kind of alert on each device: how many times, over what time, and one set of
 // buttons. The addresses involved are folded away under "Show the N addresses".
-function AlertCard({ g, days, busy, run, reload }) {
+function AlertCard({ g, days, busy, run, reload, inline }) {
   const [open, setOpen] = useState(false);
   const [names, setNames] = useState({});
   const first = g.rows[0];
@@ -215,6 +216,9 @@ function AlertCard({ g, days, busy, run, reload }) {
       <div className="actions alertacts">
         <Button small disabled={busy} onClick={() => allow(first.mac, 'This will not alert again for this device.')} title="Let this through for this device">Allow for this device</Button>
         <Button small disabled={busy} onClick={() => allow('', 'This will not alert again.')}>Allow for all</Button>
+        {inline && first.blocked > 0 && <Pill tone="good">Blocked{first.blocked > 1 ? ` ×${first.blocked}` : ''}</Pill>}
+        {inline && <Button small disabled={busy} onClick={() => run(async () => { for (const sid of sids) await post('/api/threat/inline/stop-blocking', { sid }); return true; }, 'This check now only alerts.').then(reload)} title="Keep alerting about this check, but stop dropping its traffic">Stop blocking this</Button>}
+        {inline && first.local && <Button small disabled={busy} onClick={() => run(() => post('/api/threat/inline/never', { addr: first.local }), `${first.local} will not be checked.`).then(reload)} title="Skip this device when checking traffic">Never check this address</Button>}
         {first.mac && !first.quiet && <Button small disabled={busy} onClick={() => run(() => post('/api/threat/trust', { mac: first.mac }), `${first.device} will not be checked.`).then(reload)} title={`Never check ${first.device}`}>Never check this device</Button>}
       </div>
     </div>
@@ -237,13 +241,13 @@ function Alerts({ data, reload }) {
   const quiet = all.filter((x) => x.quiet);
   return (
     <div className="list">
-      <AlertGroups rows={loud} days={days} busy={busy} run={run} reload={reload} />
+      <AlertGroups rows={loud} days={days} busy={busy} run={run} reload={reload} inline={data.inline} />
       {!loud.length && <Empty>Nothing suspicious has been seen.</Empty>}
       {quiet.length > 0 && (
         <div>
           <button className="link small" onClick={() => setShowQuiet(!showQuiet)}>{showQuiet ? 'Hide' : 'Show'} odd network behaviour and usually harmless traffic ({quiet.length})</button>
           <p className="small muted">The engine noticed unusual packets. This is common and almost never a threat, so it is kept out of the way.</p>
-          {showQuiet && <AlertGroups rows={quiet} days={days} busy={busy} run={run} reload={reload} />}
+          {showQuiet && <AlertGroups rows={quiet} days={days} busy={busy} run={run} reload={reload} inline={data.inline} />}
         </div>
       )}
       <Field label="Allowing lasts"><Segmented value={days} onChange={setDays} options={[{ value: '0', label: 'Until I remove it' }, { value: '7', label: '7 days' }, { value: '1', label: '1 day' }]} /></Field>
@@ -261,6 +265,7 @@ function Settings({ data, reload }) {
   return (
     <div className="stack">
       <ModeCard data={data} reload={reload} />
+      {data.inline && <ThreatInline reload={reload} />}
       <Card title="How closely to watch" desc="A lighter setting looks for fewer things and uses less of the machine.">
         <div className="list" id="threat-presets">
           {(data.presets || []).map((x) => (

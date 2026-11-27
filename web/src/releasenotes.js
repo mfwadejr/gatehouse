@@ -1,6 +1,15 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.76',
+    title: 'Block as it happens',
+    items: [
+      'Threats, Settings: a fourth choice, Block as it happens. Traffic the firewall lets through between your networks and the internet is checked on its way, and a packet that matches a check set to Block is dropped before it arrives, instead of blocking the address after the first packets got through.',
+      'Each group of checks is Off, Alert or Block. Only known malware, exploit attempts and exploit kits block to start with; scans, policy, peer-to-peer and the rest start on Alert, and address lists never block. On an alert, Stop blocking this and Never check this address undo a single choice, and Changes you made lists them with Undo.',
+      'It fails open: if the checks stop or cannot keep up, traffic passes unchecked and your internet keeps working. The page says Keeping up or Falling behind, warns if the machine looks too small (under 2 cores or 4 GB, or a virtual machine), and the Overview shows a red notice with Back to Watch only if checking stops. A harmless Try it address proves blocking works.',
+    ],
+  },
+  {
     version: '0.9.4.75',
     title: 'Backup copies to a USB drive, SFTP and SMB, and Both by default',
     items: [
