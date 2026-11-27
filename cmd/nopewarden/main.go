@@ -460,6 +460,18 @@ func recoverCmd(args []string) {
 			defer fixOwner()
 			return svc.SetPassword(u.ID, pw)
 		},
+		CheckPassword: func(name, pw string) error {
+			if err := open(); err != nil {
+				return err
+			}
+			return svc.CheckNewPassword(pw, name)
+		},
+		PasswordRules: func() string {
+			if err := open(); err != nil {
+				return "at least 8 characters"
+			}
+			return svc.Policy().Describe()
+		},
 		ClearTwoStep: func(name string) error {
 			if err := open(); err != nil {
 				return err

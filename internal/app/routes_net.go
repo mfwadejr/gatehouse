@@ -61,6 +61,11 @@ type NetController interface {
 	ThreatApply(p threatcfg.Plan) error
 	ThreatUpdateRules() error
 	ThreatRollback() error
+	LCDStatus() netd.LCDInfo
+	LCDDetect() (netd.LCDFacts, error)
+	LCDInstallStart() error
+	LCDRemove() error
+	LCDApply(p netd.LCDPlan) error
 	DiagServices() []netd.DiagService
 	DiagLog(unit string, lines int) (string, error)
 	DiagRestart(unit string) error

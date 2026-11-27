@@ -707,6 +707,38 @@ export class Guard extends React.Component {
   }
 }
 
+// usePasswordRules fetches the box's password rules and gives back a checker, so every place that asks
+// for a new password shows the same rules the server enforces. problem(pw) is the first rule broken, or ''.
+export function usePasswordRules() {
+  const { data } = useData('/api/auth/password-rules');
+  return useMemo(() => {
+    const p = data?.policy || { min: 8, upper: false, lower: false, digit: false, symbol: false, common: true };
+    const lines = (pw) => {
+      const v = pw || '';
+      const out = [{ ok: [...v].length >= p.min, text: `At least ${p.min} characters${v ? ` (${[...v].length} so far)` : ''}` }];
+      if (p.upper) out.push({ ok: /\p{Lu}/u.test(v), text: 'A capital letter' });
+      if (p.lower) out.push({ ok: /\p{Ll}/u.test(v), text: 'A small letter' });
+      if (p.digit) out.push({ ok: /\p{Nd}/u.test(v), text: 'A number' });
+      if (p.symbol) out.push({ ok: /[^\p{L}\p{Nd}]/u.test(v), text: 'A symbol such as ! or #' });
+      return out;
+    };
+    const problem = (pw) => { const bad = lines(pw).find((l) => !l.ok); return bad ? bad.text : ''; };
+    return { policy: p, text: data?.text || `at least ${p.min} characters`, lines, problem, ok: (pw) => !problem(pw) };
+  }, [data]);
+}
+
+// PasswordRules shows the rules as a checklist that ticks off while the person types.
+export function PasswordRules({ rules, pw }) {
+  return (
+    <ul className="small" style={{ listStyle: 'none', margin: 0, padding: 0 }} aria-live="polite">
+      {rules.lines(pw).map((l) => (
+        <li key={l.text} className={l.ok ? 'goodtext' : 'muted'}>{l.ok ? '\u2713' : '\u25CB'} {l.text}</li>
+      ))}
+      {rules.policy.common && <li className="muted">{'\u25CB'} Not one of the very common passwords</li>}
+    </ul>
+  );
+}
+
 // usePortNames gives back a function that turns a port name (enp0s20f0) into what the person
 // called it, "T-Mobile gateway (enp0s20f0)", or the plain port name when it has no friendly name.
 export function usePortNames() {

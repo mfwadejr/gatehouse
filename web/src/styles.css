@@ -583,6 +583,7 @@ mark { background: color-mix(in srgb, var(--color-status-warning) 35%, transpare
 .gap1 { gap: var(--space-1); }
 .gap2 { gap: var(--space-2); }
 .errtext { color: var(--color-status-bad); }
+.goodtext { color: var(--color-status-good); }
 .leftalign { text-align: left; }
 .endalign { justify-content: flex-end; }
 .startalign { align-items: flex-start; }
@@ -913,3 +914,7 @@ button.tag:hover { color: var(--color-text-primary); border-color: var(--color-b
 @keyframes ftnew { from { background: var(--color-state-hover); } to { background: transparent; } }
 .livefeed .lf-row .lf-who, .livefeed .lf-row .lf-name { white-space: normal; }
 .livefeed .lf-row > :last-child { justify-self: end; }
+
+/* The front panel display, drawn as the panel is. */
+.lcdpic { display: inline-block; margin: 0; padding: .6rem .8rem; background: var(--color-bg-inset); color: var(--color-text-primary); border: var(--border-width-thin) solid var(--color-border-default); border-radius: var(--radius-sm); font-family: var(--font-family-mono); font-size: var(--font-size-md); line-height: 1.35; letter-spacing: .05em; }
+.lcdreport { max-height: 18rem; overflow: auto; white-space: pre-wrap; font-family: var(--font-family-mono); font-size: var(--font-size-sm); }

@@ -12,7 +12,7 @@ Administrators see every tab. Other accounts see only their own sign-in settings
 
 - **General** holds **Finish setting up** (only while something is left), **Common setups** (step-by-step guides, folded; **Show the guides** opens them), **Device mode** (Router or Bridge), **Power** (restart or shut down), **Your place on the map** and **Appearance**.
 - **Managing this device** holds everything about how you reach this box: **Management port**, **Who may manage this device** (with **Test my access**), **Console address** and **Remote login**.
-- **Account & sign-in** holds **Two-factor sign-in**, **Password** and **Where you are signed in**. The round arrow at the bottom of the left menu signs you out of this browser straight away.
+- **Account & sign-in** holds **Two-factor sign-in**, **Password**, **Password rules** and **Where you are signed in**. The round arrow at the bottom of the left menu signs you out of this browser straight away.
 - **Alerts & logs** holds **Alerts** (a phone message through ntfy, or email, with **More: quiet hours** folded under it) and a folded **Send data to other tools**. That folded part has **Send logs elsewhere**, **Send traffic records (NetFlow / IPFIX)** and SNMP. These only send data out. They keep nothing here.
 - **Storage** shows everything NopeWarden keeps on its own disk and for how long. See below.
 - **Backup & recovery** holds **Backups** and **Changes**. See below.
@@ -54,6 +54,14 @@ You cannot lock yourself out. NopeWarden refuses to save a limit that does not i
 - **Send logs elsewhere** copies NopeWarden's events to a syslog server you run, such as a NAS or a log tool. Enter its address and port, switch it on, and watch the card for the last send. It is off by default, and a server that is down never slows the firewall.
 - **Send traffic records (NetFlow / IPFIX)** tells a traffic-analysis tool which devices talked to which, and how much. Only the collector you name receives it. Off by default.
 - **Let a monitoring tool read this device (SNMP)** is read-only. It shows the name, uptime and each port's traffic to a tool such as a graphing server. Off by default. Set a community string before you switch it on.
+
+## Password rules
+
+**Password rules** (Account & sign-in, owners only) sets the rules for every new password NopeWarden accepts: sign-in, the backup file and the copies sent off this machine. The shortest password is 8 characters unless you raise it (up to 64). You can also require a capital letter, a small letter, a number and a symbol; these are off by default, because a longer password does more than forced symbols. **Refuse very common passwords** is on by default. Passwords do not expire, and passwords already set keep working until they are next changed. When a password is refused, the message names the rule it did not meet. Passwords for other services that NopeWarden only stores to sign in there are not judged.
+
+## Front panel display
+
+Many appliances have a small text display and some buttons on the front. Under **Advanced**, **Front panel display** can use it. The display program (LCDproc) is an extra, installed only when you press **Install the display program**, and removed with **Remove the display program**. **Detect my display** looks at the machine's make, USB, serial and I2C ports and says what it found, how sure it is and how many buttons it has; **Copy** sends the whole report to the clipboard. Choose the display type and its settings, then **Test the display**: it draws rows and columns, every character, the built-in symbols and the backlight on the real display without saving anything, and shows each button as you press it so you can choose what it does. Save with **Show things on the front panel** on. It shows the name and version, internet speed, each network, DHCP addresses in use, the machine's load and alerts, a few seconds each. A picture of the display is shown in the console.
 
 ## Advanced
 - **High availability** runs two NopeWarden machines as a pair. One is active. If it fails, the other takes over within seconds and devices keep their addresses. Bridge mode and a pair cannot be used together yet.

@@ -263,6 +263,11 @@ func (f *fakeNetCtl) ThreatInstallPreview() (netd.ThreatPreview, error) {
 }
 func (f *fakeNetCtl) ThreatInstallStart() error            { return nil }
 func (f *fakeNetCtl) ThreatRemove() error                  { return nil }
+func (f *fakeNetCtl) LCDStatus() netd.LCDInfo              { return netd.LCDInfo{Installed: true, State: "idle"} }
+func (f *fakeNetCtl) LCDDetect() (netd.LCDFacts, error)    { return netd.LCDFacts{Vendor: "Test"}, nil }
+func (f *fakeNetCtl) LCDInstallStart() error               { return nil }
+func (f *fakeNetCtl) LCDRemove() error                     { return nil }
+func (f *fakeNetCtl) LCDApply(p netd.LCDPlan) error        { return p.Check() }
 func (f *fakeNetCtl) ThreatApply(p threatcfg.Plan) error   { f.threat = p; return nil }
 func (f *fakeNetCtl) ThreatUpdateRules() error             { return nil }
 func (f *fakeNetCtl) ThreatRollback() error                { return nil }

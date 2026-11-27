@@ -3,7 +3,7 @@ import MapLocation from './MapLocation.jsx';
 import { useTheme } from '../theme.js';
 import React, { useEffect, useState } from 'react';
 import { del, get, post, put, useData } from '../api.js';
-import { Guard, Button, Card, Empty, Field, Form, Input, Modal, Note, Page, Pill, Segmented, Select, Tabs, ToggleRow, useAction, useCheck, CheckLine, fmt, useStepUp, useToast, DangerStep, CodeInput } from '../ui.jsx';
+import { Guard, Button, Card, Empty, Field, Form, Input, Modal, Note, Page, Pill, Segmented, Select, Tabs, ToggleRow, useAction, useCheck, CheckLine, fmt, useStepUp, useToast, DangerStep, CodeInput, usePasswordRules, PasswordRules } from '../ui.jsx';
 import { Enrol } from './Auth.jsx';
 import Backups from './Backups.jsx';
 import Changes from './Changes.jsx';
@@ -17,21 +17,47 @@ import MgmtPort from './MgmtPort.jsx';
 import ManageAccess from './ManageAccess.jsx';
 import HighAvailability from './HighAvailability.jsx';
 import RemoteLogin from './RemoteLogin.jsx';
+import FrontPanel from './FrontPanel.jsx';
 import Alerts from './Alerts.jsx';
 import { PowerModal, useReconnect } from './PowerModal.jsx';
 
+function PasswordPolicy() {
+  const { data, reload } = useData('/api/auth/password-rules');
+  const [run, busy] = useAction();
+  const p = data?.policy;
+  if (!p) return null;
+  const save = (patch) => run(() => put('/api/auth/password-rules', { ...p, ...patch }), 'Saved.').then(reload);
+  return (
+    <Card title="Password rules" desc="The rules for every new password: sign-in, the backup file and the copies sent off this machine. A longer password does more than forced symbols, so a few unrelated words is a good choice. Passwords already set keep working until they are next changed. Passwords do not expire.">
+      <div className="stack">
+        <Field label="Shortest password" hint="From 8 to 64 characters.">
+          <div style={{ width: '9rem' }}><Select value={String(p.min)} onChange={(v) => save({ min: Number(v) })} options={[8, 10, 12, 14, 16, 20, 24, 32, 48, 64].map((n) => ({ value: String(n), label: `${n} characters` }))} /></div>
+        </Field>
+        <ToggleRow title="Needs a capital letter" checked={p.upper} onChange={(v) => save({ upper: v })} />
+        <ToggleRow title="Needs a small letter" checked={p.lower} onChange={(v) => save({ lower: v })} />
+        <ToggleRow title="Needs a number" checked={p.digit} onChange={(v) => save({ digit: v })} />
+        <ToggleRow title="Needs a symbol" desc="Such as ! or #." checked={p.symbol} onChange={(v) => save({ symbol: v })} />
+        <ToggleRow title="Refuse very common passwords" desc="Turns away passwords such as Password1! that are tried first by anyone guessing." checked={p.common} onChange={(v) => save({ common: v })} />
+        <p className="small muted">Rules now: {data.text}.</p>
+      </div>
+    </Card>
+  );
+}
+
 function Password() {
+  const rules = usePasswordRules();
   const [f, setF] = useState({ current: '', next: '', again: '' });
   const [run, busy] = useAction();
   const mismatch = f.next && f.again && f.next !== f.again;
   return (
-    <Card enter title="Password" desc="Use at least 12 characters. A few random words is easy to remember and hard to guess.">
+    <Card enter title="Password" desc={`Use ${rules.text}. A few random words is easy to remember and hard to guess.`}>
       <div className="formgrid">
         <Field label="Current password"><Input type="password" value={f.current} onChange={(v) => setF({ ...f, current: v })} autoComplete="current-password" /></Field>
         <Field label="New password"><Input type="password" value={f.next} onChange={(v) => setF({ ...f, next: v })} autoComplete="new-password" /></Field>
         <Field label="New password again" hint={mismatch ? 'These do not match.' : undefined}><Input type="password" value={f.again} onChange={(v) => setF({ ...f, again: v })} autoComplete="new-password" /></Field>
       </div>
-      <div className="actions"><Button kind="primary" disabled={busy || !f.current || !f.next || mismatch} onClick={async () => { if (await run(() => post('/api/auth/password', { current: f.current, new: f.next }), 'Password changed. Other sessions were signed out.')) setF({ current: '', next: '', again: '' }); }}>Change password</Button></div>
+      {f.next && <PasswordRules rules={rules} pw={f.next} />}
+      <div className="actions"><Button kind="primary" disabled={busy || !f.current || !f.next || mismatch || !rules.ok(f.next)} onClick={async () => { if (await run(() => post('/api/auth/password', { current: f.current, new: f.next }), 'Password changed. Other sessions were signed out.')) setF({ current: '', next: '', again: '' }); }}>Change password</Button></div>
     </Card>
   );
 }
@@ -308,6 +334,7 @@ export default function Settings({ me, reloadMe }) {
         <>
           <TwoStep me={me} data={data} reload={reload} boot={reloadMe} />
           <Password />
+          {admin && <PasswordPolicy />}
           <Sessions />
         </>
       )}
@@ -334,6 +361,7 @@ export default function Settings({ me, reloadMe }) {
         <>
           <div id="set-ha"><Guard what="High availability"><HighAvailability me={me} /></Guard></div>
           <Guard what="Bridge mode"><BridgeMode /></Guard>
+          <div id="set-lcd"><Guard what="Front panel display"><FrontPanel /></Guard></div>
         </>
       )}
       {(!admin || tab === 'general') && <Appearance />}

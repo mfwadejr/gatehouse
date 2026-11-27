@@ -37,6 +37,11 @@ type fakeNet struct {
 	shut    []bool          // clean shutdowns asked for, with whether the UPS was told to cut its output
 	tests   []string        // self-tests asked for, as "drive:kind"
 
+	lcd      netd.LCDInfo  // the front panel display software, as the demo console shows it
+	lcdFacts netd.LCDFacts // what a Detect finds
+	lcdErr   error
+	lcdPlan  netd.LCDPlan // the last plan applied
+
 	vpn      netd.VPNPlan
 	vpnCalls int
 	upnp     []netd.UPnPMapping
@@ -151,6 +156,34 @@ func (f *fakeNet) SQMApply(p netd.SQMPlan) (string, error) {
 	}
 	return "cake", nil
 }
+func (f *fakeNet) LCDStatus() netd.LCDInfo { return f.lcd }
+func (f *fakeNet) LCDDetect() (netd.LCDFacts, error) {
+	return f.lcdFacts, f.lcdErr
+}
+func (f *fakeNet) LCDInstallStart() error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.lcd.Installed = true
+	f.lcd.Drivers = []string{"CFontz633", "hd44780"}
+	return nil
+}
+func (f *fakeNet) LCDRemove() error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.lcd = netd.LCDInfo{}
+	return nil
+}
+func (f *fakeNet) LCDApply(p netd.LCDPlan) error {
+	if err := p.Check(); err != nil {
+		return err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.lcdPlan = p
+	f.lcd.Running = p.Enabled
+	return nil
+}
+
 func (f *fakeNet) ThreatStatus() netd.ThreatInfo {
 	f.mu.Lock()
 	defer f.mu.Unlock()

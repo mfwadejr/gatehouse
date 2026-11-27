@@ -117,6 +117,10 @@ func TestDemoConsole(t *testing.T) {
 			c.call("POST", "/api/dns/records", map[string]any{"name": r[0], "type": "A", "value": r[1], "ttl": 300})
 		}
 	}
+	fn.mu.Lock() // a front panel display, so its screen has something to show
+	fn.lcd = netd.LCDInfo{Installed: true, Drivers: []string{"CFontz633", "hd44780", "sdeclcd"}}
+	fn.lcdFacts = netd.LCDFacts{Vendor: "Example Appliances", Product: "FW-1000", Matches: []netd.LCDMatch{{Driver: "hd44780", Settings: map[string]string{"ConnectionType": "4bit", "Size": "20x2"}, Sure: "guess", Why: "A 20 x 2 text display is usual on this make of box.", Keys: 0}}, Report: "Make: Example Appliances FW-1000\nUSB: none\nSerial: none"}
+	fn.mu.Unlock()
 	fmt.Println("DEMO READY", scene, c.base)
 	time.Sleep(time.Duration(envInt("NW_SECONDS", 600)) * time.Second)
 }

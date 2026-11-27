@@ -67,6 +67,11 @@ type NetController interface {
 	ThreatApply(p threatcfg.Plan) error
 	ThreatUpdateRules() error
 	ThreatRollback() error
+	LCDStatus() netd.LCDInfo
+	LCDDetect() (netd.LCDFacts, error)
+	LCDInstallStart() error
+	LCDRemove() error
+	LCDApply(p netd.LCDPlan) error
 	DiagServices() []netd.DiagService
 	DiagLog(unit string, lines int) (string, error)
 	DiagRestart(unit string) error
@@ -422,6 +427,20 @@ func (s *Server) dispatchNet(r request) (any, error) {
 		return nil, s.Net.UsbCopy(p.UUID, p.Src, p.Name, p.Keep)
 	case "ndpi.installed":
 		return s.Net.NDPIInstalled(), nil
+	case "lcd.status":
+		return s.Net.LCDStatus(), nil
+	case "lcd.detect":
+		return s.Net.LCDDetect()
+	case "lcd.install":
+		return nil, s.Net.LCDInstallStart()
+	case "lcd.remove":
+		return nil, s.Net.LCDRemove()
+	case "lcd.apply":
+		var p netd.LCDPlan
+		if err := json.Unmarshal(r.Params, &p); err != nil {
+			return nil, errors.New("bad parameters")
+		}
+		return nil, s.Net.LCDApply(p)
 	case "threat.status":
 		return s.Net.ThreatStatus(), nil
 	case "threat.preview":
@@ -816,6 +835,31 @@ func (c *Client) UsbList() ([]netd.UsbDisk, error) {
 // UsbCopy copies a backup file onto a USB drive.
 func (c *Client) UsbCopy(uuid, src, name string, keep int) error {
 	return c.callWithin(5*time.Minute, "usb.copy", map[string]any{"uuid": uuid, "src": src, "name": name, "keep": keep}, nil)
+}
+
+// LCDStatus describes the front panel display software.
+func (c *Client) LCDStatus() netd.LCDInfo {
+	var out netd.LCDInfo
+	c.call("lcd.status", nil, &out)
+	return out
+}
+
+// LCDDetect looks for a front panel display and reports what the machine shows.
+func (c *Client) LCDDetect() (netd.LCDFacts, error) {
+	var out netd.LCDFacts
+	err := c.callWithin(2*time.Minute, "lcd.detect", nil, &out)
+	return out, err
+}
+
+// LCDInstallStart installs the display software in the background.
+func (c *Client) LCDInstallStart() error { return c.call("lcd.install", nil, nil) }
+
+// LCDRemove takes the display software out.
+func (c *Client) LCDRemove() error { return c.callWithin(15*time.Minute, "lcd.remove", nil, nil) }
+
+// LCDApply switches the display on or off with the given settings.
+func (c *Client) LCDApply(p netd.LCDPlan) error {
+	return c.callWithin(2*time.Minute, "lcd.apply", p, nil)
 }
 
 // ThreatStatus describes the optional threat-watching engine.

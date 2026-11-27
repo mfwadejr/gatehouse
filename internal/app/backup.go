@@ -921,8 +921,8 @@ func (a *App) registerBackupRoutes() {
 		if !api.Decode(w, r, &in) {
 			return
 		}
-		if len(in.Password) < 8 {
-			fail(w, errors.New("use a password of at least 8 characters"))
+		if err := a.Auth.Policy().Check(in.Password, ""); err != nil {
+			fail(w, err)
 			return
 		}
 		raw, err := os.ReadFile(p)

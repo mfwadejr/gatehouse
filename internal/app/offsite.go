@@ -510,8 +510,8 @@ func (a *App) registerOffsiteRoutes() {
 		out := old
 		out.Keep, out.RemindOn, out.RemindDays = in.Keep, in.RemindOn, in.RemindDays
 		if pw.Password != "" {
-			if len(pw.Password) < 8 {
-				fail(w, errors.New("the copy password needs at least 8 characters"))
+			if err := a.Auth.Policy().Check(pw.Password, ""); err != nil {
+				fail(w, err)
 				return
 			}
 			out.Password = a.Box.Seal(pw.Password)

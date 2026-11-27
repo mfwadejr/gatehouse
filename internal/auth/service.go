@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -106,7 +107,7 @@ func (s *Service) CreateUser(username, password, role string) (User, error) {
 	if username == "" || len(username) > 64 {
 		return User{}, errors.New("username must be 1 to 64 characters")
 	}
-	if err := CheckPasswordPolicy(password, username); err != nil {
+	if err := s.CheckNewPassword(password, username); err != nil {
 		return User{}, err
 	}
 	h, err := HashPassword(password)
@@ -131,7 +132,7 @@ func (s *Service) SetPassword(userID int64, password string) error {
 	if err := s.db.QueryRow(`SELECT username FROM users WHERE id=?`, userID).Scan(&name); err != nil {
 		return err
 	}
-	if err := CheckPasswordPolicy(password, name); err != nil {
+	if err := s.CheckNewPassword(password, name); err != nil {
 		return err
 	}
 	h, err := HashPassword(password)
@@ -598,3 +599,43 @@ func (s *Service) ChangePassword(userID int64, current, next string) error {
 	}
 	return s.SetPassword(userID, next)
 }
+
+// Policy returns the box's password rules, from its settings.
+func (s *Service) Policy() Policy {
+	d := DefaultPolicy()
+	if s == nil || s.db == nil {
+		return d
+	}
+	n, err := strconv.Atoi(s.db.Setting("pw.min", ""))
+	if err != nil {
+		n = d.Min
+	}
+	b := func(k string, def bool) bool {
+		v := s.db.Setting(k, "")
+		if v == "" {
+			return def
+		}
+		return v == "1"
+	}
+	return Policy{Min: n, Upper: b("pw.upper", false), Lower: b("pw.lower", false), Digit: b("pw.digit", false), Symbol: b("pw.symbol", false), Common: b("pw.common", d.Common)}.Clean()
+}
+
+// SetPolicy stores the password rules.
+func (s *Service) SetPolicy(p Policy) error {
+	p = p.Clean()
+	o := func(v bool) string {
+		if v {
+			return "1"
+		}
+		return "0"
+	}
+	for k, v := range map[string]string{"pw.min": strconv.Itoa(p.Min), "pw.upper": o(p.Upper), "pw.lower": o(p.Lower), "pw.digit": o(p.Digit), "pw.symbol": o(p.Symbol), "pw.common": o(p.Common)} {
+		if err := s.db.SetSetting(k, v); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// CheckNewPassword checks a new password against the box's rules. The user name may be empty.
+func (s *Service) CheckNewPassword(pw, username string) error { return s.Policy().Check(pw, username) }

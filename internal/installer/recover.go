@@ -10,8 +10,12 @@ import (
 // RecoveryEnv is what the recovery screen can do. The command that starts it connects these to the
 // real account database and firewall.
 type RecoveryEnv struct {
-	Users         func() []string
-	SetPassword   func(name, password string) error
+	Users       func() []string
+	SetPassword func(name, password string) error
+	// CheckPassword says what is wrong with a new password under the box's rules; nil when it is fine.
+	CheckPassword func(name, password string) error
+	// PasswordRules is the rule in words, for the prompt.
+	PasswordRules func() string
 	ClearTwoStep  func(name string) error
 	ResetFirewall func() error
 	Diagnose      func() string // what is running and the last error lines
@@ -72,13 +76,22 @@ func RunRecovery(t *Term, env RecoveryEnv) error {
 			}
 			var pw string
 			for {
-				p1, err := t.password("New password (at least 12 characters)")
+				rules := "at least 8 characters"
+				if env.PasswordRules != nil {
+					rules = env.PasswordRules()
+				}
+				p1, err := t.password("New password (" + rules + ")")
 				if err != nil {
 					break
 				}
 				t.p("\n")
-				if len([]rune(p1)) < 12 {
-					t.p("  %sToo short: %d of the 12 characters needed.%s\n", red, len([]rune(p1)), reset)
+				if env.CheckPassword != nil {
+					if err := env.CheckPassword(name, p1); err != nil {
+						t.p("  %s%v.%s\n", red, err, reset)
+						continue
+					}
+				} else if len([]rune(p1)) < 8 {
+					t.p("  %sToo short: %d of the 8 characters needed.%s\n", red, len([]rune(p1)), reset)
 					continue
 				}
 				p2, err := t.password("Type it again")

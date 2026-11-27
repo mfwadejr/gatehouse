@@ -50,7 +50,7 @@ func sourceRoutes(t *testing.T, re *regexp.Regexp) []route {
 
 // Routes that are open on purpose: signing in, the health check, first-time setup.
 var openRoutes = map[string]bool{
-	"POST /api/auth/login": true, "POST /api/auth/mfa": true, "GET /api/health": true,
+	"POST /api/auth/login": true, "POST /api/auth/mfa": true, "GET /api/health": true, "GET /api/auth/password-rules": true,
 	"GET /api/install/info": true, "GET /api/setup": true, "POST /api/setup": true, "POST /api/auth/ssh-verify": true,
 }
 

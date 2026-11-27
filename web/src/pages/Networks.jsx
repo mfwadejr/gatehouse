@@ -7,6 +7,7 @@ import { NetworkLayout } from '../netlayout.jsx';
 import { SAVED_LATER, SaveChoice } from '../changes.jsx';
 import { confirmRemoval } from '../removal.js';
 import AddNetwork from '../AddNetwork.jsx';
+import NetworkEditor from '../NetworkEditor.jsx';
 import { ScopeForm } from './DHCP.jsx';
 import { usePortWatch } from './Internet.jsx';
 import { Button, Card, Empty, Field, Input, Modal, Note, Page, Pill, Select, ToggleRow, useAction, useToast, confirmBox, usePortNames } from '../ui.jsx';
@@ -44,117 +45,6 @@ function PortRow({ p, onSaved }) {
         <Pill tone={p.link ? 'good' : ''}>{p.link ? `Connected${p.speed > 0 ? ` · ${p.speed} Mb/s` : ''}` : 'No cable'}</Pill>
       </div>
     </div>
-  );
-}
-
-function EditNetwork({ n, zones, onClose, onSaved }) {
-  const pn = usePortNames();
-  const [f, setF] = useState({ ...n.iface });
-  const [run, busy] = useAction();
-  const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
-  const { data: sug } = useData('/api/networks/suggest');
-  const [port, setPort] = useState(n.iface.kind === 'vlan' ? n.iface.parent : n.iface.name);
-  const [vlan, setVlan] = useState(String(n.iface.vlan || ''));
-  const isBridge = n.iface.kind === 'bridge';
-  const { data: allPorts } = useData('/api/networks/suggest?all=1');
-  const [mem, setMem] = useState(n.iface.members || []);
-  const first = n.iface.members || [];
-  const dropped = first.filter((m) => !mem.includes(m));
-  const added = mem.filter((m) => !first.includes(m));
-  const tick = (name, on) => setMem((x) => (on ? [...x.filter((m) => m !== name), name] : x.filter((m) => m !== name)));
-  const why = (p) => {
-    if (mem.includes(p.name) || first.includes(p.name)) return '';
-    if (p.use === 'internet') return 'used for the internet';
-    if (p.use === 'bridge') return 'part of another network';
-    if (p.use === 'network') return 'has a network of its own';
-    return '';
-  };
-  const plain = n.iface.kind === 'phys';
-  const [extra, setExtra] = useState([]);
-  const tickExtra = (name, on) => setExtra((x) => (on ? [...x.filter((m) => m !== name), name] : x.filter((m) => m !== name)));
-  const addPorts = async () => {
-    const ok = await run(() => post('/api/networks/add-ports', { id: n.iface.id, ports: extra }), 'Saved. It goes live in a moment.');
-    if (ok) { onSaved(); onClose(); }
-  };
-  const movable = !isBridge;
-  const moved = movable && (port !== (n.iface.kind === 'vlan' ? n.iface.parent : n.iface.name) || Number(vlan || 0) !== (n.iface.vlan || 0));
-  const save = async (later) => {
-    const go = async () => {
-      await put('/api/net/interfaces', isBridge ? { ...f, members: mem } : f);
-      if (moved) await post('/api/networks/move', { id: n.iface.id, port, vlan: Number(vlan || 0) });
-    };
-    const ok = await run(later ? () => holdAnd(go) : go, later ? SAVED_LATER : 'Saved.');
-    if (ok) { onSaved(); onClose(); }
-  };
-  return (
-    <Modal title={`Edit ${n.title}`} onClose={onClose}
-      footer={<><Button onClick={onClose}>Cancel</Button><SaveChoice onSave={save} busy={busy} disabled={isBridge && mem.length === 0} /></>}>
-      <div className="stack">
-        <Field label="Address of this router on the network" hint="With the size, like 192.168.10.1/24. Devices here use it as their gateway.">
-          <Input value={f.ipv4 || ''} onChange={set('ipv4')} className="in mono" />
-        </Field>
-        <Field label="What it can reach" hint="The firewall network this belongs to. Change what each network can reach on the Firewall page.">
-          <Select value={String(f.zone_id || 0)} onChange={(v) => set('zone_id')(Number(v))} options={[{ value: '0', label: 'Not assigned yet' }, ...zones.map((z) => ({ value: String(z.id), label: z.name }))]} />
-        </Field>
-        <ToggleRow title="In use" desc="Turn off to switch the network off without deleting it." checked={f.enabled} onChange={set('enabled')} />
-        {isBridge && (
-          <Field label="Ports on this network" hint="Tick the ports that act as a switch for this network. Devices plugged into any ticked port share the same addresses. Nothing changes until you apply.">
-            <div className="stack">
-              {((allPorts && allPorts.ports) || []).map((p) => {
-                const reason = why(p);
-                const on = mem.includes(p.name);
-                return (
-                  <label key={p.name} className="small" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', opacity: reason ? 0.6 : 1 }}>
-                    <input type="checkbox" checked={on} disabled={!!reason} onChange={(e) => tick(p.name, e.target.checked)} />
-                    <span className="mono">{pn(p.name)}</span>
-                    <span className="muted">{p.link ? `cable connected${p.speed > 0 ? `, ${p.speed} Mb/s` : ''}` : 'no cable'}{reason ? ` · ${reason}` : on && !first.includes(p.name) ? ' · will join' : ''}</span>
-                  </label>
-                );
-              })}
-              {mem.length === 0 && <Note tone="warn">A network needs at least one port.</Note>}
-              {(dropped.length > 0 || added.length > 0) && <Note tone="warn">{dropped.length ? `Taking ${dropped.map(pn).join(', ')} out cuts off devices plugged into ${dropped.length === 1 ? 'it' : 'them'}. ` : ''}If you manage NopeWarden through one of these ports, keep another way in until you have applied and checked it. NopeWarden puts the change back by itself if you cannot confirm it.</Note>}
-            </div>
-          </Field>
-        )}
-        {plain && (
-          <Field label="Add more ports to this network" hint="Devices on these ports share this network's addresses, like extra ports on a switch. Nothing changes until you apply.">
-            <div className="stack">
-              {((allPorts && allPorts.ports) || []).filter((p) => p.name !== n.iface.name).map((p) => {
-                const reason = why(p);
-                return (
-                  <label key={p.name} className="small" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', opacity: reason ? 0.6 : 1 }}>
-                    <input type="checkbox" checked={extra.includes(p.name)} disabled={!!reason} onChange={(e) => tickExtra(p.name, e.target.checked)} />
-                    <span className="mono">{pn(p.name)}</span>
-                    <span className="muted">{p.link ? `cable connected${p.speed > 0 ? `, ${p.speed} Mb/s` : ''}` : 'no cable'}{reason ? ` · ${reason}` : ''}</span>
-                  </label>
-                );
-              })}
-              {extra.length > 0 && <Note tone="warn">NopeWarden briefly restarts this network while it changes. If you manage NopeWarden through it, keep another way in until you have applied and checked it. NopeWarden puts the change back by itself if you cannot confirm it.</Note>}
-              <div><Button small disabled={busy || extra.length === 0} onClick={addPorts}>Add {extra.length ? extra.join(', ') : 'ports'} to this network</Button></div>
-            </div>
-          </Field>
-        )}
-        <details className="more">
-          <summary>More options</summary>
-          <div className="stack">
-            {movable && (
-              <>
-                <Field label="Port" hint="The physical port this network is plugged into.">
-                  <Select value={port} onChange={setPort} options={[...new Set([port, ...((sug && sug.ports) || []).map((p) => p.name)])].map((x) => ({ value: x, label: pn(x) }))} />
-                </Field>
-                <Field label="VLAN number" hint="Leave empty to use the whole port. Your switch must pass the number you choose.">
-                  <Input value={vlan} onChange={(v) => setVlan(v.replace(/\D/g, ''))} className="in mono" />
-                </Field>
-                {moved && <Note tone="warn">Moving a network to another port or VLAN cuts devices off until they are on the new one. If you manage NopeWarden from this network, keep another way in until you have applied and checked it.</Note>}
-              </>
-            )}
-            <p className="small muted">
-              {f.kind === 'vlan' ? <>This network is a VLAN: number {f.vlan} on port {pn(f.parent)}. Your switch must pass that number.</> : f.kind === 'bridge' ? <>This network spreads over several ports ({(f.members || []).map(pn).join(', ')}), carried by {f.name}.</> : <>This network uses the whole port {pn(f.name)}. To add another network to the same port, add a network and choose this port: NopeWarden then uses a VLAN number for it.</>}
-            </p>
-          </div>
-        </details>
-      </div>
-    </Modal>
   );
 }
 
@@ -253,7 +143,7 @@ export default function Networks({ me }) {
       </Card>
 
       {adding && <AddNetwork onClose={() => setAdding(false)} onCreated={(n, later) => { setAdding(false); toast(later ? `${n} saved for later. It waits on the Review page.` : `${n} added. It goes live in a moment.`); all(); }} />}
-      {edit && <EditNetwork n={edit} zones={zones || []} onClose={() => setEdit(null)} onSaved={all} />}
+      {edit && <NetworkEditor zone={(zones || []).find((z) => z.id === edit.iface.zone_id) || null} iface={edit.iface} scope={edit.scope || null} zones={zones || []} onClose={() => setEdit(null)} onSaved={all} />}
       {dhcp && <ScopeForm initial={dhcp} ifaces={ifs || []} onClose={() => setDhcp(null)} onSaved={all} />}
     </Page>
   );

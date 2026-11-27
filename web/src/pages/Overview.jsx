@@ -234,13 +234,9 @@ function DhcpTile({ util, h }) {
   const list = util || [];
   const used = list.reduce((a, s) => a + s.active, 0), size = list.reduce((a, s) => a + s.size, 0);
   const full = list.filter((s) => s.size && s.active / s.size > 0.8);
-  const busiest = [...list].sort((x, y) => (y.size ? y.active / y.size : 0) - (x.size ? x.active / x.size : 0))[0];
-  const sub = !busiest ? '' : list.length === 1
-    ? `${busiest.active} of ${busiest.size} addresses used on ${busiest.name}`
-    : <><button type="button" className="sublink" onClick={() => go('dhcp')}>{list.length} networks hand out addresses. Busiest: {busiest.name}, {busiest.active} of {busiest.size}</button></>;
   return (
     <Tile title="DHCP" pill={!list.length ? 'No scope' : full.length ? `${full[0].name} nearly full` : 'Serving'} tone={!list.length ? 'warn' : full.length ? 'warn' : 'good'}
-      big={<CountUp value={used} />} unit={size ? `of ${size} addresses` : 'leases'} to="dhcp" sub={sub}
+      big={<CountUp value={used} />} unit={size ? `of ${size} addresses` : 'leases'} to="dhcp"
       chart={<Chart series={miniSeries(h, 'dhcp.used')} from={h?.from || 0} to={h?.to || 1} unit="addresses" height={56} compact axes label="Addresses in use, last hour" />}
       caption="Addresses in use · last hour" />
   );

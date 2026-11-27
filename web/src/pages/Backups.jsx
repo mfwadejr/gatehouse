@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { del, post, put, saveFile, sendFile, useData } from '../api.js';
 import OffsiteCopies from './OffsiteCopies.jsx';
-import { Button, Card, Empty, Field, Input, Modal, Note, Pill, Select, ToggleRow, useAction, fmt, useStepUp, stepReady, StepUp, Limited , useDelayedDelete } from '../ui.jsx';
+import { Button, Card, Empty, Field, Input, Modal, Note, Pill, Select, ToggleRow, useAction, fmt, useStepUp, stepReady, StepUp, Limited , useDelayedDelete, usePasswordRules, PasswordRules } from '../ui.jsx';
 
 // Backups of the settings: made on a schedule, checked when they are made, and checkable again by
 // trying a restore without changing anything. Nothing here touches the network until a restore is
@@ -111,11 +111,13 @@ function PlainDownload({ b, onClose }) {
 function ProtectedDownload({ b, onClose }) {
   const [run, busy] = useAction();
   const [pw, setPw] = useState('');
+  const rules = usePasswordRules();
   return (
     <Modal title="Download with a password" onClose={onClose}
-      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy || pw.length < 8} onClick={async () => { if (await run(() => saveFile('POST', `/api/backups/${b.name}/download`, { password: pw }, b.name.replace(/\.ghbk$/, '') + '-protected.ghbk'))) onClose(); }}>Download</Button></>}>
+      footer={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" disabled={busy || !rules.ok(pw)} onClick={async () => { if (await run(() => saveFile('POST', `/api/backups/${b.name}/download`, { password: pw }, b.name.replace(/\.ghbk$/, '') + '-protected.ghbk'))) onClose(); }}>Download</Button></>}>
       <p>A backup holds the key to your saved internet and VPN passwords. A password keeps it safe if the file is stored somewhere shared. There is no way to recover a lost password, so keep it somewhere safe.</p>
-      <Field label="Password (at least 8 characters)"><Input type="password" value={pw} onChange={setPw} autoFocus /></Field>
+      <Field label="Password"><Input type="password" value={pw} onChange={setPw} autoFocus /></Field>
+      <PasswordRules rules={rules} pw={pw} />
     </Modal>
   );
 }

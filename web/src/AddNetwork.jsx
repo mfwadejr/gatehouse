@@ -44,7 +44,6 @@ export default function AddNetwork({ onClose, onCreated }) {
     { value: 'isolated', label: 'Isolated', internet: false, intra: true, hint: 'Cameras and smart-home gadgets. No internet and no other networks.' },
     { value: 'custom', label: 'Custom', internet: true, intra: true, hint: 'Starts with nothing allowed between networks. Set the switches below, then write your own rules.' },
   ];
-  const kind = KINDS.find((k) => k.value === f.kind) || KINDS[1];
   // A guest network starts with a 2 hour lease so its addresses come back by themselves; the choice below can change it.
   const chooseKind = (v) => { const k = KINDS.find((x) => x.value === v); setF((x) => ({ ...x, kind: v, internet: k.internet, intra_allow: k.intra, lease: v === 'guest' ? '2h' : x.lease === '2h' ? '1d' : x.lease })); };
   const port = sug?.ports?.find((p) => p.name === f.port);
@@ -75,9 +74,15 @@ export default function AddNetwork({ onClose, onCreated }) {
         <Field label="Name" hint="For example Home, Cameras, Guests or Office.">
           <Input value={f.name} onChange={set('name')} maxLength={40} autoComplete="off" />
         </Field>
-        <Field label="What kind of network is it?" hint={kind.hint}>
-          <Segmented value={f.kind} onChange={chooseKind} options={KINDS.map((k) => ({ value: k.value, label: k.label }))} />
-        </Field>
+        <div className="field"><span className="lab">What kind of network is it?</span>
+          <div className="stack">
+            {KINDS.map((k) => (
+              <button type="button" key={k.value} className={`preset ${f.kind === k.value ? 'on' : ''}`} onClick={() => chooseKind(k.value)} aria-pressed={f.kind === k.value}>
+                <span className="t">{k.label}</span><span className="d">{k.hint}</span>
+              </button>
+            ))}
+          </div>
+        </div>
         <Field label="Port" hint={shared ? 'This port already has a network, so the new one shares it using a VLAN. Your switch must pass that VLAN number.' : 'Plug the switch or devices for this network into this port.'}>
           <Select value={f.port} onChange={set('port')} options={portOptions.length ? portOptions : [{ value: '', label: 'No ports found' }]} />
         </Field>

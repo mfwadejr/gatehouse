@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { post, put, useData } from '../api.js';
-import { Button, Empty, Field, Input, Note, Pill, Select, ToggleRow, useAction, fmt } from '../ui.jsx';
+import { Button, Empty, Field, Input, Note, Pill, Select, ToggleRow, useAction, fmt, usePasswordRules, PasswordRules } from '../ui.jsx';
 
 // Copies of each backup kept somewhere other than this machine, encrypted with a password of the
 // person's own. Passwords and keys typed here are sent once and never shown again.
@@ -180,6 +180,7 @@ export default function OffsiteCopies() {
   const [run, busy] = useAction();
   const [draft, setDraft] = useState(null);
   const [pw, setPw] = useState('');
+  const rules = usePasswordRules();
   const [msg, setMsg] = useState({});
   if (!data) return null;
   const c = draft || data.config;
@@ -202,9 +203,10 @@ export default function OffsiteCopies() {
       <h3 style={{ fontSize: 'var(--font-size-base)', fontWeight: 'var(--font-weight-semibold)' }}>Copies off this machine</h3>
       <p className="small muted">A backup on this machine is lost with it. Here you can have a copy sent somewhere else after every backup. Copies are scrambled with a password of your own before they leave, so the place that keeps them cannot read them.</p>
       <div className="inline" style={{ alignItems: 'flex-start' }}>
-        <Field label="Password for the copies" hint={data.config.password_set ? 'A password is set. Type a new one only to change it; older copies keep the old one.' : 'At least 8 characters.'}>
+        <Field label="Password for the copies" hint={data.config.password_set ? 'A password is set. Type a new one only to change it; older copies keep the old one.' : `${rules.text.charAt(0).toUpperCase()}${rules.text.slice(1)}.`}>
           <Input type="password" value={pw} onChange={(v) => { setPw(v); if (!draft) setDraft(c); }} autoComplete="new-password" />
         </Field>
+        {pw && <PasswordRules rules={rules} pw={pw} />}
         <Field label="Keep this many copies in each place" hint="Older copies there are deleted.">
           <div style={{ width: '9rem' }}><Select value={String(c.keep)} onChange={(v) => edit({ keep: Number(v) })} options={[3, 7, 14, 30, 60].map((n) => ({ value: String(n), label: String(n) }))} /></div>
         </Field>

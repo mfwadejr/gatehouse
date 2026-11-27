@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import qrcode from 'qrcode-generator';
 import { get, post, setCsrf } from '../api.js';
-import { Button, Field, Icon, Input, Note, CodeInput } from '../ui.jsx';
+import { Button, Field, Icon, Input, Note, CodeInput, usePasswordRules, PasswordRules } from '../ui.jsx';
 import { Logo } from '../logo.jsx';
 
 function Frame({ title, children }) {
@@ -18,22 +18,18 @@ function Frame({ title, children }) {
 
 function submitOnEnter(fn) { return (e) => { e.preventDefault(); fn(); }; }
 
-function pwHint(p) {
-  if (!p) return 'At least 12 characters. Several unrelated words in a row works well.';
-  if (p.length < 12) return `${p.length} of 12 characters. ${12 - p.length} more needed.`;
-  return 'Long enough.';
-}
-
 // The first visit to a new device: whoever opens it from the local network creates the administrator
 // account. There is no code and no default login. Once it exists this page never appears again.
 export function Setup({ onDone }) {
+  const rules = usePasswordRules();
   const [f, setF] = useState({ username: 'admin', password: '', again: '' });
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
   const go = async () => {
     setErr('');
-    if (f.password.length < 12) { setErr(`The password is too short: ${f.password.length} of the 12 characters needed. Several unrelated words in a row is easy to remember and long enough.`); return; }
+    const bad = rules.problem(f.password);
+    if (bad) { setErr(`The password does not meet the rules yet: ${bad.toLowerCase()}.`); return; }
     if (f.password !== f.again) { setErr('The two passwords do not match.'); return; }
     setBusy(true);
     try { await post('/api/setup', { username: f.username, password: f.password }); onDone(f.username, f.password); }
@@ -45,7 +41,8 @@ export function Setup({ onDone }) {
       <p className="sec">Create your administrator account. You will use it to sign in to this device.</p>
       <form className="stack" onSubmit={submitOnEnter(go)}>
         <Field label="Administrator name"><Input value={f.username} onChange={set('username')} autoComplete="username" autoFocus /></Field>
-        <Field label="Password" hint={pwHint(f.password)}><Input type="password" value={f.password} onChange={set('password')} autoComplete="new-password" /></Field>
+        <Field label="Password" hint="Several unrelated words in a row works well."><Input type="password" value={f.password} onChange={set('password')} autoComplete="new-password" /></Field>
+        <PasswordRules rules={rules} pw={f.password} />
         <Field label="Password again" hint={f.again && f.again !== f.password ? 'These do not match yet.' : undefined}><Input type="password" value={f.again} onChange={set('again')} autoComplete="new-password" /></Field>
         {err && <Note tone="bad">{err}</Note>}
         <Button kind="primary" type="submit" disabled={busy}>Create account</Button>

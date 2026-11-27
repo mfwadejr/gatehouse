@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"nopewarden/internal/auth"
 	"os"
 	"path/filepath"
 	"strings"
@@ -142,6 +143,27 @@ func (a *App) registerSetupRoutes() {
 	s.Public("GET /api/install/info", func(w http.ResponseWriter, r *http.Request) {
 		api.JSON(w, 200, map[string]any{"installer": false})
 	})
+	// The password rules, so the first screen and the sign-in pages can show them before anyone is signed in.
+	s.Public("GET /api/auth/password-rules", func(w http.ResponseWriter, r *http.Request) {
+		p := a.Auth.Policy()
+		api.JSON(w, 200, map[string]any{"policy": p, "text": p.Describe()})
+	})
+	s.HandleAdmin("PUT /api/auth/password-rules", func(w http.ResponseWriter, r *http.Request, c *api.Ctx) {
+		var in auth.Policy
+		if !api.Decode(w, r, &in) {
+			return
+		}
+		if in.Min < 8 || in.Min > 64 {
+			api.Error(w, http.StatusBadRequest, "the shortest password can be from 8 to 64 characters")
+			return
+		}
+		if err := a.Auth.SetPolicy(in); err != nil {
+			fail(w, err)
+			return
+		}
+		a.event("auth", "info", "Password rules changed", a.Auth.Policy().Describe())
+		api.JSON(w, 200, map[string]any{"policy": a.Auth.Policy(), "text": a.Auth.Policy().Describe()})
+	})
 	s.Public("GET /api/setup", func(w http.ResponseWriter, r *http.Request) {
 		api.JSON(w, 200, map[string]bool{"needed": !a.Auth.HasUsers()})
 	})
@@ -174,10 +196,6 @@ func (a *App) registerSetupRoutes() {
 		defer a.setupMu.Unlock()
 		if a.Auth.HasUsers() {
 			api.Error(w, http.StatusConflict, "this device is already set up")
-			return
-		}
-		if len(in.Password) < 12 {
-			api.Error(w, http.StatusBadRequest, "the password must be at least 12 characters")
 			return
 		}
 		if _, err := a.Auth.CreateUser(in.Username, in.Password, "admin"); err != nil {

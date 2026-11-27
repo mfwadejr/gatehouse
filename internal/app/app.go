@@ -106,6 +106,7 @@ type App struct {
 	traffic     wanTraffic
 	mgmtTraffic wanTraffic // the management port's own speed
 	netTraffic  wanTraffic // each network's own speed, summed over its ports
+	lcdm        lcdManager // the front panel display
 	vpnTraffic  wanTraffic // each VPN tunnel's own speed, by VPN id
 	viaNames    viaCache
 	health      healthSampler
@@ -439,6 +440,7 @@ func (a *App) Run(ctx context.Context) error {
 	run(func() { a.vpnMonitor(ctx) })
 	run(func() { a.collectFW(ctx) })
 	run(func() { a.collectTraffic(ctx) })
+	run(func() { a.lcdLoop(ctx) })
 	run(func() { a.collectHistory(ctx) })
 	run(func() { a.speedLoop(ctx) })
 	run(func() { a.upstreamProbeLoop(ctx) })

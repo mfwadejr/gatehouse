@@ -62,10 +62,24 @@ func (a *App) registerFWRoutes() {
 			return
 		}
 		var id int64
-		err := fw.Mutate(a.Config, func(tx *sql.Tx) (e error) { id, e = fw.SaveZone(tx, z); return })
+		var oldName string
+		err := fw.Mutate(a.Config, func(tx *sql.Tx) (e error) {
+			if z.ID != 0 {
+				tx.QueryRow(`SELECT name FROM zones WHERE id=?`, z.ID).Scan(&oldName)
+			}
+			if id, e = fw.SaveZone(tx, z); e != nil {
+				return e
+			}
+			// A new name must reach everything stored under the old one, in the same step.
+			return renameNetworkRefs(tx, oldName, strings.TrimSpace(z.Name))
+		})
 		if err != nil {
 			fail(w, err)
 			return
+		}
+		a.renameNetworkHistory(oldName, strings.TrimSpace(z.Name))
+		if a.DHCP != nil && oldName != "" && oldName != strings.TrimSpace(z.Name) {
+			a.DHCP.Reload()
 		}
 		a.markDirty()
 		api.JSON(w, 200, map[string]int64{"id": id})

@@ -1,6 +1,17 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.80',
+    title: 'One edit dialog for networks, password rules, and the front panel display',
+    items: [
+      'Networks and Firewall: Edit now opens the same dialog from both places, in the Firewall look with the type cards. It holds the name, type, port or VLAN, address, DHCP, the internet, devices-talk and manage switches, IPv6, gateway, enforced DNS and SSH. Add a network uses the same type cards.',
+      'Renaming a network now renames it everywhere it is used: firewall rules, DHCP, VPN routes, DNS profiles, blocks, speed control, routes, port-group routes, scope rules, the mDNS pairs and the speed history. If a name is already taken, nothing changes and the message says why. The build checks the whole database for the old name.',
+      'Overview: the DHCP tile no longer shows the busiest-network sentence.',
+      'Password rules (Settings, Account): the shortest password is 8 characters at setup too, can be set from 8 to 64, and can require a capital, a small letter, a number and a symbol (all off by default). Very common passwords are refused by default. Passwords do not expire. The same rules apply to the backup file and the off-site copies, and the message names the rule that was not met. Passwords already set keep working.',
+      'Settings, Advanced, Front panel display: for the small text display and buttons on the front of many appliances. Detect looks at the machine, its USB, serial and I2C ports and says what it found, how sure it is, and how many buttons; Copy sends the whole report. Test draws on the display with the settings you are editing, without saving, and shows each button as you press it. You choose what each button does, what the display shows, how long each screen stays, and when the backlight goes off. A live picture of the display is shown. The display program (LCDproc) is installed only if you ask and can be removed.',
+    ],
+  },
+  {
     version: '0.9.4.79',
     title: 'Each network counts only its own traffic',
     items: [

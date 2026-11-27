@@ -153,7 +153,7 @@ func TestRecoveryScreen(t *testing.T) {
 	if !strings.Contains(out.String(), "Listening: yes") {
 		t.Fatal("the DHCP and DNS view shows nothing")
 	}
-	if !strings.Contains(out.String(), "Too short: 5 of the 12") || strings.Contains(out.String(), "a long enough pass") {
+	if !strings.Contains(out.String(), "Too short: 5 of the 8") || strings.Contains(out.String(), "a long enough pass") {
 		t.Fatal("password feedback wrong or the password was echoed")
 	}
 }

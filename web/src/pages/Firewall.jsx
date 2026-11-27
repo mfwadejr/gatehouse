@@ -4,6 +4,7 @@ import { del, holdAnd, put, useData, useStream } from '../api.js';
 import { SAVED_LATER, SaveChoice } from '../changes.jsx';
 import { confirmRemoval } from '../removal.js';
 import AddNetwork from '../AddNetwork.jsx';
+import NetworkEditor from '../NetworkEditor.jsx';
 import { go } from '../App.jsx';
 import { linkState } from '../linkstate.js';
 import AlwaysOn from './AlwaysOn.jsx';
@@ -90,7 +91,8 @@ function InternetRow({ ov }) {
 
 function Networks({ ov, presets, reload }) {
   const pn = usePortNames();
-  const { data: ifs } = useData('/api/net/interfaces');
+  const { data: ifs, reload: reloadIfs } = useData('/api/net/interfaces');
+  const { data: scopes } = useData('/api/dhcp/scopes');
   const [edit, setEdit] = useState(null);
   const [addNet, setAddNet] = useState(false);
   const toast = useToast();
@@ -138,7 +140,12 @@ function Networks({ ov, presets, reload }) {
         </Card>
       )}
       {addNet && <AddNetwork onClose={() => setAddNet(false)} onCreated={(n, later) => { setAddNet(false); toast(later ? `${n} saved for later. It waits on the Review page.` : `${n} added. It goes live in a moment.`); reload(); go('networks'); }} />}
-      {edit && <ZoneForm initial={edit} presets={presets} ifaces={ifs || []} taken={taken} onClose={() => setEdit(null)} onSaved={reload} />}
+      {edit && (() => {
+        // A network that has a port or VLAN opens the same dialog as the Networks page; one with no port yet keeps the short form.
+        const own = (ifs || []).find((i) => i.zone_id === edit.id);
+        if (!own) return <ZoneForm initial={edit} presets={presets} ifaces={ifs || []} taken={taken} onClose={() => setEdit(null)} onSaved={reload} />;
+        return <NetworkEditor zone={edit} iface={own} scope={(scopes || []).find((s) => s.iface === own.name) || null} zones={zones} onClose={() => setEdit(null)} onSaved={() => { reload(); reloadIfs(); }} />;
+      })()}
     </>
   );
 }
