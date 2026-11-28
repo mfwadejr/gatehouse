@@ -529,31 +529,88 @@ function HappenedCard({ items }) {
 
 const upText = (s) => { const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60); return d ? `${d} d ${h} h` : h ? `${h} h ${m} min` : `${m} min`; };
 
+// A fan, drawn as a fan: it turns faster when the fan does and stands still when it has stopped.
+function FanIcon({ rpm, tone }) {
+  const dur = rpm > 0 ? Math.max(0.5, Math.min(2.4, 2.4 - rpm / 2500)) : 0;
+  return (
+    <svg className={`fanicon ${tone}`} viewBox="0 0 48 48" aria-hidden="true">
+      <circle cx="24" cy="24" r="22" fill="none" stroke="currentColor" strokeOpacity=".35" strokeWidth="2" />
+      <g className={dur ? 'spin' : ''} style={dur ? { animationDuration: `${dur}s` } : undefined} fill="currentColor">
+        <path d="M24 24 C22 12 26 5 33 6 C38 8 36 17 24 24Z" /><path d="M24 24 C36 22 43 26 42 33 C40 38 31 36 24 24Z" />
+        <path d="M24 24 C26 36 22 43 15 42 C10 40 12 31 24 24Z" /><path d="M24 24 C12 26 5 22 6 15 C8 10 17 12 24 24Z" />
+      </g>
+      <circle cx="24" cy="24" r="4" fill="var(--color-bg-surface)" />
+    </svg>
+  );
+}
+
 function MachineCard({ sys, upd }) {
+  const { data: hw } = useData('/api/hardware', { every: 5000 });
   const gb = (n) => (n >= 1e11 ? Math.round(n / 1e9) : Math.round(n / 1e8) / 10);
-  const g = (label, v, text, title, extra) => (
-    <div key={label} title={title}>
-      <div className="spread small"><span>{label}</span><b>{text}</b></div>
+  // Each value has a long form and shorter ones; the narrowest that still fits is shown (by the
+  // container's width, in CSS), so a value never wraps and every bar sits on the same line.
+  const g = (label, v, forms, title, extra) => (
+    <div key={label} title={title} className={`gauge ${forms[0].length > 19 ? 'lg' : ''}`}>
+      <div className="gaugehead small"><span>{label}</span><b><span className="f1">{forms[0]}</span><span className="f2">{forms[1]}</span><span className="f3">{forms[2]}</span></b></div>
       <div className={`bar ${v > 85 ? 'warnbar' : ''}`}><i style={{ width: `${Math.min(100, v || 0)}%` }} /></div>
       {extra}
     </div>
   );
-  const memText = sys?.mem_total ? `${Math.round(sys.mem || 0)} % · ${gb(sys.mem_used || 0)} of ${gb(sys.mem_total)} GB` : `${Math.round(sys?.mem || 0)} %`;
-  const diskText = sys?.disk_size ? `${Math.round(sys.disk || 0)} % · ${gb(sys.disk_used || 0)} of ${gb(sys.disk_size)} GB` : `${Math.round(sys?.disk || 0)} %`;
-  const cpuText = sys?.cores ? `${Math.round(sys.cpu || 0)} % · ${sys.cores} core${sys.cores === 1 ? '' : 's'}` : `${Math.round(sys?.cpu || 0)} %`;
+  const pct = (v) => `${Math.round(v || 0)} %`;
+  const forms = (v, used, total, unit) => (total ? [`${pct(v)} · ${gb(used || 0)} of ${gb(total)} ${unit}`, `${pct(v)} · ${gb(used || 0)}/${gb(total)} ${unit}`, pct(v)] : [pct(v), pct(v), pct(v)]);
+  const cpuForms = sys?.cores ? [`${pct(sys.cpu)} · ${sys.cores} core${sys.cores === 1 ? '' : 's'}`, `${pct(sys.cpu)} · ${sys.cores}c`, pct(sys.cpu)] : [pct(sys?.cpu), pct(sys?.cpu), pct(sys?.cpu)];
   const loadTip = sys?.cores ? `Load average: ${sys.load1?.toFixed(2)} (1 min) · ${sys.load5?.toFixed(2)} (5 min) · ${sys.load15?.toFixed(2)} (15 min). Around ${sys.cores} or less is comfortable.` : undefined;
+  const cpu = (hw?.temps || []).find((t) => t.kind === 'cpu');
+  const temp = cpu ? cpu.c : sys?.temp;
+  const high = cpu ? cpu.high : 80;
+  const tstate = !(temp > 0) ? '' : temp >= high ? 'hot' : temp >= high - 10 ? 'warm' : 'ok';
+  const fans = hw?.has_fans ? hw.fans || [] : null;
+  const stopped = (fans || []).filter((f) => f.state === 'stopped');
+  const trouble = stopped.length > 0 || tstate === 'warm' || tstate === 'hot';
+  const tempBlock = temp > 0 && (
+    <div key="Temperature" className="gauge" title={`Warm from ${Math.round(high - 10)} °C, hot from ${Math.round(high)} °C`}>
+      <div className="gaugehead small"><span>Temperature</span><b>{Math.round(temp)} °C</b></div>
+      <div className="tempwrap">
+        <div className="bar"><i className={{ ok: 't-ok', warm: 't-warm', hot: 't-hot' }[tstate]} style={{ width: `${Math.min(100, (temp / 100) * 100)}%` }} /></div>
+        <span className="tick" style={{ left: `${high - 10}%` }} /><span className="tick hi" style={{ left: `${high}%` }} />
+      </div>
+      <div className="tempcap small muted"><span>cool</span><span>warm {Math.round(high - 10)} · hot {Math.round(high)}</span></div>
+    </div>
+  );
   return (
     <Card title="This machine" desc={`NopeWarden ${upd?.current || ''}${upd?.needs_reboot ? ' · restart needed' : ''}${sys?.uptime ? ` · up ${upText(sys.uptime)}` : ''}`}>
       <div className="ov-gauges">
-        {g('Processor', sys?.cpu, cpuText, loadTip)}
-        {g('Memory', sys?.mem, memText, 'Memory in use, not counting what the system keeps as a speed-up cache')}
-        {g('Disk', sys?.disk, diskText, undefined, (
+        {g('Processor', sys?.cpu, cpuForms, loadTip)}
+        {g('Memory', sys?.mem, forms(sys?.mem, sys?.mem_used, sys?.mem_total, 'GB'), 'Memory in use, not counting what the system keeps as a speed-up cache')}
+        {g('Disk', sys?.disk, forms(sys?.disk, sys?.disk_used, sys?.disk_size, 'GB'), undefined, (
           <>
             <button type="button" className="linkbtn small" onClick={() => go('diagnostics/services')}>What's using it?</button>
           </>
         ))}
-        {sys?.temp > 0 && g('Temperature', sys.temp, `${Math.round(sys.temp)} °C`)}
+        {tempBlock}
       </div>
+      {(fans || temp > 0) && (
+        <div className="cooling">
+          {fans && (
+            <>
+              <h3 className="coolhead small muted">Cooling</h3>
+              <div className="fanrow">
+                {fans.map((f) => (
+                  <div className={`fan ${f.state}`} key={f.name}>
+                    <FanIcon rpm={f.rpm} tone={f.state === 'stopped' ? 'bad' : tstate === 'hot' || tstate === 'warm' ? 'warm' : 'ok'} />
+                    <div><b>{f.state === 'stopped' ? `${f.name} stopped` : f.name}</b><div className="small muted">{f.state === 'stopped' ? 'was turning · check it' : `turning · ${f.rpm.toLocaleString()} rpm`}</div></div>
+                  </div>
+                ))}
+                {!fans.length && <span className="small muted">No fan on this board is reporting a speed.</span>}
+              </div>
+            </>
+          )}
+          {temp > 0 && (
+            <div className="coolsum"><Pill tone={trouble ? 'bad' : 'good'}>{trouble ? 'Check cooling' : fans?.length ? 'Cooling is fine' : 'Cool'}</Pill>
+              <span className="small muted">Processor {Math.round(temp)} °C{fans?.length ? `, ${fans.filter((f) => f.state === 'turning').length} of ${fans.length} fan${fans.length === 1 ? '' : 's'} turning` : ''}{tstate === 'warm' || tstate === 'hot' ? ', running warm' : ''}</span></div>
+          )}
+        </div>
+      )}
     </Card>
   );
 }

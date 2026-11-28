@@ -920,3 +920,33 @@ button.tag:hover { color: var(--color-text-primary); border-color: var(--color-b
 /* The front panel display, drawn as the panel is. */
 .lcdpic { display: inline-block; margin: 0; padding: .6rem .8rem; background: var(--color-bg-inset); color: var(--color-text-primary); border: var(--border-width-thin) solid var(--color-border-default); border-radius: var(--radius-sm); font-family: var(--font-family-mono); font-size: var(--font-size-md); line-height: 1.35; letter-spacing: .05em; }
 .lcdreport { max-height: 18rem; overflow: auto; white-space: pre-wrap; font-family: var(--font-family-mono); font-size: var(--font-size-sm); }
+
+/* This machine: values never wrap, so every bar is on the same line; the narrowest form that fits is shown. */
+.gauge { container-type: inline-size; }
+.gaugehead { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-2); white-space: nowrap; }
+.gaugehead b { font-weight: var(--font-weight-semibold); }
+.gaugehead .f2, .gaugehead .f3 { display: none; }
+@container (max-width: 13rem) { .gauge:not(.lg) .gaugehead .f1 { display: none; } .gauge:not(.lg) .gaugehead .f2 { display: inline; } }
+@container (max-width: 10rem) { .gauge:not(.lg) .gaugehead .f2 { display: none; } .gauge:not(.lg) .gaugehead .f3 { display: inline; } }
+@container (max-width: 18rem) { .gauge.lg .gaugehead .f1 { display: none; } .gauge.lg .gaugehead .f2 { display: inline; } }
+@container (max-width: 13rem) { .gauge.lg .gaugehead .f2 { display: none; } .gauge.lg .gaugehead .f3 { display: inline; } }
+.tempwrap { position: relative; }
+.tempwrap .tick { position: absolute; top: calc(var(--space-1) * -0.75); width: 2px; height: calc(100% + var(--space-1) * 1.5); background: var(--color-text-muted); opacity: .7; }
+.tempwrap .tick.hi { background: var(--color-status-warning); opacity: 1; }
+.bar > i.t-ok { background: var(--color-status-good); }
+.bar > i.t-warm { background: var(--color-status-warning); }
+.bar > i.t-hot { background: var(--color-status-bad); }
+.tempcap { display: flex; justify-content: space-between; white-space: nowrap; }
+.cooling { margin-top: var(--space-4); padding-top: var(--space-3); border-top: var(--border-width-thin) solid var(--color-border-default); display: grid; gap: var(--space-3); }
+.coolhead { margin: 0; font-weight: var(--font-weight-medium); text-transform: uppercase; letter-spacing: .04em; }
+.fanrow { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5); }
+.fan { display: flex; align-items: center; gap: var(--space-2); }
+.fanicon { width: 2.4rem; height: 2.4rem; flex: none; }
+.fanicon.ok { color: var(--color-status-good); }
+.fanicon.warm { color: var(--color-status-warning); }
+.fanicon.bad { color: var(--color-status-bad); }
+.fan.stopped b { color: var(--color-status-bad); }
+.fanicon .spin { transform-origin: 24px 24px; animation: fanspin linear infinite; }
+@keyframes fanspin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .fanicon .spin { animation: none; } }
+.coolsum { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }

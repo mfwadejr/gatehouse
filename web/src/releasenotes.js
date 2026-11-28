@@ -1,6 +1,14 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.82',
+    title: 'Cooling on the This machine tile',
+    items: [
+      'Overview, This machine: a Cooling row shows each fan as a small fan that turns faster when the fan does, and stands still and red when a fan that was turning has stopped. The Temperature bar is now green, amber or red with ticks at the warm and hot limits, and a one-line summary says Cooling is fine or Check cooling. A box with no fan chip shows no fans.',
+      'The values on the tile no longer wrap onto a second line, so the four bars always sit on the same line. When there is not room, a value shortens (7 % · 0.6/8.2 GB, then 7 %) instead of wrapping.',
+    ],
+  },
+  {
     version: '0.9.4.81',
     title: 'Hardware temperatures and fans, and clearer boxes',
     items: [

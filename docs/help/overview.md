@@ -26,7 +26,7 @@ The picture uses made-up devices and numbers. Yours will show your own.
 - **What happened** lists the latest events in plain words, newest first, with repeats folded into one row and a count.
 - **Your networks** shows each network and how busy it is.
 - **Busiest devices** and **Data used, last 24 hours**.
-- **This machine** shows processor, memory and disk. **What's using it?** opens Diagnostics, which lists the biggest places on the disk.
+- **This machine** shows processor, memory, disk and temperature. The temperature bar is green, amber or red with marks at the warm and hot limits. On a box with a fan chip a **Cooling** row shows each fan turning, faster when the fan is faster, and red and still if a fan that was turning has stopped, with a tag that says Cooling is fine or Check cooling. A box with no fan chip shows no fans. When there is not room, a value shortens instead of wrapping. **What's using it?** opens Diagnostics, which lists the biggest places on the disk.
 - **Hide or show cards** at the bottom of the page lets you untick any card you do not want. Each person has their own choice.
 
 Cards update on their own. If updates stop, a "Reconnecting" label appears at the top right.
