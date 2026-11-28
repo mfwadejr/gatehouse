@@ -157,6 +157,7 @@ func (f *fakeNet) SQMApply(p netd.SQMPlan) (string, error) {
 	return "cake", nil
 }
 func (f *fakeNet) LCDStatus() netd.LCDInfo { return f.lcd }
+func (f *fakeNet) HwLoad() []string        { return nil }
 func (f *fakeNet) LCDDetect() (netd.LCDFacts, error) {
 	return f.lcdFacts, f.lcdErr
 }

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { post, put, useData } from '../api.js';
-import { Button, Card, Field, Input, Note, Segmented, Select, useAction } from '../ui.jsx';
+import { Button, Card, Field, Input, Note, Pill, Segmented, Select, useAction } from '../ui.jsx';
 import { COUNTRIES, MAP_H, MAP_W } from '../worldmap.js';
 import { centreOf, project, unproject } from '../mapgeo.js';
 
@@ -58,7 +58,7 @@ export default function MapLocation() {
     const [la, lo] = data.set ? unproject(data.x, data.y).map(two) : [];
     return (
       <Card title="Your place on the map" desc="Where the lines on the Overview map start."
-        actions={<Button small onClick={() => setEditing(true)}>{data.set ? 'Change' : 'Set my place'}</Button>}>
+        actions={<><Pill tone={data.set ? 'good' : ''}>{data.set ? 'Configured' : 'Not set'}</Pill><Button small onClick={() => setEditing(true)}>{data.set ? 'Change' : 'Set my place'}</Button></>}>
         <p className="small muted" style={{ margin: 0 }}>{data.set ? `Placed at about ${la}, ${lo} (latitude, longitude). It stays on this machine.` : 'No place set. The Overview uses the middle of the country your browser is set to.'}</p>
       </Card>
     );

@@ -249,7 +249,7 @@ export function ChangeProvider({ me, children }) {
   );
 }
 
-// The bar at the bottom of the window: the steps and the countdown while a change goes live, and the
+// The box in the middle of the window, over a dimmed page: the steps and the countdown while a change goes live, and the
 // result afterwards until it is closed.
 function ChangeBar({ pend, run, left, auto, setAutoPref, busy, confirm, undo, close }) {
   const out = run?.outcome || '';
@@ -258,6 +258,7 @@ function ChangeBar({ pend, run, left, auto, setAutoPref, busy, confirm, undo, cl
   const head = applyHeadline(run);
   const cls = counting ? 'countdown' : out === 'kept' ? 'ok' : out ? 'bad' : 'countdown';
   return (
+    <div className="confirmveil">
     <div className={`confirmbar ${cls} floating`} role={out === 'kept' ? 'status' : 'alert'}>
       <div>
         {counting ? (
@@ -282,6 +283,7 @@ function ChangeBar({ pend, run, left, auto, setAutoPref, busy, confirm, undo, cl
       )}
       {!counting && out && <div className="actions"><Button onClick={close}>Close</Button></div>}
       {run && <ApplyList run={run} />}
+    </div>
     </div>
   );
 }

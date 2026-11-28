@@ -18,6 +18,7 @@ import ManageAccess from './ManageAccess.jsx';
 import HighAvailability from './HighAvailability.jsx';
 import RemoteLogin from './RemoteLogin.jsx';
 import FrontPanel from './FrontPanel.jsx';
+import Hardware from './Hardware.jsx';
 import Alerts from './Alerts.jsx';
 import { PowerModal, useReconnect } from './PowerModal.jsx';
 
@@ -320,6 +321,7 @@ export default function Settings({ me, reloadMe }) {
           <Guard what="Device mode"><DeviceMode /></Guard>
           <Guard what="PowerCard"><PowerCard me={me} /></Guard>
           <Guard what="Map location"><MapLocation /></Guard>
+          <Guard what="Hardware"><Hardware /></Guard>
         </>
       )}
       {admin && tab === 'manage' && (

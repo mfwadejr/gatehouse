@@ -445,6 +445,7 @@ func (a *App) registerRoutes() {
 	a.registerAddNetRoutes()
 	a.registerTrafficRoutes()
 	a.registerLCDRoutes()
+	a.registerHardwareRoutes()
 	a.registerOverviewRoutes()
 	a.registerSpeedRoutes()
 	a.registerSpeedCtlRoutes()

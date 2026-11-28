@@ -454,12 +454,16 @@ func (a *App) lcdPages(cfg lcdConfig, w, h int) (pages [][]string, scr []string)
 				}
 			}
 			mem := lcdMemory()
-			add(id, "Load "+load+" Mem "+mem, "Up "+lcdDur(up))
+			l2 := "Up " + lcdDur(up)
+			if t := a.cpuTemp(); t > 0 {
+				l2 += fmt.Sprintf(" CPU %dC", t)
+			}
+			add(id, "Load "+load+" Mem "+mem, l2)
 		case "alerts":
 			var warn, thr int
 			since := time.Now().Add(-24 * time.Hour).Unix()
 			if a.Logs != nil {
-				a.Logs.QueryRow(`SELECT COUNT(*) FROM events WHERE ts>=? AND severity IN ('warning','error','critical')`, since).Scan(&warn)
+				a.Logs.QueryRow(`SELECT COUNT(*) FROM events WHERE ts>=? AND severity IN ('warn','warning','error','critical')`, since).Scan(&warn)
 				a.Logs.QueryRow(`SELECT COUNT(*) FROM threat_alerts WHERE ts>=?`, since).Scan(&thr)
 			}
 			add(id, fmt.Sprintf("Warnings 24h: %d", warn), fmt.Sprintf("Threats 24h: %d", thr))

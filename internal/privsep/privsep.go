@@ -68,6 +68,7 @@ type NetController interface {
 	ThreatUpdateRules() error
 	ThreatRollback() error
 	LCDStatus() netd.LCDInfo
+	HwLoad() []string
 	LCDDetect() (netd.LCDFacts, error)
 	LCDInstallStart() error
 	LCDRemove() error
@@ -427,6 +428,8 @@ func (s *Server) dispatchNet(r request) (any, error) {
 		return nil, s.Net.UsbCopy(p.UUID, p.Src, p.Name, p.Keep)
 	case "ndpi.installed":
 		return s.Net.NDPIInstalled(), nil
+	case "hw.load":
+		return s.Net.HwLoad(), nil
 	case "lcd.status":
 		return s.Net.LCDStatus(), nil
 	case "lcd.detect":
@@ -835,6 +838,13 @@ func (c *Client) UsbList() ([]netd.UsbDisk, error) {
 // UsbCopy copies a backup file onto a USB drive.
 func (c *Client) UsbCopy(uuid, src, name string, keep int) error {
 	return c.callWithin(5*time.Minute, "usb.copy", map[string]any{"uuid": uuid, "src": src, "name": name, "keep": keep}, nil)
+}
+
+// HwLoad loads the temperature and fan drivers this machine has chips for.
+func (c *Client) HwLoad() []string {
+	var out []string
+	c.callWithin(2*time.Minute, "hw.load", nil, &out)
+	return out
 }
 
 // LCDStatus describes the front panel display software.

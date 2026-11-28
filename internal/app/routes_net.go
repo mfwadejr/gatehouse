@@ -62,6 +62,7 @@ type NetController interface {
 	ThreatUpdateRules() error
 	ThreatRollback() error
 	LCDStatus() netd.LCDInfo
+	HwLoad() []string
 	LCDDetect() (netd.LCDFacts, error)
 	LCDInstallStart() error
 	LCDRemove() error

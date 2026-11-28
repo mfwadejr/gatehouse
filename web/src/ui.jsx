@@ -746,7 +746,12 @@ export function usePortNames() {
   return useMemo(() => {
     const m = {};
     (Array.isArray(data) ? data : []).forEach((p) => { if (p.label) m[p.name] = p.label; });
-    return (name) => (name && m[name] ? `${m[name]} (${name})` : name || '');
+    const plain = (name) => (name && m[name] ? `${m[name]} (${name})` : name || '');
+    // A VLAN port is named for the port it rides on and its number (enp4s0.2): say so in words.
+    return (name) => {
+      const v = !m[name] && /^(.+)\.(\d{1,4})$/.exec(name || '');
+      return v ? `VLAN ${v[2]} on ${plain(v[1])}` : plain(name);
+    };
   }, [data]);
 }
 

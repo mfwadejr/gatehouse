@@ -76,6 +76,7 @@ const ROWS = [
   ['High availability', 'settings/advanced', 'Run two machines as a pair with automatic failover', 'ha failover backup standby keepalived pair redundancy pair cable warm standby spare internet', 'High availability'],
   ['Traffic labels', 'protection/lists', 'Name the app behind each connection by looking at packets', 'ndpi dpi deep packet inspection application youtube zoom bittorrent labels settings advanced moved', 'Traffic labels'],
   ['Device mode', 'settings/general', 'Choose Router or Bridge and see which cable goes where', 'router bridge mode ports cables internet port change walkthrough', 'Device mode'],
+  ['Hardware', 'settings/general', 'Processor and board temperatures, and fans where the box reports them', 'hardware temperature temp fan fans cpu processor hot cooling sensors rpm', 'Hardware'],
   ['Front panel display', 'settings/advanced', 'The small text display and buttons on the front of the box: detect it, test it, choose what it shows', 'lcd front panel display screen buttons lcdproc crystalfontz hd44780 detect test', 'Front panel display'],
   ['Bridge mode', 'settings/advanced', 'Filter between another router and your network without routing', 'bridge transparent filtering inline passthrough', 'Bridge mode'],
   ['App and category lists', 'protection/lists', 'Which version of each blocklist is in use, and going back', 'blocklist version rollback settings advanced moved', 'Lists used for blocking'],

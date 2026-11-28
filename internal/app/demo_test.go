@@ -117,6 +117,18 @@ func TestDemoConsole(t *testing.T) {
 			c.call("POST", "/api/dns/records", map[string]any{"name": r[0], "type": "A", "value": r[1], "ttl": 300})
 		}
 	}
+	hw := t.TempDir() // the box's sensors, as read on a real machine
+	hwmonRoot = hw
+	for d, f := range map[string]map[string]string{
+		"hwmon0": {"name": "acpitz", "temp1_input": "27800"},
+		"hwmon1": {"name": "coretemp", "temp1_input": "31000", "temp1_label": "Package id 0", "temp1_max": "80000", "temp1_crit": "100000"},
+		"hwmon2": {"name": "w83627dhg", "temp1_input": "31500", "fan1_input": "2850", "fan2_input": "3010"},
+	} {
+		os.MkdirAll(hw+"/"+d, 0o755)
+		for n, v := range f {
+			os.WriteFile(hw+"/"+d+"/"+n, []byte(v+"\n"), 0o644)
+		}
+	}
 	fn.mu.Lock() // a front panel display, so its screen has something to show
 	fn.lcd = netd.LCDInfo{Installed: true, Drivers: []string{"CFontz633", "hd44780", "sdeclcd"}}
 	fn.lcdFacts = netd.LCDFacts{Vendor: "Example Appliances", Product: "FW-1000", Matches: []netd.LCDMatch{{Driver: "hd44780", Settings: map[string]string{"ConnectionType": "4bit", "Size": "20x2"}, Sure: "guess", Why: "A 20 x 2 text display is usual on this make of box.", Keys: 0}}, Report: "Make: Example Appliances FW-1000\nUSB: none\nSerial: none"}

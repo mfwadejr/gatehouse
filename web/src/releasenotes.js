@@ -1,6 +1,16 @@
 // Plain-language release notes, newest first. Add an entry for every release.
 export const RELEASES = [
   {
+    version: '0.9.4.81',
+    title: 'Hardware temperatures and fans, and clearer boxes',
+    items: [
+      'Settings, General, Hardware (new): the processor and board temperatures against their limits, and each fan as turning or stopped. NopeWarden loads the sensor drivers your box has chips for, so nothing needs setting up by hand. You are told in the Logs if the processor runs hot or a fan that was turning stops. A box with no fan chip shows nothing about fans, and a box that reports nothing shows no card. The chips\' own alarms and voltages are left out because they are often unset defaults. On the front panel display, the This machine screen now includes the processor temperature.',
+      'The 60-second safety box and the Applied successfully box now come up in the middle of the window over a dimmed page, so they are not missed. The page behind them does not take clicks while the timer runs.',
+      'Overview, Networks and every other port list: a VLAN port now reads VLAN 2 on LAN (enp4s0) instead of enp4s0.2.',
+      'Settings, Your place on the map: a green Configured tag beside the Change button once a place is set, and a grey Not set tag with a Set my place button before then.',
+    ],
+  },
+  {
     version: '0.9.4.80',
     title: 'One edit dialog for networks, password rules, and the front panel display',
     items: [

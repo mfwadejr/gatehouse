@@ -55,6 +55,10 @@ You cannot lock yourself out. NopeWarden refuses to save a limit that does not i
 - **Send traffic records (NetFlow / IPFIX)** tells a traffic-analysis tool which devices talked to which, and how much. Only the collector you name receives it. Off by default.
 - **Let a monitoring tool read this device (SNMP)** is read-only. It shows the name, uptime and each port's traffic to a tool such as a graphing server. Off by default. Set a community string before you switch it on.
 
+## Hardware
+
+**Hardware** (General) shows the processor and board temperatures and, where the box has a fan chip, each fan as turning or stopped. NopeWarden loads the sensor drivers your box has chips for on its own. A temperature is Warm 10 degrees below the chip's limit (usually 80°C) and Hot at it. The Logs say so once if the processor runs hot or a fan that was turning stops. A fan that never turns is taken to be an empty header and is not listed. Fan speeds are as the board reports them and may not be exact. A box with no fan chip shows nothing about fans, and a box that reports nothing shows no card.
+
 ## Password rules
 
 **Password rules** (Account & sign-in, owners only) sets the rules for every new password NopeWarden accepts: sign-in, the backup file and the copies sent off this machine. The shortest password is 8 characters unless you raise it (up to 64). You can also require a capital letter, a small letter, a number and a symbol; these are off by default, because a longer password does more than forced symbols. **Refuse very common passwords** is on by default. Passwords do not expire, and passwords already set keep working until they are next changed. When a password is refused, the message names the rule it did not meet. Passwords for other services that NopeWarden only stores to sign in there are not judged.
